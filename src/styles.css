@@ -1,0 +1,872 @@
+/* ═══════════════════════════════════════════════════════════
+   جمعية الشفاء الخيرية — منظومة تصميم بأسلوب الرعاية الصحية
+   لوحة تركوازية هادئة، خط Cairo، بطاقات ناعمة، RTL أولاً
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+  /* healthcare palette */
+  --teal-900: #0b3d3a;
+  --teal-800: #0e4f4a;
+  --teal-700: #0f766e;
+  --teal-600: #0d9488;
+  --teal-500: #14b8a6;
+  --teal-100: #ccfbf1;
+  --teal-50: #f0fdfa;
+  --mint: #7fd6b8;
+
+  --surface-1: #ffffff;
+  --page: #f4f9f8;
+  --text-primary: #10201e;
+  --text-secondary: #4c625f;
+  --muted: #7d938f;
+  --grid: #e2edeb;
+  --border: rgba(16, 32, 30, 0.08);
+
+  --primary: var(--teal-600);
+  --primary-soft: var(--teal-50);
+  --accent-text: var(--teal-700);         /* نص مميز فوق خلفية soft */
+  --dropzone-hover: var(--teal-100);
+
+  /* status system */
+  --status-pending: #b45309;      /* كهرماني — بانتظار */
+  --status-pending-bg: #fef3e2;
+  --status-review: #0369a1;       /* أزرق — قيد المراجعة */
+  --status-review-bg: #e8f4fb;
+  --status-good: #15803d;         /* أخضر — موافَق/مصروف */
+  --status-good-bg: #e9f7ee;
+  --status-bad: #b91c1c;          /* أحمر ناعم — مرفوض */
+  --status-bad-bg: #fdecec;
+  --status-neutral: #52616e;
+  --status-neutral-bg: #eef1f4;
+
+  --shadow-card: 0 1px 3px rgba(16, 32, 30, 0.05), 0 4px 16px rgba(16, 32, 30, 0.05);
+  --shadow-pop: 0 10px 36px rgba(11, 61, 58, 0.16);
+  --radius: 14px;
+}
+/* الوضع الداكن — يُفعَّل عبر data-theme الذي يضبطه theme.js
+   (خيار "تلقائي" يُحوَّل إلى light/dark في JS تبعاً لنظام التشغيل) */
+:root[data-theme='dark'] {
+  --surface-1: #16211f;
+  --page: #0d1514;
+  --text-primary: #eef7f5;
+  --text-secondary: #b3c6c2;
+  --muted: #7d938f;
+  --grid: #24332f;
+  --border: rgba(255, 255, 255, 0.09);
+  --primary: var(--teal-500);
+  --primary-soft: rgba(20, 184, 166, 0.12);
+  --accent-text: var(--teal-500);
+  --dropzone-hover: rgba(20, 184, 166, 0.2);
+  --status-pending: #f5a848;  --status-pending-bg: rgba(245, 168, 72, 0.14);
+  --status-review: #58b6e8;   --status-review-bg: rgba(88, 182, 232, 0.14);
+  --status-good: #4ade80;     --status-good-bg: rgba(74, 222, 128, 0.13);
+  --status-bad: #f08c8c;      --status-bad-bg: rgba(240, 140, 140, 0.13);
+  --status-neutral: #9fb0bd;  --status-neutral-bg: rgba(159, 176, 189, 0.14);
+  --shadow-card: none;
+}
+:root { color-scheme: light; }
+:root[data-theme='dark'] { color-scheme: dark; }
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Cairo', system-ui, -apple-system, 'Segoe UI', Tahoma, sans-serif;
+  background: var(--page);
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.layout { display: flex; min-height: 100vh; }
+
+/* ═══ الشريط الجانبي ═══ */
+.sidebar {
+  width: 250px;
+  background: linear-gradient(180deg, var(--teal-900) 0%, var(--teal-800) 100%);
+  color: #fff;
+  padding: 22px 0;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+.sidebar .brand {
+  padding: 0 20px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.brand-logo {
+  width: 42px; height: 42px;
+  border-radius: 12px;
+  background: rgba(127, 214, 184, 0.18);
+  display: grid; place-items: center;
+  font-size: 22px;
+  flex-shrink: 0;
+}
+.sidebar .brand h1 { font-size: 16px; font-weight: 800; line-height: 1.3; }
+.sidebar .brand p { font-size: 11px; color: var(--mint); margin-top: 2px; font-weight: 500; }
+
+/* بحث الشريط الجانبي */
+.sidebar-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 16px 14px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+.sidebar-search svg { width: 15px; height: 15px; color: var(--mint); flex-shrink: 0; }
+.sidebar-search input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: #fff;
+  font-size: 12.5px;
+}
+.sidebar-search input::placeholder { color: rgba(255, 255, 255, 0.45); }
+.sidebar-search input:focus { outline: none; box-shadow: none; border: none; }
+
+/* فلتر فوق الجداول */
+.table-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.table-filter input { flex: 1; max-width: 380px; }
+.table-filter .count { font-size: 12px; color: var(--muted); }
+
+/* شريحة ملف مرفق في نموذج الطلب */
+.file-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--primary-soft);
+  color: var(--accent-text);
+  border: 1px solid var(--teal-500);
+}
+.file-chip button {
+  background: none;
+  color: inherit;
+  padding: 0 2px;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.sidebar nav { display: flex; flex-direction: column; gap: 2px; padding: 0 12px; }
+.sidebar nav a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  color: rgba(255, 255, 255, 0.72);
+  text-decoration: none;
+  font-size: 13.5px;
+  font-weight: 600;
+  border-radius: 10px;
+  transition: background 0.15s, color 0.15s;
+}
+.sidebar nav a svg { width: 18px; height: 18px; flex-shrink: 0; opacity: 0.85; }
+.sidebar nav a:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
+.sidebar nav a.active { background: rgba(127, 214, 184, 0.16); color: #fff; }
+.sidebar nav a.active svg { color: var(--mint); opacity: 1; }
+
+/* بطاقة المستخدم */
+.user-box {
+  margin: 0 16px 16px;
+  padding: 13px 15px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 12px;
+}
+.user-box .user-name { font-size: 13.5px; font-weight: 700; color: #fff; }
+.user-box .user-role { font-size: 11px; color: var(--mint); margin-top: 3px; font-weight: 600; }
+.user-box .logout {
+  margin-top: 10px;
+  width: 100%;
+  padding: 6px;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.85);
+  border-radius: 8px;
+}
+.user-box .logout:hover { background: rgba(255, 255, 255, 0.2); }
+
+.main { flex: 1; padding: 30px 36px; max-width: 1240px; }
+.main > h2 { font-size: 22px; font-weight: 800; margin-bottom: 4px; }
+.main .subtitle { color: var(--text-secondary); font-size: 13px; margin-bottom: 24px; }
+
+/* ═══ البطاقات والمؤشرات ═══ */
+.card {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 22px;
+  margin-bottom: 20px;
+  box-shadow: var(--shadow-card);
+}
+.card h3 { font-size: 15px; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+.card.highlight { border-inline-start: 4px solid var(--primary); }
+.card.highlight.chairman { border-inline-start-color: var(--status-good); }
+
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(175px, 1fr)); gap: 14px; margin-bottom: 20px; }
+.tile {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  box-shadow: var(--shadow-card);
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.tile::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: 0; top: 0; bottom: 0;
+  width: 4px;
+  background: var(--teal-500);
+  opacity: 0.85;
+}
+.tile:hover { transform: translateY(-2px); box-shadow: var(--shadow-pop); }
+.tile .label { font-size: 12px; color: var(--text-secondary); font-weight: 600; margin-bottom: 8px; }
+.tile .value { font-size: 30px; font-weight: 800; line-height: 1; }
+.tile .hint { font-size: 11px; color: var(--muted); margin-top: 7px; }
+.tile.alert::before { background: var(--status-pending); }
+.tile.alert .value { color: var(--status-pending); }
+
+/* ═══ مخطط الأعمدة الأفقي ═══ */
+.barlist .row { display: grid; grid-template-columns: 150px 1fr 44px; align-items: center; gap: 12px; margin-bottom: 12px; }
+.barlist .name { font-size: 12.5px; color: var(--text-secondary); font-weight: 600; }
+.barlist .track { height: 20px; border-radius: 6px; background: var(--primary-soft); overflow: hidden; }
+.barlist .fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--teal-500), var(--teal-600));
+  border-radius: 6px;
+  min-width: 4px;
+  transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.barlist .num { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* ═══ الجداول ═══ */
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+th {
+  text-align: start;
+  color: var(--muted);
+  font-weight: 700;
+  font-size: 11.5px;
+  padding: 9px 12px;
+  border-bottom: 2px solid var(--grid);
+  white-space: nowrap;
+}
+td { padding: 12px; border-bottom: 1px solid var(--grid); vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+tbody tr.clickable { cursor: pointer; transition: background 0.12s; }
+tbody tr.clickable:hover { background: var(--primary-soft); }
+td.num { font-variant-numeric: tabular-nums; }
+
+/* ═══ الشارات — منظومة الحالات ═══ */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 11px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--status-neutral);
+  background: var(--status-neutral-bg);
+  white-space: nowrap;
+}
+.badge::before {
+  content: '';
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.badge.blue { color: var(--status-review); background: var(--status-review-bg); }
+.badge.good { color: var(--status-good); background: var(--status-good-bg); }
+.badge.bad { color: var(--status-bad); background: var(--status-bad-bg); }
+.badge.warn { color: var(--status-pending); background: var(--status-pending-bg); }
+
+/* ═══ تقدّم مراجعات الأعضاء الخمسة ═══ */
+.progress5 { display: inline-flex; gap: 5px; vertical-align: middle; margin-inline-start: 8px; }
+.progress5 span {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  border: 2px dashed var(--grid);
+  display: grid; place-items: center;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--muted);
+  background: var(--surface-1);
+  transition: transform 0.15s;
+}
+.progress5 span:hover { transform: scale(1.15); }
+.progress5 span.ok { background: var(--status-good); border: 2px solid var(--status-good); color: #fff; }
+.progress5 span.no { background: var(--status-bad); border: 2px solid var(--status-bad); color: #fff; }
+
+/* ═══ النماذج ═══ */
+form.inline { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field label { font-size: 12px; color: var(--text-secondary); font-weight: 600; }
+input, select, textarea {
+  font: inherit;
+  font-size: 13.5px;
+  padding: 9px 12px;
+  border: 1.5px solid var(--grid);
+  border-radius: 10px;
+  background: var(--surface-1);
+  color: var(--text-primary);
+  min-width: 140px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--teal-500);
+  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.15);
+}
+textarea { min-width: 280px; }
+button {
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 10px;
+  background: var(--primary);
+  color: #fff;
+  cursor: pointer;
+  transition: filter 0.15s, transform 0.1s;
+}
+button:hover { filter: brightness(1.1); }
+button:active { transform: scale(0.98); }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+button.whatsapp { background: #25d366; color: #06301b; }
+
+.error { color: var(--status-bad); font-size: 13px; margin-top: 8px; font-weight: 600; }
+.empty {
+  color: var(--muted);
+  font-size: 13px;
+  padding: 18px 0;
+  text-align: center;
+}
+
+/* ═══ بطاقات المراجعات ═══ */
+.review {
+  display: flex;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid var(--grid);
+  border-radius: 12px;
+  margin-bottom: 10px;
+  background: var(--surface-1);
+}
+.review .who { min-width: 175px; }
+.review .who .name { font-weight: 700; font-size: 13.5px; }
+.review .who .title { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+.review .rec { flex: 1; font-size: 13px; color: var(--text-secondary); line-height: 1.7; }
+.review .when { font-size: 11px; color: var(--muted); white-space: nowrap; }
+
+/* ═══ لوحة القرار — وثيقة رسمية ═══ */
+.decision-box {
+  background: var(--status-good-bg);
+  border: 1.5px solid var(--status-good);
+  border-radius: 12px;
+  padding: 18px 20px;
+  position: relative;
+}
+.decision-box::after {
+  content: '⚖';
+  position: absolute;
+  inset-inline-end: 16px;
+  top: 12px;
+  font-size: 30px;
+  opacity: 0.18;
+}
+.decision-box.rejected { background: var(--status-bad-bg); border-color: var(--status-bad); }
+.decision-box strong { font-size: 15px; font-weight: 800; }
+
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+@media (max-width: 950px) { .grid2 { grid-template-columns: 1fr; } }
+
+a.plain { color: var(--primary); text-decoration: none; font-weight: 600; }
+a.plain:hover { text-decoration: underline; }
+
+/* ═══ تسجيل الدخول ═══ */
+.login-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(900px 500px at 85% -10%, rgba(20, 184, 166, 0.14), transparent),
+    radial-gradient(700px 400px at 0% 110%, rgba(127, 214, 184, 0.16), transparent),
+    var(--page);
+  padding: 20px;
+}
+.login-card {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 38px 34px;
+  width: 100%;
+  max-width: 390px;
+  box-shadow: var(--shadow-pop);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.login-logo {
+  width: 64px; height: 64px;
+  margin: 0 auto;
+  border-radius: 18px;
+  background: linear-gradient(135deg, var(--teal-500), var(--teal-700));
+  display: grid; place-items: center;
+  font-size: 30px;
+  box-shadow: 0 8px 20px rgba(13, 148, 136, 0.35);
+}
+.login-card h1 { font-size: 19px; font-weight: 800; text-align: center; }
+.login-card > p { font-size: 12.5px; color: var(--text-secondary); text-align: center; margin-bottom: 6px; }
+.login-card input { min-width: 0; width: 100%; }
+.login-hint {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--primary-soft);
+  border-radius: 10px;
+  padding: 12px 14px;
+  line-height: 1.9;
+}
+.login-hint ul { margin: 4px 18px 0 0; }
+.login-hint code { direction: ltr; unicode-bidi: embed; font-weight: 700; color: var(--accent-text); }
+
+/* ═══ منطقة استيراد الكشف ═══ */
+.dropzone {
+  border: 2px dashed var(--teal-500);
+  border-radius: 12px;
+  background: var(--primary-soft);
+  padding: 34px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.dropzone:hover, .dropzone.drag { background: var(--dropzone-hover); border-color: var(--accent-text); }
+.dropzone .dz-icon { font-size: 30px; display: block; margin-bottom: 8px; }
+
+/* مؤشر خطوات دورة حياة الطلب */
+.flow-steps { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 2px; }
+.flow-steps .step {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--status-neutral-bg);
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.flow-steps .step.done { background: var(--status-good-bg); color: var(--status-good); }
+.flow-steps .step.now { background: var(--teal-600); color: #fff; }
+.flow-steps .arrow { color: var(--muted); font-size: 11px; align-self: center; }
+
+/* ═══ الوحدة المالية ═══ */
+.finance-bar-wrap { margin-top: 4px; }
+.finance-bar {
+  display: flex;
+  height: 26px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--grid);
+}
+.finance-bar .seg { min-width: 4px; transition: width 0.4s ease; }
+.finance-bar .seg.spent { background: var(--status-neutral); }
+.finance-bar .seg.committed { background: var(--status-pending); }
+.finance-bar .seg.available { background: var(--status-good); }
+.finance-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin-top: 12px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+.finance-legend .dot {
+  display: inline-block;
+  width: 10px; height: 10px;
+  border-radius: 3px;
+  margin-inline-end: 5px;
+  vertical-align: middle;
+}
+.finance-legend .dot.spent { background: var(--status-neutral); }
+.finance-legend .dot.committed { background: var(--status-pending); }
+.finance-legend .dot.available { background: var(--status-good); }
+.finance-legend .deficit { color: var(--status-bad); font-weight: 700; }
+
+.tile.hero::before { background: var(--status-good); }
+
+/* بطاقة مالية مصغّرة في لوحة القرار */
+.finance-mini {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: var(--primary-soft);
+  border: 1px solid var(--border);
+  font-size: 13px;
+}
+
+/* تحذير كهرماني (تجاوز المتاح) */
+.warn-box {
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: var(--status-pending-bg);
+  border: 1px solid var(--status-pending);
+  color: var(--status-pending);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.7;
+}
+
+/* زر شبحي للإجراءات الخفيفة (تعديل سعر، إيقاف خدمة) */
+button.ghost {
+  background: transparent;
+  color: var(--primary);
+  border: 1px solid var(--grid);
+}
+button.ghost:hover { background: var(--primary-soft); filter: none; }
+
+/* ═══ شريط المسودة (الحفظ التلقائي) ═══ */
+.draft-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  margin-bottom: 16px;
+  background: var(--status-review-bg);
+  border: 1px solid var(--status-review);
+  color: var(--status-review);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.draft-bar button {
+  background: transparent;
+  color: inherit;
+  border: 1px solid currentColor;
+  padding: 4px 12px;
+  font-size: 12px;
+  border-radius: 8px;
+}
+.draft-saved {
+  font-size: 11.5px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+/* ═══ مبدّل الوضع (فاتح / داكن / تلقائي) ═══ */
+.theme-toggle {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  margin: 0 16px 14px;
+}
+.theme-toggle button {
+  flex: 1;
+  padding: 5px 4px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 7px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.65);
+}
+.theme-toggle button:hover { background: rgba(255, 255, 255, 0.1); filter: none; }
+.theme-toggle button.on { background: rgba(127, 214, 184, 0.22); color: #fff; }
+
+/* نسخة لصفحة الدخول (فوق خلفية فاتحة/داكنة عادية) */
+.theme-toggle.plain {
+  margin: 0;
+  background: var(--surface-1);
+  border: 1px solid var(--grid);
+  position: fixed;
+  top: 16px;
+  inset-inline-start: 16px;
+  width: 170px;
+  z-index: 10;
+}
+.theme-toggle.plain button { color: var(--muted); }
+.theme-toggle.plain button:hover { background: var(--primary-soft); }
+
+/* ═══ بطاقة الدور المطبوعة — نظام العيادات ═══ */
+.ticket-print {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 60vh;
+}
+.ticket-card {
+  background: var(--surface-1);
+  border: 1px solid var(--grid);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-pop);
+  padding: 32px 40px;
+  text-align: center;
+  width: 320px;
+}
+.ticket-card h2 { font-size: 15px; color: var(--muted); margin-bottom: 6px; }
+.ticket-doctor { font-size: 14px; color: var(--text-secondary); margin-bottom: 14px; }
+.ticket-number {
+  font-size: 64px; font-weight: 800; color: var(--primary);
+  line-height: 1; margin: 10px 0;
+}
+.ticket-code { font-size: 13px; color: var(--muted); direction: ltr; }
+.ticket-hint { font-size: 12px; color: var(--muted); margin-top: 14px; }
+
+@media print {
+  .sidebar, .no-print { display: none !important; }
+  .layout, .main { display: block !important; padding: 0 !important; margin: 0 !important; }
+  .ticket-card { box-shadow: none; border: 2px dashed #999; width: auto; }
+}
+
+/* ═══ الشاشة العامة (تابلت الصالة) — نص كبير، تباين عالٍ، ثابت على الوضع الداكن ═══ */
+.public-display {
+  min-height: 100vh;
+  background: #0b1615;
+  color: #eef7f5;
+  padding: 28px 36px;
+  font-family: 'Cairo', sans-serif;
+}
+.public-display-header {
+  display: flex; align-items: center; gap: 16px;
+  margin-bottom: 32px;
+}
+.public-display-logo { font-size: 44px; }
+.public-display-header h1 { font-size: 28px; font-weight: 800; color: #eef7f5; }
+
+.public-display-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 24px;
+}
+.public-display-card {
+  background: #10201e;
+  border: 1px solid rgba(127, 214, 184, 0.18);
+  border-radius: 20px;
+  padding: 28px;
+  text-align: center;
+}
+.pd-doctor { font-size: 24px; font-weight: 800; }
+.pd-specialty { font-size: 15px; color: #b3c6c2; margin-bottom: 20px; }
+
+.pd-label { font-size: 14px; color: #7fd6b8; font-weight: 700; margin-bottom: 6px; }
+.pd-current { padding: 18px 0; border-bottom: 1px solid rgba(127, 214, 184, 0.18); margin-bottom: 16px; }
+.pd-number {
+  font-size: 72px; font-weight: 800; color: #14b8a6; line-height: 1;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+}
+.pd-number .pd-name { font-size: 20px; font-weight: 600; color: #eef7f5; }
+.pd-number.pd-dim { color: rgba(127, 214, 184, 0.35); }
+
+.pd-next-number { font-size: 30px; font-weight: 700; color: #eef7f5; }
+.pd-next-number span { font-size: 17px; font-weight: 500; color: #b3c6c2; }
+.pd-next-number.pd-dim { color: rgba(238, 247, 245, 0.3); }
+
+.pd-queue-len { margin-top: 18px; font-size: 13px; color: #7d938f; }
+
+/* حالة البثّ وزر تفعيل الصوت — أقصى اليسار في الترويسة */
+.pd-header-tools { margin-inline-start: auto; display: flex; align-items: center; gap: 12px; }
+.pd-live {
+  font-size: 13px; font-weight: 700; color: #7fd6b8;
+  padding: 6px 12px; border-radius: 999px;
+  background: rgba(127, 214, 184, 0.12);
+}
+.pd-live::before { content: '●'; margin-inline-end: 6px; }
+.pd-live-off { color: #f0b37e; background: rgba(240, 179, 126, 0.12); }
+.pd-audio-btn {
+  font-family: inherit; font-size: 15px; font-weight: 700; cursor: pointer;
+  color: #0b1615; background: #14b8a6; border: none;
+  padding: 10px 18px; border-radius: 12px;
+}
+
+/* بطاقة الدكتور المنادى عنده — إطار متوهّج يربط الصوت بالمكان */
+.public-display-card.pd-card-active {
+  border-color: #14b8a6;
+  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.35);
+}
+
+/* ═══ بطاقة النداء: تغطي الشاشة لحظة النداء ═══ */
+.pd-banner {
+  position: fixed; inset: 0; z-index: 50;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(6, 15, 14, 0.93);
+  animation: pd-banner-in 0.35s ease-out;
+}
+.pd-banner-inner {
+  text-align: center; padding: 48px 72px;
+  border: 3px solid #14b8a6; border-radius: 32px;
+  background: #10201e;
+  animation: pd-pulse 1.4s ease-in-out infinite;
+}
+.pd-banner-label {
+  font-size: 22px; font-weight: 700; color: #7fd6b8;
+  letter-spacing: 6px; margin-bottom: 10px;
+}
+.pd-banner-number {
+  font-size: 190px; font-weight: 800; color: #14b8a6; line-height: 1;
+}
+.pd-banner-name { font-size: 46px; font-weight: 700; color: #eef7f5; margin-top: 10px; }
+.pd-banner-doctor { font-size: 34px; font-weight: 600; color: #b3c6c2; margin-top: 22px; }
+.pd-banner-room {
+  display: block; margin-top: 12px;
+  font-size: 30px; font-weight: 800; color: #7fd6b8;
+}
+
+@keyframes pd-banner-in {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes pd-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(20, 184, 166, 0.55); }
+  50%      { box-shadow: 0 0 60px 12px rgba(20, 184, 166, 0.28); }
+}
+
+/* شاشات الصالة كبيرة وبعيدة عن العين — نكبّر الخط على العروض العريضة */
+@media (min-width: 1600px) {
+  .public-display-header h1 { font-size: 38px; }
+  .pd-doctor { font-size: 32px; }
+  .pd-number { font-size: 96px; }
+  .pd-number .pd-name { font-size: 26px; }
+  .pd-next-number { font-size: 38px; }
+  .pd-banner-number { font-size: 240px; }
+}
+
+/* من يعاني حساسية الحركة: نُبقي البطاقة ثابتة بلا نبض */
+@media (prefers-reduced-motion: reduce) {
+  .pd-banner, .pd-banner-inner { animation: none; }
+}
+
+/* ═══ موقع المريض العام — بحث عن الدور ═══ */
+.patient-turn-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(900px 500px at 85% -10%, rgba(20, 184, 166, 0.14), transparent),
+    radial-gradient(700px 400px at 0% 110%, rgba(127, 214, 184, 0.16), transparent),
+    var(--page);
+  padding: 20px;
+}
+.patient-turn-card {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 34px 30px;
+  width: 100%;
+  max-width: 380px;
+  box-shadow: var(--shadow-pop);
+}
+.patient-turn-logo {
+  width: 60px; height: 60px; margin: 0 auto 10px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--teal-500), var(--teal-700));
+  display: grid; place-items: center; font-size: 28px;
+  box-shadow: 0 8px 20px rgba(13, 148, 136, 0.35);
+}
+.patient-turn-card h1 { font-size: 18px; font-weight: 800; text-align: center; }
+.patient-turn-card .subtitle { text-align: center; margin-bottom: 18px; }
+.patient-turn-card input { width: 100%; }
+
+.patient-turn-result {
+  margin-top: 22px;
+  padding-top: 20px;
+  border-top: 1px solid var(--grid);
+  text-align: center;
+}
+.ptr-doctor { font-size: 14px; color: var(--text-secondary); margin-bottom: 8px; }
+.ptr-number { font-size: 56px; font-weight: 800; color: var(--primary); line-height: 1; }
+.ptr-status { margin-top: 8px; font-size: 13px; color: var(--muted); }
+.ptr-wait { margin-top: 12px; font-size: 14px; color: var(--text-primary); }
+.ptr-wait strong { color: var(--primary); }
+
+/* انزياح الموعد كما يراه المريض: الوقت الأصلي والجديد وسبب كل تأجيل */
+.ptr-delay {
+  margin-top: 16px; padding: 12px 14px; border-radius: 10px;
+  background: rgba(180, 83, 9, 0.08); border: 1px solid rgba(180, 83, 9, 0.25);
+  text-align: start;
+}
+.ptr-delay-times { font-size: 14px; }
+.ptr-delay-times s { opacity: 0.55; }
+.ptr-delay-total { margin-top: 4px; font-size: 13px; font-weight: 700; color: #b45309; }
+.ptr-delay-list { margin: 8px 0 0; padding-inline-start: 18px; font-size: 12.5px; color: var(--text-primary); }
+.ptr-delay-list li { margin-bottom: 3px; }
+.ptr-delay-note { margin: 8px 0 0; font-size: 11.5px; color: var(--muted); line-height: 1.6; }
+
+/* ═══ قائمة الخانات الزمنية العمودية — حجز الدكتور كتقويم ═══ */
+.slot-list { display: flex; flex-direction: column; gap: 6px; }
+.slot-row {
+  display: flex; align-items: center; gap: 14px;
+  padding: 10px 14px;
+  border: 1px solid var(--grid);
+  border-radius: 10px;
+}
+.slot-row.available { background: var(--primary-soft); border-color: transparent; }
+.slot-row.booked { background: var(--surface-1); }
+.slot-row.walkin-row { margin-top: 10px; border-style: dashed; }
+
+/* خانة الفراغ الاحتياطي آخر الساعة — محجوزة للطوارئ، مميّزة بصرياً عن الخانات العادية */
+.slot-row.buffer {
+  background: repeating-linear-gradient(
+    45deg, var(--status-pending-bg), var(--status-pending-bg) 8px,
+    transparent 8px, transparent 16px);
+  border-color: var(--status-pending);
+  border-style: dashed;
+}
+.slot-row.buffer .slot-label { color: var(--status-pending); font-weight: 700; }
+.slot-row.buffer.booked { background: var(--status-pending-bg); border-style: solid; }
+
+/* ═══ شاشة الإعدادات ═══ */
+.setting-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--grid);
+  flex-wrap: wrap;
+}
+.setting-row:last-child { border-bottom: none; padding-bottom: 0; }
+.setting-info { flex: 1; min-width: 240px; }
+.setting-info label { font-size: 13.5px; font-weight: 700; display: block; }
+.setting-desc { font-size: 12px; color: var(--text-secondary); margin-top: 5px; line-height: 1.7; }
+.setting-meta { font-size: 11px; color: var(--muted); margin-top: 5px; }
+.setting-control { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.setting-control input, .setting-control select { width: 120px; }
+.slot-time { font-weight: 700; font-size: 14px; min-width: 56px; color: var(--accent-text); }
+.slot-row.booked .slot-time { color: var(--text-secondary); }
+.slot-label { flex: 1; font-size: 13.5px; color: var(--text-secondary); }
+.slot-row.available .slot-label { color: var(--accent-text); font-weight: 600; }
+.slot-booking-form {
+  margin: 4px 0 10px;
+  padding: 14px 16px;
+  border: 1px dashed var(--primary);
+  border-radius: 10px;
+  background: var(--primary-soft);
+}
+.theme-toggle.plain button.on { background: var(--primary-soft); color: var(--accent-text); }
