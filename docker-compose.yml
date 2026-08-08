@@ -1,0 +1,16 @@
+services:
+  shefaa-dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: shefaa-dashboard
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8113:80"
+    networks:
+      # نفس شبكة الـ backend — nginx يحلّ اسم shefaa-backend داخلياً
+      - postgres_stack_default
+
+networks:
+  postgres_stack_default:
+    external: true
