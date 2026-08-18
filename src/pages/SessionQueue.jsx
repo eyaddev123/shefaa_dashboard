@@ -55,9 +55,9 @@ function TicketPrint({ appt, doctorName, onDone }) {
   )
 }
 
-function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel }) {
+function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel, urgent = false }) {
   const blank = { mobile: '', full_name: '', gender: '', birth_year: '', booking_type: 'walk_in',
-                  reason: '', visit_type: 'consultation', priority: 'normal' }
+                  reason: '', visit_type: 'consultation', priority: urgent ? 'urgent' : 'normal' }
   const [form, setForm] = useState(blank)
   const [lookupState, setLookupState] = useState(null) // null | 'checking' | 'found' | 'new'
   const [followup, setFollowup] = useState(null)       // أهليّة المراجعة للمريض الحالي
@@ -150,7 +150,11 @@ function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel }) {
         <select value={form.priority} onChange={set('priority')}>
           {Object.entries(PRIORITIES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
-        {form.priority !== 'normal' && (
+        {form.priority === 'urgent' ? (
+          <span style={{ fontSize: 11, color: 'var(--bad, #b91c1c)', fontWeight: 700 }}>
+            يتصدّر الطابور — يُنادى بعد المريض الحالي مباشرة
+          </span>
+        ) : form.priority !== 'normal' && (
           <span style={{ fontSize: 11, color: 'var(--warn, #b45309)' }}>
             يتقدّم كل المنتظرين، ومواعيدهم تتأجل
           </span>
@@ -195,16 +199,46 @@ function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel }) {
 function SlotList({ sessionId, fees, onBooked }) {
   const [slots, setSlots] = useState(null)
   const [err, setErr] = useState(null)
-  const [openSlot, setOpenSlot] = useState(null) // slot_time currently showing the booking form, or 'walkin'
+  const [openSlot, setOpenSlot] = useState(null) // slot_time currently showing the booking form, or 'walkin' | 'urgent'
+  const urgentFormRef = useRef(null)
 
   const load = () => api.clinic.slots(sessionId).then(setSlots).catch((e) => setErr(e.message))
   useEffect(() => { load() }, [sessionId])
+
+  // نموذج الحالة الفورية أعلى الصفحة — نُحضره أمام العين فور فتحه بدل أن يبحث عنه الموظف وقت الطوارئ
+  useEffect(() => {
+    if (openSlot === 'urgent')
+      urgentFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [openSlot])
 
   if (err) return <p className="error">{err}</p>
   if (!slots) return <p className="empty">جارٍ التحميل…</p>
 
   return (
     <div className="slot-list">
+      {/* الحالة الإسعافية أولاً وفوق كل شيء: زر بارز في الأعلى لا يحتاج بحثاً وقت الضغط */}
+      <div className="urgent-bar">
+        <div className="urgent-bar-text">
+          <strong>🚨 حالة فورية (إسعافية)</strong>
+          <span>تُنادى مباشرة بعد المريض الحالي — أو فوراً إن لم يكن أحد قيد الكشف</span>
+        </div>
+        {openSlot !== 'urgent' && (
+          <button className="urgent-btn" onClick={() => setOpenSlot('urgent')}>حجز فوري</button>
+        )}
+      </div>
+      {openSlot === 'urgent' && (
+        <div className="slot-booking-form" ref={urgentFormRef}>
+          <BookingForm
+            sessionId={sessionId}
+            slotTime={null}
+            fees={fees}
+            urgent
+            onCancel={() => setOpenSlot(null)}
+            onBooked={(appt) => { setOpenSlot(null); load(); onBooked(appt) }}
+          />
+        </div>
+      )}
+
       {slots.slots.length === 0 && (
         <p className="empty">لا خانات محددة لهذه الجلسة — استخدم «حجز بلا وقت محدد» أدناه.</p>
       )}
@@ -237,7 +271,7 @@ function SlotList({ sessionId, fees, onBooked }) {
           )}
         </div>
       ))}
-      {openSlot && openSlot !== 'walkin' && (
+      {openSlot && openSlot !== 'walkin' && openSlot !== 'urgent' && (
         <div className="slot-booking-form">
           <p className="subtitle" style={{ marginBottom: 0 }}>حجز خانة <strong dir="ltr">{openSlot}</strong></p>
           <BookingForm

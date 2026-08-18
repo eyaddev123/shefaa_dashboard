@@ -104,16 +104,40 @@ export default function DoctorScreen() {
             )}
           </div>
 
+          {/* الطابور كامل: مَن وصل ومَن لم يصل في مكان واحد، بالترتيب */}
           <div className="card">
-            <h3>بانتظار الحضور ({stillWaiting.length})</h3>
-            {stillWaiting.length === 0 ? (
-              <p className="empty">لا أحد — الجميع إمّا حاضر أو انتهى دوره.</p>
+            <h3>
+              الطابور كامل ({arrivedWaiting.length + stillWaiting.length})
+              <span className="doc-queue-legend">
+                <span className="doc-dot doc-dot-here" /> وصل ({arrivedWaiting.length})
+                <span className="doc-dot doc-dot-away" /> لم يصل ({stillWaiting.length})
+              </span>
+            </h3>
+            {arrivedWaiting.length + stillWaiting.length === 0 ? (
+              <p className="empty">لا أحد بانتظار الدور — الجميع انتهى أو لم يُحجز بعد.</p>
             ) : (
               <table>
-                <thead><tr><th>الدور</th><th>الاسم</th></tr></thead>
+                <thead>
+                  <tr><th>الدور</th><th>الاسم</th><th>الحالة</th></tr>
+                </thead>
                 <tbody>
+                  {/* الحاضرون أولاً — هم مَن يُنادى منهم فعلياً */}
+                  {arrivedWaiting.map((a) => (
+                    <tr key={a.id} className={a.id === nextUp?.id ? 'doc-row-next' : undefined}>
+                      <td className="num">{a.queue_number}</td>
+                      <td>{a.full_name}</td>
+                      <td>
+                        <span className="badge good">وصل</span>
+                        {a.id === nextUp?.id && <span className="doc-next-tag">التالي</span>}
+                      </td>
+                    </tr>
+                  ))}
                   {stillWaiting.map((a) => (
-                    <tr key={a.id}><td className="num">{a.queue_number}</td><td>{a.full_name}</td></tr>
+                    <tr key={a.id} className="doc-row-away">
+                      <td className="num">{a.queue_number}</td>
+                      <td>{a.full_name}</td>
+                      <td><span className="badge">لم يصل بعد</span></td>
+                    </tr>
                   ))}
                 </tbody>
               </table>

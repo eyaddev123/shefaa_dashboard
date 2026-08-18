@@ -296,6 +296,75 @@ td.num { font-variant-numeric: tabular-nums; }
   border-radius: 50%;
   background: currentColor;
 }
+/* شريط التنقل بالأيام — الحجز المسبق ومراجعة الأيام الماضية */
+.day-strip {
+  display: flex; align-items: center; gap: 8px;
+  margin: 14px 0 4px; flex-wrap: wrap;
+}
+.day-strip-days { display: flex; gap: 6px; flex: 1; overflow-x: auto; padding-bottom: 2px; }
+.day-nav {
+  background: var(--surface-1); color: var(--text-primary); border: 1px solid var(--border);
+  border-radius: 8px; width: 32px; height: 44px; font-size: 18px; font-weight: 800;
+  cursor: pointer; flex-shrink: 0;
+}
+.day-nav:hover { border-color: var(--primary); color: var(--primary); }
+.day-chip {
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  min-width: 62px; padding: 6px 8px;
+  background: var(--surface-1); color: var(--text-primary);
+  border: 1px solid var(--border); border-radius: 10px;
+  cursor: pointer; flex-shrink: 0; position: relative;
+}
+.day-chip:hover { border-color: var(--primary); }
+.day-chip-wd { font-size: 11px; color: var(--muted); font-weight: 600; }
+.day-chip-num { font-size: 14px; font-weight: 800; }
+.day-chip-tag { font-size: 9px; font-weight: 800; color: var(--primary); }
+/* الأيام الماضية للاطّلاع فقط — نخفتها كي لا تُحجز سهواً */
+.day-chip-past { opacity: 0.5; }
+.day-chip-today { border-color: var(--primary); }
+.day-chip-on {
+  background: var(--primary); border-color: var(--primary); color: #fff; opacity: 1;
+}
+.day-chip-on .day-chip-wd, .day-chip-on .day-chip-tag { color: rgba(255, 255, 255, 0.85); }
+.day-back { padding: 6px 12px; font-size: 12px; flex-shrink: 0; }
+
+/* شريط الحالة الإسعافية — أعلى قائمة الخانات، بارز كي يُلتقط تحت الضغط */
+.urgent-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  flex-wrap: wrap;
+  padding: 12px 16px; margin-bottom: 14px;
+  border: 2px solid var(--status-bad); border-radius: 12px;
+  background: var(--status-bad-bg);
+}
+.urgent-bar-text { display: flex; flex-direction: column; gap: 2px; }
+.urgent-bar-text strong { font-size: 15px; color: var(--status-bad); }
+.urgent-bar-text span { font-size: 12px; color: var(--text-secondary); }
+.urgent-btn {
+  background: var(--status-bad); color: #fff; border: none;
+  padding: 10px 22px; border-radius: 10px;
+  font-size: 14px; font-weight: 800; cursor: pointer;
+}
+.urgent-btn:hover { filter: brightness(0.92); }
+
+/* شاشة الدكتور — الطابور كامل: تمييز مَن وصل عمّن لم يصل */
+.doc-queue-legend {
+  margin-inline-start: 12px; font-size: 12px; font-weight: 600;
+  color: var(--muted); display: inline-flex; align-items: center; gap: 6px;
+}
+.doc-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.doc-dot-here { background: var(--status-good); }
+.doc-dot-away { background: var(--muted); margin-inline-start: 8px; }
+
+/* لم يصل بعد — نخفت الصف كي يبرز الحاضرون */
+.doc-row-away td { opacity: 0.55; }
+
+/* التالي في النداء — يجب أن يُلتقط بلمحة عين */
+.doc-row-next td { background: var(--status-good-bg); font-weight: 700; }
+.doc-next-tag {
+  margin-inline-start: 8px; font-size: 11px; font-weight: 800;
+  color: var(--primary); letter-spacing: 0.02em;
+}
+
 .badge.blue { color: var(--status-review); background: var(--status-review-bg); }
 .badge.good { color: var(--status-good); background: var(--status-good-bg); }
 .badge.bad { color: var(--status-bad); background: var(--status-bad-bg); }
@@ -681,12 +750,23 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
   font-size: 72px; font-weight: 800; color: #14b8a6; line-height: 1;
   display: flex; flex-direction: column; align-items: center; gap: 6px;
 }
-.pd-number .pd-name { font-size: 20px; font-weight: 600; color: #eef7f5; }
 .pd-number.pd-dim { color: rgba(127, 214, 184, 0.35); }
 
 .pd-next-number { font-size: 30px; font-weight: 700; color: #eef7f5; }
-.pd-next-number span { font-size: 17px; font-weight: 500; color: #b3c6c2; }
 .pd-next-number.pd-dim { color: rgba(238, 247, 245, 0.3); }
+
+/* أرقام الطابور: الممتلئ = وصل، المفرَّغ المنقّط = لم يصل بعد */
+.pd-queue { margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(127, 214, 184, 0.18); }
+.pd-queue-nums { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.pd-chip {
+  min-width: 40px; padding: 6px 10px; border-radius: 10px;
+  font-size: 20px; font-weight: 800; line-height: 1.15;
+}
+.pd-chip-here { background: #14b8a6; color: #04241f; border: 2px solid #14b8a6; }
+.pd-chip-away {
+  background: transparent; color: rgba(238, 247, 245, 0.55);
+  border: 2px dashed rgba(238, 247, 245, 0.3);
+}
 
 .pd-queue-len { margin-top: 18px; font-size: 13px; color: #7d938f; }
 
@@ -731,7 +811,6 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
 .pd-banner-number {
   font-size: 190px; font-weight: 800; color: #14b8a6; line-height: 1;
 }
-.pd-banner-name { font-size: 46px; font-weight: 700; color: #eef7f5; margin-top: 10px; }
 .pd-banner-doctor { font-size: 34px; font-weight: 600; color: #b3c6c2; margin-top: 22px; }
 .pd-banner-room {
   display: block; margin-top: 12px;
@@ -752,8 +831,8 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
   .public-display-header h1 { font-size: 38px; }
   .pd-doctor { font-size: 32px; }
   .pd-number { font-size: 96px; }
-  .pd-number .pd-name { font-size: 26px; }
   .pd-next-number { font-size: 38px; }
+  .pd-chip { font-size: 26px; min-width: 50px; }
   .pd-banner-number { font-size: 240px; }
 }
 

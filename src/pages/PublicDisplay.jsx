@@ -104,10 +104,7 @@ export default function PublicDisplay() {
               <div className="pd-current">
                 <div className="pd-label">يُخدَم الآن</div>
                 {b.current ? (
-                  <div className="pd-number">
-                    {b.current.queue_number}
-                    <span className="pd-name">{b.current.first_name}</span>
-                  </div>
+                  <div className="pd-number">{b.current.queue_number}</div>
                 ) : (
                   <div className="pd-number pd-dim">—</div>
                 )}
@@ -116,13 +113,29 @@ export default function PublicDisplay() {
               <div className="pd-next">
                 <div className="pd-label">التالي</div>
                 {b.next ? (
-                  <div className="pd-next-number">
-                    {b.next.queue_number} <span>{b.next.first_name}</span>
-                  </div>
+                  <div className="pd-next-number">{b.next.queue_number}</div>
                 ) : (
                   <div className="pd-next-number pd-dim">—</div>
                 )}
               </div>
+
+              {/* كل أرقام الطابور — الممتلئ وصل فعلاً، والمفرَّغ لم يحضر بعد */}
+              {b.queue?.length > 0 && (
+                <div className="pd-queue">
+                  <div className="pd-label">الأرقام بالانتظار</div>
+                  <div className="pd-queue-nums">
+                    {b.queue.map((q) => (
+                      <span
+                        key={q.queue_number}
+                        className={`pd-chip ${q.arrived ? 'pd-chip-here' : 'pd-chip-away'}`}
+                        title={q.arrived ? 'وصل' : 'لم يصل بعد'}
+                      >
+                        {q.queue_number}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="pd-queue-len">{b.queue_length} في الطابور</div>
             </div>
@@ -136,7 +149,6 @@ export default function PublicDisplay() {
           <div className="pd-banner-inner">
             <div className="pd-banner-label">نداء</div>
             <div className="pd-banner-number">{banner.queue_number}</div>
-            <div className="pd-banner-name">{banner.first_name}</div>
             <div className="pd-banner-doctor">
               توجّه إلى {withTitle(banner.doctor_name)}
               {banner.room && <span className="pd-banner-room">غرفة {banner.room}</span>}

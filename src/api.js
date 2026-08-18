@@ -218,6 +218,22 @@ export const todayLocal = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
+// إزاحة تاريخ بصيغة YYYY-MM-DD بعدد أيام (± ) مع البقاء في التوقيت المحلي.
+// نبني Date من المكوّنات لا من نص ISO: نص «2026-08-08» يُفسَّر UTC فينزلق يوماً.
+export const addDays = (isoDate, days) => {
+  const [y, m, d] = isoDate.split('-').map(Number)
+  const dt = new Date(y, m - 1, d + days)
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`
+}
+
+// اسم اليوم بالعربية + رقم اليوم، لعرضه في شريط التنقل بالأيام
+const AR_WEEKDAYS = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
+export const dayLabel = (isoDate) => {
+  const [y, m, d] = isoDate.split('-').map(Number)
+  const dt = new Date(y, m - 1, d)
+  return { weekday: AR_WEEKDAYS[dt.getDay()], day: d, month: m }
+}
+
 export const SESSION_STATUSES = {
   open: 'مفتوحة', in_progress: 'قيد التنفيذ', closed: 'مغلقة', cancelled: 'ملغاة',
 }

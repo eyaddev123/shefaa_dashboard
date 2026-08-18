@@ -86,7 +86,10 @@ export default function NewRequest() {
     setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]))
 
   const addFiles = (e) => {
-    setFiles((f) => [...f, ...Array.from(e.target.files || [])])
+    // نلتقط الملفات فوراً: FileList حيّ ومرتبط بالحقل، وتفريغ الحقل أدناه
+    // يُفرغه قبل أن تنفّذ React دالة التحديث المؤجّلة
+    const picked = Array.from(e.target.files || [])
+    setFiles((f) => [...f, ...picked])
     e.target.value = ''
   }
   const removeFile = (i) => setFiles((f) => f.filter((_, idx) => idx !== i))

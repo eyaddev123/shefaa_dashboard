@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { api, SESSION_STATUSES, fmtTime, todayLocal } from '../api.js'
+import { addDays, api, dayLabel, SESSION_STATUSES, fmtTime, todayLocal } from '../api.js'
 import { useRole } from '../RoleContext.jsx'
 
 function sessionBadge(status) {
@@ -9,7 +9,11 @@ function sessionBadge(status) {
 }
 
 export default function ClinicBoard() {
-  const [date, setDate] = useState(todayLocal())
+  const today = todayLocal()
+  const [date, setDate] = useState(today)
+  // أول يوم في الشريط المعروض — يتحرك أسبوعاً كاملاً بأزرار ‹ ›
+  const [weekStart, setWeekStart] = useState(today)
+  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
   const [sessions, setSessions] = useState(null)
   const [err, setErr] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -30,8 +34,8 @@ export default function ClinicBoard() {
     <>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
         <div>
-          <h2>لوحة العيادات اليومية</h2>
-          <p className="subtitle">جلسات الدكاترة لليوم المحدد وطول طابور كل منها</p>
+          <h2>لوحة العيادات</h2>
+          <p className="subtitle">جلسات الدكاترة لليوم المحدد وطول طابور كل منها — تنقّل بالأيام للحجز المسبق</p>
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }}>
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
@@ -39,6 +43,31 @@ export default function ClinicBoard() {
             <button onClick={generate} disabled={busy}>{busy ? 'جارٍ التوليد…' : 'توليد جلسات هذا اليوم'}</button>
           )}
         </div>
+      </div>
+
+      {/* شريط الأيام: الماضي للاطّلاع، القادم للحجز المسبق */}
+      <div className="day-strip">
+        <button className="day-nav" onClick={() => setWeekStart(addDays(weekStart, -7))} title="الأسبوع السابق">‹</button>
+        <div className="day-strip-days">
+          {days.map((d) => {
+            const { weekday, day, month } = dayLabel(d)
+            return (
+              <button
+                key={d}
+                className={`day-chip ${d === date ? 'day-chip-on' : ''} ${d === today ? 'day-chip-today' : ''} ${d < today ? 'day-chip-past' : ''}`}
+                onClick={() => setDate(d)}
+              >
+                <span className="day-chip-wd">{weekday}</span>
+                <span className="day-chip-num">{day}/{month}</span>
+                {d === today && <span className="day-chip-tag">اليوم</span>}
+              </button>
+            )
+          })}
+        </div>
+        <button className="day-nav" onClick={() => setWeekStart(addDays(weekStart, 7))} title="الأسبوع التالي">›</button>
+        {date !== today && (
+          <button className="ghost day-back" onClick={() => { setDate(today); setWeekStart(today) }}>ارجع لليوم</button>
+        )}
       </div>
 
       {err && <p className="error">{err}</p>}
