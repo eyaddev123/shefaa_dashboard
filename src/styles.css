@@ -908,6 +908,10 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
 .slot-row.available { background: var(--primary-soft); border-color: transparent; }
 .slot-row.booked { background: var(--surface-1); }
 .slot-row.walkin-row { margin-top: 10px; border-style: dashed; }
+/* خانة مضى وقتها — باهتة وبلا زر حجز، فلا تُغري بحجز في وقت انقضى */
+.slot-row.past { opacity: 0.45; background: var(--surface-1); border-color: transparent; }
+.slot-row.past .slot-time { text-decoration: line-through; }
+.slot-row.past .slot-label { color: var(--text-secondary); font-weight: 500; }
 
 /* خانة الفراغ الاحتياطي آخر الساعة — محجوزة للطوارئ، مميّزة بصرياً عن الخانات العادية */
 .slot-row.buffer {
@@ -919,6 +923,17 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
 }
 .slot-row.buffer .slot-label { color: var(--status-pending); font-weight: 700; }
 .slot-row.buffer.booked { background: var(--status-pending-bg); border-style: solid; }
+
+/* حالة ذات أولوية تشغل خانة — تُميَّز بالأحمر ولو كانت في فراغ احتياطي.
+   توضع بعد قواعد .buffer وبنفس درجة تخصيصها كي تكسبها (وإلا غلبها لون الفراغ). */
+.slot-row.priority.booked,
+.slot-row.buffer.priority.booked {
+  background: var(--status-bad-bg);
+  border-color: var(--status-bad);
+  border-style: solid;
+}
+.slot-row.priority .slot-time { color: var(--status-bad); font-weight: 800; }
+.slot-row.buffer.priority .slot-label { color: var(--text-primary); }
 
 /* ═══ شاشة الإعدادات ═══ */
 .setting-row {

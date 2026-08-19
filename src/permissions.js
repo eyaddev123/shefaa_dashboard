@@ -1,25 +1,33 @@
 // صلاحيات العرض في الواجهة — مرآة لـ server/src/permissions.js.
 // هذه لإخفاء ما لا يعني المستخدم فقط؛ الفرض الفعلي على الخادم.
 
-export const AID_ROLES = ['officer', 'accountant', 'board']
-export const CLINIC_ROLES = ['clinic_admin', 'clinic_reception', 'doctor', 'board']
+// المشرف العام: يرى كل شاشات النظام، ولا يكتب إلا في الموظفين والإعدادات
+export const SUPER_ADMIN = 'super_admin'
+
+export const AID_ROLES = ['officer', 'accountant', 'board', SUPER_ADMIN]
+export const CLINIC_ROLES = ['clinic_admin', 'clinic_reception', 'doctor', 'board', SUPER_ADMIN]
 
 export const canReadAid = (role) => AID_ROLES.includes(role)
 export const canReadClinic = (role) => CLINIC_ROLES.includes(role)
 export const canSearchAid = (role) => AID_ROLES.includes(role)
 
-// إدارة الأطباء والجداول: مسؤول العيادات يكتب، المجلس يطالع فقط
-export const canSeeDoctorsPage = (role) => role === 'clinic_admin' || role === 'board'
+// إدارة الموظفين وأدوارهم — المشرف العام حصراً
+export const canManageUsers = (role) => role === SUPER_ADMIN
+
+// إدارة الأطباء والجداول: مسؤول العيادات يكتب، المجلس والمشرف العام يطالعان فقط
+export const canSeeDoctorsPage = (role) =>
+  role === 'clinic_admin' || role === 'board' || role === SUPER_ADMIN
 
 // لوحة العيادات اليومية والطابور
 export const canSeeClinicBoard = (role) =>
-  role === 'clinic_admin' || role === 'clinic_reception' || role === 'board'
+  role === 'clinic_admin' || role === 'clinic_reception' || role === 'board' || role === SUPER_ADMIN
 
-// شاشة الطبيب الخاصة
+// شاشة الطبيب الخاصة — مربوطة بسجلّ دكتور، فلا معنى لها لغير الطبيب
 export const canSeeDoctorScreen = (role) => role === 'doctor'
 
-// شاشة الإعدادات: مسؤول العيادات يعدّل، المجلس يطالع فقط
-export const canSeeSettings = (role) => role === 'clinic_admin' || role === 'board'
+// شاشة الإعدادات: مسؤول العيادات والمشرف العام يعدّلان، المجلس يطالع فقط
+export const canSeeSettings = (role) =>
+  role === 'clinic_admin' || role === 'board' || role === SUPER_ADMIN
 
 // أول صفحة مسموحة لكل دور — وجهة إعادة التوجيه عند محاولة فتح مسار ممنوع
 export function homePathFor(role) {
@@ -44,4 +52,5 @@ export const ROUTE_ACCESS = {
   '/clinic/session': canSeeClinicBoard,
   '/clinic/doctor': canSeeDoctorScreen,
   '/settings': canSeeSettings,
+  '/users': canManageUsers,
 }

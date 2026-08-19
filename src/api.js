@@ -70,6 +70,13 @@ export const api = {
   addDisease: (body) => http('/diseases', { method: 'POST', body: JSON.stringify(body) }),
   addService: (body) => http('/services', { method: 'POST', body: JSON.stringify(body) }),
   updateService: (id, body) => http(`/services/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  // إدارة الموظفين والصلاحيات — المشرف العام حصراً
+  users: () => http('/users'),
+  userOptions: () => http('/users/options'),
+  addUser: (body) => http('/users', { method: 'POST', body: JSON.stringify(body) }),
+  updateUser: (id, body) => http(`/users/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  resetPassword: (id, password) =>
+    http(`/users/${id}/password`, { method: 'POST', body: JSON.stringify({ password }) }),
   settings: () => http('/settings'),
   updateSetting: (key, value) =>
     http(`/settings/${key}`, { method: 'PATCH', body: JSON.stringify({ value }) }),
@@ -125,6 +132,29 @@ export const api = {
     if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
     return data
   },
+}
+
+// تسميات الأدوار بالعربية — مصدر واحد للشريط الجانبي وشاشة الموظفين
+export const ROLE_LABELS = {
+  officer: 'موظف إدخال',
+  board: 'عضو مجلس الإدارة',
+  accountant: 'محاسب الجمعية',
+  clinic_admin: 'مسؤول العيادات',
+  clinic_reception: 'استقبال العيادات',
+  doctor: 'طبيب',
+  super_admin: 'المشرف العام',
+}
+
+// شرح ما يفتحه كل دور — يُعرض تحت قائمة الأدوار في نموذج إنشاء الموظف
+// كي يعرف المشرف ما الذي يمنحه فعلاً قبل أن يمنحه.
+export const ROLE_DESCRIPTIONS = {
+  officer: 'يُدخل العائلات والطلبات والمرفقات، ويصدر سندات الصرف، ويطابق كشوف الأمين.',
+  accountant: 'الخزينة والإيرادات وأسعار الكتالوج وسندات الصرف ومطابقة الأمين.',
+  board: 'يراجع الطلبات ويوصي عليها. المدير المسؤول وحده يتخذ القرار النهائي.',
+  clinic_admin: 'الدكاترة وجداول الدوام وتوليد الجلسات والإعدادات، مع كامل لوحة العيادات.',
+  clinic_reception: 'حجز المرضى وتسجيل الحضور وإدارة الطابور اليومي.',
+  doctor: 'شاشته الخاصة فقط: طابور جلساته ونداء المرضى.',
+  super_admin: 'يطالع كل شاشات النظام، ويدير الموظفين وأدوارهم والإعدادات.',
 }
 
 export const AID_TYPES = {

@@ -250,15 +250,19 @@ function SlotList({ sessionId, fees, onBooked }) {
       )}
       {slots.slots.map((s) => (
         <div key={s.slot_time}
-          className={`slot-row ${s.available ? 'available' : 'booked'} ${s.is_buffer ? 'buffer' : ''}`}>
+          className={`slot-row ${s.available ? 'available' : 'booked'} ${s.is_buffer ? 'buffer' : ''} ${s.is_past ? 'past' : ''} ${s.priority && s.priority !== 'normal' ? 'priority' : ''}`}>
           <span className="slot-time" dir="ltr">{s.slot_time}</span>
-          {s.available ? (
+          {s.is_past && !s.full_name ? (
+            <span className="slot-label">مضى وقتها</span>
+          ) : s.available ? (
             <span className="slot-label">
               {s.is_buffer ? 'فراغ احتياطي — للحالات الفورية فقط' : 'متاحة'}
             </span>
           ) : (
             <span className="slot-label">
               الدور {s.queue_number} — {s.full_name}
+              {/* شارة الأولوية أولاً: الموظف يميّز الحالة الإسعافية من نظرة واحدة */}
+              {priorityBadge(s.priority)}
               {' '}<span className="badge" style={{ marginInlineStart: 6 }}>{APPOINTMENT_STATUSES[s.status]}</span>
               {s.used_buffer && <span className="badge warn" style={{ marginInlineStart: 6 }}>استُخدم الفراغ</span>}
             </span>

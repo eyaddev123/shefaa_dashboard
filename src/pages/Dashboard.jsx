@@ -226,6 +226,57 @@ export default function Dashboard() {
     )
   }
 
+  // ═══ لوحة المشرف العام — نظرة شاملة على القسمين معاً وحالة الحسابات ═══
+  // فرع مستقل قبل لوحة المجلس: تلك تفترض طابور مراجعة وعضوية مجلس، والمشرف بلا أيّهما.
+  if (d.view === 'super_admin') {
+    const u = d.users || {}
+    return (
+      <>
+        <h2>لوحة القيادة — المشرف العام</h2>
+        <p className="subtitle">
+          أهلاً {user.display_name} — تطالع كل شاشات النظام، وتدير الموظفين وأدوارهم.
+        </p>
+        <Tiles d={d} />
+        {d.treasury && <TreasuryTiles treasury={d.treasury} />}
+
+        <div className="card highlight">
+          <h3>👥 الحسابات — {u.active || 0} فعّال من {u.total || 0}</h3>
+          <div className="tiles">
+            <div className="tile"><div className="label">فعّال</div><div className="value">{u.active || 0}</div></div>
+            <div className="tile"><div className="label">موقوف</div><div className="value">{u.suspended || 0}</div></div>
+            <div className="tile">
+              <div className="label">لم يسجّل دخوله بعد</div>
+              <div className="value">{u.never_logged_in || 0}</div>
+            </div>
+          </div>
+          <p style={{ marginTop: 14 }}>
+            <Link className="plain" to="/users">إدارة الموظفين والصلاحيات</Link>
+          </p>
+        </div>
+
+        <div className="card">
+          <h3>🏥 العيادات اليوم — {d.todaySessions?.length || 0} جلسة / {d.doctorsCount || 0} طبيب فعّال</h3>
+          <table>
+            <thead><tr><th>الطبيب</th><th>البداية</th><th>الحالة</th><th>بالانتظار</th></tr></thead>
+            <tbody>
+              {(d.todaySessions || []).map((s) => (
+                <tr key={s.id}>
+                  <td>{s.doctor_name}</td>
+                  <td>{fmtTime(s.start_time)}</td>
+                  <td><span className="badge">{SESSION_STATUSES[s.status] || s.status}</span></td>
+                  <td className="num">{s.active_count}</td>
+                </tr>
+              ))}
+              {!d.todaySessions?.length && <tr><td colSpan={4} className="empty">لا جلسات اليوم بعد</td></tr>}
+            </tbody>
+          </table>
+        </div>
+
+        <StatusChart byStatus={d.byStatus} />
+      </>
+    )
+  }
+
   // ═══ لوحة عضو المجلس / المدير المسؤول ═══
   return (
     <>
