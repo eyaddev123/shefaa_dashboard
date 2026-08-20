@@ -429,6 +429,34 @@ form.inline > .field input, form.inline > .field select,
 form.inline > button, .inline > button { flex: 0 0 auto; }
 form.inline > .field-check, .inline > .field-check { flex: 0 0 auto; }
 .field label { font-size: 12px; color: var(--text-secondary); font-weight: 600; }
+
+/* ═══ حقل كلمة المرور مع زرّ الإظهار ═══ */
+/* الحقل dir="ltr" (كلمات المرور لاتينية) داخل صفحة RTL. نثبّت الزرّ يميناً
+   بـ right لا inset-inline-end: الأخيرة تتبع اتجاه الحاوية فتضعه يساراً فوق النص. */
+.password-wrap { position: relative; display: flex; }
+.password-wrap input { width: 100%; padding-right: 40px; padding-left: 12px; }
+
+.password-eye {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  box-shadow: none;
+}
+.password-eye:hover { background: var(--primary-soft); color: var(--text-primary); filter: none; }
+.password-eye:active { transform: translateY(-50%); }
+.password-eye svg { width: 17px; height: 17px; }
+
 input, select, textarea {
   font: inherit;
   font-size: 13.5px;

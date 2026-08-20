@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, ROLE_LABELS, ROLE_DESCRIPTIONS, fmtDate } from '../api.js'
 import { useRole } from '../RoleContext.jsx'
+import PasswordInput from '../components/PasswordInput.jsx'
 
 // الأدوار التي يلزمها ربط بسجلّ خارجي — مرآة لقواعد الخادم
 const NEEDS_BOARD_MEMBER = (role) => role === 'board'
@@ -77,15 +78,15 @@ function NewUserForm({ options, onCreated }) {
         </div>
         <div className="field">
           <label>كلمة المرور</label>
-          <input type="password" value={form.password} onChange={set('password')}
-                 required minLength={6} dir="ltr" style={{ textAlign: 'left' }}
-                 autoComplete="new-password" name="new-employee-password" />
+          <PasswordInput value={form.password} onChange={set('password')}
+                         required minLength={6}
+                         autoComplete="new-password" name="new-employee-password" />
         </div>
         <div className="field">
           <label>تأكيد كلمة المرور</label>
-          <input type="password" value={form.confirm} onChange={set('confirm')}
-                 required minLength={6} dir="ltr" style={{ textAlign: 'left' }}
-                 autoComplete="new-password" name="new-employee-password-confirm" />
+          <PasswordInput value={form.confirm} onChange={set('confirm')}
+                         required minLength={6}
+                         autoComplete="new-password" name="new-employee-password-confirm" />
         </div>
         <div className="field">
           <label>الدور</label>
@@ -226,15 +227,15 @@ function PasswordReset({ user, onDone }) {
     <form className="inline" onSubmit={submit} autoComplete="off">
       <div className="field">
         <label>كلمة المرور الجديدة</label>
-        <input type="password" value={pw} onChange={(e) => { setPw(e.target.value); setErr(null) }}
-               required minLength={6} dir="ltr" style={{ textAlign: 'left' }} autoFocus
-               autoComplete="new-password" name={`reset-password-${user.id}`} />
+        <PasswordInput value={pw} onChange={(e) => { setPw(e.target.value); setErr(null) }}
+                       required minLength={6} autoFocus
+                       autoComplete="new-password" name={`reset-password-${user.id}`} />
       </div>
       <div className="field">
         <label>تأكيدها</label>
-        <input type="password" value={confirm} onChange={(e) => { setConfirm(e.target.value); setErr(null) }}
-               required minLength={6} dir="ltr" style={{ textAlign: 'left' }}
-               autoComplete="new-password" name={`reset-password-confirm-${user.id}`} />
+        <PasswordInput value={confirm} onChange={(e) => { setConfirm(e.target.value); setErr(null) }}
+                       required minLength={6}
+                       autoComplete="new-password" name={`reset-password-confirm-${user.id}`} />
       </div>
       <button type="submit" disabled={busy} style={{ padding: '6px 14px', fontSize: 12.5 }}>
         {busy ? 'جارٍ…' : 'تعيين'}

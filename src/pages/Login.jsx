@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useRole } from '../RoleContext.jsx'
 import ThemeToggle from '../components/ThemeToggle.jsx'
+import PasswordInput from '../components/PasswordInput.jsx'
 
 export default function Login() {
   const { login } = useRole()
@@ -32,8 +33,8 @@ export default function Login() {
         </div>
         <div className="field">
           <label>كلمة المرور</label>
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} dir="ltr" required
-                 name="password" autoComplete="current-password" />
+          <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} required
+                         name="password" autoComplete="current-password" />
         </div>
         <button type="submit" disabled={busy}>{busy ? 'جارٍ الدخول…' : 'تسجيل الدخول'}</button>
         {err && <p className="error">{err}</p>}
