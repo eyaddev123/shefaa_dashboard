@@ -54,30 +54,38 @@ function NewUserForm({ options, onCreated }) {
     finally { setBusy(false) }
   }
 
+  // autoComplete="off" على النموذج، و new-password على حقول السر:
+  // هذه شاشة إدارة يُنشئ فيها المشرف حساباً لغيره، لا شاشة دخول. بدونها يقرأها
+  // المتصفح كنموذج تسجيل دخول فيحقن بيانات حساب محفوظ (اسماً وكلمة مرور) في
+  // «الاسم المعروض» و«كلمة المرور» — فيُنشأ موظف باسم خاطئ وكلمة سرّ يجهلها المشرف.
   return (
-    <form onSubmit={submit} style={{ marginTop: 14 }}>
+    <form onSubmit={submit} style={{ marginTop: 14 }} autoComplete="off">
       <div className="inline">
         <div className="field">
           <label>اسم المستخدم (للدخول)</label>
           <input value={form.username} onChange={set('username')} required
-                 dir="ltr" style={{ textAlign: 'left' }}
+                 dir="ltr" style={{ textAlign: 'left' }} autoComplete="off"
+                 name="new-employee-username"
                  placeholder="samer.y" pattern="[a-z0-9_.]{3,50}"
                  title="حروف إنجليزية صغيرة وأرقام و _ . فقط، 3 خانات فأكثر" />
         </div>
         <div className="field">
           <label>الاسم المعروض</label>
           <input value={form.display_name} onChange={set('display_name')} required
+                 autoComplete="off" name="new-employee-display-name"
                  placeholder="أ. سامر يوسف" />
         </div>
         <div className="field">
           <label>كلمة المرور</label>
           <input type="password" value={form.password} onChange={set('password')}
-                 required minLength={6} dir="ltr" style={{ textAlign: 'left' }} />
+                 required minLength={6} dir="ltr" style={{ textAlign: 'left' }}
+                 autoComplete="new-password" name="new-employee-password" />
         </div>
         <div className="field">
           <label>تأكيد كلمة المرور</label>
           <input type="password" value={form.confirm} onChange={set('confirm')}
-                 required minLength={6} dir="ltr" style={{ textAlign: 'left' }} />
+                 required minLength={6} dir="ltr" style={{ textAlign: 'left' }}
+                 autoComplete="new-password" name="new-employee-password-confirm" />
         </div>
         <div className="field">
           <label>الدور</label>
@@ -169,15 +177,17 @@ function NewBoardMemberForm({ onCreated }) {
   }
 
   return (
-    <form className="inline" onSubmit={submit} style={{ marginTop: 10 }}>
+    <form className="inline" onSubmit={submit} style={{ marginTop: 10 }} autoComplete="off">
       <div className="field">
         <label>اسم عضو المجلس</label>
         <input value={name} onChange={(e) => { setName(e.target.value); setErr(null) }}
-               required placeholder="د. محمد الخطيب" />
+               required placeholder="د. محمد الخطيب"
+               autoComplete="off" name="new-board-member-name" />
       </div>
       <div className="field">
         <label>الصفة (اختياري)</label>
-        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="رئيس المجلس" />
+        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="رئيس المجلس"
+               autoComplete="off" name="new-board-member-title" />
       </div>
       <div className="field field-check" style={{ justifyContent: 'flex-end' }}>
         <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 400 }}>
@@ -213,16 +223,18 @@ function PasswordReset({ user, onDone }) {
   }
 
   return (
-    <form className="inline" onSubmit={submit}>
+    <form className="inline" onSubmit={submit} autoComplete="off">
       <div className="field">
         <label>كلمة المرور الجديدة</label>
         <input type="password" value={pw} onChange={(e) => { setPw(e.target.value); setErr(null) }}
-               required minLength={6} dir="ltr" style={{ textAlign: 'left' }} autoFocus />
+               required minLength={6} dir="ltr" style={{ textAlign: 'left' }} autoFocus
+               autoComplete="new-password" name={`reset-password-${user.id}`} />
       </div>
       <div className="field">
         <label>تأكيدها</label>
         <input type="password" value={confirm} onChange={(e) => { setConfirm(e.target.value); setErr(null) }}
-               required minLength={6} dir="ltr" style={{ textAlign: 'left' }} />
+               required minLength={6} dir="ltr" style={{ textAlign: 'left' }}
+               autoComplete="new-password" name={`reset-password-confirm-${user.id}`} />
       </div>
       <button type="submit" disabled={busy} style={{ padding: '6px 14px', fontSize: 12.5 }}>
         {busy ? 'جارٍ…' : 'تعيين'}

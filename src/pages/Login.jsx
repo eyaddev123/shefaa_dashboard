@@ -27,11 +27,13 @@ export default function Login() {
 
         <div className="field">
           <label>اسم المستخدم</label>
-          <input value={username} onChange={(e) => setUsername(e.target.value)} dir="ltr" autoFocus required />
+          <input value={username} onChange={(e) => setUsername(e.target.value)} dir="ltr" autoFocus required
+                 name="username" autoComplete="username" />
         </div>
         <div className="field">
           <label>كلمة المرور</label>
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} dir="ltr" required />
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} dir="ltr" required
+                 name="password" autoComplete="current-password" />
         </div>
         <button type="submit" disabled={busy}>{busy ? 'جارٍ الدخول…' : 'تسجيل الدخول'}</button>
         {err && <p className="error">{err}</p>}
