@@ -165,7 +165,31 @@ body {
   line-height: 1;
 }
 
-.sidebar nav { display: flex; flex-direction: column; gap: 2px; padding: 0 12px; }
+/* الروابط وحدها هي التي تُمرَّر عند طول القائمة — الهوية وصندوق المستخدم ومبدّل
+   السمة تبقى ثابتة. min-height: 0 ضروري: العنصر المرن لا ينكمش دون محتواه بدونها،
+   فيفيض المنيو خارج الشريط بدل أن يُمرَّر (كان يقصّ آخر رابط ويُخرج مبدّل السمة). */
+/* العناصر الثابتة فوق القائمة: لا تنكمش ليبقى المتاح للتمرير هو الروابط وحدها */
+.sidebar .brand, .sidebar .user-box, .sidebar-search { flex-shrink: 0; }
+
+.sidebar nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 12px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* شريط تمرير خفيف لا يزاحم الروابط بصرياً */
+.sidebar nav::-webkit-scrollbar { width: 6px; }
+.sidebar nav::-webkit-scrollbar-track { background: transparent; }
+.sidebar nav::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 3px;
+}
+.sidebar nav::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.3); }
 .sidebar nav a {
   display: flex;
   align-items: center;
@@ -388,8 +412,22 @@ td.num { font-variant-numeric: tabular-nums; }
 .progress5 span.no { background: var(--status-bad); border: 2px solid var(--status-bad); color: #fff; }
 
 /* ═══ النماذج ═══ */
-form.inline { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
-.field { display: flex; flex-direction: column; gap: 5px; }
+/* صفّ حقول يلتفّ عند ضيق العرض. يُطبَّق على <form class="inline"> وعلى أي
+   حاوية .inline داخل نموذج (صفوف الحقول المجزّأة داخل نموذج واحد). */
+form.inline, .inline { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+
+.field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+
+/* داخل صفّ ملتفّ: يكبر الحقل ليملأ الفراغ وينكمش حتى 180px ثم يلتفّ السطر.
+   min-width: 0 ضروري — بدونه لا ينكمش العنصر المرن دون عرضه الطبيعي فيفيض
+   خارج البطاقة بدل أن يلتفّ (وهو ما كان يقصّ زر «إنشاء الموظف» والشرح). */
+form.inline > .field, .inline > .field { flex: 1 1 180px; }
+form.inline > .field input, form.inline > .field select,
+.inline > .field input, .inline > .field select { width: 100%; }
+
+/* الأزرار وحقول الاختيار (checkbox) تبقى بحجمها الطبيعي ولا تتمدّد مع الحقول */
+form.inline > button, .inline > button { flex: 0 0 auto; }
+form.inline > .field-check, .inline > .field-check { flex: 0 0 auto; }
 .field label { font-size: 12px; color: var(--text-secondary); font-weight: 600; }
 input, select, textarea {
   font: inherit;
@@ -509,18 +547,6 @@ a.plain:hover { text-decoration: underline; }
 .login-card h1 { font-size: 19px; font-weight: 800; text-align: center; }
 .login-card > p { font-size: 12.5px; color: var(--text-secondary); text-align: center; margin-bottom: 6px; }
 .login-card input { min-width: 0; width: 100%; }
-.login-hint {
-  margin-top: 8px;
-  font-size: 12px;
-  color: var(--text-secondary);
-  background: var(--primary-soft);
-  border-radius: 10px;
-  padding: 12px 14px;
-  line-height: 1.9;
-}
-.login-hint ul { margin: 4px 18px 0 0; }
-.login-hint code { direction: ltr; unicode-bidi: embed; font-weight: 700; color: var(--accent-text); }
-
 /* ═══ منطقة استيراد الكشف ═══ */
 .dropzone {
   border: 2px dashed var(--teal-500);

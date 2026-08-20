@@ -56,7 +56,7 @@ function NewUserForm({ options, onCreated }) {
 
   return (
     <form onSubmit={submit} style={{ marginTop: 14 }}>
-      <div className="inline" style={{ flexWrap: 'wrap' }}>
+      <div className="inline">
         <div className="field">
           <label>اسم المستخدم (للدخول)</label>
           <input value={form.username} onChange={set('username')} required
@@ -124,9 +124,12 @@ function NewUserForm({ options, onCreated }) {
       </p>
 
       {noMembersLeft && (
-        <p className="error">
-          كل أعضاء المجلس الفعّالين لهم حسابات مسبقاً. أضف عضواً جديداً للمجلس أولاً.
-        </p>
+        <>
+          <p className="error" style={{ marginBottom: 0 }}>
+            لا يوجد عضو مجلس بلا حساب. أضف عضواً جديداً للمجلس ليمكن إنشاء حسابه:
+          </p>
+          <NewBoardMemberForm onCreated={onCreated} />
+        </>
       )}
       {noDoctorsLeft && (
         <p className="error">
@@ -140,6 +143,53 @@ function NewUserForm({ options, onCreated }) {
           لا يمكن استرجاعها لاحقاً، إنما إعادة تعيينها.
         </p>
       )}
+    </form>
+  )
+}
+
+// ═══ إضافة عضو مجلس ═══
+// يظهر عند اختيار دور «عضو المجلس» ولا يوجد عضو حرّ — بلا سجلّ عضو لا يمكن إنشاء حسابه،
+// فيصير هذا الباب شرطاً لتشغيل مسار اعتماد الطلبات على قاعدة نظيفة.
+function NewBoardMemberForm({ onCreated }) {
+  const [name, setName] = useState('')
+  const [title, setTitle] = useState('')
+  const [isChairman, setIsChairman] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState(null)
+
+  const submit = async (e) => {
+    e.preventDefault()
+    setBusy(true); setErr(null)
+    try {
+      await api.addBoardMember({ name: name.trim(), title: title.trim(), is_chairman: isChairman })
+      setName(''); setTitle(''); setIsChairman(false)
+      onCreated()
+    } catch (ex) { setErr(ex.message) }
+    finally { setBusy(false) }
+  }
+
+  return (
+    <form className="inline" onSubmit={submit} style={{ marginTop: 10 }}>
+      <div className="field">
+        <label>اسم عضو المجلس</label>
+        <input value={name} onChange={(e) => { setName(e.target.value); setErr(null) }}
+               required placeholder="د. محمد الخطيب" />
+      </div>
+      <div className="field">
+        <label>الصفة (اختياري)</label>
+        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="رئيس المجلس" />
+      </div>
+      <div className="field field-check" style={{ justifyContent: 'flex-end' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 400 }}>
+          <input type="checkbox" checked={isChairman} style={{ width: 'auto' }}
+                 onChange={(e) => setIsChairman(e.target.checked)} />
+          المدير المسؤول (القرار النهائي)
+        </label>
+      </div>
+      <button type="submit" disabled={busy} style={{ padding: '6px 14px', fontSize: 12.5 }}>
+        {busy ? 'جارٍ…' : 'إضافة عضو المجلس'}
+      </button>
+      {err && <p className="error">{err}</p>}
     </form>
   )
 }
@@ -163,7 +213,7 @@ function PasswordReset({ user, onDone }) {
   }
 
   return (
-    <form className="inline" onSubmit={submit} style={{ flexWrap: 'wrap' }}>
+    <form className="inline" onSubmit={submit}>
       <div className="field">
         <label>كلمة المرور الجديدة</label>
         <input type="password" value={pw} onChange={(e) => { setPw(e.target.value); setErr(null) }}
@@ -223,7 +273,7 @@ function RoleEditor({ user, options, onDone }) {
   }
 
   return (
-    <form className="inline" onSubmit={submit} style={{ flexWrap: 'wrap' }}>
+    <form className="inline" onSubmit={submit}>
       <div className="field">
         <label>الدور الجديد</label>
         <select value={role} onChange={(e) => {

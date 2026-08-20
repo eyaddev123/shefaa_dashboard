@@ -39,6 +39,7 @@ export const api = {
   request: (id) => http(`/requests/${id}`),
   vouchers: () => http('/vouchers'),
   boardMembers: () => http('/board-members'),
+  addBoardMember: (body) => http('/board-members', { method: 'POST', body: JSON.stringify(body) }),
   addReview: (requestId, body) =>
     http(`/requests/${requestId}/reviews`, { method: 'POST', body: JSON.stringify(body) }),
   addDecision: (requestId, body) =>

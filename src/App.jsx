@@ -104,7 +104,9 @@ function Sidebar() {
         {canSeeSettings(role) && <NavLink to="/settings">{I.settings} الإعدادات</NavLink>}
       </nav>
 
-      <div style={{ marginTop: 'auto', paddingTop: 14 }}>
+      {/* nav صار هو الممتدّ (flex: 1) فيدفع هذا للأسفل — لا حاجة لـ marginTop: auto،
+          وهي كانت تُخرجه خارج الشاشة حين يطول المنيو */}
+      <div style={{ paddingTop: 14, flexShrink: 0 }}>
         <ThemeToggle />
       </div>
     </aside>

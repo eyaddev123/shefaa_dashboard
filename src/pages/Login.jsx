@@ -35,16 +35,6 @@ export default function Login() {
         </div>
         <button type="submit" disabled={busy}>{busy ? 'جارٍ الدخول…' : 'تسجيل الدخول'}</button>
         {err && <p className="error">{err}</p>}
-
-        <div className="login-hint">
-          <strong>حسابات تجريبية</strong> — كلمة المرور للجميع: <code>123456</code>
-          <ul>
-            <li><code>officer</code> — موظف الإدخال</li>
-            <li><code>accountant</code> — المحاسب (الخزينة والأسعار والمطابقة)</li>
-            <li><code>chairman</code> — المدير المسؤول (قرار نهائي)</li>
-            <li><code>samir · layla · khaled · rana</code> — أعضاء المجلس</li>
-          </ul>
-        </div>
       </form>
     </div>
   )
