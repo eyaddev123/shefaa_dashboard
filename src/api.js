@@ -31,7 +31,19 @@ export const api = {
   me: () => http('/auth/me'),
   dashboard: () => http('/dashboard'),
   stats: () => http('/stats'),
-  families: () => http('/families'),
+  families: (opts = {}) => http(`/families${opts.issues ? '?issues=1' : ''}`),
+
+  // مراجعة جودة البيانات المستوردة من الأرشيف
+  dqSummary: () => http('/data-quality/summary'),
+  dqRecords: (params = {}) => {
+    const q = new URLSearchParams(
+      Object.entries(params).filter(([, v]) => v !== '' && v != null)).toString()
+    return http(`/data-quality/records${q ? `?${q}` : ''}`)
+  },
+  dqFix: (scope, id, body) =>
+    http(`/data-quality/${scope}/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  dqReopen: (scope, id) =>
+    http(`/data-quality/${scope}/${id}/reopen`, { method: 'POST' }),
   family: (id) => http(`/families/${id}`),
   person: (id) => http(`/persons/${id}`),
   search: (q) => http(`/search?q=${encodeURIComponent(q)}`),
@@ -120,6 +132,21 @@ export const api = {
     publicBoard: () => http('/public/clinic/board'),
     displayStreamUrl: () => '/api/public/clinic/display-stream',
     myTurn: (body) => http('/public/clinic/my-turn', { method: 'POST', body: JSON.stringify(body) }),
+  },
+  // المرفق الطبي لا يُفتح برابط مباشر — الرابط بلا توكن، والمجلد لم يعد مكشوفاً.
+  // نجلبه هنا بالتوكن ثم نفتحه كـ blob محلي، فلا يمرّ ملف طبي أبداً بلا مصادقة.
+  openAttachment: async (attachmentId) => {
+    const res = await fetch(`/api/attachments/${attachmentId}/file`, {
+      headers: { Authorization: `Bearer ${getToken()}` },
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.error || 'تعذّر فتح المرفق')
+    }
+    const url = URL.createObjectURL(await res.blob())
+    window.open(url, '_blank', 'noopener')
+    // نحرّر الذاكرة بعد أن يلتقط التبويب الجديد الرابط
+    setTimeout(() => URL.revokeObjectURL(url), 60000)
   },
   uploadAttachment: async (requestId, file) => {
     const form = new FormData()

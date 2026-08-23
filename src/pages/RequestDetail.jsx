@@ -126,7 +126,11 @@ export default function RequestDetail() {
 
   const totalMembers = r.board.length
   const approvals = r.reviews.filter((x) => x.approved).length
-  const allReviewed = r.reviews.length >= totalMembers
+  // نفس شرط الخادم حرفياً: **لا عضو نشط بلا مراجعة**، لا مجرّد عدّ.
+  // (r.reviews قد تحوي مراجعات أعضاء أُوقفوا لاحقاً، فيبلغ العدد النِّصاب زوراً
+  //  بينما عضو نشط لم يراجع — فتَعِد الواجهة بقرار يرفضه الخادم بـ 409.)
+  const pendingMembers = r.board.filter((m) => !r.reviews.some((x) => x.board_member_id === m.id))
+  const allReviewed = pendingMembers.length === 0
   const decided = !!r.decision_type
 
   const notifyWhatsApp = async () => {
@@ -140,6 +144,11 @@ export default function RequestDetail() {
       window.open(`https://wa.me/${waNumber(r.mobile || r.family_mobile || '')}?text=${encodeURIComponent(msg)}`, '_blank')
       load()
     } catch (e) { alert(e.message) }
+  }
+
+  // المرفقات لم تعد روابط مباشرة: مجلد uploads مغلق، والملف يُجلب بالتوكن ثم يُفتح
+  const openAttachment = async (attachmentId) => {
+    try { await api.openAttachment(attachmentId) } catch (ex) { alert(ex.message) }
   }
 
   const uploadFile = async (e) => {
@@ -205,10 +214,12 @@ export default function RequestDetail() {
           <strong style={{ fontSize: 13 }}>المرفقات:</strong>{' '}
           {r.attachments.length === 0 && <span className="empty">لا مرفقات</span>}
           {r.attachments.map((a) => (
-            <a key={a.id} className="plain" style={{ marginInlineStart: 10, fontSize: 13 }}
-               href={a.storage_path} target="_blank" rel="noreferrer">
+            <button key={a.id} type="button" className="plain"
+                    style={{ marginInlineStart: 10, fontSize: 13, background: 'none', border: 'none',
+                             padding: 0, cursor: 'pointer', color: 'var(--primary)' }}
+                    onClick={() => openAttachment(a.id)}>
               📎 {a.original_name}
-            </a>
+            </button>
           ))}
           {role === 'officer' && (
             <label style={{ display: 'inline-block', marginInlineStart: 14, fontSize: 13, cursor: 'pointer', color: 'var(--primary)' }}>
@@ -248,6 +259,27 @@ export default function RequestDetail() {
             </div>
           ))}
           {r.reviews.length === 0 && <p className="empty">لم يراجع أحد بعد</p>}
+          {/* سجلّ تعديلات المراجعات — الخادم لا يرسله إلا للرئيس، فلا يظهر لغيره */}
+          {r.review_history?.length > 0 && (
+            <details style={{ marginTop: 12, fontSize: 13 }}>
+              <summary style={{ cursor: 'pointer', color: 'var(--text-secondary)' }}>
+                سجلّ التعديلات على المراجعات ({r.review_history.length})
+              </summary>
+              <div style={{ marginTop: 8 }}>
+                {r.review_history.map((h) => (
+                  <div key={h.id} style={{ padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
+                    <strong>{h.member_name}</strong>
+                    {' — كان: '}
+                    <span className={`badge ${h.decision ? 'good' : 'bad'}`}>
+                      {h.decision ? 'موافق' : 'غير موافق'}
+                    </span>
+                    {h.recommendation && <div className="rec">{h.recommendation}</div>}
+                    <div className="when">عُدِّل في {fmtDate(h.changed_at)}</div>
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
           {role === 'board' && !decided && <ReviewForm request={r} onSaved={load} />}
         </div>
 
@@ -275,7 +307,10 @@ export default function RequestDetail() {
                 ? <><p className="empty">اكتملت مراجعات الأعضاء — بانتظار قرارك</p><DecisionForm request={r} onSaved={load} /></>
                 : <p className="empty">اكتملت المراجعات ({approvals} موافقة) — القرار النهائي بيد المدير المسؤول</p>
             ) : (
-              <p className="empty">لا يُتخذ القرار قبل مراجعة الأعضاء الخمسة جميعاً ({r.reviews.length}/{totalMembers})</p>
+              <p className="empty">
+                لا يُتخذ القرار قبل مراجعة كل الأعضاء النشطين — بقي {pendingMembers.length} من {totalMembers}
+                {pendingMembers.length > 0 && `: ${pendingMembers.map((m) => m.name).join('، ')}`}
+              </p>
             )}
           </div>
 
