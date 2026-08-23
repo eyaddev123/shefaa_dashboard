@@ -166,8 +166,12 @@ function NewBoardMemberForm({ onCreated }) {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState(null)
 
-  const submit = async (e) => {
-    e.preventDefault()
+  // ليست <form>: هذه الكتلة تُعرض **داخل** نموذج إنشاء الموظف، وHTML يمنع تداخل
+  // النماذج. المتصفح يُسقط الداخلي فيصير زرّه تابعاً للخارجي، فينتهي الضغط إلى
+  // محاولة إرسال نموذج الموظف (وهو ناقص) ولا يُرسَل طلب العضو أبداً.
+  // فالإرسال هنا بمعالج نقر صريح، والزر type="button" لئلا يُرسل الخارجي.
+  const submit = async () => {
+    if (!name.trim()) { setErr('اسم العضو مطلوب'); return }
     setBusy(true); setErr(null)
     try {
       await api.addBoardMember({ name: name.trim(), title: title.trim(), is_chairman: isChairman })
@@ -177,12 +181,17 @@ function NewBoardMemberForm({ onCreated }) {
     finally { setBusy(false) }
   }
 
+  // Enter داخل الحقول يرسل النموذج الخارجي، فنعترضه ونشغّل الإضافة بدله
+  const onKeyDown = (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); submit() }
+  }
+
   return (
-    <form className="inline" onSubmit={submit} style={{ marginTop: 10 }} autoComplete="off">
+    <div className="inline" style={{ marginTop: 10 }} onKeyDown={onKeyDown}>
       <div className="field">
         <label>اسم عضو المجلس</label>
         <input value={name} onChange={(e) => { setName(e.target.value); setErr(null) }}
-               required placeholder="د. محمد الخطيب"
+               placeholder="د. محمد الخطيب"
                autoComplete="off" name="new-board-member-name" />
       </div>
       <div className="field">
@@ -197,11 +206,12 @@ function NewBoardMemberForm({ onCreated }) {
           المدير المسؤول (القرار النهائي)
         </label>
       </div>
-      <button type="submit" disabled={busy} style={{ padding: '6px 14px', fontSize: 12.5 }}>
+      <button type="button" onClick={submit} disabled={busy}
+              style={{ padding: '6px 14px', fontSize: 12.5 }}>
         {busy ? 'جارٍ…' : 'إضافة عضو المجلس'}
       </button>
       {err && <p className="error">{err}</p>}
-    </form>
+    </div>
   )
 }
 
