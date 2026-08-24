@@ -265,6 +265,13 @@ function SlotList({ sessionId, fees, onBooked }) {
               {priorityBadge(s.priority)}
               {' '}<span className="badge" style={{ marginInlineStart: 6 }}>{APPOINTMENT_STATUSES[s.status]}</span>
               {s.used_buffer && <span className="badge warn" style={{ marginInlineStart: 6 }}>استُخدم الفراغ</span>}
+              {/* سطر الانزياح: «06:30 ← 06:45» مع السبب. بلا هذا يرى المريض خانته
+                  الحالية بلا تفسير لتغيّرها عمّا اتُّفق عليه. */}
+              {s.delay_minutes > 0 && (
+                <span style={{ display: 'block', marginTop: 3 }}>
+                  <SlotCell appt={s} />
+                </span>
+              )}
             </span>
           )}
           {/* خانة الفراغ لا تُعرض للحجز العادي — تُملأ تلقائياً بأول حالة فورية */}
