@@ -58,7 +58,7 @@ export default function DoctorScreen() {
           <div className="card highlight">
             <h3>قيد الكشف الآن</h3>
             {current ? (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+              <div className="action-row">
                 <div>
                   <div style={{ fontSize: 32, fontWeight: 800, color: 'var(--primary)' }}>الدور {current.queue_number}</div>
                   <div style={{ color: 'var(--text-secondary)' }}>{current.full_name}</div>
@@ -82,7 +82,7 @@ export default function DoctorScreen() {
           <div className="card">
             <h3>التالي في الطابور</h3>
             {nextUp ? (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+              <div className="action-row">
                 <div>
                   <div style={{ fontSize: 22, fontWeight: 700 }}>الدور {nextUp.queue_number} — {nextUp.full_name}</div>
                   {nextUp.reason && <div style={{ color: 'var(--muted)', fontSize: 13 }}>{nextUp.reason}</div>}

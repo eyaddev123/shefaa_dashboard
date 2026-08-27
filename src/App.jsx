@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Navigate, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { RoleProvider, useRole } from './RoleContext.jsx'
 import {
@@ -66,11 +66,14 @@ function SidebarSearch() {
   )
 }
 
-function Sidebar() {
+function Sidebar({ onNavigate }) {
   const { user, role, isChairman, logout } = useRole()
   const aid = canReadAid(role)
   return (
-    <aside className="sidebar">
+    <aside className="sidebar" onClick={(e) => {
+      // أي نقرة على رابط داخل الدرج تُغلقه — الجوال لا يحتمل قائمة تغطي الشاشة بعد الانتقال
+      if (onNavigate && e.target.closest('a')) onNavigate()
+    }}>
       <div className="brand">
         <div className="brand-logo">🏥</div>
         <div>
@@ -123,14 +126,53 @@ function Guard({ allow, children }) {
   return children
 }
 
+// شريط علوي يظهر على الجوال/التابلت فقط — يفتح الشريط الجانبي كدرج منزلق
+function TopBar({ onOpen, open }) {
+  return (
+    <header className="topbar">
+      <button className="topbar-burger" onClick={onOpen}
+              aria-label="فتح القائمة" aria-expanded={open}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+             strokeLinecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      </button>
+      <div className="topbar-title">
+        <span className="topbar-logo">🏥</span>
+        <span>جمعية الشفاء الخيرية</span>
+      </div>
+    </header>
+  )
+}
+
 function Shell() {
   const { user, loading, role } = useRole()
+  const [drawer, setDrawer] = useState(false)
+  const { pathname } = useLocation()
+
+  // تبديل الصفحة يغلق الدرج ولو تمّ من زر رجوع المتصفح لا من رابط داخل القائمة
+  useEffect(() => { setDrawer(false) }, [pathname])
+
+  // منع تمرير الصفحة خلف الدرج المفتوح — وإلا انزلق المحتوى تحت القائمة على الجوال
+  useEffect(() => {
+    if (!drawer) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const onKey = (e) => { if (e.key === 'Escape') setDrawer(false) }
+    window.addEventListener('keydown', onKey)
+    return () => {
+      document.body.style.overflow = prev
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [drawer])
+
   if (loading) return <p className="empty" style={{ padding: 40 }}>جارٍ التحميل…</p>
   if (!user) return <Login />
   const aid = (el) => <Guard allow={canReadAid}>{el}</Guard>
   return (
-    <div className="layout">
-      <Sidebar />
+    <div className={`layout ${drawer ? 'drawer-open' : ''}`}>
+      <TopBar onOpen={() => setDrawer(true)} open={drawer} />
+      {/* الحجاب يغلق الدرج باللمس خارجه — سلوك متوقَّع على الجوال */}
+      <div className="drawer-scrim" onClick={() => setDrawer(false)} aria-hidden="true" />
+      <Sidebar onNavigate={() => setDrawer(false)} />
       <main className="main">
         <Routes>
           <Route path="/" element={<Dashboard />} />

@@ -28,7 +28,7 @@ export default function Families() {
 
   return (
     <>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
+      <div className="page-head">
         <div>
           <h2>العائلات — الملفات الدائمة</h2>
           <p className="subtitle">الملف يبقى مدى الحياة وتتراكم عليه الطلبات</p>

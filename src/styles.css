@@ -228,7 +228,9 @@ body {
 }
 .user-box .logout:hover { background: rgba(255, 255, 255, 0.2); }
 
-.main { flex: 1; padding: 30px 36px; max-width: 1240px; }
+/* min-width: 0 ضروري على العنصر المرن — بدونه يتمدّد المحتوى العريض (جدول)
+   فيدفع الصفحة أفقياً بدل أن يُمرَّر داخل حاويته */
+.main { flex: 1; min-width: 0; padding: 30px 36px; max-width: 1240px; }
 .main > h2 { font-size: 22px; font-weight: 800; margin-bottom: 4px; }
 .main .subtitle { color: var(--text-secondary); font-size: 13px; margin-bottom: 24px; }
 
@@ -285,6 +287,10 @@ body {
 .barlist .num { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
 
 /* ═══ الجداول ═══ */
+/* الجداول لا تنكمش دون محتواها. نجعل البطاقة تُمرِّر جدولها أفقياً بدل أن يفيض
+   على الصفحة كلها — فيبقى التمرير محصوراً في الجدول لا في الصفحة.
+   -webkit-overflow-scrolling للزخم على iOS. */
+.card { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 th {
   text-align: start;
@@ -465,15 +471,21 @@ input, select, textarea {
   border-radius: 10px;
   background: var(--surface-1);
   color: var(--text-primary);
-  min-width: 140px;
+  /* عرض مرغوب لا أدنى مُلزِم: على الجوال ينكمش الحقل مع البطاقة بدل أن يفيض */
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
+/* الحقول المستقلة (خارج .field) تحتفظ بعرض مريح على الشاشات الواسعة */
+.inline > input, .inline > select, form.inline > input, form.inline > select,
+.table-filter > input, .table-filter > select { width: auto; min-width: min(140px, 100%); }
 input:focus, select:focus, textarea:focus {
   outline: none;
   border-color: var(--teal-500);
   box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.15);
 }
-textarea { min-width: 280px; }
+textarea { min-width: 0; width: 100%; max-width: 100%; }
 button {
   font: inherit;
   font-size: 13.5px;
@@ -1018,3 +1030,244 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
   background: var(--primary-soft);
 }
 .theme-toggle.plain button.on { background: var(--primary-soft); color: var(--accent-text); }
+
+/* ═══ رأس الصفحة: العنوان يميناً وزرّ الإجراء يساراً ═══ */
+/* يلتفّ من تلقائه على الشاشة الضيقة بدل أن يسحق العنوان أو يقصّ الزر */
+.page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+}
+.page-head > :first-child { min-width: 0; flex: 1 1 260px; }
+
+/* صفّ إجراء داخل بطاقة (شاشة الطبيب: النداء والإنهاء) */
+.action-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+}
+.action-row > :first-child { min-width: 0; }
+
+@media (max-width: 639px) {
+  /* على الجوال يملأ صفّ الأزرار السطر — الإبهام يخطئ الأزرار الصغيرة المتلاصقة */
+  .page-head > button, .page-head > :last-child:not(:first-child) { width: 100%; }
+  .action-row > :last-child:not(:first-child) { width: 100%; display: flex; gap: 8px; }
+  .action-row > :last-child:not(:first-child) > button { flex: 1; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   الاستجابة — موبايل / تابلت / لابتوب
+   الافتراضي أعلاه هو تخطيط اللابتوب (شريط جانبي ثابت). ما دون 1024px
+   يتحوّل الشريط إلى درج منزلق يفتحه شريط علوي، وتنكمش المسافات والخطوط.
+   ═══════════════════════════════════════════════════════════ */
+
+/* الشريط العلوي مخفي على اللابتوب — الشريط الجانبي ظاهر دائماً هناك */
+.topbar { display: none; }
+.drawer-scrim { display: none; }
+
+/* ═══ لابتوب صغير وتابلت أفقي (1024–1280) — تضييق الهوامش لا التخطيط ═══ */
+@media (max-width: 1280px) {
+  .main { padding: 26px 24px; }
+  .sidebar { width: 224px; }
+}
+
+/* ═══ تابلت وموبايل (< 1024px) — الشريط الجانبي يصير درجاً ═══ */
+@media (max-width: 1023px) {
+  .layout { flex-direction: column; }
+
+  .topbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    padding: 10px 14px;
+    background: linear-gradient(180deg, var(--teal-900) 0%, var(--teal-800) 100%);
+    color: #fff;
+    /* الشاشات ذات النتوء (iPhone) — نُبعد المحتوى عن المنطقة المحجوبة */
+    padding-top: max(10px, env(safe-area-inset-top));
+  }
+  .topbar-burger {
+    display: grid;
+    place-items: center;
+    width: 44px;              /* هدف لمس 44px — أدنى مقاس مريح بالإبهام */
+    height: 44px;
+    padding: 0;
+    flex-shrink: 0;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    color: #fff;
+  }
+  .topbar-burger:hover { background: rgba(255, 255, 255, 0.2); filter: none; }
+  .topbar-burger svg { width: 22px; height: 22px; }
+  .topbar-title {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 15px; font-weight: 800; min-width: 0;
+  }
+  .topbar-title span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .topbar-logo { font-size: 20px; flex-shrink: 0; }
+
+  /* الدرج: خارج الشاشة افتراضياً، ينزلق من جهة البداية (يمين في RTL) */
+  .sidebar {
+    position: fixed;
+    inset-block: 0;
+    inset-inline-start: 0;
+    width: min(280px, 84vw);
+    height: 100dvh;           /* dvh لا vh — شريط عنوان المتصفح المتحرك يقصّ vh */
+    z-index: 50;
+    transform: translateX(var(--drawer-hidden, 105%));
+    transition: transform 0.22s ease-out;
+    box-shadow: var(--shadow-pop);
+    padding-bottom: max(22px, env(safe-area-inset-bottom));
+  }
+  /* RTL يُخفي الدرج يميناً (+) وLTR يساراً (−) — بلا هذا يظهر من الجهة الخطأ */
+  [dir='rtl'] .sidebar { --drawer-hidden: 105%; }
+  [dir='ltr'] .sidebar { --drawer-hidden: -105%; }
+  .drawer-open .sidebar { transform: translateX(0); }
+
+  .drawer-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    background: rgba(6, 15, 14, 0.5);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.22s ease-out;
+  }
+  .drawer-open .drawer-scrim { opacity: 1; pointer-events: auto; }
+
+  /* روابط القائمة أكبر داخل الدرج — تُلمس بالإبهام لا بالفأرة */
+  .sidebar nav a { padding: 13px 14px; font-size: 14.5px; }
+  .user-box .logout { padding: 9px; }
+
+  /* width:100% كان يجبر ثمانية أعمدة على عرض الشاشة فتنزل الكلمات حرفاً حرفاً
+     ويرتفع الصفّ إلى 250px. width:auto يمنح كل عمود عرضه الطبيعي، والبطاقة
+     (overflow-x:auto) تُمرِّر ما زاد أفقياً — سطر واحد لكل سجلّ. */
+  table { width: auto; min-width: 100%; }
+  td { white-space: nowrap; max-width: 30ch; overflow: hidden; text-overflow: ellipsis; }
+
+  /* تلميح بصري أن الجدول يُمرَّر: تدرّج يلتصق بحافة البطاقة ويختفي عند نهاية
+     التمرير. background-attachment:local هو ما يجعله يتبع موضع التمرير. */
+  .card:has(> table), .card:has(> div > table) {
+    background-image: linear-gradient(to left, var(--surface-1), transparent 24px),
+                      linear-gradient(to left, rgba(16, 32, 30, 0.12), transparent 12px);
+    background-position: left center, left center;
+    background-repeat: no-repeat;
+    background-size: 24px 100%, 12px 100%;
+    background-attachment: local, scroll;
+  }
+
+  .main { padding: 20px 16px; max-width: none; }
+  .main > h2 { font-size: 19px; }
+  .main .subtitle { margin-bottom: 18px; }
+
+  .card { padding: 16px; margin-bottom: 16px; }
+  .tiles { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .tile { padding: 14px 15px; }
+  .tile .value { font-size: 25px; }
+
+  /* عمود الاسم في مخطط الأعمدة كان ثابتاً 150px فيسحق شريط النسبة */
+  .barlist .row { grid-template-columns: minmax(90px, 40%) 1fr 40px; gap: 8px; }
+
+  /* بطاقة المراجعة عمودية: 175px للاسم + نص بجانبه لا يتّسعان على الجوال */
+  .review { flex-direction: column; gap: 6px; }
+  .review .who { min-width: 0; }
+  .review .when { white-space: normal; }
+
+  .grid2 { grid-template-columns: 1fr; gap: 14px; }
+
+  /* مبدّل السمة العائم فوق صفحة الدخول كان يغطّي الحقول على الشاشة الضيقة */
+  .theme-toggle.plain { position: static; width: 100%; margin-bottom: 4px; }
+  .login-page { padding: 16px; align-content: center; }
+  .login-card { padding: 28px 22px; }
+}
+
+/* ═══ موبايل (< 640px) ═══ */
+@media (max-width: 639px) {
+  body { font-size: 13.5px; }
+  .main { padding: 16px 12px; }
+  .card { padding: 14px 12px; border-radius: 12px; }
+
+  table { font-size: 12.5px; }
+  th { padding: 8px 8px; font-size: 11px; }
+  td { padding: 9px 8px; max-width: 22ch; }
+
+  .tiles { grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); }
+  .tile .value { font-size: 22px; }
+
+  /* حقول النموذج تملأ السطر: صفّان بعرض النصف لا يُقرآن على 360px */
+  form.inline > .field, .inline > .field { flex: 1 1 100%; }
+  .table-filter { flex-wrap: wrap; }
+  .table-filter input { max-width: none; }
+
+  /* أهداف اللمس: الأزرار أطول ولا تنكمش دون 44px */
+  button { padding: 11px 18px; min-height: 44px; }
+  .sidebar .user-box .logout, .draft-bar button, .file-chip button,
+  .password-eye, .day-nav, .theme-toggle button { min-height: 0; }
+  input, select, textarea { font-size: 16px; padding: 11px 12px; }  /* 16px يمنع تكبير iOS التلقائي عند التركيز */
+
+  .setting-row { gap: 10px; }
+  .setting-info { min-width: 0; }
+  .setting-control { width: 100%; }
+  .setting-control input, .setting-control select { width: 100%; }
+
+  /* صفّ الخانة الزمنية: الوقت والوصف والزر لا يتّسعون في سطر واحد */
+  .slot-row { flex-wrap: wrap; gap: 8px 10px; padding: 12px; }
+  .slot-row > button { width: 100%; }
+  .slot-time { min-width: 48px; }
+
+  .urgent-bar { padding: 12px; }
+  .urgent-btn { width: 100%; }
+
+  .flow-steps { gap: 4px; }
+  .flow-steps .step { font-size: 10.5px; padding: 4px 8px; }
+
+  .ticket-card { width: 100%; max-width: 320px; padding: 26px 20px; }
+  .ticket-number { font-size: 54px; }
+
+  .patient-turn-card { padding: 24px 18px; }
+  .ptr-number { font-size: 46px; }
+
+  .finance-legend { gap: 10px 16px; }
+  .decision-box { padding: 16px 14px; }
+}
+
+/* ═══ الشاشة العامة وشاشة النداء ═══ */
+/* هذه تعمل على تابلت الصالة وربما على تلفاز — تصغر بمرونة لا بخطوة واحدة */
+@media (max-width: 1023px) {
+  .public-display { padding: 20px 16px; }
+  .public-display-header { margin-bottom: 20px; gap: 12px; }
+  .public-display-header h1 { font-size: 21px; }
+  .public-display-logo { font-size: 32px; }
+  .public-display-grid { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+  .public-display-card { padding: 20px 16px; border-radius: 16px; }
+  .pd-doctor { font-size: 19px; }
+  .pd-number { font-size: 54px; }
+  .pd-next-number { font-size: 24px; }
+
+  /* رقم النداء 190px يفيض عرض الجوال — clamp يُبقيه أكبر ما تحتمله الشاشة */
+  .pd-banner-inner { padding: 32px 24px; border-radius: 24px; width: min(92vw, 560px); }
+  .pd-banner-number { font-size: clamp(88px, 34vw, 190px); }
+  .pd-banner-label { font-size: 16px; letter-spacing: 4px; }
+  .pd-banner-doctor { font-size: 22px; margin-top: 14px; }
+  .pd-banner-room { font-size: 20px; }
+}
+
+@media (max-width: 639px) {
+  .public-display-grid { grid-template-columns: 1fr; }
+  .pd-header-tools { width: 100%; margin-inline-start: 0; justify-content: space-between; }
+  .public-display-header { flex-wrap: wrap; }
+  .pd-audio-btn { min-height: 44px; }
+}
+
+/* الجوال الأفقي القصير: الدرج والبطاقات الطويلة تحتاج تمريراً لا ارتفاعاً ثابتاً */
+@media (max-height: 480px) and (orientation: landscape) {
+  .ticket-print { min-height: 0; padding: 20px 0; }
+  .login-page, .patient-turn-page { min-height: 0; padding: 24px 16px; }
+}

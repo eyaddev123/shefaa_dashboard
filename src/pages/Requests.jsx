@@ -33,7 +33,7 @@ export default function Requests() {
 
   return (
     <>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
+      <div className="page-head">
         <div>
           <h2>طلبات المساعدة</h2>
           <p className="subtitle">

@@ -32,7 +32,7 @@ export default function ClinicBoard() {
 
   return (
     <>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
+      <div className="page-head">
         <div>
           <h2>لوحة العيادات</h2>
           <p className="subtitle">جلسات الدكاترة لليوم المحدد وطول طابور كل منها — تنقّل بالأيام للحجز المسبق</p>
