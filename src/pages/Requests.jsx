@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState, useCallback } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api, AID_TYPES, STATUSES, fmtDate, fmtMoney } from '../api.js'
 import { useRole } from '../RoleContext.jsx'
+import { isReadOnly } from '../permissions.js'
 
 function statusBadge(status) {
   const cls =
@@ -12,24 +13,43 @@ function statusBadge(status) {
   return <span className={`badge ${cls}`}>{STATUSES[status] || status}</span>
 }
 
+// أرباع البحث — كلٌّ على حدة، فلا تختلط النتائج
+const SEARCH_BY = { name: 'الاسم', phone: 'رقم الهاتف', request_no: 'رقم الطلب' }
+
 export default function Requests() {
   const [rows, setRows] = useState([])
-  const [filter, setFilter] = useState('')
+  const [loading, setLoading] = useState(false)
   const { role } = useRole()
   const navigate = useNavigate()
 
-  useEffect(() => { api.requests().then(setRows) }, [])
+  // البحث والفلتر محفوظان في الـ URL فلا يضيعان بالتحديث
+  const [params, setParams] = useSearchParams()
+  const by = SEARCH_BY[params.get('by')] ? params.get('by') : 'name'
+  const q = params.get('q') || ''
+  const statusFilter = params.get('status') || ''
+  const [text, setText] = useState(q)
 
-  const visible = useMemo(() => {
-    const q = filter.trim().toLowerCase()
-    if (!q) return rows
-    return rows.filter((r) =>
-      r.head_name?.toLowerCase().includes(q) ||
-      r.file_number?.includes(q) ||
-      String(r.id) === q ||
-      r.description?.toLowerCase().includes(q) ||
-      r.beneficiaries.some((b) => b.name?.toLowerCase().includes(q)))
-  }, [rows, filter])
+  // البحث خادمي بالربع المختار (فارغ ⇒ كل الطلبات)
+  const fetchRows = useCallback((searchBy, query) => {
+    setLoading(true)
+    api.requests(query.trim() ? searchBy : null, query.trim())
+      .then(setRows).finally(() => setLoading(false))
+  }, [])
+
+  useEffect(() => { fetchRows(by, q) }, [fetchRows, by, q])
+
+  const runSearch = (e) => {
+    e?.preventDefault()
+    const next = new URLSearchParams(params)
+    if (text.trim()) { next.set('by', by); next.set('q', text.trim()) }
+    else { next.delete('q') }
+    setParams(next, { replace: true })
+  }
+  const setBy = (v) => { const n = new URLSearchParams(params); n.set('by', v); setParams(n, { replace: true }) }
+  const setStatus = (v) => { const n = new URLSearchParams(params); v ? n.set('status', v) : n.delete('status'); setParams(n, { replace: true }) }
+
+  // فلتر الحالة يُطبَّق على نتائج البحث (بالواجهة — لا يحتاج جولة خادم)
+  const visible = statusFilter ? rows.filter((r) => r.status === statusFilter) : rows
 
   return (
     <>
@@ -50,22 +70,33 @@ export default function Requests() {
       </div>
 
       <div className="card">
-        <div className="table-filter">
-          <input value={filter} onChange={(e) => setFilter(e.target.value)}
-                 placeholder="تصفية: اسم رب العائلة، مستفيد، رقم ملف، رقم طلب…" />
-          {filter && <span className="count">{visible.length} من {rows.length}</span>}
+        {/* بحث مقسَّم لأرباع: اسم / هاتف / رقم طلب */}
+        <form className="search-bar" onSubmit={runSearch}>
+          <select value={by} onChange={(e) => setBy(e.target.value)} aria-label="نوع البحث">
+            {Object.entries(SEARCH_BY).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select>
+          <input value={text} onChange={(e) => setText(e.target.value)}
+                 dir={by === 'name' ? 'rtl' : 'ltr'}
+                 placeholder={by === 'name' ? 'اسم رب العائلة أو المستفيد…'
+                   : by === 'phone' ? 'رقم الهاتف…' : 'رقم الطلب…'} />
+          <button type="submit">بحث</button>
+          {q && <button type="button" className="ghost" onClick={() => { setText(''); const n = new URLSearchParams(params); n.delete('q'); setParams(n, { replace: true }) }}>مسح</button>}
+        </form>
+
+        {/* فلتر الحالة يبقى شغّالاً مع البحث */}
+        <div className="table-filter" style={{ gap: 8 }}>
+          <select value={statusFilter} onChange={(e) => setStatus(e.target.value)}>
+            <option value="">كل الحالات</option>
+            {Object.entries(STATUSES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select>
+          <span className="count">{loading ? 'جارٍ البحث…' : `${visible.length} نتيجة`}</span>
         </div>
+
         <table>
           <thead>
             <tr>
-              <th>الملف</th>
-              <th>رب العائلة</th>
-              <th>المستفيدون</th>
-              <th>النوع</th>
-              <th>تاريخ الطلب</th>
-              <th>مراجعات المجلس</th>
-              <th>الحالة</th>
-              <th>المصروف</th>
+              <th>الملف</th><th>رب العائلة</th><th>المستفيدون</th><th>النوع</th>
+              <th>تاريخ الطلب</th><th>مراجعات المجلس</th><th>الحالة</th><th>المصروف</th>
             </tr>
           </thead>
           <tbody>
@@ -81,7 +112,7 @@ export default function Requests() {
                 <td className="num">{fmtMoney(r.disbursed_total)}</td>
               </tr>
             ))}
-            {visible.length === 0 && <tr><td colSpan={8} className="empty">لا نتائج مطابقة</td></tr>}
+            {!loading && visible.length === 0 && <tr><td colSpan={8} className="empty">لا نتائج مطابقة</td></tr>}
           </tbody>
         </table>
       </div>

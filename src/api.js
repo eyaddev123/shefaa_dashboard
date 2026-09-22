@@ -46,8 +46,12 @@ export const api = {
     http(`/data-quality/${scope}/${id}/reopen`, { method: 'POST' }),
   family: (id) => http(`/families/${id}`),
   person: (id) => http(`/persons/${id}`),
+  updatePerson: (id, body) => http(`/persons/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   search: (q) => http(`/search?q=${encodeURIComponent(q)}`),
-  requests: () => http('/requests'),
+  // بحث سريع عن عائلة (combobox إنشاء الطلب)
+  familyLookup: (q) => http(`/families/lookup?q=${encodeURIComponent(q)}`),
+  // قائمة الطلبات مع بحث خادمي محدَّد بربع: by=name|phone|request_no
+  requests: (by, q) => http('/requests' + (by && q ? `?by=${by}&q=${encodeURIComponent(q)}` : '')),
   request: (id) => http(`/requests/${id}`),
   vouchers: () => http('/vouchers'),
   boardMembers: () => http('/board-members'),
@@ -60,6 +64,8 @@ export const api = {
   standingApprovals: (familyId) => http(`/families/${familyId}/standing-approvals`),
   revokeStandingApproval: (id, reason) =>
     http(`/standing-approvals/${id}/revoke`, { method: 'POST', body: JSON.stringify({ reason }) }),
+  reconfirmStandingApproval: (id) =>
+    http(`/standing-approvals/${id}/reconfirm`, { method: 'POST' }),
   standingDueReview: () => http('/standing-approvals/due-review'),
   flaggedVouchers: () => http('/reconciliation/flagged'),
   addVoucher: (requestId, body) =>
@@ -177,6 +183,7 @@ export const ROLE_LABELS = {
   clinic_reception: 'استقبال العيادات',
   doctor: 'طبيب',
   super_admin: 'المشرف العام',
+  manager: 'مدير (اطّلاع فقط)',
 }
 
 // شرح ما يفتحه كل دور — يُعرض تحت قائمة الأدوار في نموذج إنشاء الموظف
@@ -189,7 +196,19 @@ export const ROLE_DESCRIPTIONS = {
   clinic_reception: 'حجز المرضى وتسجيل الحضور وإدارة الطابور اليومي.',
   doctor: 'شاشته الخاصة فقط: طابور جلساته ونداء المرضى.',
   super_admin: 'يطالع كل شاشات النظام، ويدير الموظفين وأدوارهم والإعدادات.',
+  manager: 'يطالع كل شاشات المساعدات والعيادات — بلا أي كتابة أو إضافة أو تعديل.',
 }
+
+// الحالة الاجتماعية — تُعرض حسب جنس الابن المشتقّ من العلاقة
+export const MARITAL_STATUS = {
+  single: { m: 'أعزب', f: 'عزباء' },
+  married: { m: 'متزوج', f: 'متزوجة' },
+  divorced: { m: 'مطلّق', f: 'مطلّقة' },
+  widowed: { m: 'أرمل', f: 'أرملة' },
+}
+// نصّ الحالة حسب جنس الفرد (daughter → مؤنّث، غيره → مذكّر)
+export const maritalLabel = (status, relation) =>
+  status ? (MARITAL_STATUS[status]?.[relation === 'daughter' ? 'f' : 'm'] || status) : null
 
 export const AID_TYPES = {
   treatment: 'علاج',
@@ -339,3 +358,7 @@ export const fmtMoney = (n) =>
 
 export const fmtDate = (d) =>
   d ? new Date(d).toLocaleDateString('ar-SY', { year: 'numeric', month: 'long', day: 'numeric' }) : '—'
+
+// تاريخ ووقت — لسجل التعديلات (متى غُيّر الحقل بالضبط)
+export const fmtDateTime = (d) =>
+  d ? new Date(d).toLocaleString('ar-SY', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'

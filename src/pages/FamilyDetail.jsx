@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { api, AID_TYPES, DECISION_TYPES, RELATIONS, STATUSES, fmtDate, fmtMoney } from '../api.js'
+import { api, AID_TYPES, DECISION_TYPES, RELATIONS, STATUSES, MARITAL_STATUS, maritalLabel, fmtDate, fmtMoney } from '../api.js'
 import { useRole } from '../RoleContext.jsx'
 
 function statusBadge(status) {
@@ -12,20 +12,30 @@ function statusBadge(status) {
   return <span className={`badge ${cls}`}>{STATUSES[status] || status}</span>
 }
 
+const WITH_CHILDREN_COUNTS = new Set(['married', 'divorced', 'widowed'])
 function NewPersonForm({ familyId, onCreated }) {
-  const blank = { name: '', relation: 'son', birth_year: '', occupation: '', monthly_wage: '', national_id: '' }
+  const blank = { name: '', relation: 'son', birth_year: '', marital_status: '',
+    daughters_count: '', sons_count: '', occupation: '', monthly_wage: '', national_id: '' }
   const [form, setForm] = useState(blank)
   const [err, setErr] = useState(null)
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
+
+  const isChild = form.relation === 'son' || form.relation === 'daughter'
+  const showCounts = isChild && WITH_CHILDREN_COUNTS.has(form.marital_status)
 
   const submit = async (e) => {
     e.preventDefault()
     setErr(null)
     try {
       await api.addPerson(familyId, {
-        ...form,
+        name: form.name, relation: form.relation,
         birth_year: form.birth_year ? Number(form.birth_year) : null,
+        marital_status: form.marital_status || null,
+        daughters_count: showCounts && form.daughters_count !== '' ? Number(form.daughters_count) : null,
+        sons_count: showCounts && form.sons_count !== '' ? Number(form.sons_count) : null,
+        occupation: form.occupation || null,
         monthly_wage: form.monthly_wage ? Number(form.monthly_wage) : null,
+        national_id: form.national_id || null,
         is_head: form.relation === 'head',
       })
       setForm(blank)
@@ -43,6 +53,23 @@ function NewPersonForm({ familyId, onCreated }) {
         </select>
       </div>
       <div className="field"><label>سنة التولّد</label><input type="number" value={form.birth_year} onChange={set('birth_year')} /></div>
+      {/* الحالة الاجتماعية للأبناء فقط، والعددان مع متزوج/مطلّق/أرمل */}
+      {isChild && (
+        <div className="field">
+          <label>الحالة الاجتماعية</label>
+          <select value={form.marital_status} onChange={set('marital_status')}>
+            <option value="">— غير محدَّدة —</option>
+            {Object.keys(MARITAL_STATUS).map((k) =>
+              <option key={k} value={k}>{maritalLabel(k, form.relation)}</option>)}
+          </select>
+        </div>
+      )}
+      {showCounts && (
+        <>
+          <div className="field"><label>عدد البنات</label><input type="number" min="0" value={form.daughters_count} onChange={set('daughters_count')} /></div>
+          <div className="field"><label>عدد الصبيان</label><input type="number" min="0" value={form.sons_count} onChange={set('sons_count')} /></div>
+        </>
+      )}
       <div className="field"><label>المهنة</label><input value={form.occupation} onChange={set('occupation')} /></div>
       <div className="field"><label>الأجر الشهري</label><input type="number" value={form.monthly_wage} onChange={set('monthly_wage')} /></div>
       <div className="field"><label>الرقم الوطني</label><input value={form.national_id} onChange={set('national_id')} dir="ltr" /></div>
@@ -59,17 +86,24 @@ export default function FamilyDetail() {
   const navigate = useNavigate()
 
   const [standing, setStanding] = useState([])
+  const [headChange, setHeadChange] = useState(null)   // آخر تعديل هوية رب الأسرة (للتعليق)
   const [revoking, setRevoking] = useState(null)
+  const [confirming, setConfirming] = useState(false)
 
   const load = useCallback(() => api.family(id).then(setH), [id])
   const loadStanding = useCallback(
-    () => api.standingApprovals(id).then(setStanding).catch(() => {}), [id])
+    () => api.standingApprovals(id).then((r) => {
+      setStanding(r.approvals || [])
+      setHeadChange(r.head_identity_change || null)
+    }).catch(() => {}), [id])
   useEffect(() => { load(); loadStanding() }, [load, loadStanding])
 
   if (!h) return <p className="empty">جارٍ التحميل…</p>
 
-  // الاعتماد الفعّال واحد بحكم الفهرس الفريد الجزئي؛ الباقي تاريخ
+  // الاعتماد الفعّال واحد بحكم الفهرس الفريد الجزئي؛ الباقي تاريخ.
+  // المعلّق فعّال لكنه ينتظر تأكيد المدير المسؤول.
   const active = standing.find((x) => !x.revoked_at)
+  const suspended = active && active.suspended_at
   const history = standing.filter((x) => x.revoked_at)
 
   const revoke = async (sa) => {
@@ -83,11 +117,23 @@ export default function FamilyDetail() {
     finally { setRevoking(null) }
   }
 
+  const reconfirm = async (sa) => {
+    if (!window.confirm('تأكيد أن هوية رب الأسرة الجديدة صحيحة، ورفع تعليق الاعتماد الدائم؟')) return
+    setConfirming(true)
+    try {
+      await api.reconfirmStandingApproval(sa.id)
+      await loadStanding()
+    } catch (e) { window.alert(e.message) }
+    finally { setConfirming(false) }
+  }
+
   return (
     <>
       <h2>
         ملف {h.file_number} — عائلة {h.head_name}
-        {active && <span className="standing-badge" style={{ marginRight: 10 }}>معتمدة دائماً</span>}
+        {active && (suspended
+          ? <span className="standing-badge suspended" style={{ marginRight: 10 }}>اعتماد معلّق</span>
+          : <span className="standing-badge" style={{ marginRight: 10 }}>معتمدة دائماً</span>)}
       </h2>
       <p className="subtitle">
         فُتح في {fmtDate(h.opened_at)} · {h.current_address || 'بدون عنوان'} ·
@@ -127,6 +173,24 @@ export default function FamilyDetail() {
                 يمرّ الطلب تلقائياً إذا: التزامه ضمن السقف، ولم يفت تاريخ إعادة النظر،
                 ولا يتضمن عملية، ولا في ملف العائلة مشكلة بيانات حاجبة.
               </p>
+              {/* ═══ معلّق: عُدّلت هوية رب الأسرة، بانتظار تأكيد المدير المسؤول ═══ */}
+              {suspended && (
+                <div className="warn-box" style={{ marginTop: 10 }}>
+                  <strong>الاعتماد معلّق</strong> — {active.suspend_reason}
+                  {headChange && (
+                    <div style={{ marginTop: 6, fontSize: 13 }}>
+                      {headChange.field === 'national_id' ? 'الرقم الوطني' : 'الاسم'}:{' '}
+                      <span className="muted" style={{ textDecoration: 'line-through' }}>{headChange.old_value || '—'}</span>
+                      {' ← '}<strong>{headChange.new_value || '—'}</strong>
+                    </div>
+                  )}
+                  {isChairman
+                    ? <button disabled={confirming} onClick={() => reconfirm(active)} style={{ marginTop: 8 }}>
+                        {confirming ? 'جارٍ التأكيد…' : 'تأكيد الاعتماد'}
+                      </button>
+                    : <p className="hint" style={{ marginBottom: 0 }}>التأكيد من صلاحية المدير المسؤول.</p>}
+                </div>
+              )}
               {isChairman && (
                 <button className="danger" disabled={revoking === active.id}
                         onClick={() => revoke(active)} style={{ marginTop: 10 }}>

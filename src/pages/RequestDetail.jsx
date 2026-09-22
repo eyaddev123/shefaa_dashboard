@@ -220,6 +220,13 @@ export default function RequestDetail() {
         {r.notified_at && <> · <span className="badge good">أُبلغ المستفيد ✓</span></>}
         {r.fulfilled_at && <> · <span className="badge good">استفاد فعلاً ✓</span></>}
       </p>
+      {/* تنبيه: عُدّل أحد أفراد العائلة بعد تقديم الطلب وقبل قراره — للشفافية لا المنع */}
+      {r.family_edited_after_submit && (
+        <div className="warn-box" style={{ marginBottom: 14 }}>
+          ⚠️ عُدّلت بيانات أحد أفراد العائلة <strong>بعد</strong> تقديم هذا الطلب.
+          راجع الملف قبل القرار — <Link to={`/families/${r.family_id}`}>سجل تعديلات العائلة</Link>.
+        </div>
+      )}
       <div className="flow-steps" style={{ marginBottom: 20 }}>
         {flowSteps.map((s, i) => (
           <span key={s.key} style={{ display: 'inline-flex', gap: 6 }}>

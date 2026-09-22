@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import FamilyCombobox from '../components/FamilyCombobox.jsx'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { api, AID_TYPES, RELATIONS, SERVICE_UNITS, fmtMoney } from '../api.js'
 import { useRole } from '../RoleContext.jsx'
@@ -10,8 +11,8 @@ export default function NewRequest() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
 
-  const [families, setFamilies] = useState([])
   const [familyId, setFamilyId] = useState(params.get('family') || '')
+  const [familyObj, setFamilyObj] = useState(null)   // العائلة المختارة (للعرض بالـ combobox)
   const [members, setMembers] = useState([])
   const [selected, setSelected] = useState([])
   const [aidType, setAidType] = useState('treatment')
@@ -28,10 +29,15 @@ export default function NewRequest() {
   const [expectedCost, setExpectedCost] = useState('')
   const [costTouched, setCostTouched] = useState(false)
 
-  useEffect(() => { api.families().then(setFamilies); api.catalog().then(setCatalog) }, [])
+  useEffect(() => { api.catalog().then(setCatalog) }, [])
   useEffect(() => {
-    if (familyId) api.family(familyId).then((h) => setMembers(h.members))
-    else setMembers([])
+    if (familyId) api.family(familyId).then((h) => {
+      setMembers(h.members)
+      // نضبط كائن العرض إن لم يكن مضبوطاً (قدوم عبر ?family= أو استعادة مسودة)
+      setFamilyObj((cur) => cur && String(cur.id) === String(familyId)
+        ? cur : { id: h.id, file_number: h.file_number, head_name: h.head_name })
+    })
+    else { setMembers([]); setFamilyObj(null) }
   }, [familyId])
 
   // حفظ تلقائي للمسودة (الملفات لا تُحفظ — يعاد إرفاقها عند الاستعادة)
@@ -136,14 +142,10 @@ export default function NewRequest() {
             {savedAt && !restored && <span className="draft-saved">يُحفظ تلقائياً ✓ {fmtDraftTime(savedAt)}</span>}
           </h3>
           <div className="inline" style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-end' }}>
-            <div className="field">
+            <div className="field" style={{ minWidth: 280 }}>
               <label>العائلة (الملف)</label>
-              <select value={familyId} onChange={(e) => setFamilyId(e.target.value)} required autoFocus>
-                <option value="">— اختر الملف —</option>
-                {families.map((h) => (
-                  <option key={h.id} value={h.id}>{h.file_number} — {h.head_name}</option>
-                ))}
-              </select>
+              <FamilyCombobox value={familyObj} autoFocus
+                onChange={(fam) => { setFamilyObj(fam); setFamilyId(fam ? String(fam.id) : ''); setSelected([]) }} />
             </div>
             <div className="field">
               <label>نوع المساعدة</label>

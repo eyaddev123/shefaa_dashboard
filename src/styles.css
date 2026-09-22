@@ -1298,3 +1298,32 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
   padding: 10px 12px; border-radius: 8px; font-size: 13px; line-height: 1.7;
   background: var(--status-good-bg, #e7f6ec); color: var(--status-good, #1b7f3b);
 }
+
+/* ═══ الدفعة الثانية: combobox العائلة + شريط البحث + التعليق ═══ */
+.combobox { position: relative; }
+.combobox-list {
+  position: absolute; z-index: 30; top: calc(100% + 4px); inset-inline: 0;
+  max-height: 320px; overflow-y: auto; margin: 0; padding: 4px; list-style: none;
+  background: var(--surface, #fff); border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(0,0,0,.14);
+}
+.combobox-list li {
+  display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  padding: 9px 11px; border-radius: 7px; cursor: pointer; font-size: 14px;
+}
+.combobox-list li.active { background: var(--surface-2, rgba(0,0,0,.05)); }
+.combobox-list li.empty { justify-content: center; color: var(--muted); cursor: default; }
+.combobox-list .cb-main { font-weight: 600; }
+.combobox-list .cb-meta { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+
+.search-bar { display: flex; gap: 8px; align-items: stretch; margin-bottom: 10px; flex-wrap: wrap; }
+.search-bar select { flex: 0 0 auto; }
+.search-bar input { flex: 1 1 220px; }
+
+/* شارة الاعتماد المعلّق — تمييز عن «معتمدة دائماً» الخضراء */
+.standing-badge.suspended {
+  background: var(--status-warn-bg, #fdf1dc); color: var(--status-warn, #9a6b00);
+}
+.standing-badge.sm { font-size: 11px; padding: 2px 8px; }
+.badge.sm { font-size: 11px; padding: 2px 7px; }
+.note-line { font-size: 13.5px; color: var(--text-secondary, #555); margin: 4px 0 0; }
