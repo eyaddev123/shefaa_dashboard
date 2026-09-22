@@ -47,8 +47,12 @@ function TicketPrint({ appt, doctorName, onDone }) {
         <h2>بطاقة الدور</h2>
         <p className="ticket-doctor">{doctorName}</p>
         <p className="ticket-number">{appt.queue_number}</p>
-        <p className="ticket-code">رمز البطاقة: {appt.ticket_code}</p>
-        <p className="ticket-hint">احتفظ بهذه البطاقة — بها رقم دورك ورمزه</p>
+        {/* رمز الوصول هو مفتاح صفحة «دوري» العامة — يُطبع بارزاً لأن المريض
+            سيكتبه على موبايله. رمز البطاقة الداخلي لم يعد يفتح شيئاً علناً. */}
+        <p className="ticket-access-code">رمز الوصول: <strong>{appt.access_code}</strong></p>
+        <p className="ticket-hint">
+          احتفظ بهذه البطاقة. لمتابعة دورك: افتح صفحة «دوري» وأدخل رقم موبايلك مع رمز الوصول.
+        </p>
         <button className="no-print" onClick={onDone} style={{ marginTop: 16 }}>إغلاق</button>
       </div>
     </div>

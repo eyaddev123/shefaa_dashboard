@@ -772,6 +772,13 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
   line-height: 1; margin: 10px 0;
 }
 .ticket-code { font-size: 13px; color: var(--muted); direction: ltr; }
+/* رمز الوصول مفتاح صفحة «دوري» — بارز ومتباعد الأحرف كي يُنقل بلا خطأ،
+   فأكثر من يقرؤه كبار بالعمر عن ورقة مطبوعة. */
+.ticket-access-code {
+  font-size: 20px; font-weight: 700; margin-top: 8px;
+  letter-spacing: 4px; direction: ltr;
+}
+.ticket-access-code strong { font-variant-numeric: tabular-nums; }
 .ticket-hint { font-size: 12px; color: var(--muted); margin-top: 14px; }
 
 @media print {
@@ -1270,4 +1277,24 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
 @media (max-height: 480px) and (orientation: landscape) {
   .ticket-print { min-height: 0; padding: 20px 0; }
   .login-page, .patient-turn-page { min-height: 0; padding: 24px 16px; }
+}
+
+/* ═══ الاعتماد الدائم ═══ */
+.standing-grant {
+  margin-top: 14px; padding: 12px 14px;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface-2, rgba(0,0,0,.02));
+}
+.standing-toggle { display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 600; }
+.standing-toggle input { width: 16px; height: 16px; cursor: pointer; }
+.standing-grant .hint { font-size: 12px; color: var(--muted); margin: 6px 0 0; line-height: 1.6; }
+/* شارة العائلة المعتمدة دائماً — تُقرأ من بعيد على شاشة تفاصيل العائلة */
+.standing-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 700;
+  background: var(--status-good-bg, #e7f6ec); color: var(--status-good, #1b7f3b);
+}
+.auto-approved-note {
+  padding: 10px 12px; border-radius: 8px; font-size: 13px; line-height: 1.7;
+  background: var(--status-good-bg, #e7f6ec); color: var(--status-good, #1b7f3b);
 }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { api, AID_TYPES, RELATIONS, STATUSES, fmtDate, fmtMoney } from '../api.js'
+import { api, AID_TYPES, DECISION_TYPES, RELATIONS, STATUSES, fmtDate, fmtMoney } from '../api.js'
 import { useRole } from '../RoleContext.jsx'
 
 function statusBadge(status) {
@@ -55,17 +55,40 @@ function NewPersonForm({ familyId, onCreated }) {
 export default function FamilyDetail() {
   const { id } = useParams()
   const [h, setH] = useState(null)
-  const { role } = useRole()
+  const { role, isChairman } = useRole()
   const navigate = useNavigate()
 
+  const [standing, setStanding] = useState([])
+  const [revoking, setRevoking] = useState(null)
+
   const load = useCallback(() => api.family(id).then(setH), [id])
-  useEffect(() => { load() }, [load])
+  const loadStanding = useCallback(
+    () => api.standingApprovals(id).then(setStanding).catch(() => {}), [id])
+  useEffect(() => { load(); loadStanding() }, [load, loadStanding])
 
   if (!h) return <p className="empty">جارٍ التحميل…</p>
 
+  // الاعتماد الفعّال واحد بحكم الفهرس الفريد الجزئي؛ الباقي تاريخ
+  const active = standing.find((x) => !x.revoked_at)
+  const history = standing.filter((x) => x.revoked_at)
+
+  const revoke = async (sa) => {
+    const reason = window.prompt('سبب سحب الاعتماد الدائم (إلزامي):')
+    if (!reason || !reason.trim()) return
+    setRevoking(sa.id)
+    try {
+      await api.revokeStandingApproval(sa.id, reason.trim())
+      await loadStanding()
+    } catch (e) { window.alert(e.message) }
+    finally { setRevoking(null) }
+  }
+
   return (
     <>
-      <h2>ملف {h.file_number} — عائلة {h.head_name}</h2>
+      <h2>
+        ملف {h.file_number} — عائلة {h.head_name}
+        {active && <span className="standing-badge" style={{ marginRight: 10 }}>معتمدة دائماً</span>}
+      </h2>
       <p className="subtitle">
         فُتح في {fmtDate(h.opened_at)} · {h.current_address || 'بدون عنوان'} ·
         جوال: <span dir="ltr">{h.mobile || '—'}</span>
@@ -80,6 +103,61 @@ export default function FamilyDetail() {
           <div className="hint">عبر كل الطلبات وسندات الصرف</div>
         </div>
       </div>
+
+      {/* ═══ الاعتماد الدائم: الشروط + الطلب الأصلي + سجلّ المنح والسحب ═══
+          الشروط معروضة نصاً لأن الموظف يحتاج أن يعرف **لماذا** مرّ طلب ولم يمرّ غيره. */}
+      {(active || history.length > 0) && (
+        <div className="card">
+          <h3>الاعتماد الدائم</h3>
+          {active ? (
+            <>
+              <p>
+                <strong>{DECISION_TYPES[active.decision_type] || active.decision_type}</strong>
+                {active.decision_type === 'percentage' && active.decision_value != null &&
+                  <> — {Number(active.decision_value)}٪</>}
+                {' · السقف لكل طلب: '}<strong>{fmtMoney(active.per_request_cap)}</strong>
+                {active.review_date && <> · تاريخ إعادة النظر: {fmtDate(active.review_date)}</>}
+              </p>
+              <p className="hint">
+                مُنح من الطلب رقم{' '}
+                <Link to={`/requests/${active.source_request_id}`}>{active.source_request_no}</Link>
+                {' '}بواسطة {active.granted_by_name || '—'} في {fmtDate(active.granted_at)}.
+              </p>
+              <p className="hint">
+                يمرّ الطلب تلقائياً إذا: التزامه ضمن السقف، ولم يفت تاريخ إعادة النظر،
+                ولا يتضمن عملية، ولا في ملف العائلة مشكلة بيانات حاجبة.
+              </p>
+              {isChairman && (
+                <button className="danger" disabled={revoking === active.id}
+                        onClick={() => revoke(active)} style={{ marginTop: 10 }}>
+                  {revoking === active.id ? 'جارٍ السحب…' : 'سحب الاعتماد'}
+                </button>
+              )}
+            </>
+          ) : <p className="empty">لا اعتماد فعّال — طلبات العائلة تمرّ بمراجعة المجلس</p>}
+
+          {history.length > 0 && (
+            <details style={{ marginTop: 12, fontSize: 13 }}>
+              <summary style={{ cursor: 'pointer', color: 'var(--text-secondary)' }}>
+                اعتمادات سابقة مسحوبة ({history.length})
+              </summary>
+              <div style={{ marginTop: 8 }}>
+                {history.map((x) => (
+                  <div key={x.id} style={{ padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
+                    <strong>{DECISION_TYPES[x.decision_type] || x.decision_type}</strong>
+                    {' · سقف '}{fmtMoney(x.per_request_cap)}
+                    <div className="when">
+                      مُنح {fmtDate(x.granted_at)} · سُحب {fmtDate(x.revoked_at)}
+                      {x.revoked_by_name && <> بواسطة {x.revoked_by_name}</>}
+                    </div>
+                    <div className="rec">السبب: {x.revoke_reason}</div>
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+        </div>
+      )}
 
       <div className="card">
         <h3>أفراد العائلة — انقر على الفرد لعرض سجل مساعداته</h3>

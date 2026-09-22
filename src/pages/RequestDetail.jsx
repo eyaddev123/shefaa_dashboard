@@ -55,6 +55,8 @@ function ReviewForm({ request, onSaved }) {
 function DecisionForm({ request, onSaved }) {
   const { member } = useRole()
   const [form, setForm] = useState({ decision_type: 'percentage', decision_value: '', decision_text: '', session_no: '' })
+  // الاعتماد الدائم: خيار يُضاف للقرار نفسه لا شاشة منفصلة — القرار ومنحُه فعل واحد
+  const [standing, setStanding] = useState({ on: false, cap: '', review_date: '' })
   const [treasury, setTreasury] = useState(null)
   const [err, setErr] = useState(null)
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
@@ -64,6 +66,9 @@ function DecisionForm({ request, onSaved }) {
   // معاينة حية للالتزام الناتج عن القرار المُدخل
   const committed = committedFromDecision(form.decision_type, form.decision_value, request.expected_cost)
   const exceeds = treasury && committed > treasury.available
+  // الاعتماد الدائم متاح فقط مع الموافقة الكاملة أو النسبة — نفس شرط الخادم حرفياً.
+  // المبلغ المقطوع يخصّ كلفة هذا الطلب وحده فلا معنى لتعميمه، والرفض لا اعتماد فيه.
+  const standingAllowed = ['full_approval', 'percentage'].includes(form.decision_type)
 
   const submit = async (e) => {
     e.preventDefault()
@@ -73,6 +78,11 @@ function DecisionForm({ request, onSaved }) {
         ...form,
         decision_value: form.decision_value ? Number(form.decision_value) : null,
         board_member_id: member.id,
+        ...(standingAllowed && standing.on ? {
+          grant_standing_approval: true,
+          standing_per_request_cap: Number(standing.cap),
+          standing_review_date: standing.review_date || null,
+        } : {}),
       })
       onSaved()
     } catch (e) { setErr(e.message) }
@@ -95,7 +105,7 @@ function DecisionForm({ request, onSaved }) {
           بمقدار {fmtMoney(committed - treasury.available)}. القرار بيدك — لكن يُنصح بتدبير إيرادات إضافية قبل الصرف.
         </div>
       )}
-      <form className="inline" onSubmit={submit} style={{ marginTop: 14 }}>
+      <form id="decision-form" className="inline" onSubmit={submit} style={{ marginTop: 14 }}>
         <div className="field">
           <label>نوع القرار</label>
           <select value={form.decision_type} onChange={set('decision_type')}>
@@ -105,9 +115,43 @@ function DecisionForm({ request, onSaved }) {
         <div className="field"><label>القيمة (نسبة أو مبلغ)</label><input type="number" value={form.decision_value} onChange={set('decision_value')} /></div>
         <div className="field"><label>رقم الجلسة</label><input value={form.session_no} onChange={set('session_no')} /></div>
         <div className="field" style={{ flex: 1 }}><label>نص القرار</label><textarea rows={2} value={form.decision_text} onChange={set('decision_text')} required /></div>
-        <button type="submit">اعتماد القرار النهائي</button>
-        {err && <p className="error">{err}</p>}
       </form>
+
+      {/* ═══ الاعتماد الدائم ═══
+          يخفى تماماً مع أنواع القرار التي لا تقبله بدل أن يظهر معطَّلاً بلا تفسير. */}
+      {standingAllowed && (
+        <div className="standing-grant">
+          <label className="standing-toggle">
+            <input type="checkbox" checked={standing.on}
+                   onChange={(e) => setStanding((v) => ({ ...v, on: e.target.checked }))} />
+            <span>اعتماد العائلة كحالة دائمة</span>
+          </label>
+          <p className="hint">
+            طلبات هذه العائلة بعد اليوم تُعتمد تلقائياً بنفس القرار بلا مراجعة مجلس — ما دامت
+            ضمن السقف، ولا تتضمن عملية، ولا في ملفها مشكلة بيانات حاجبة.
+          </p>
+          {standing.on && (
+            <div className="inline" style={{ marginTop: 10 }}>
+              <div className="field">
+                <label>السقف لكل طلب (إلزامي)</label>
+                <input type="number" min="1" required value={standing.cap}
+                       onChange={(e) => setStanding((v) => ({ ...v, cap: e.target.value }))} />
+              </div>
+              <div className="field">
+                <label>تاريخ إعادة النظر (اختياري)</label>
+                <input type="date" value={standing.review_date}
+                       onChange={(e) => setStanding((v) => ({ ...v, review_date: e.target.value }))} />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      {/* الزر خارج الوسم <form> ومربوط به بـ form= كي يقع **بعد** خيار الاعتماد
+          الدائم بصرياً: من يضغط «اعتماد القرار» يكون قد رأى الخيار قبله لا بعده. */}
+      <div style={{ marginTop: 14 }}>
+        <button type="submit" form="decision-form">اعتماد القرار النهائي</button>
+        {err && <p className="error">{err}</p>}
+      </div>
     </>
   )
 }
@@ -258,7 +302,26 @@ export default function RequestDetail() {
               <div className="when">{fmtDate(rev.reviewed_at)}</div>
             </div>
           ))}
-          {r.reviews.length === 0 && <p className="empty">لم يراجع أحد بعد</p>}
+          {/* طلب اعتُمد تلقائياً: غياب المراجعات هنا **صحيح** لا نقص — نقول ذلك
+              صراحةً وإلا قُرئت الشاشة كأن المجلس أهمل الطلب. */}
+          {r.reviews.length === 0 && r.standing_approval && (
+            <div className="auto-approved-note">
+              اعتُمد تلقائياً بموجب الاعتماد الدائم للعائلة
+              {r.standing_approval.source_request_no != null && (
+                <> (الطلب رقم {r.standing_approval.source_request_no}
+                  {r.standing_approval.source_decided_at && <>، بتاريخ {fmtDate(r.standing_approval.source_decided_at)}</>})
+                </>
+              )}
+              {' — بلا مراجعة مجلس.'}
+            </div>
+          )}
+          {r.reviews.length === 0 && !r.standing_approval && <p className="empty">لم يراجع أحد بعد</p>}
+          {/* لماذا لم يُعتمد تلقائياً رغم وجود اعتماد دائم للعائلة */}
+          {r.auto_skip_reason && (
+            <div className="warn-box" style={{ marginTop: 10 }}>
+              لم يُعتمد تلقائياً: {r.auto_skip_reason} — فمشى بمسار مراجعة المجلس.
+            </div>
+          )}
           {/* سجلّ تعديلات المراجعات — الخادم لا يرسله إلا للرئيس، فلا يظهر لغيره */}
           {r.review_history?.length > 0 && (
             <details style={{ marginTop: 12, fontSize: 13 }}>

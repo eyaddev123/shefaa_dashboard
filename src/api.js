@@ -56,6 +56,12 @@ export const api = {
     http(`/requests/${requestId}/reviews`, { method: 'POST', body: JSON.stringify(body) }),
   addDecision: (requestId, body) =>
     http(`/requests/${requestId}/decision`, { method: 'POST', body: JSON.stringify(body) }),
+  // الاعتماد الدائم للعائلة
+  standingApprovals: (familyId) => http(`/families/${familyId}/standing-approvals`),
+  revokeStandingApproval: (id, reason) =>
+    http(`/standing-approvals/${id}/revoke`, { method: 'POST', body: JSON.stringify({ reason }) }),
+  standingDueReview: () => http('/standing-approvals/due-review'),
+  flaggedVouchers: () => http('/reconciliation/flagged'),
   addVoucher: (requestId, body) =>
     http(`/requests/${requestId}/vouchers`, { method: 'POST', body: JSON.stringify(body) }),
   addFamily: (body) => http('/families', { method: 'POST', body: JSON.stringify(body) }),

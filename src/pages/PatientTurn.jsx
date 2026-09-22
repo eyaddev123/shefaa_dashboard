@@ -3,7 +3,7 @@ import { api, APPOINTMENT_STATUSES, fmtTime } from '../api.js'
 
 export default function PatientTurn() {
   const [mobile, setMobile] = useState('')
-  const [ticketCode, setTicketCode] = useState('')
+  const [accessCode, setAccessCode] = useState('')
   const [result, setResult] = useState(null)
   const [err, setErr] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -12,7 +12,7 @@ export default function PatientTurn() {
     e.preventDefault()
     setErr(null); setBusy(true); setResult(null)
     try {
-      const r = await api.clinic.myTurn({ mobile, ticket_code: ticketCode })
+      const r = await api.clinic.myTurn({ mobile, access_code: accessCode })
       setResult(r)
     } catch (ex) { setErr(ex.message) }
     finally { setBusy(false) }
@@ -31,9 +31,12 @@ export default function PatientTurn() {
             <input value={mobile} onChange={(e) => setMobile(e.target.value)} dir="ltr" required autoFocus />
           </div>
           <div className="field">
-            <label>رمز البطاقة</label>
-            <input value={ticketCode} onChange={(e) => setTicketCode(e.target.value)} dir="ltr" required
-                   placeholder="مكتوب على بطاقتك" />
+            {/* رمز وصول من 6 أرقام لا رمز البطاقة: البطاقة تُخمَّن بالعدّ، والرمز لا.
+                inputMode=numeric يفتح لوحة الأرقام — أكثر المرضى كبار بالعمر. */}
+            <label>رمز الوصول</label>
+            <input value={accessCode} onChange={(e) => setAccessCode(e.target.value.replace(/\D/g, ''))}
+                   dir="ltr" required inputMode="numeric" maxLength={6} autoComplete="off"
+                   placeholder="٦ أرقام مطبوعة على بطاقتك" />
           </div>
           <button type="submit" disabled={busy} style={{ width: '100%', padding: '13px', fontSize: 15 }}>
             {busy ? 'جارٍ البحث…' : 'اعرض دوري'}
