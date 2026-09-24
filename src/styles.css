@@ -289,8 +289,12 @@ body {
 /* ═══ الجداول ═══ */
 /* الجداول لا تنكمش دون محتواها. نجعل البطاقة تُمرِّر جدولها أفقياً بدل أن يفيض
    على الصفحة كلها — فيبقى التمرير محصوراً في الجدول لا في الصفحة.
-   -webkit-overflow-scrolling للزخم على iOS. */
+   -webkit-overflow-scrolling للزخم على iOS.
+   لكنّ overflow-x: auto يجعل المحور الرأسي auto أيضاً بحكم CSS، فتقصّ البطاقةُ
+   أيَّ قائمةٍ منسدلةٍ مطلقةٍ بداخلها وتُمرِّرها. لذا نستثني البطاقة التي تحوي
+   combobox مفتوحاً: تُعيد overflow إلى visible فتنسدل القائمة فوق ما تحتها. */
 .card { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.card:has(.combobox-list) { overflow: visible; }
 table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 th {
   text-align: start;
@@ -477,6 +481,31 @@ input, select, textarea {
   max-width: 100%;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
+/* ═══ القوائم المنسدلة (select) ═══
+   لوحةُ select المفتوحة يرسمها النظام لا CSS، فلا تطالها ألوانُ الثيم. ثلاثةُ
+   أمورٍ تُدجّنها: color-scheme يُلبسها ثوبَ الوضع الداكن، وتلوينُ option صراحةً
+   لمن يحترمه (فايرفوكس وويندوز)، وسهمٌ من صنعنا لأنّ السهم الأصليّ يقف يميناً
+   في RTL فيركب النصّ. */
+select {
+  color-scheme: inherit;                     /* اللوحةُ الأصليّة تتبع الثيم */
+  appearance: none; -webkit-appearance: none;
+  /* سهمٌ SVG مدمَج — لونه currentColor كي يتبع نصَّ الحقل في الوضعين */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5l5-5' fill='none' stroke='%237d938f' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: left 12px center;     /* يساراً في RTL — لا يركب النصّ */
+  background-size: 11px;
+  padding-inline-end: 12px;
+  padding-inline-start: 32px;                /* مكانُ السهم */
+  cursor: pointer;
+}
+select:disabled { cursor: not-allowed; opacity: 0.6; }
+/* خياراتُ القائمة: يحترمها فايرفوكس وويندوز؛ ويتجاهلها ماك فيقع على color-scheme */
+select option {
+  background: var(--surface-1);
+  color: var(--text-primary);
+}
+select option:checked { font-weight: 700; }
+
 /* الحقول المستقلة (خارج .field) تحتفظ بعرض مريح على الشاشات الواسعة */
 .inline > input, .inline > select, form.inline > input, form.inline > select,
 .table-filter > input, .table-filter > select { width: auto; min-width: min(140px, 100%); }
@@ -1302,22 +1331,44 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
 /* ═══ الدفعة الثانية: combobox العائلة + شريط البحث + التعليق ═══ */
 .combobox { position: relative; }
 .combobox-list {
-  position: absolute; z-index: 30; top: calc(100% + 4px); inset-inline: 0;
-  max-height: 320px; overflow-y: auto; margin: 0; padding: 4px; list-style: none;
-  background: var(--surface, #fff); border: 1px solid var(--border); border-radius: 10px;
-  box-shadow: 0 8px 28px rgba(0,0,0,.14);
+  position: absolute; z-index: 30; top: calc(100% + 6px); inset-inline: 0;
+  /* قائمةٌ منسدلةٌ معتادة: سقفُ ارتفاعٍ يُظهر ~٧ نتائج ثم تُمرَّر القائمةُ
+     وحدَها — لا الصفحةُ ولا البطاقة. وأقصاه ٦٠٪ من الشاشة كي لا تتجاوزها. */
+  max-height: min(340px, 60vh); overflow-y: auto; overscroll-behavior: contain;
+  margin: 0; padding: 4px; list-style: none;
+  background: var(--surface-1); color: var(--text-primary);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow-pop);
 }
+:root[data-theme='dark'] .combobox-list { border-color: var(--grid); }
 .combobox-list li {
   display: flex; justify-content: space-between; align-items: center; gap: 10px;
-  padding: 9px 11px; border-radius: 7px; cursor: pointer; font-size: 14px;
+  padding: 9px 11px; border-radius: 9px; cursor: pointer; font-size: 14px;
+  color: var(--text-primary);
 }
-.combobox-list li.active { background: var(--surface-2, rgba(0,0,0,.05)); }
+.combobox-list li.active { background: var(--primary-soft); color: var(--accent-text); }
 .combobox-list li.empty { justify-content: center; color: var(--muted); cursor: default; }
 .combobox-list .cb-main { font-weight: 600; }
 .combobox-list .cb-meta { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+/* سطر «عرض ٢٠ أخرى» — يفصله خط علوي كي لا يُقرأ نتيجةً */
+.combobox-list .cb-more {
+  justify-content: center; font-size: 13px; font-weight: 600;
+  color: var(--accent-text); border-top: 1px solid var(--grid);
+  border-radius: 0 0 9px 9px; margin-top: 4px;
+  position: sticky; bottom: -4px; background: var(--surface-1);
+}
+.combobox-list .cb-more:hover { background: var(--primary-soft); }
+/* شريط تمرير رفيع يتبع الثيم بدل الرمادي الافتراضي */
+.combobox-list::-webkit-scrollbar { width: 9px; }
+.combobox-list::-webkit-scrollbar-thumb {
+  background: var(--grid); border-radius: 9px; border: 3px solid var(--surface-1);
+}
+.combobox-list::-webkit-scrollbar-track { background: transparent; }
 
 .search-bar { display: flex; gap: 8px; align-items: stretch; margin-bottom: 10px; flex-wrap: wrap; }
-.search-bar select { flex: 0 0 auto; }
+/* width:100% من القاعدة العامّة كان يجعل select يحتلّ سطراً كاملاً فينزل
+   حقلُ البحث تحته. flex-basis وحدَه لا يكفي — نُلغي العرض صراحةً. */
+.search-bar select { flex: 0 0 auto; width: auto; min-width: 150px; }
 .search-bar input { flex: 1 1 220px; }
 
 /* شارة الاعتماد المعلّق — تمييز عن «معتمدة دائماً» الخضراء */

@@ -31,7 +31,13 @@ export const api = {
   me: () => http('/auth/me'),
   dashboard: () => http('/dashboard'),
   stats: () => http('/stats'),
-  families: (opts = {}) => http(`/families${opts.issues ? '?issues=1' : ''}`),
+  families: (opts = {}) => {
+    const p = new URLSearchParams()
+    if (opts.issues) p.set('issues', '1')
+    if (opts.by && opts.q) { p.set('by', opts.by); p.set('q', opts.q) }
+    const qs = p.toString()
+    return http(`/families${qs ? '?' + qs : ''}`)
+  },
 
   // مراجعة جودة البيانات المستوردة من الأرشيف
   dqSummary: () => http('/data-quality/summary'),
@@ -49,7 +55,7 @@ export const api = {
   updatePerson: (id, body) => http(`/persons/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   search: (q) => http(`/search?q=${encodeURIComponent(q)}`),
   // بحث سريع عن عائلة (combobox إنشاء الطلب)
-  familyLookup: (q) => http(`/families/lookup?q=${encodeURIComponent(q)}`),
+  familyLookup: (q, offset = 0) => http(`/families/lookup?q=${encodeURIComponent(q)}&offset=${offset}`),
   // قائمة الطلبات مع بحث خادمي محدَّد بربع: by=name|phone|request_no
   requests: (by, q) => http('/requests' + (by && q ? `?by=${by}&q=${encodeURIComponent(q)}` : '')),
   request: (id) => http(`/requests/${id}`),
