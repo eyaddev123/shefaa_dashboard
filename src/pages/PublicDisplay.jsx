@@ -16,6 +16,19 @@ const DAILY_RELOAD_HOUR = 3      // إعادة تحميل مسكّرة: تتخل
 // بأنفسنا لأنّ رمز الجهاز قد يُرفض (401) فلا معنى لمحاولةٍ كل ثانية.
 const RETRY_MS = [1000, 2000, 5000, 10000, 30000]
 
+// توزيع البطاقات على أعمدة: ١←١، ٢←٢، ٣←٣، ٤←٢ (٢×٢)، وما فوق←٣.
+// أربع عيادات في ٢×٢ لا ٣+١: صفٌّ أخير ببطاقة وحيدة ممدودة يبدو خللاً ويُهدر
+// نصف الشاشة. وفوق ذلك تتكاثر الصفوف والبطاقات تتقلّص معاً بـ grid لا بالتمرير.
+//
+// ⚠️ إلا على نافذة **عريضة وقصيرة**: صفّان في ارتفاع ضئيل يسحقان البطاقة حتى
+// يختفي «يُخدَم الآن» ورقم الغرفة. فإن قصر الارتفاع نُسطّح الكل في صفٍّ واحد —
+// البطاقة تضيق عرضاً ويبقى محتواها كاملاً، وهذا أهون من محتوى مبتور.
+const gridCols = (n, wide = false) => {
+  if (n <= 3) return Math.max(1, n)
+  if (n === 4) return wide ? 4 : 2
+  return wide ? Math.min(n, 6) : 3
+}
+
 const two = (n) => String(n).padStart(2, '0')
 const AR_DAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
 const AR_MONTHS = ['كانون الثاني', 'شباط', 'آذار', 'نيسان', 'أيار', 'حزيران',
@@ -31,6 +44,9 @@ export default function PublicDisplay() {
   const [settings, setSettings] = useState(() => loadSettings())
   const [showSettings, setShowSettings] = useState(false)
   const [now, setNow] = useState(() => new Date())
+  // نسبة النافذة: أعرض من 2:1 تعني ارتفاعاً لا يكفي صفّين من البطاقات
+  const [wide, setWide] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth / window.innerHeight > 2)
   // البطاقات التي تغيّر رقمها حديثاً — تُومض ليلفت التغيّر النظر حتى لو الصوت مقفول
   const [flashing, setFlashing] = useState({})
 
@@ -51,6 +67,14 @@ export default function PublicDisplay() {
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000)
     return () => clearInterval(t)
+  }, [])
+
+  // ── نسبة النافذة: تُعيد توزيع البطاقات عند تغيّر المقاس أو دوران الشاشة ──
+  useEffect(() => {
+    const onResize = () => setWide(window.innerWidth / window.innerHeight > 2)
+    window.addEventListener('resize', onResize)
+    onResize()
+    return () => window.removeEventListener('resize', onResize)
   }, [])
 
   // ── إعادة تحميل مسكّرة مرّة باليوم ──
@@ -288,7 +312,7 @@ export default function PublicDisplay() {
       ) : data.board.length === 0 ? (
         <p className="pd-msg">لا عيادات مفتوحة حالياً</p>
       ) : (
-        <div className="pd-grid" style={{ '--cols': Math.min(3, data.board.length) }}>
+        <div className="pd-grid" style={{ '--cols': gridCols(data.board.length, wide) }}>
           {data.board.map((b) => (
             <div
               key={b.doctor_name}

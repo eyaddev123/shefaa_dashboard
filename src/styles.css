@@ -824,8 +824,10 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
    بهوامش ثابتة — الهامش الثابت يدفع آخر سطر خارج الشاشة على الشاشة الأقصر. */
 .pd-root {
   height: 100vh;
-  display: grid;
-  grid-template-rows: auto auto 1fr;
+  /* عدد الأبناء متغيّر (لافتة صوت؟ لافتة تأخير؟). flex عمودي أبسط من grid هنا:
+     الترتيب يتبع ترتيب العناصر في JSX، وشبكة البطاقات وحدها تتمدّد (flex:1). */
+  display: flex;
+  flex-direction: column;
   gap: 1.2vh;
   overflow: hidden;              /* لا تمرير على شاشة الصالة إطلاقاً */
   background: #0b1615;
@@ -864,6 +866,7 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
 
 /* ── الشبكة: عمود لكل عيادة، والصفوف تتوزّع الارتفاع المتاح ── */
 .pd-grid {
+  flex: 1;                       /* تأخذ ما تبقّى من الارتفاع بعد الترويسة واللافتات */
   display: grid;
   grid-template-columns: repeat(var(--cols, 3), 1fr);
   gap: 1.2vh 1.2vw;
@@ -881,25 +884,54 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
   border-radius: 1.4vh;
   padding: 1.2vh 1vw;
 }
-.pd-card-head { min-height: 0; }
+/* ترويسة البطاقة: كتلة مرنة عمودية بأسطر لا تتراكب. الاعتماد على ارتفاع
+   السطر وحده جعل «يُخدَم الآن» يركب على الاختصاص عند أربع بطاقات. */
+.pd-card-head {
+  display: flex; flex-direction: column; gap: 0.2vh;
+  min-height: min-content; flex: none;
+}
 .pd-doctor {
-  font-size: clamp(14px, 1.5vw, 30px); font-weight: 800;
+  font-size: clamp(14px, 1.5vw, 30px); font-weight: 800; line-height: 1.3;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.pd-specialty { font-size: clamp(10px, 0.95vw, 18px); color: #b3c6c2; }
+.pd-specialty {
+  font-size: clamp(10px, 0.95vw, 18px); color: #b3c6c2; line-height: 1.4;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 
 .pd-current-wrap {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 0.4vh; min-height: 0;
+  overflow: hidden;   /* يقصّ الفائض بدل أن يدفعه فوق الترويسة */
 }
+/* الاختصاص و«يُخدَم الآن» قد يُقصّان عند الضيق الشديد، أما الرقم فلا */
+.pd-label { flex: none; }
 .pd-label { font-size: clamp(10px, 0.9vw, 17px); color: #7fd6b8; font-weight: 700; }
 /* الرقم الحالي هو بطل الشاشة: يُقرأ من آخر الصالة */
 .pd-number {
-  font-size: clamp(48px, 7.5vw, 150px); font-weight: 800; color: #14b8a6;
-  line-height: 0.95;
+  /* ═══ الرقم لا ينكمش أبداً ═══
+     min-height:0 مع flex كان يسحق صندوقه إلى ارتفاع صفر بينما يبقى الخطّ 50-66px،
+     فيُرسم الرقم خارج صندوقه ويختفي **تحت** سطر الغرفة. ظهر على نافذة عريضة
+     قصيرة (نسبة ~2.6:1) لا على 1080p. فـ flex: none يمنع السحق، و1em ارتفاعاً
+     أدنى يضمن للرقم مكانه دائماً. */
+  flex: none;
+  min-height: 1em;
+  /* يتبع ارتفاع البطاقة (cqh) لا النافذة: في نافذة قصيرة تقصر البطاقة فيصغر
+     الرقم معها بدل أن يفيض. وvmin احتياطٌ لمتصفّح بلا حاويات استعلام. */
+  font-size: clamp(32px, 9vmin, 120px);
+  font-weight: 800; color: #14b8a6;
+  line-height: 1;
+}
+
+@supports (container-type: size) {
+  .pd-card { container-type: size; }
+  .pd-number { font-size: clamp(32px, 34cqh, 120px); }
 }
 .pd-number.pd-dim { color: rgba(127, 214, 184, 0.3); }
-.pd-room { font-size: clamp(12px, 1.2vw, 24px); font-weight: 800; color: #7fd6b8; }
+.pd-room {
+  font-size: clamp(12px, 1.2vw, 24px); font-weight: 800; color: #7fd6b8;
+  margin-top: 0.4vh;   /* يفصلها عن الرقم الضخم فلا تبدو ملتصقة بذيله */
+}
 
 /* الرقمان الجايان */
 .pd-upcoming {
@@ -917,12 +949,13 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
 .pd-card.pd-flash { animation: pd-flash 0.8s ease-in-out 3; }
 
 /* ── لافتة الصوت المقفول: تغطّي عرض الشاشة، لا تُفوَّت ── */
+/* صفٌّ عادي في الشبكة لا طبقة عائمة: التثبيت في الأعلى كان يغطّي الترويسة
+   والساعة تماماً. تبقى بارزة بلونها وحجمها، وتختفي فور تفعيل الصوت. */
 .pd-audio-gate {
-  position: fixed; inset-inline: 0; top: 0; z-index: 60;
   font-family: inherit; cursor: pointer; border: none;
   font-size: clamp(15px, 1.8vw, 34px); font-weight: 800;
   color: #3a1d02; background: #f0b37e;
-  padding: 1.2vh 1vw;
+  padding: 1.2vh 1vw; border-radius: 12px;
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
 }
 .pd-offline-alert {
