@@ -27,7 +27,10 @@ function NewDoctorForm({ onCreated }) {
       <div className="field"><label>اسم الدكتور</label><input value={form.name} onChange={set('name')} required /></div>
       <div className="field"><label>الاختصاص</label><input value={form.specialty} onChange={set('specialty')} /></div>
       <div className="field"><label>الجوال</label><input value={form.phone} onChange={set('phone')} /></div>
-      <div className="field"><label>الغرفة</label><input value={form.room} onChange={set('room')} placeholder="مثال: 3" /></div>
+      {/* رقم الغرفة يُشتقّ منه اسم المقطع الصوتي (room-3.mp3) — الخادم يطبّع
+              الأرقام العربية والمسافات، والتنويه هنا يمنع المشكلة من أصلها (AUDIO.md) */}
+          <div className="field"><label>الغرفة</label><input value={form.room} onChange={set('room')} placeholder="مثال: 3" />
+            <small className="hint">بالأرقام اللاتينية (3 لا ٣) — يُنطق على شاشة النداء</small></div>
       <div className="field"><label>سعر المعاينة (ل.س)</label><input type="number" min="0" value={form.consultation_fee} onChange={set('consultation_fee')} required /></div>
       <div className="field"><label>سعر المراجعة (ل.س)</label><input type="number" min="0" value={form.followup_fee} onChange={set('followup_fee')} required /></div>
       <div className="field"><label>صلاحية المراجعة (يوم)</label><input type="number" min="1" value={form.followup_window_days} onChange={set('followup_window_days')} required /></div>

@@ -327,6 +327,7 @@ export default function SessionQueue() {
   const [data, setData] = useState(null)
   const [err, setErr] = useState(null)
   const [ticket, setTicket] = useState(null)
+  const [recalled, setRecalled] = useState(null)   // وقت آخر إعادة نداء — تأكيدٌ مرئي للموظف
 
   const load = () => api.clinic.queue(id).then(setData).catch((e) => setErr(e.message))
   useEffect(() => { load() }, [id])
@@ -339,6 +340,13 @@ export default function SessionQueue() {
   const cancel = async (apptId) => {
     if (!confirm('إلغاء هذا الحجز؟')) return
     try { await api.clinic.updateAppointment(apptId, { status: 'cancelled' }); load() }
+    catch (ex) { alert(ex.message) }
+  }
+
+  // إعادة النداء: الاستقبال يرى المريض لا يتحرّك — يُعاد بثّ النداء بلا تغيير حالته.
+  // الخادم يخنقها مرّة كل عشر ثوانٍ لكل حجز، فرسالة 429 تُعرض كما هي.
+  const recall = async (apptId) => {
+    try { await api.clinic.recall(apptId); setRecalled(Date.now()) }
     catch (ex) { alert(ex.message) }
   }
 
@@ -383,6 +391,35 @@ export default function SessionQueue() {
           onBooked={(appt) => setTicket(appt)}
         />
       </div>
+
+      {/* المريض الحالي وزر إعادة النداء — الاستقبال هو من يرى المريض لا يتحرّك */}
+      {(() => {
+        const current = data.appointments.find((a) => a.status === 'in_service')
+        if (!current) return null
+        return (
+          <div className="card highlight">
+            <div className="action-row">
+              <div>
+                <h3 style={{ marginBottom: 4 }}>قيد الكشف الآن</h3>
+                <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--primary)' }}>
+                  الدور {current.queue_number}
+                </div>
+                <div style={{ color: 'var(--text-secondary)' }}>{current.full_name}</div>
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <button className="ghost" onClick={() => recall(current.id)} style={{ padding: '12px 20px', fontSize: 15 }}>
+                  🔊 إعادة النداء
+                </button>
+                {recalled && (
+                  <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 5 }}>
+                    أُعيد النداء {new Date(recalled).toLocaleTimeString('ar', { hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       <div className="card">
         <h3>الطابور ({data.appointments.length})</h3>

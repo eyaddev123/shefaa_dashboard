@@ -55,7 +55,10 @@ function ProfileForm({ doctor, globalBuffer, onSaved }) {
         <div className="field"><label>الاختصاص</label><input value={form.specialty} onChange={set('specialty')} /></div>
         <div className="field"><label>الجوال</label><input value={form.phone} onChange={set('phone')} dir="ltr" /></div>
         {/* يظهر ويُنطَق على شاشة الصالة ضمن النداء */}
-        <div className="field"><label>الغرفة</label><input value={form.room} onChange={set('room')} placeholder="مثال: 3" /></div>
+        {/* رقم الغرفة يُشتقّ منه اسم المقطع الصوتي (room-3.mp3) — الخادم يطبّع
+              الأرقام العربية والمسافات، والتنويه هنا يمنع المشكلة من أصلها (AUDIO.md) */}
+          <div className="field"><label>الغرفة</label><input value={form.room} onChange={set('room')} placeholder="مثال: 3" />
+            <small className="hint">بالأرقام اللاتينية (3 لا ٣) — يُنطق على شاشة النداء</small></div>
       </div>
 
       <h4 style={{ marginTop: 18, marginBottom: 0 }}>التسعيرة</h4>

@@ -1,4 +1,6 @@
-// نداء المريض صوتياً على شاشة الصالة عبر Web Speech API (صوت المتصفح — بلا ملفات ولا إنترنت).
+// قراءة آلية للنداء عبر Web Speech API — **احتياطٌ لا أساس**.
+// الأساس مقاطع مسجَّلة (call-audio.js): أصوات العربية في المتصفح تختلف من جهاز لجهاز
+// وقد تغيب عن جهاز الشاشة فتصمت بلا خطأ. تبقى هذه للمقطع الناقص، ولشاشات الموظفين.
 
 // نكتب الرقم بالحروف بدل تمريره رقماً: كثير من الأصوات تقرأ "12" بالإنجليزية أو تتهجّاه رقماً رقماً.
 const ONES = ['', 'واحد', 'اثنان', 'ثلاثة', 'أربعة', 'خمسة', 'ستة', 'سبعة', 'ثمانية', 'تسعة']
@@ -33,9 +35,13 @@ export function arabicNumber(n) {
 export const withTitle = (name = '') =>
   /^(د\.|د |الدكتور|الدكتورة|دكتور|دكتورة)/.test(name.trim()) ? name : `الدكتور ${name}`
 
-export function announcementText({ queue_number, doctor_name, room }) {
-  const parts = [`المريض رقم ${arabicNumber(queue_number)}`, `توجّه إلى ${withTitle(doctor_name)}`]
-  if (room) parts.push(`غرفة ${arabicNumber(room)}`)
+// ═══ نصّ النداء الآلي — احتياطٌ للمقطع الناقص وحده ═══
+// الأساس تسجيلاتٌ جاهزة (انظر call-audio.js وAUDIO.md)، وهذه تُنقذ النداءة إن نقص
+// منها مقطع. النصّ يطابق التسجيلات حرفياً: «الرقم ٢١، يرجى التوجه إلى الغرفة ٣».
+// **ولا اسم دكتور فيه** — قرارٌ مثبَّت: اسمه يظهر على الشاشة ولا يُنطق أبداً.
+export function announcementText({ queue_number, room }) {
+  const parts = [`الرقم ${arabicNumber(queue_number)}`]
+  if (room) parts.push(`يرجى التوجه إلى الغرفة ${arabicNumber(room)}`)
   return `${parts.join('، ')}.`
 }
 

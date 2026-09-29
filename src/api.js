@@ -148,7 +148,8 @@ export const api = {
     recall: (appointmentId) => http(`/clinic/appointments/${appointmentId}/recall`, { method: 'POST' }),
     // بلا مصادقة — الشاشة العامة وموقع المريض
     publicBoard: () => http('/public/clinic/board'),
-    displayStreamUrl: () => '/api/public/clinic/display-stream',
+    // رمز الجهاز يمرّ في الاستعلام: EventSource لا يقبل ترويسات مخصّصة
+    displayStreamUrl: (key) => `/api/public/clinic/display-stream?key=${encodeURIComponent(key)}`,
     myTurn: (body) => http('/public/clinic/my-turn', { method: 'POST', body: JSON.stringify(body) }),
   },
   // المرفق الطبي لا يُفتح برابط مباشر — الرابط بلا توكن، والمجلد لم يعد مكشوفاً.
