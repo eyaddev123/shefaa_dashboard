@@ -130,6 +130,10 @@ export const api = {
     queue: (sessionId) => http(`/clinic/sessions/${sessionId}/queue`),
     slots: (sessionId) => http(`/clinic/sessions/${sessionId}/slots`),
     doctor: (id) => http(`/clinic/doctors/${id}`),
+    // يبحث بالموبايل أو بالاسم. الرد إمّا مريضاً واحداً (مطابقة موبايل قاطعة)،
+    // أو { candidates: [...] } (مطابقة اسم — يقرّر الموظف)، أو null.
+    lookupPatientBy: (body) =>
+      http('/clinic/patients/lookup', { method: 'POST', body: JSON.stringify(body) }),
     lookupPatient: (mobile, sessionId) =>
       http('/clinic/patients/lookup', { method: 'POST', body: JSON.stringify({ mobile, session_id: sessionId }) }),
     followupCheck: (sessionId, mobile) =>
@@ -138,7 +142,9 @@ export const api = {
       http(`/clinic/appointments/${appointmentId}/prioritize`, { method: 'POST', body: JSON.stringify({ priority }) }),
     book: (sessionId, body) =>
       http(`/clinic/sessions/${sessionId}/appointments`, { method: 'POST', body: JSON.stringify(body) }),
-    arrive: (appointmentId) => http(`/clinic/appointments/${appointmentId}/arrive`, { method: 'POST' }),
+    // patient اختياري: استكمال المعلومات المؤجَّلة مع تعليم الحضور في طلب واحد
+    arrive: (appointmentId, patient) => http(`/clinic/appointments/${appointmentId}/arrive`,
+      { method: 'POST', body: JSON.stringify(patient ? { patient } : {}) }),
     updateAppointment: (appointmentId, body) =>
       http(`/clinic/appointments/${appointmentId}`, { method: 'PATCH', body: JSON.stringify(body) }),
     mySessions: (date) => http(`/clinic/my-sessions?date=${date}`),

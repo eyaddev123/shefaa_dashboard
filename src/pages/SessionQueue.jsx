@@ -80,20 +80,38 @@ function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel, urgent = f
   const [busy, setBusy] = useState(false)
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
 
+  // المرشّحون بالاسم: الاسم ليس معرّفاً قاطعاً، فيقرّر الموظف «هو نفسه» أو «جديد»
+  const [candidates, setCandidates] = useState(null)
+
+  const applyPatient = (patient) => {
+    setForm((f) => ({ ...f, full_name: patient.full_name, mobile: patient.mobile || f.mobile,
+      gender: patient.gender || '', birth_year: patient.birth_year || '' }))
+    setLookupState('found')
+    setFollowup(patient.followup || null)
+    setCandidates(null)
+  }
+
   const checkMobile = async (mobile) => {
     if (mobile.length < 8) { setLookupState(null); setFollowup(null); return }
     setLookupState('checking')
     try {
-      const patient = await api.clinic.lookupPatient(mobile, sessionId)
-      if (patient) {
-        setForm((f) => ({ ...f, full_name: patient.full_name, gender: patient.gender || '', birth_year: patient.birth_year || '' }))
-        setLookupState('found')
-        setFollowup(patient.followup || null)
-      } else {
-        setLookupState('new')
-        setFollowup(null)
-      }
+      const r = await api.clinic.lookupPatientBy({ mobile, session_id: sessionId })
+      if (r?.candidates) { setCandidates(r.candidates); setLookupState('candidates') }
+      else if (r) applyPatient(r)
+      else { setLookupState('new'); setFollowup(null); setCandidates(null) }
     } catch { setLookupState(null) }
+  }
+
+  // ★ البحث بالاسم: المسار الوحيد للتعرّف على مريض بلا موبايل — وبدونه يصير
+  // صفاً جديداً في كل زيارة ويتقطّع تاريخه الطبّي.
+  const checkName = async (name) => {
+    const words = String(name || '').trim().split(/\s+/).filter(Boolean)
+    if (words.length < 3) { setCandidates(null); return }   // لا نبحث بالناقص
+    try {
+      const r = await api.clinic.lookupPatientBy({ full_name: name, session_id: sessionId })
+      if (r?.candidates?.length) { setCandidates(r.candidates); setLookupState('candidates') }
+      else setCandidates(null)
+    } catch { setCandidates(null) }
   }
 
   const isFollowup = form.visit_type === 'followup'
@@ -127,14 +145,52 @@ function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel, urgent = f
 
   return (
     <form className="inline" onSubmit={submit} style={{ marginTop: 14, flexWrap: 'wrap' }}>
+      {/* ★ الإلزامي عند الحجز: الاسم الثلاثي وحده. الباقي يُستكمل عند الحضور. */}
+      <div className="field" style={{ minWidth: 240 }}>
+        <label>الاسم الثلاثي</label>
+        <input value={form.full_name}
+          onChange={(e) => { set('full_name')(e); checkName(e.target.value) }}
+          required autoFocus placeholder="الاسم واسم الأب والكنية" />
+        <small className="hint">ثلاث كلمات على الأقل</small>
+      </div>
       <div className="field">
-        <label>رقم الموبايل</label>
-        <input value={form.mobile} onChange={(e) => { set('mobile')(e); checkMobile(e.target.value) }} required dir="ltr" autoFocus />
+        <label>رقم الموبايل <span className="opt">(اختياري)</span></label>
+        <input value={form.mobile} onChange={(e) => { set('mobile')(e); checkMobile(e.target.value) }} dir="ltr" />
         {lookupState === 'checking' && <span style={{ fontSize: 11, color: 'var(--muted)' }}>جارٍ البحث…</span>}
         {lookupState === 'found' && <span style={{ fontSize: 11, color: 'var(--good, green)' }}>مريض سابق — تم تعبئة بياناته</span>}
         {lookupState === 'new' && <span style={{ fontSize: 11, color: 'var(--muted)' }}>مريض جديد</span>}
+        {/* تنبيه صريح: بلا موبايل لا متابعة في «دوري» — مدخلها موبايل + رمز */}
+        {!form.mobile.trim() && (
+          <small className="hint warn-hint">
+            بلا موبايل لن يستطيع المريض متابعة دوره في صفحة «دوري» (الدخول إليها بالموبايل والرمز)
+          </small>
+        )}
       </div>
-      <div className="field"><label>الاسم الكامل</label><input value={form.full_name} onChange={set('full_name')} required /></div>
+
+      {/* مرشّحون بالاسم: الاسم ليس معرّفاً قاطعاً، فيقرّر الموظف لا النظام */}
+      {candidates?.length > 0 && (
+        <div className="candidates-box">
+          <div className="candidates-title">
+            مريض بهذا الاسم مسجَّل سابقاً ({candidates.length}) — هل هو نفسه؟
+          </div>
+          {candidates.map((c) => (
+            <div key={c.id} className="candidate-row">
+              <div>
+                <strong>{c.full_name}</strong>
+                <span className="candidate-meta">
+                  {c.mobile ? <span dir="ltr">{c.mobile}</span> : 'بلا موبايل'}
+                  {c.visits_count > 0 && ` · ${c.visits_count} زيارة`}
+                  {c.last_visit && ` · آخرها ${c.last_visit}`}
+                </span>
+              </div>
+              <button type="button" className="ghost" onClick={() => applyPatient(c)}>هو نفسه</button>
+            </div>
+          ))}
+          <button type="button" className="ghost candidate-new" onClick={() => { setCandidates(null); setLookupState('new') }}>
+            لا — مريض جديد
+          </button>
+        </div>
+      )}
       <div className="field">
         <label>الجنس</label>
         <select value={form.gender} onChange={set('gender')}>
@@ -207,6 +263,72 @@ function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel, urgent = f
       </div>
       {err && <p className="error">{err}</p>}
     </form>
+  )
+}
+
+// ═══ نموذج استكمال معلومات المريض عند الحضور ═══
+// يُفتح تلقائياً حين يرفض الخادم الحضور لنقص المعلومات. يعرض الحقول الناقصة
+// وحدها ويُرسلها مع تعليم الحضور في طلب واحد — فلا حضورٌ بمعلومات نصف مكتملة.
+function CompletePatientForm({ appt, missing, patient, onCancel, onSubmit }) {
+  const [form, setForm] = useState({
+    mobile: patient.mobile || '', gender: patient.gender || '',
+    birth_year: patient.birth_year || '',
+  })
+  const [err, setErr] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
+  const need = (k) => missing.includes(k)
+
+  const submit = async (e) => {
+    e.preventDefault()
+    setErr(null); setBusy(true)
+    try {
+      await onSubmit({
+        mobile: form.mobile.trim() || null,
+        gender: form.gender || null,
+        birth_year: form.birth_year ? Number(form.birth_year) : null,
+      })
+    } catch (ex) { setErr(ex.message) }
+    finally { setBusy(false) }
+  }
+
+  return (
+    <div className="card highlight">
+      <h3>استكمال معلومات المريض — {appt?.full_name}</h3>
+      <p className="subtitle" style={{ marginTop: -6 }}>
+        الدور {appt?.queue_number} · هذه المعلومات أُجّلت عند الحجز وتلزم قبل تعليم الحضور.
+      </p>
+      <form onSubmit={submit}>
+        <div className="inline" style={{ flexWrap: 'wrap' }}>
+          {need('mobile') && (
+            <div className="field">
+              <label>رقم الموبايل</label>
+              <input value={form.mobile} onChange={set('mobile')} dir="ltr" required autoFocus />
+              <small className="hint">به يتابع المريض دوره في «دوري»</small>
+            </div>
+          )}
+          {need('gender') && (
+            <div className="field">
+              <label>الجنس</label>
+              <select value={form.gender} onChange={set('gender')} required>
+                <option value="">—</option><option value="male">ذكر</option><option value="female">أنثى</option>
+              </select>
+            </div>
+          )}
+          {need('birth_year') && (
+            <div className="field">
+              <label>سنة الميلاد</label>
+              <input type="number" value={form.birth_year} onChange={set('birth_year')} style={{ width: 110 }} required />
+            </div>
+          )}
+        </div>
+        <div className="action-row" style={{ marginTop: 12 }}>
+          <button type="submit" disabled={busy}>{busy ? 'جارٍ الحفظ…' : 'حفظ وتعليم الحضور'}</button>
+          <button type="button" className="ghost" onClick={onCancel}>إلغاء</button>
+        </div>
+        {err && <p className="error">{err}</p>}
+      </form>
+    </div>
   )
 }
 
@@ -435,9 +557,19 @@ export default function SessionQueue() {
   const load = () => api.clinic.queue(id).then(setData).catch((e) => setErr(e.message))
   useEffect(() => { load() }, [id])
 
-  const arrive = async (apptId) => {
-    try { await api.clinic.arrive(apptId); load() }
-    catch (ex) { alert(ex.message) }
+  // ★ الحضور: إن رفض الخادم لنقص المعلومات، نفتح نموذج الإكمال مباشرةً بدل عرض
+  // خطأ يترك الموظف يخمّن ما ينقص ومن أين يُكمله.
+  const [completing, setCompleting] = useState(null)   // { appt, missing, patient }
+  const arrive = async (apptId, patientPatch) => {
+    try { await api.clinic.arrive(apptId, patientPatch); setCompleting(null); load() }
+    catch (ex) {
+      if (ex.data?.code === 'PATIENT_INFO_INCOMPLETE') {
+        const appt = data.appointments.find((a) => String(a.id) === String(apptId))
+        setCompleting({ appt, missing: ex.data.missing_fields || [], patient: ex.data.patient || {} })
+        return
+      }
+      alert(ex.message)
+    }
   }
 
   const cancel = async (apptId) => {
@@ -567,6 +699,16 @@ export default function SessionQueue() {
           </div>
         )
       })()}
+
+      {completing && (
+        <CompletePatientForm
+          appt={completing.appt}
+          missing={completing.missing}
+          patient={completing.patient}
+          onCancel={() => setCompleting(null)}
+          onSubmit={(patch) => arrive(completing.appt.id, patch)}
+        />
+      )}
 
       {postponing && (
         <PostponeDialog
