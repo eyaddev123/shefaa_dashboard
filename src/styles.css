@@ -442,6 +442,14 @@ form.inline > button, .inline > button { flex: 0 0 auto; }
 form.inline > .field-check, .inline > .field-check { flex: 0 0 auto; }
 .field label { font-size: 12px; color: var(--text-secondary); font-weight: 600; }
 
+/* حقل اختيار (checkbox): المربّع والنصّ في سطر واحد، والنصّ بحجم الحقول لا التسمية */
+.field-check label {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13.5px; color: var(--text); font-weight: 600; cursor: pointer;
+}
+.field-check input[type='checkbox'] { width: 16px; height: 16px; accent-color: var(--primary); cursor: pointer; }
+.field-check .hint { display: block; margin-top: 4px; }
+
 /* ═══ حقل كلمة المرور مع زرّ الإظهار ═══ */
 /* الحقل dir="ltr" (كلمات المرور لاتينية) داخل صفحة RTL. نثبّت الزرّ يميناً
    بـ right لا inset-inline-end: الأخيرة تتبع اتجاه الحاوية فتضعه يساراً فوق النص. */
@@ -1077,6 +1085,29 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
 .ptr-delay-list { margin: 8px 0 0; padding-inline-start: 18px; font-size: 12.5px; color: var(--text-primary); }
 .ptr-delay-list li { margin-bottom: 3px; }
 .ptr-delay-note { margin: 8px 0 0; font-size: 11.5px; color: var(--muted); line-height: 1.6; }
+
+/* تجاوز الدوام: لافتة صريحة لا لون تحذير خفيف — المريض ينتظر بلا أن يعرف أن موعده سقط */
+.ptr-overflow {
+  display: flex; flex-direction: column; gap: 4px;
+  margin-top: 14px; padding: 14px 16px; border-radius: 12px;
+  background: rgba(240, 179, 126, 0.16); border: 1px solid rgba(240, 179, 126, 0.5);
+  text-align: center;
+}
+.ptr-overflow strong { font-size: 16px; color: #8a4b08; }
+.ptr-overflow span { font-size: 13px; color: var(--text-secondary); }
+
+/* رمز الوصول الجديد بعد التأجيل — يُقرأ للمريض، فيكون بارزاً وقابلاً للنسخ بالعين */
+.ptr-code-line { margin: 10px 0; font-size: 13.5px; }
+.ptr-code {
+  font-size: 20px; letter-spacing: 3px; font-weight: 800; color: var(--primary);
+  background: var(--surface-2, rgba(20, 184, 166, 0.1));
+  padding: 2px 10px; border-radius: 8px; display: inline-block; direction: ltr;
+}
+
+/* قسم من تجاوزوا الدوام في شاشة الاستقبال */
+.overflow-card { border-inline-start: 4px solid #f0b37e; }
+/* «بعد انتهاء الدوام» بدل خانةٍ فارغة: الموعد لم يُلغَ، بل فقد وقته */
+.after-hours { color: #8a4b08; font-size: 12px; }
 
 /* ═══ قائمة الخانات الزمنية العمودية — حجز الدكتور كتقويم ═══ */
 .slot-list { display: flex; flex-direction: column; gap: 6px; }

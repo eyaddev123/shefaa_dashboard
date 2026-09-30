@@ -146,6 +146,11 @@ export const api = {
     done: (appointmentId) => http(`/clinic/appointments/${appointmentId}/done`, { method: 'POST' }),
     noShow: (appointmentId) => http(`/clinic/appointments/${appointmentId}/no-show`, { method: 'POST' }),
     recall: (appointmentId) => http(`/clinic/appointments/${appointmentId}/recall`, { method: 'POST' }),
+    // تأجيل موعد إلى جلسة أخرى — ينشئ حجزاً جديداً ويُعلّم القديم «مؤجَّل»
+    postpone: (appointmentId, body) =>
+      http(`/clinic/appointments/${appointmentId}/postpone`, { method: 'POST', body: JSON.stringify(body) }),
+    // جلسات يوم ما (لاختيار الجلسة الهدف عند التأجيل)
+    sessions: (date) => http(`/clinic/sessions?date=${date}`),
     // بلا مصادقة — الشاشة العامة وموقع المريض
     publicBoard: () => http('/public/clinic/board'),
     // رمز الجهاز يمرّ في الاستعلام: EventSource لا يقبل ترويسات مخصّصة

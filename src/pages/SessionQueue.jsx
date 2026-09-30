@@ -14,6 +14,16 @@ function SlotCell({ appt }) {
   const orig = fmtTime(appt.original_slot_time)
   const now = fmtTime(appt.slot_time)
   if (!appt.original_slot_time && !appt.slot_time) return <span className="muted">—</span>
+  // ★ من تجاوز الدوام: خانته NULL فـ fmtTime تعطي «—»، فيقرأ الموظف «12:15 ← —»
+  // ولا يفهم شيئاً. نكتبها صراحةً: الموعد لم يُلغَ، بل صار بعد انتهاء الدوام.
+  if (!appt.slot_time && (appt.delays || []).some((d) => d.cause === 'session_overflow')) {
+    return (
+      <span title="انزاح موعده إلى ما بعد نهاية الدوام — ما زال في الطابور">
+        <s style={{ opacity: 0.55 }} dir="ltr">{orig}</s>{' → '}
+        <strong className="after-hours">بعد انتهاء الدوام</strong>
+      </span>
+    )
+  }
   if (!appt.delay_minutes) return <span dir="ltr">{now}</span>
   const detail = (appt.delays || [])
     .map((d) => `${DELAY_CAUSES[d.cause] || d.cause}: ${d.minutes} د${d.times > 1 ? ` (${d.times} مرات)` : ''}`)
@@ -200,7 +210,97 @@ function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel, urgent = f
   )
 }
 
-function SlotList({ sessionId, fees, onBooked }) {
+// ═══ نافذة تأجيل الموعد ═══
+// تختار الجلسة الهدف (نفس الدكتور أو غيره) وتكتب السبب. الخادم ينشئ الحجز الجديد
+// بنفس قواعد الحجز — فرفضُه (جلسة ممتلئة أو ليوم مضى) يظهر كما هو بلا تفسير محلي.
+function PostponeDialog({ appt, currentSessionId, onClose, onDone }) {
+  const [date, setDate] = useState(() => {
+    // الغد افتراضاً: التأجيل يعني «ليس اليوم» في أغلب الحالات
+    const d = new Date(); d.setDate(d.getDate() + 1)
+    return d.toISOString().slice(0, 10)
+  })
+  const [sessions, setSessions] = useState(null)
+  const [targetId, setTargetId] = useState('')
+  const [reason, setReason] = useState('')
+  const [err, setErr] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [done, setDone] = useState(null)
+
+  useEffect(() => {
+    setSessions(null); setTargetId('')
+    api.clinic.sessions(date)
+      .then((rows) => setSessions(rows.filter((r) => String(r.id) !== String(currentSessionId))))
+      .catch((e) => setErr(e.message))
+  }, [date, currentSessionId])
+
+  const submit = async (e) => {
+    e.preventDefault()
+    setErr(null); setBusy(true)
+    try {
+      const r = await api.clinic.postpone(appt.id, { target_session_id: targetId, reason: reason.trim() })
+      setDone(r)   // نعرض رمز الوصول الجديد ليُعطى للمريض قبل إغلاق النافذة
+    } catch (ex) { setErr(ex.message) }
+    finally { setBusy(false) }
+  }
+
+  if (done) return (
+    <div className="card highlight">
+      <h3>✔ تم التأجيل</h3>
+      <p>
+        {appt.full_name} — الدور الجديد <strong>{done.queue_number}</strong>
+        {done.slot_time && <> الساعة <strong dir="ltr">{fmtTime(done.slot_time)}</strong></>}
+      </p>
+      {/* رمز الوصول الجديد: بلا إعطائه للمريض لا يستطيع متابعة دوره في «دوري» */}
+      <p className="ptr-code-line">
+        رمز الوصول الجديد: <strong className="ptr-code">{done.access_code}</strong>
+        <small> — أعطِه للمريض، والرمز القديم لم يعد يعمل</small>
+      </p>
+      <button onClick={onDone}>تمّ</button>
+    </div>
+  )
+
+  return (
+    <div className="card highlight">
+      <h3>تأجيل موعد — {appt.full_name} (الدور {appt.queue_number})</h3>
+      <form onSubmit={submit}>
+        <div className="inline" style={{ flexWrap: 'wrap' }}>
+          <div className="field">
+            <label>تاريخ الجلسة الجديدة</label>
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+          </div>
+          <div className="field" style={{ minWidth: 280 }}>
+            <label>الجلسة</label>
+            <select value={targetId} onChange={(e) => setTargetId(e.target.value)} required>
+              <option value="">— اختر —</option>
+              {(sessions || []).map((sn) => (
+                <option key={sn.id} value={sn.id}>
+                  {sn.doctor_name} · {fmtTime(sn.start_time)}–{fmtTime(sn.end_time)} ({sn.active_count} بالطابور)
+                </option>
+              ))}
+            </select>
+            {sessions && sessions.length === 0 && (
+              <small className="hint">لا جلسات أخرى في هذا التاريخ — جرّب تاريخاً آخر</small>
+            )}
+          </div>
+          <div className="field" style={{ minWidth: 260 }}>
+            <label>سبب التأجيل</label>
+            <input value={reason} onChange={(e) => setReason(e.target.value)}
+              placeholder="مثال: الدكتور غائب / تجاوز الدوام" required />
+          </div>
+        </div>
+        <div className="action-row" style={{ marginTop: 12 }}>
+          <button type="submit" disabled={busy || !targetId || !reason.trim()}>
+            {busy ? 'جارٍ التأجيل…' : 'تأكيد التأجيل'}
+          </button>
+          <button type="button" className="ghost" onClick={onClose}>إلغاء</button>
+        </div>
+        {err && <p className="error">{err}</p>}
+      </form>
+    </div>
+  )
+}
+
+function SlotList({ sessionId, fees, onBooked, acceptsUrgent = true }) {
   const [slots, setSlots] = useState(null)
   const [err, setErr] = useState(null)
   const [openSlot, setOpenSlot] = useState(null) // slot_time currently showing the booking form, or 'walkin' | 'urgent'
@@ -220,16 +320,19 @@ function SlotList({ sessionId, fees, onBooked }) {
 
   return (
     <div className="slot-list">
-      {/* الحالة الإسعافية أولاً وفوق كل شيء: زر بارز في الأعلى لا يحتاج بحثاً وقت الضغط */}
-      <div className="urgent-bar">
-        <div className="urgent-bar-text">
-          <strong>🚨 حالة فورية (إسعافية)</strong>
-          <span>تُنادى مباشرة بعد المريض الحالي — أو فوراً إن لم يكن أحد قيد الكشف</span>
+      {/* الحالة الإسعافية أولاً وفوق كل شيء: زر بارز في الأعلى لا يحتاج بحثاً وقت الضغط.
+          ويختفي كلياً عند دكتور لا تأتيه حالات إسعافية — الإخفاء تجميل، والخادم هو الحارس. */}
+      {acceptsUrgent && (
+        <div className="urgent-bar">
+          <div className="urgent-bar-text">
+            <strong>🚨 حالة فورية (إسعافية)</strong>
+            <span>تُنادى مباشرة بعد المريض الحالي — أو فوراً إن لم يكن أحد قيد الكشف</span>
+          </div>
+          {openSlot !== 'urgent' && (
+            <button className="urgent-btn" onClick={() => setOpenSlot('urgent')}>حجز فوري</button>
+          )}
         </div>
-        {openSlot !== 'urgent' && (
-          <button className="urgent-btn" onClick={() => setOpenSlot('urgent')}>حجز فوري</button>
-        )}
-      </div>
+      )}
       {openSlot === 'urgent' && (
         <div className="slot-booking-form" ref={urgentFormRef}>
           <BookingForm
@@ -343,6 +446,11 @@ export default function SessionQueue() {
     catch (ex) { alert(ex.message) }
   }
 
+  // ── تأجيل موعد إلى جلسة أخرى ──
+  // المريض جاء والدكتور غائب، أو تجاوز دوره نهاية الدوام. ننقل موعده بدل أن
+  // يبقى معلّقاً في جلسة انتهت. الخادم ينشئ الحجز الجديد بنفس قواعد الحجز.
+  const [postponing, setPostponing] = useState(null)   // الحجز المطلوب تأجيله
+
   // إعادة النداء: الاستقبال يرى المريض لا يتحرّك — يُعاد بثّ النداء بلا تغيير حالته.
   // الخادم يخنقها مرّة كل عشر ثوانٍ لكل حجز، فرسالة 429 تُعرض كما هي.
   const recall = async (apptId) => {
@@ -388,6 +496,7 @@ export default function SessionQueue() {
         <SlotList
           sessionId={id}
           fees={{ consultation_fee: data.consultation_fee, followup_fee: data.followup_fee }}
+          acceptsUrgent={data.accepts_urgent !== false}
           onBooked={(appt) => setTicket(appt)}
         />
       </div>
@@ -420,6 +529,53 @@ export default function SessionQueue() {
           </div>
         )
       })()}
+
+      {/* ═══ من تجاوز الدوام ═══
+          خانته NULL **وسببه** session_overflow — والسبب هو المميّز: الحاضر بلا موعد
+          محدد خانته NULL أيضاً ولم يتجاوز شيئاً. لا إلغاء تلقائي: يبقى في الطابور
+          حتى يقرّر إنسان، وله زرّ التأجيل. */}
+      {(() => {
+        const overflowed = data.appointments.filter((a) =>
+          ['waiting', 'arrived'].includes(a.status) && !a.slot_time &&
+          (a.delays || []).some((d) => d.cause === 'session_overflow'))
+        if (overflowed.length === 0) return null
+        return (
+          <div className="card overflow-card">
+            <h3>⏰ تجاوزوا وقت الدوام ({overflowed.length})</h3>
+            <p className="subtitle" style={{ marginTop: -6 }}>
+              انزاحت مواعيدهم إلى ما بعد نهاية الدوام ففقدوا خانتهم الزمنية.
+              <strong> ما زالوا في الطابور</strong> ويُنادى عليهم إن فرغ الدكتور —
+              أو أجّل موعدهم إلى جلسة أخرى.
+            </p>
+            <table>
+              <thead><tr><th>الدور</th><th>الاسم</th><th>الموبايل</th><th>الحالة</th><th></th></tr></thead>
+              <tbody>
+                {overflowed.map((a) => (
+                  <tr key={a.id}>
+                    <td className="num">{a.queue_number}</td>
+                    <td>{a.full_name}</td>
+                    <td dir="ltr">{a.mobile}</td>
+                    <td>{appointmentBadge(a.status)}</td>
+                    <td>
+                      <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }}
+                        onClick={() => setPostponing(a)}>تأجيل لموعد آخر</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
+      })()}
+
+      {postponing && (
+        <PostponeDialog
+          appt={postponing}
+          currentSessionId={id}
+          onClose={() => setPostponing(null)}
+          onDone={() => { setPostponing(null); load() }}
+        />
+      )}
 
       <div className="card">
         <h3>الطابور ({data.appointments.length})</h3>
@@ -454,7 +610,9 @@ export default function SessionQueue() {
                   {['waiting', 'arrived', 'in_service'].includes(a.status) ? `~${a.wait_minutes} د` : '—'}
                 </td>
                 <td>
-                  {['waiting', 'arrived'].includes(a.status) && a.priority === 'normal' && (
+                  {/* الترقية طريقٌ آخر إلى أثر الإسعافي، فتختفي بنفس الشرط */}
+                  {['waiting', 'arrived'].includes(a.status) && a.priority === 'normal'
+                    && data.accepts_urgent !== false && (
                     <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }}
                       onClick={() => prioritize(a.id)}>تقديم</button>
                   )}{' '}
@@ -463,6 +621,11 @@ export default function SessionQueue() {
                       <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }} onClick={() => arrive(a.id)}>حضر</button>{' '}
                       <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }} onClick={() => cancel(a.id)}>إلغاء</button>
                     </>
+                  )}{' '}
+                  {/* التأجيل متاح لكل من لم يُخدَم بعد — لا لمن تجاوز الدوام وحده */}
+                  {['waiting', 'arrived'].includes(a.status) && (
+                    <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }}
+                      onClick={() => setPostponing(a)}>تأجيل</button>
                   )}
                 </td>
               </tr>

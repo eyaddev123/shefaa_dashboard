@@ -50,16 +50,30 @@ export default function PatientTurn() {
             <div className="ptr-doctor">{result.doctor_name} — {result.specialty || '—'}</div>
             <div className="ptr-number">{result.queue_number}</div>
             <div className="ptr-status">{APPOINTMENT_STATUSES[result.status] || result.status}</div>
+            {/* من تجاوز الدوام: نعرض عدد من أمامه بلا وقت متوقّع — لا وقت له أصلاً،
+                وعرض تقديرٍ محسوب من مواعيد انتهت وعدٌ لا يُوفى. */}
             {['waiting', 'arrived', 'in_service'].includes(result.status) && (
               <div className="ptr-wait">
                 {result.ahead_count === 0
                   ? 'دورك التالي مباشرة'
-                  : <>أمامك <strong>{result.ahead_count}</strong> — الوقت المتوقع ~<strong>{result.wait_minutes}</strong> دقيقة</>}
+                  : result.session_overflow
+                    ? <>أمامك <strong>{result.ahead_count}</strong> في الطابور</>
+                    : <>أمامك <strong>{result.ahead_count}</strong> — الوقت المتوقع ~<strong>{result.wait_minutes}</strong> دقيقة</>}
+              </div>
+            )}
+
+            {/* ★ تجاوز الدوام: خانته NULL بسبب session_overflow.
+                رسالة صريحة بلا وقت متوقّع — لأن لا وقت له. وتركها فارغة أو عرض
+                وقتٍ قديم يجعل المريض ينتظر موعداً لم يعد قائماً. */}
+            {result.session_overflow && (
+              <div className="ptr-overflow" role="alert">
+                <strong>تجاوز دورك وقت الدوام</strong>
+                <span>يرجى مراجعة الاستقبال لتحديد موعد جديد.</span>
               </div>
             )}
 
             {/* شفافية الانزياح: المريض يرى موعده الأصلي والجديد وسبب كل تأجيل */}
-            {result.delay_minutes > 0 && (
+            {result.delay_minutes > 0 && !result.session_overflow && (
               <div className="ptr-delay">
                 <div className="ptr-delay-times">
                   موعدك: <s dir="ltr">{fmtTime(result.original_slot_time)}</s>

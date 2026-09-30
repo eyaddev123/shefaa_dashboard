@@ -4,10 +4,12 @@ import { api, WEEKDAYS, fmtMoney, fmtTime } from '../api.js'
 
 function NewDoctorForm({ onCreated }) {
   const blank = { name: '', specialty: '', phone: '', consultation_fee: '', followup_fee: '',
-                  followup_window_days: '7', expected_visit_minutes: '15', room: '' }
+                  followup_window_days: '7', expected_visit_minutes: '15', room: '',
+                  accepts_urgent: true }
   const [form, setForm] = useState(blank)
   const [err, setErr] = useState(null)
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
+  const setBool = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.checked }))
   const submit = async (e) => {
     e.preventDefault()
     setErr(null)
@@ -28,13 +30,22 @@ function NewDoctorForm({ onCreated }) {
       <div className="field"><label>الاختصاص</label><input value={form.specialty} onChange={set('specialty')} /></div>
       <div className="field"><label>الجوال</label><input value={form.phone} onChange={set('phone')} /></div>
       {/* رقم الغرفة يُشتقّ منه اسم المقطع الصوتي (room-3.mp3) — الخادم يطبّع
-              الأرقام العربية والمسافات، والتنويه هنا يمنع المشكلة من أصلها (AUDIO.md) */}
-          <div className="field"><label>الغرفة</label><input value={form.room} onChange={set('room')} placeholder="مثال: 3" />
-            <small className="hint">بالأرقام اللاتينية (3 لا ٣) — يُنطق على شاشة النداء</small></div>
+          الأرقام العربية والمسافات، والتنويه هنا يمنع المشكلة من أصلها (AUDIO.md) */}
+      <div className="field"><label>الغرفة</label><input value={form.room} onChange={set('room')} placeholder="مثال: 3" />
+        <small className="hint">بالأرقام اللاتينية (3 لا ٣) — يُنطق على شاشة النداء</small></div>
       <div className="field"><label>سعر المعاينة (ل.س)</label><input type="number" min="0" value={form.consultation_fee} onChange={set('consultation_fee')} required /></div>
       <div className="field"><label>سعر المراجعة (ل.س)</label><input type="number" min="0" value={form.followup_fee} onChange={set('followup_fee')} required /></div>
       <div className="field"><label>صلاحية المراجعة (يوم)</label><input type="number" min="1" value={form.followup_window_days} onChange={set('followup_window_days')} required /></div>
       <div className="field"><label>مدة الكشف المتوقعة (دقيقة)</label><input type="number" min="1" value={form.expected_visit_minutes} onChange={set('expected_visit_minutes')} required /></div>
+      {/* اختصاصات كالتخاطب والعلاج الفيزيائي لا تأتيها حالات إسعافية — إطفاء العلم
+          يُخفي زرّي الحجز الفوري والترقية عند هذا الدكتور، والخادم يرفضهما كذلك */}
+      <div className="field field-check">
+        <label>
+          <input type="checkbox" checked={form.accepts_urgent} onChange={setBool('accepts_urgent')} />
+          يقبل الحالات الإسعافية
+        </label>
+        <small className="hint">أطفئه للاختصاصات التي لا تأتيها حالات إسعافية (تخاطب، علاج فيزيائي)</small>
+      </div>
       <button type="submit">إضافة دكتور</button>
       {err && <p className="error">{err}</p>}
     </form>

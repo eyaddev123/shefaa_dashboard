@@ -16,11 +16,13 @@ function ProfileForm({ doctor, globalBuffer, onSaved }) {
     followup_window_days: doctor.followup_window_days,
     expected_visit_minutes: doctor.expected_visit_minutes,
     notes: doctor.notes || '',
+    accepts_urgent: doctor.accepts_urgent !== false,
   })
   const [err, setErr] = useState(null)
   const [saved, setSaved] = useState(false)
   const [busy, setBusy] = useState(false)
   const set = (k) => (e) => { setForm((f) => ({ ...f, [k]: e.target.value })); setSaved(false) }
+  const setBool = (k) => (e) => { setForm((f) => ({ ...f, [k]: e.target.checked })); setSaved(false) }
 
   const submit = async (e) => {
     e.preventDefault()
@@ -54,11 +56,19 @@ function ProfileForm({ doctor, globalBuffer, onSaved }) {
         <div className="field"><label>اسم الدكتور</label><input value={form.name} onChange={set('name')} required /></div>
         <div className="field"><label>الاختصاص</label><input value={form.specialty} onChange={set('specialty')} /></div>
         <div className="field"><label>الجوال</label><input value={form.phone} onChange={set('phone')} dir="ltr" /></div>
-        {/* يظهر ويُنطَق على شاشة الصالة ضمن النداء */}
-        {/* رقم الغرفة يُشتقّ منه اسم المقطع الصوتي (room-3.mp3) — الخادم يطبّع
-              الأرقام العربية والمسافات، والتنويه هنا يمنع المشكلة من أصلها (AUDIO.md) */}
-          <div className="field"><label>الغرفة</label><input value={form.room} onChange={set('room')} placeholder="مثال: 3" />
-            <small className="hint">بالأرقام اللاتينية (3 لا ٣) — يُنطق على شاشة النداء</small></div>
+        {/* رقم الغرفة يظهر ويُنطَق على شاشة الصالة، ويُشتقّ منه اسم المقطع الصوتي
+            (room-3.mp3) — الخادم يطبّع الأرقام العربية والمسافات (AUDIO.md) */}
+        <div className="field"><label>الغرفة</label><input value={form.room} onChange={set('room')} placeholder="مثال: 3" />
+          <small className="hint">بالأرقام اللاتينية (3 لا ٣) — يُنطق على شاشة النداء</small></div>
+        {/* إطفاؤه يُخفي زرّي الحجز الفوري والترقية عند هذا الدكتور، والخادم يرفضهما أيضاً.
+            الحجوزات الإسعافية القائمة عنده لا تتأثر — العلم يمنع الجديد فقط. */}
+        <div className="field field-check">
+          <label>
+            <input type="checkbox" checked={form.accepts_urgent} onChange={setBool('accepts_urgent')} />
+            يقبل الحالات الإسعافية
+          </label>
+          <small className="hint">أطفئه للاختصاصات التي لا تأتيها حالات إسعافية (تخاطب، علاج فيزيائي)</small>
+        </div>
       </div>
 
       <h4 style={{ marginTop: 18, marginBottom: 0 }}>التسعيرة</h4>
