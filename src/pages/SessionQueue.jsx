@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { api, APPOINTMENT_STATUSES, BOOKING_TYPES, VISIT_TYPES, PRIORITIES, DELAY_CAUSES, fmtMoney, fmtTime } from '../api.js'
+import { api, APPOINTMENT_STATUSES, BOOKING_TYPES, VISIT_TYPES, PRIORITIES, DELAY_CAUSES, fmtMoney, fmtTime, toLatinDigits } from '../api.js'
 
 // شارة الأولوية — تُبرز من يتقدّم الطابور وسببه
 function priorityBadge(priority) {
@@ -80,38 +80,55 @@ function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel, urgent = f
   const [busy, setBusy] = useState(false)
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
 
-  // المرشّحون بالاسم: الاسم ليس معرّفاً قاطعاً، فيقرّر الموظف «هو نفسه» أو «جديد»
+  // ═══ البحث بالاسم هو المدخل الأساسي ═══
+  // الموبايل صار اختيارياً عند الحجز، فالبحث به وحده يترك من لا موبايل له بلا
+  // طريق للتعرّف عليه — صفٌّ جديد في كل زيارة وتاريخٌ مقطوع. والاسم متاح دائماً.
   const [candidates, setCandidates] = useState(null)
+  const [picked, setPicked] = useState(null)       // من اختير (أو مُلئ تلقائياً) — لإظهاره وللتراجع
+  const [beforePick, setBeforePick] = useState(null) // لقطة النموذج قبل الملء، للتراجع
 
-  const applyPatient = (patient) => {
+  const applyPatient = (patient, auto = false) => {
+    setBeforePick((prev) => prev ?? form)          // أول ملء فقط: لا نطمس لقطة التراجع
     setForm((f) => ({ ...f, full_name: patient.full_name, mobile: patient.mobile || f.mobile,
       gender: patient.gender || '', birth_year: patient.birth_year || '' }))
     setLookupState('found')
     setFollowup(patient.followup || null)
     setCandidates(null)
+    setPicked({ ...patient, auto })
   }
 
-  const checkMobile = async (mobile) => {
-    if (mobile.length < 8) { setLookupState(null); setFollowup(null); return }
-    setLookupState('checking')
-    try {
-      const r = await api.clinic.lookupPatientBy({ mobile, session_id: sessionId })
-      if (r?.candidates) { setCandidates(r.candidates); setLookupState('candidates') }
-      else if (r) applyPatient(r)
-      else { setLookupState('new'); setFollowup(null); setCandidates(null) }
-    } catch { setLookupState(null) }
+  // التراجع: يُعيد النموذج لما كان قبل الملء — الموظف قد يكتشف أنه ليس نفسه
+  const undoPick = () => {
+    if (beforePick) setForm(beforePick)
+    setPicked(null); setBeforePick(null)
+    setLookupState(null); setFollowup(null); setCandidates(null)
   }
 
-  // ★ البحث بالاسم: المسار الوحيد للتعرّف على مريض بلا موبايل — وبدونه يصير
-  // صفاً جديداً في كل زيارة ويتقطّع تاريخه الطبّي.
+  const handleLookup = (r) => {
+    const list = r?.candidates
+    if (list?.length === 1) { applyPatient(list[0], true); return }   // نتيجة واحدة ⇒ ملء مباشر
+    if (list?.length > 1) { setCandidates(list); setLookupState('candidates'); return }
+    if (r?.id) { applyPatient(r); return }                            // مطابقة موبايل قاطعة
+    setLookupState('new'); setFollowup(null); setCandidates(null)
+  }
+
+  // ★ المدخل الأساسي: يبحث فور اكتمال ثلاث كلمات
   const checkName = async (name) => {
+    if (picked) return                      // اختيارٌ قائم — لا نبحث فوقه
     const words = String(name || '').trim().split(/\s+/).filter(Boolean)
-    if (words.length < 3) { setCandidates(null); return }   // لا نبحث بالناقص
-    try {
-      const r = await api.clinic.lookupPatientBy({ full_name: name, session_id: sessionId })
-      if (r?.candidates?.length) { setCandidates(r.candidates); setLookupState('candidates') }
-      else setCandidates(null)
-    } catch { setCandidates(null) }
+    if (words.length < 3) { setCandidates(null); setLookupState(null); return }
+    setLookupState('checking')
+    try { handleLookup(await api.clinic.lookupPatientBy({ full_name: name, session_id: sessionId })) }
+    catch { setLookupState(null) }
+  }
+
+  // خيار ثانوي: الموبايل معرّفٌ قاطع حين يعرفه الموظف
+  const checkMobile = async (mobile) => {
+    if (picked) return
+    if (String(mobile).trim().length < 8) { setFollowup(null); return }
+    setLookupState('checking')
+    try { handleLookup(await api.clinic.lookupPatientBy({ mobile, session_id: sessionId })) }
+    catch { setLookupState(null) }
   }
 
   const isFollowup = form.visit_type === 'followup'
@@ -145,21 +162,24 @@ function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel, urgent = f
 
   return (
     <form className="inline" onSubmit={submit} style={{ marginTop: 14, flexWrap: 'wrap' }}>
-      {/* ★ الإلزامي عند الحجز: الاسم الثلاثي وحده. الباقي يُستكمل عند الحضور. */}
-      <div className="field" style={{ minWidth: 240 }}>
+      {/* ★ المدخل الأساسي: الاسم الثلاثي — يبحث عن المريض السابق ويكفي للحجز */}
+      <div className="field" style={{ minWidth: 260 }}>
         <label>الاسم الثلاثي</label>
         <input value={form.full_name}
           onChange={(e) => { set('full_name')(e); checkName(e.target.value) }}
           required autoFocus placeholder="الاسم واسم الأب والكنية" />
-        <small className="hint">ثلاث كلمات على الأقل</small>
+        {lookupState === 'checking' && <small className="hint">جارٍ البحث…</small>}
+        {lookupState === 'new' && <small className="hint">مريض جديد</small>}
+        {!lookupState && <small className="hint">ثلاث كلمات على الأقل — نبحث بها عن المريض السابق</small>}
       </div>
       <div className="field">
         <label>رقم الموبايل <span className="opt">(اختياري)</span></label>
-        <input value={form.mobile} onChange={(e) => { set('mobile')(e); checkMobile(e.target.value) }} dir="ltr" />
-        {lookupState === 'checking' && <span style={{ fontSize: 11, color: 'var(--muted)' }}>جارٍ البحث…</span>}
-        {lookupState === 'found' && <span style={{ fontSize: 11, color: 'var(--good, green)' }}>مريض سابق — تم تعبئة بياناته</span>}
-        {lookupState === 'new' && <span style={{ fontSize: 11, color: 'var(--muted)' }}>مريض جديد</span>}
-        {/* تنبيه صريح: بلا موبايل لا متابعة في «دوري» — مدخلها موبايل + رمز */}
+        {/* ★ الأرقام العربية تُحوَّل فور الكتابة ليرى الموظف ما سيُخزَّن — والخادم
+            يطبّع أيضاً، فالواجهة عرضٌ لا حراسة. */}
+        <input value={form.mobile}
+          onChange={(e) => { const v = toLatinDigits(e.target.value)
+            setForm((f) => ({ ...f, mobile: v })); checkMobile(v) }}
+          dir="ltr" inputMode="numeric" />
         {!form.mobile.trim() && (
           <small className="hint warn-hint">
             بلا موبايل لن يستطيع المريض متابعة دوره في صفحة «دوري» (الدخول إليها بالموبايل والرمز)
@@ -167,11 +187,28 @@ function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel, urgent = f
         )}
       </div>
 
+      {/* من اختير: يظهر صراحةً مع إمكانية التراجع — الملء التلقائي بلا إظهار
+          يجعل الموظف يحجز لمريضٍ لم يقصده وهو لا يدري */}
+      {picked && (
+        <div className="picked-box">
+          <div>
+            <strong>{picked.auto ? 'مريض سابق — مُلئت بياناته' : 'اختير المريض'}:</strong>{' '}
+            {picked.full_name}
+            <span className="candidate-meta">
+              {picked.mobile ? <span dir="ltr">{picked.mobile}</span> : 'بلا موبايل'}
+              {picked.visits_count > 0 && ` · ${picked.visits_count} زيارة`}
+              {picked.last_visit && ` · آخرها ${picked.last_visit}`}
+            </span>
+          </div>
+          <button type="button" className="ghost" onClick={undoPick}>تراجع — ليس هو</button>
+        </div>
+      )}
+
       {/* مرشّحون بالاسم: الاسم ليس معرّفاً قاطعاً، فيقرّر الموظف لا النظام */}
       {candidates?.length > 0 && (
         <div className="candidates-box">
           <div className="candidates-title">
-            مريض بهذا الاسم مسجَّل سابقاً ({candidates.length}) — هل هو نفسه؟
+            وُجد {candidates.length} مرضى بهذا الاسم — اختر الصحيح أو تابع كمريض جديد
           </div>
           {candidates.map((c) => (
             <div key={c.id} className="candidate-row">
@@ -197,7 +234,10 @@ function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel, urgent = f
           <option value="">—</option><option value="male">ذكر</option><option value="female">أنثى</option>
         </select>
       </div>
-      <div className="field"><label>سنة الميلاد</label><input type="number" value={form.birth_year} onChange={set('birth_year')} style={{ width: 90 }} /></div>
+      {/* type="text" لا number: حقل الرقم لا يقبل الأرقام العربية أصلاً فتُبتلع الكتابة */}
+      <div className="field"><label>سنة الميلاد</label>
+        <input value={form.birth_year} inputMode="numeric" style={{ width: 100 }}
+          onChange={(e) => setForm((f) => ({ ...f, birth_year: toLatinDigits(e.target.value) }))} /></div>
       {!slotTime && (
         <div className="field">
           <label>طريقة الحجز</label>
@@ -303,7 +343,8 @@ function CompletePatientForm({ appt, missing, patient, onCancel, onSubmit }) {
           {need('mobile') && (
             <div className="field">
               <label>رقم الموبايل</label>
-              <input value={form.mobile} onChange={set('mobile')} dir="ltr" required autoFocus />
+              <input value={form.mobile} dir="ltr" inputMode="numeric" required autoFocus
+                onChange={(e) => setForm((f) => ({ ...f, mobile: toLatinDigits(e.target.value) }))} />
               <small className="hint">به يتابع المريض دوره في «دوري»</small>
             </div>
           )}
@@ -318,7 +359,8 @@ function CompletePatientForm({ appt, missing, patient, onCancel, onSubmit }) {
           {need('birth_year') && (
             <div className="field">
               <label>سنة الميلاد</label>
-              <input type="number" value={form.birth_year} onChange={set('birth_year')} style={{ width: 110 }} required />
+              <input value={form.birth_year} inputMode="numeric" style={{ width: 110 }} required
+                onChange={(e) => setForm((f) => ({ ...f, birth_year: toLatinDigits(e.target.value) }))} />
             </div>
           )}
         </div>
