@@ -1111,13 +1111,13 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
 
 /* ═══ تبسيط الحجز: الإلزامي الاسم الثلاثي وحده ═══ */
 .field label .opt { color: var(--muted); font-weight: 500; font-size: 11px; }
-/* تنبيه لا خطأ: الحجز صحيح، لكن للموظف أن يعرف ما يفقده المريض */
-.warn-hint { color: #8a4b08; }
+/* تنبيه لا خطأ: الحجز صحيح، لكن للموظف أن يعرف ما يفقده المريض.
+   من متغيّر السمة لا لونٍ ثابت — البنّي الداكن لا يُقرأ على خلفية داكنة. */
+.warn-hint { color: var(--status-pending); }
 
 /* مرشّحو الاسم: الاسم ليس معرّفاً قاطعاً — يقرّر الموظف لا النظام */
 .candidates-box {
-  flex: 1 1 100%;
-  margin-top: 6px; padding: 10px 12px;
+  padding: 10px 12px;
   background: rgba(240, 179, 126, 0.12);
   border: 1px solid rgba(240, 179, 126, 0.45); border-radius: 12px;
 }
@@ -1132,10 +1132,62 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
 
 /* من اختير (أو مُلئ تلقائياً): يظهر صراحةً مع تراجع — الملء الصامت يجعل الموظف
    يحجز لمريضٍ لم يقصده وهو لا يدري */
+/* ═══════ نموذج حجز الدور ═══════
+   كان `form.inline` بـ flex-wrap و align-items:flex-end — فأي حقل يحمل سطر
+   تلميح يدفع جيرانه فتنكسر المحاذاة، والحقول تلتفّ بترتيبٍ لا يتوقّعه أحد.
+   الآن: صفوفٌ صريحة، كل صفّ شبكةٌ متساوية الأعمدة، والتلميح داخل الحقل لا بينه
+   وبين جاره. */
+.booking-form { display: flex; flex-direction: column; gap: 14px; margin-top: 14px; }
+
+.bf-row { display: grid; gap: 12px; align-items: start; }
+
+/* صفّ الهوية: الاسم هو المدخل الأساسي فيأخذ ضعف عرض الموبايل */
+.bf-row-identity { grid-template-columns: 2fr 1fr; }
+
+/* صفّ التفاصيل: الجنس وسنة الميلاد ضيّقان (قيمهما قصيرة)، ونوع الزيارة
+   والأولوية أوسع (قيمهما نصوص طويلة مثل «حالة فورية (إسعافية)»)، وسبب الزيارة
+   يأخذ ما تبقّى. النسب لا القياسات: تنكمش معاً على الشاشات الأضيق. */
+.bf-row-details {
+  grid-template-columns:
+    minmax(90px, 0.8fr)    /* الجنس */
+    minmax(90px, 0.8fr)    /* سنة الميلاد */
+    minmax(110px, 1fr)     /* طريقة الحجز */
+    minmax(110px, 1fr)     /* نوع الزيارة */
+    minmax(130px, 1.2fr)   /* الأولوية — أطول القيم */
+    minmax(140px, 1.4fr);  /* سبب الزيارة */
+}
+
+/* الحقل: عمودٌ ثابت البنية — تسمية، مُدخَل، ثم تلميح بارتفاع محجوز */
+.booking-form .field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.booking-form .field input, .booking-form .field select { width: 100%; }
+/* الارتفاع محجوز دائماً (&nbsp; حين لا تلميح) فلا يقفز الصفّ عند ظهوره واختفائه */
+.booking-form .field .hint { min-height: 1.15em; margin: 0; line-height: 1.35; }
+
+/* ملاحظة بعرض النموذج: التحذير في خانة ضيّقة يكسر محاذاة الصفّ */
+/* ألوان الحالة من متغيّرات السمة (--status-*) لا قيَماً ثابتة: الأحمر الداكن
+   يصير غير مقروء على الخلفية الداكنة، والمتغيّرات مضبوطة للسمتين أصلاً. */
+.bf-note { margin: 0; font-size: 12.5px; line-height: 1.6; }
+.bf-note-urgent { color: var(--status-bad); font-weight: 700; }
+.bf-note-warn { color: var(--status-pending); }
+.bf-note-ok { color: var(--status-good); }
+
+.bf-followup { display: flex; flex-direction: column; gap: 8px; }
+.bf-actions { display: flex; gap: 8px; }
+
+/* شاشات أضيق: الصفوف تتحوّل إلى عمودين ثم عمود واحد */
+@media (max-width: 1100px) {
+  .bf-row-details { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 720px) {
+  .bf-row-identity, .bf-row-details { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 480px) {
+  .bf-row-identity, .bf-row-details { grid-template-columns: 1fr; }
+}
+
 .picked-box {
-  flex: 1 1 100%;
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  margin-top: 6px; padding: 8px 12px;
+  padding: 10px 14px;
   background: rgba(20, 184, 166, 0.10);
   border: 1px solid rgba(20, 184, 166, 0.4); border-radius: 12px;
   font-size: 13px;

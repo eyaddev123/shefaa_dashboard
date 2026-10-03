@@ -161,30 +161,32 @@ function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel, urgent = f
   const fee = isFollowup ? fees?.followup_fee : fees?.consultation_fee
 
   return (
-    <form className="inline" onSubmit={submit} style={{ marginTop: 14, flexWrap: 'wrap' }}>
-      {/* ★ المدخل الأساسي: الاسم الثلاثي — يبحث عن المريض السابق ويكفي للحجز */}
-      <div className="field" style={{ minWidth: 260 }}>
-        <label>الاسم الثلاثي</label>
-        <input value={form.full_name}
-          onChange={(e) => { set('full_name')(e); checkName(e.target.value) }}
-          required autoFocus placeholder="الاسم واسم الأب والكنية" />
-        {lookupState === 'checking' && <small className="hint">جارٍ البحث…</small>}
-        {lookupState === 'new' && <small className="hint">مريض جديد</small>}
-        {!lookupState && <small className="hint">ثلاث كلمات على الأقل — نبحث بها عن المريض السابق</small>}
-      </div>
-      <div className="field">
-        <label>رقم الموبايل <span className="opt">(اختياري)</span></label>
-        {/* ★ الأرقام العربية تُحوَّل فور الكتابة ليرى الموظف ما سيُخزَّن — والخادم
-            يطبّع أيضاً، فالواجهة عرضٌ لا حراسة. */}
-        <input value={form.mobile}
-          onChange={(e) => { const v = toLatinDigits(e.target.value)
-            setForm((f) => ({ ...f, mobile: v })); checkMobile(v) }}
-          dir="ltr" inputMode="numeric" />
-        {!form.mobile.trim() && (
-          <small className="hint warn-hint">
-            بلا موبايل لن يستطيع المريض متابعة دوره في صفحة «دوري» (الدخول إليها بالموبايل والرمز)
+    <form className="booking-form" onSubmit={submit}>
+      {/* ═══ صفّ الهوية: الاسم هو المدخل الأساسي فيأخذ عرضاً أكبر ═══ */}
+      <div className="bf-row bf-row-identity">
+        <div className="field bf-name">
+          <label>الاسم الثلاثي</label>
+          <input value={form.full_name}
+            onChange={(e) => { set('full_name')(e); checkName(e.target.value) }}
+            required autoFocus placeholder="الاسم واسم الأب والكنية" />
+          <small className="hint">
+            {lookupState === 'checking' ? 'جارٍ البحث…'
+              : lookupState === 'new' ? 'مريض جديد'
+              : 'ثلاث كلمات على الأقل — نبحث بها عن المريض السابق'}
           </small>
-        )}
+        </div>
+        <div className="field bf-mobile">
+          <label>رقم الموبايل <span className="opt">(اختياري)</span></label>
+          {/* ★ الأرقام العربية تُحوَّل فور الكتابة ليرى الموظف ما سيُخزَّن — والخادم
+              يطبّع أيضاً، فالواجهة عرضٌ لا حراسة. */}
+          <input value={form.mobile}
+            onChange={(e) => { const v = toLatinDigits(e.target.value)
+              setForm((f) => ({ ...f, mobile: v })); checkMobile(v) }}
+            dir="ltr" inputMode="numeric" placeholder="09XXXXXXXX" />
+          <small className={`hint ${form.mobile.trim() ? '' : 'warn-hint'}`}>
+            {form.mobile.trim() ? '\u00A0' : 'بلا موبايل لا يتابع المريض دوره في «دوري»'}
+          </small>
+        </div>
       </div>
 
       {/* من اختير: يظهر صراحةً مع إمكانية التراجع — الملء التلقائي بلا إظهار
@@ -228,64 +230,64 @@ function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel, urgent = f
           </button>
         </div>
       )}
-      <div className="field">
-        <label>الجنس</label>
-        <select value={form.gender} onChange={set('gender')}>
-          <option value="">—</option><option value="male">ذكر</option><option value="female">أنثى</option>
-        </select>
-      </div>
-      {/* type="text" لا number: حقل الرقم لا يقبل الأرقام العربية أصلاً فتُبتلع الكتابة */}
-      <div className="field"><label>سنة الميلاد</label>
-        <input value={form.birth_year} inputMode="numeric" style={{ width: 100 }}
-          onChange={(e) => setForm((f) => ({ ...f, birth_year: toLatinDigits(e.target.value) }))} /></div>
-      {!slotTime && (
+      {/* ═══ صفّ التفاصيل: حقول ضيّقة متساوية العرض ═══ */}
+      <div className="bf-row bf-row-details">
         <div className="field">
-          <label>طريقة الحجز</label>
-          <select value={form.booking_type} onChange={set('booking_type')}>
-            {Object.entries(BOOKING_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          <label>الجنس</label>
+          <select value={form.gender} onChange={set('gender')}>
+            <option value="">—</option><option value="male">ذكر</option><option value="female">أنثى</option>
           </select>
         </div>
+        {/* نصّ لا number: حقل الرقم لا يقبل الأرقام العربية أصلاً فتُبتلع الكتابة */}
+        <div className="field">
+          <label>سنة الميلاد</label>
+          <input value={form.birth_year} inputMode="numeric" placeholder="1990"
+            onChange={(e) => setForm((f) => ({ ...f, birth_year: toLatinDigits(e.target.value) }))} />
+        </div>
+        {!slotTime && (
+          <div className="field">
+            <label>طريقة الحجز</label>
+            <select value={form.booking_type} onChange={set('booking_type')}>
+              {Object.entries(BOOKING_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            </select>
+          </div>
+        )}
+        <div className="field">
+          <label>نوع الزيارة</label>
+          <select value={form.visit_type} onChange={set('visit_type')}>
+            {Object.entries(VISIT_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select>
+          {fee != null && <small className="hint">السعر: {fmtMoney(fee)}</small>}
+        </div>
+        <div className="field">
+          <label>الأولوية</label>
+          <select value={form.priority} onChange={set('priority')}>
+            {Object.entries(PRIORITIES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select>
+        </div>
+        <div className="field bf-reason">
+          <label>سبب الزيارة <span className="opt">(اختياري)</span></label>
+          <input value={form.reason} onChange={set('reason')} />
+        </div>
+      </div>
+
+      {/* تحذير الأولوية: سطرٌ كامل تحت الصفّ لا داخل خانة ضيّقة تكسر محاذاتها */}
+      {form.priority !== 'normal' && (
+        <p className={`bf-note ${form.priority === 'urgent' ? 'bf-note-urgent' : 'bf-note-warn'}`}>
+          {form.priority === 'urgent'
+            ? '⚠ يتصدّر الطابور — يُنادى بعد المريض الحالي مباشرة، ومواعيد المنتظرين تتأجل'
+            : '⚠ يتقدّم كل المنتظرين، ومواعيدهم تتأجل'}
+        </p>
       )}
-      <div className="field">
-        <label>نوع الزيارة</label>
-        <select value={form.visit_type} onChange={set('visit_type')}>
-          {Object.entries(VISIT_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-        </select>
-        {fee != null && (
-          <span style={{ fontSize: 11, color: 'var(--muted)' }}>السعر: {fmtMoney(fee)}</span>
-        )}
-      </div>
-      <div className="field">
-        <label>الأولوية</label>
-        <select value={form.priority} onChange={set('priority')}>
-          {Object.entries(PRIORITIES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-        </select>
-        {form.priority === 'urgent' ? (
-          <span style={{ fontSize: 11, color: 'var(--bad, #b91c1c)', fontWeight: 700 }}>
-            يتصدّر الطابور — يُنادى بعد المريض الحالي مباشرة
-          </span>
-        ) : form.priority !== 'normal' && (
-          <span style={{ fontSize: 11, color: 'var(--warn, #b45309)' }}>
-            يتقدّم كل المنتظرين، ومواعيدهم تتأجل
-          </span>
-        )}
-      </div>
-      <div className="field" style={{ flex: 1, minWidth: 160 }}>
-        <label>سبب الزيارة (اختياري)</label>
-        <input value={form.reason} onChange={set('reason')} />
-      </div>
 
       {/* حالة المراجعة: مؤهَّل (أخضر) أو تحذير مع خانة سبب تجاوز للمشرف */}
       {isFollowup && followup && (
-        <div style={{ width: '100%', marginTop: 4 }}>
-          <p style={{
-            margin: '4px 0', fontSize: 12.5,
-            color: followup.eligible ? 'var(--good, green)' : 'var(--bad, #b91c1c)',
-          }}>
+        <div className="bf-followup">
+          <p className={`bf-note ${followup.eligible ? 'bf-note-ok' : 'bf-note-urgent'}`}>
             {followup.eligible ? '✓ ' : '⚠ '}{followup.message}
           </p>
           {followupBlocked && (
-            <div className="field" style={{ maxWidth: 420 }}>
+            <div className="field" style={{ maxWidth: 460 }}>
               <label>سبب تجاوز شرط المراجعة (موافقة المشرف)</label>
               <input value={override || ''} onChange={(e) => setOverride(e.target.value)}
                 placeholder="مثال: بموافقة مسؤول العيادات — حالة خاصة" required />
@@ -297,7 +299,7 @@ function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel, urgent = f
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+      <div className="bf-actions">
         <button type="submit" disabled={busy}>{busy ? 'جارٍ الحجز…' : 'حجز دور'}</button>
         {onCancel && <button type="button" className="ghost" onClick={onCancel}>إلغاء</button>}
       </div>
