@@ -4,7 +4,7 @@
 // نداءتان إن نادى دكتوران في نفس اللحظة. هنا نفكّ كل المقاطع مسبقاً إلى AudioBuffer
 // فيبدأ التشغيل فوراً، ونصطفّ المقاطع بأنفسنا فلا تتراكب أبداً.
 
-import { ALL_NUMBER_CLIPS, CLIP_TEXT, buildCallClips, roomClip } from './audio-clips.js'
+import { ALL_NUMBER_CLIPS, CLIP_TEXT, FIXED_CLIPS, buildCallClips, roomClip } from './audio-clips.js'
 import { announcementText, speak, speechSupported } from './announce.js'
 
 const CLIP_DIR = '/audio/calls'
@@ -35,11 +35,19 @@ export const saveSettings = (s) => {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
+// ═══ مقاطع لها بديلٌ مولَّد في المتصفح ═══
+// غياب ملفها **ليس نقصاً**: النغمة تُركَّب بـ Web Audio (synthChime) — وchime.mp3 غائبٌ
+// عمداً. كان يُعامَل كمقطع ناقص فيُطلق القراءة الآلية بعد **كل** نداءة: يسمع المرضى
+// التسجيل ثم صوتاً آلياً يعيد الجملة كلها، ويظهر «ناقص» في لوحة ⚙ بلا داعٍ.
+// إن وُضع الملف يوماً فالتسجيل يُستعمل بدل المولَّد تلقائياً.
+const SYNTHESIZED_CLIPS = new Set([FIXED_CLIPS.chime])
+
 class CallAudio {
   constructor() {
     this.ctx = null
     this.buffers = new Map()      // اسم المقطع → AudioBuffer
     this.missing = new Set()      // مقاطع غائبة — حُذّر عنها مرّة ولا تُعاد المحاولة
+    this.substituted = new Set()  // غائبة ولها بديلٌ مولَّد — ليست نقصاً ولا تُعاد المحاولة
     this.queue = []
     this.playing = false
     this.settings = loadSettings()
@@ -79,13 +87,14 @@ class CallAudio {
   }
 
   async fetchClip(name) {
-    if (this.buffers.has(name) || this.missing.has(name)) return
+    if (this.buffers.has(name) || this.missing.has(name) || this.substituted.has(name)) return
     try {
       const res = await fetch(`${CLIP_DIR}/${encodeURIComponent(name)}${CLIP_EXT}`)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const buf = await this.ctx.decodeAudioData(await res.arrayBuffer())
       this.buffers.set(name, buf)
     } catch (e) {
+      if (SYNTHESIZED_CLIPS.has(name)) { this.substituted.add(name); return }
       // مقطع ناقص لا يوقف النداء: يُسجَّل تحذيرٌ يقرأه من يسجّل المقاطع، ويُستعاض
       // عنه بقراءة المتصفح عند النطق (انظر playClips).
       this.missing.add(name)
@@ -132,7 +141,8 @@ class CallAudio {
    */
   async playCall(card) {
     const clips = buildCallClips(card)
-    const missingInCall = clips.filter((c) => !this.buffers.has(c))
+    // الناقص فعلاً وحده يُطلق القراءة الآلية — لا ما له بديلٌ مولَّد
+    const missingInCall = clips.filter((c) => !this.buffers.has(c) && !SYNTHESIZED_CLIPS.has(c))
 
     for (const name of clips) {
       if (name === 'chime' && !this.buffers.has(name)) { await this.synthChime(); continue }
