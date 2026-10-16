@@ -2,14 +2,23 @@ export const getToken = () => localStorage.getItem('token')
 
 async function http(path, options = {}) {
   const token = getToken()
-  const res = await fetch(`/api${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options.headers,
-    },
-  })
+  let res
+  try {
+    res = await fetch(`/api${path}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...options.headers,
+      },
+    })
+  } catch {
+    // انقطاع الشبكة: fetch يرمي «Failed to fetch» بالإنجليزية — رسالة عربية مفهومة بدلها
+    const err = new Error('تعذّر الاتصال بالخادم — تحقّق من الشبكة وأعد المحاولة')
+    err.status = 0
+    err.data = { code: 'NETWORK_ERROR' }
+    throw err
+  }
   if (res.status === 401 && path !== '/auth/login') {
     localStorage.removeItem('token')
     window.dispatchEvent(new Event('auth-expired'))
@@ -17,7 +26,10 @@ async function http(path, options = {}) {
   const data = await res.json().catch(() => ({}))
   if (!res.ok) {
     // نُرفق جسم الخطأ كاملاً بالاستثناء ليقرأ المتصل تفاصيله (مثل code و followup)
-    const err = new Error(data.error || `HTTP ${res.status}`)
+    // بلا رسالة من خادمنا (وسيطٌ ردّ 502/504 والخادم متوقف): «HTTP 502» لا تعني شيئاً للموظف
+    const err = new Error(data.error || (res.status >= 500
+      ? `الخادم لا يستجيب الآن (${res.status}) — أعد المحاولة بعد قليل`
+      : `HTTP ${res.status}`))
     err.status = res.status
     err.data = data
     throw err

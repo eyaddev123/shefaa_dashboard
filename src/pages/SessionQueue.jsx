@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { api, APPOINTMENT_STATUSES, BOOKING_TYPES, VISIT_TYPES, PRIORITIES, DELAY_CAUSES, fmtMoney, fmtTime, toLatinDigits } from '../api.js'
 import { AttendanceBadge, urgentRowClass, isAttendanceSession, usePolling, fmtClock, FlowModeTag, FLOW_MODE_LABELS } from '../attendance-ui.jsx'
 import { useRole } from '../RoleContext.jsx'
+import { useToast, RecallButton } from '../action-feedback.jsx'
 
 // شارة الأولوية — تُبرز من يتقدّم الطابور وسببه
 function priorityBadge(priority) {
@@ -682,7 +683,7 @@ function PriorityPicker({ appt, attendance, onClose, onDone }) {
 // يوم التبديل: الإعداد صار «الحضور» وجلسة اليوم وُلدت بالخانات قبله، فلا يتغيّر شيء
 // ويظن الموظف التبديل معطّلاً. اللافتة تقول السبب، والتحويل لمشرف العيادات وللجلسة
 // الفارغة وحدها — الخادم هو الحارس (403 لغيره، 409 لجلسة فيها حجز)، والإخفاء تجميل.
-function FlowModeMismatch({ data, onChanged }) {
+function FlowModeMismatch({ data, onChanged, onError }) {
   const { role } = useRole()
   const [busy, setBusy] = useState(false)
   if (!data.flow_mode_setting || data.flow_mode_setting === data.flow_mode) return null
@@ -692,7 +693,7 @@ function FlowModeMismatch({ data, onChanged }) {
     if (!confirm(`تحويل هذه الجلسة إلى ${now}؟`)) return
     setBusy(true)
     try { await api.clinic.switchSessionMode(data.id, data.flow_mode_setting); onChanged() }
-    catch (ex) { alert(ex.message) }
+    catch (ex) { onError(ex.message) }
     finally { setBusy(false) }
   }
   return (
@@ -740,11 +741,11 @@ function AttendanceBooking({ sessionId, fees, acceptsUrgent, onBooked }) {
 }
 
 // وصول الطبيب: زرٌّ مرة واحدة، ثم الوقت مع «تصحيح» يترك أثراً يُعرض تحته
-function DoctorArrivalCard({ data, onChanged }) {
+function DoctorArrivalCard({ data, onChanged, onError }) {
   const [busy, setBusy] = useState(false)
   const run = async (fn) => {
     setBusy(true)
-    try { await fn(); onChanged() } catch (ex) { alert(ex.message) } finally { setBusy(false) }
+    try { await fn(); onChanged() } catch (ex) { onError(ex.message) } finally { setBusy(false) }
   }
   const fix = () => {
     const t = prompt('الوقت الصحيح لوصول الطبيب (ساعة:دقيقة، مثل 09:40)', fmtClock(data.doctor_arrived_at))
@@ -847,11 +848,11 @@ function AttendanceQueueTable({ data, actions }) {
 
 // «لسا بانتظار»: المحجوزون غير الحاضرين — ظاهرة دائماً (الطبيب قد يُنهي مبكراً).
 // لا إلغاء ولا عدم حضور تلقائي: الإنسان يقرّر لكل واحد.
-function PendingArrivalList({ data, onChanged }) {
+function PendingArrivalList({ data, onChanged, onError }) {
   const pending = data.appointments.filter((a) => a.status === 'waiting')
   const noShow = async (a) => {
     if (!confirm(`تعليم الدور ${a.queue_number} (${a.full_name}) «ما حضر»؟`)) return
-    try { await api.clinic.noShow(a.id); onChanged() } catch (ex) { alert(ex.message) }
+    try { await api.clinic.noShow(a.id); onChanged() } catch (ex) { onError(ex.message) }
   }
   return (
     <div className="card attn-pending-card">
@@ -885,11 +886,19 @@ function PendingArrivalList({ data, onChanged }) {
 export default function SessionQueue() {
   const { id } = useParams()
   const [data, setData] = useState(null)
-  const [err, setErr] = useState(null)
+  // ★ الخطأ لا يستبدل الشاشة: loadErr لأوّل تحميل فقط (ومعه «إعادة المحاولة»)، وبعده
+  // إشعارٌ عابر والطابور الأخير باقٍ — انقطاعٌ في التحديث الدوري كان يُفرغ الصفحة حتى
+  // يُعيد الموظف تحميلها بيده. وأخطاء الأزرار إشعارٌ لا alert() يوقف الشاشة.
+  const [loadErr, setLoadErr] = useState(null)
+  const [toast, showToast] = useToast()
   const [ticket, setTicket] = useState(null)
   const [recalled, setRecalled] = useState(null)   // وقت آخر إعادة نداء — تأكيدٌ مرئي للموظف
 
-  const load = () => api.clinic.queue(id).then(setData).catch((e) => setErr(e.message))
+  const load = () => api.clinic.queue(id).then((d) => { setData(d); setLoadErr(null) })
+    .catch((e) => {
+      if (data) showToast(`تعذّر تحديث الطابور — يُعاد المحاولة تلقائياً (${e.message})`)
+      else setLoadErr(e.message)
+    })
   useEffect(() => { load() }, [id])
 
   // نمط الحضور: الطبيب ينادي ويُنهي من شاشته — تحديث دوري كي لا يرى الاستقبال طابوراً قديماً.
@@ -908,14 +917,14 @@ export default function SessionQueue() {
         setCompleting({ appt, missing: ex.data.missing_fields || [], patient: ex.data.patient || {} })
         return
       }
-      alert(ex.message)
+      showToast(ex.message); load()
     }
   }
 
   const cancel = async (apptId) => {
     if (!confirm('إلغاء هذا الحجز؟')) return
     try { await api.clinic.updateAppointment(apptId, { status: 'cancelled' }); load() }
-    catch (ex) { alert(ex.message) }
+    catch (ex) { showToast(ex.message); load() }
   }
 
   // ── تأجيل موعد إلى جلسة أخرى ──
@@ -924,11 +933,7 @@ export default function SessionQueue() {
   const [postponing, setPostponing] = useState(null)   // الحجز المطلوب تأجيله
 
   // إعادة النداء: الاستقبال يرى المريض لا يتحرّك — يُعاد بثّ النداء بلا تغيير حالته.
-  // الخادم يخنقها مرّة كل عشر ثوانٍ لكل حجز، فرسالة 429 تُعرض كما هي.
-  const recall = async (apptId) => {
-    try { await api.clinic.recall(apptId); setRecalled(Date.now()) }
-    catch (ex) { alert(ex.message) }
-  }
+  // الخادم يخنقها مرّة كل عشر ثوانٍ لكل حجز، فالزرّ (RecallButton) معطَّل طوال المدّة بعدّاد.
 
   // ترقية حجز قائم إلى أولوية (تبيّن أنه حالة فورية أو كبير بالسن أو رضيع بعد الحجز).
   // تفتح نافذة اختيار بثلاثة أزرار — كان prompt() يطلب كتابة «فوري/كبير/رضيع» باليد،
@@ -937,8 +942,12 @@ export default function SessionQueue() {
   const prioritize = (apptId) =>
     setPrioritizing(data.appointments.find((a) => String(a.id) === String(apptId)) || null)
 
-  if (err) return <p className="error">{err}</p>
-  if (!data) return <p className="empty">جارٍ التحميل…</p>
+  if (!data) return loadErr ? (
+    <div className="load-failed">
+      <p className="error">{loadErr}</p>
+      <button className="ghost" onClick={load}>إعادة المحاولة</button>
+    </div>
+  ) : <p className="empty">جارٍ التحميل…</p>
 
   if (ticket) return <TicketPrint appt={ticket} doctorName={data.doctor_name} onDone={() => { setTicket(null); load() }} />
 
@@ -953,9 +962,11 @@ export default function SessionQueue() {
         الإيراد المتوقع {fmtMoney(data.expected_revenue)}
       </p>
 
-      <FlowModeMismatch data={data} onChanged={load} />
+      {toast}
 
-      {attendance && <DoctorArrivalCard data={data} onChanged={load} />}
+      <FlowModeMismatch data={data} onChanged={load} onError={showToast} />
+
+      {attendance && <DoctorArrivalCard data={data} onChanged={load} onError={showToast} />}
 
       {attendance ? (
         <div className="card">
@@ -1000,9 +1011,8 @@ export default function SessionQueue() {
                 <div style={{ color: 'var(--text-secondary)' }}>{current.full_name}</div>
               </div>
               <div style={{ textAlign: 'center' }}>
-                <button className="ghost" onClick={() => recall(current.id)} style={{ padding: '12px 20px', fontSize: 15 }}>
-                  🔊 إعادة النداء
-                </button>
+                <RecallButton apptId={current.id} onError={showToast} onDone={() => setRecalled(Date.now())}
+                  style={{ padding: '12px 20px', fontSize: 15 }} />
                 {recalled && (
                   <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 5 }}>
                     أُعيد النداء {new Date(recalled).toLocaleTimeString('ar', { hour: '2-digit', minute: '2-digit' })}
@@ -1083,7 +1093,7 @@ export default function SessionQueue() {
       {attendance && (
         <>
           <AttendanceQueueTable data={data} actions={{ arrive, cancel, prioritize, setPostponing }} />
-          <PendingArrivalList data={data} onChanged={load} />
+          <PendingArrivalList data={data} onChanged={load} onError={showToast} />
         </>
       )}
 

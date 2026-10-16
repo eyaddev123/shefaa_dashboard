@@ -1,24 +1,35 @@
 import { useEffect, useState } from 'react'
 import { api, fmtTime, todayLocal } from '../api.js'
 import { AttendanceBadge, urgentRowClass, isAttendanceSession, usePolling, fmtClock } from '../attendance-ui.jsx'
+import { useToast, RecallButton } from '../action-feedback.jsx'
 
 export default function DoctorScreen() {
   const [sessions, setSessions] = useState(null)
   const [sessionId, setSessionId] = useState(null)
   const [queue, setQueue] = useState(null)
-  const [err, setErr] = useState(null)
+  // ★ الخطأ لا يستبدل الشاشة. loadErr لأوّل تحميل فقط (لا بيانات تُعرض بعد) ومعه زرّ
+  // إعادة المحاولة؛ وأي خطأ بعدها — زرٌّ رُفض أو تحديثٌ دوري انقطع — إشعارٌ عابر
+  // والطابور الأخير باقٍ. (كان خطأ إعادة النداء 429 يُبقي الطبيب أمام صفحة فارغة،
+  // وانقطاعٌ واحد في التحديث الدوري يُبقيها فارغة حتى يُعيد تحميلها بيده.)
+  const [loadErr, setLoadErr] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [toast, showToast] = useToast()
 
   const loadSessions = () => api.clinic.mySessions(todayLocal()).then((rows) => {
-    setSessions(rows)
+    setSessions(rows); setLoadErr(null)
     if (!sessionId && rows.length) setSessionId(rows[0].id)
-  }).catch((e) => setErr(e.message))
+  }).catch((e) => setLoadErr(e.message))
 
   useEffect(() => { loadSessions() }, [])
 
   const loadQueue = () => {
     if (!sessionId) return
-    api.clinic.queue(sessionId).then(setQueue).catch((e) => setErr(e.message))
+    api.clinic.queue(sessionId).then((q) => { setQueue(q); setLoadErr(null) })
+      .catch((e) => {
+        // طابورٌ معروض ⇒ يبقى، والتحديث الدوري يُعيد المحاولة وحده
+        if (queue) showToast(`تعذّر تحديث الطابور — يُعاد المحاولة تلقائياً (${e.message})`)
+        else setLoadErr(e.message)
+      })
   }
   useEffect(() => { loadQueue() }, [sessionId])
 
@@ -28,13 +39,19 @@ export default function DoctorScreen() {
   usePolling(loadQueue, attendance && !!sessionId)
 
   const act = async (fn, apptId) => {
-    setBusy(true); setErr(null)
-    try { await fn(apptId); loadQueue() }
-    catch (ex) { setErr(ex.message) }
-    finally { setBusy(false) }
+    setBusy(true)
+    try { await fn(apptId) }
+    catch (ex) { showToast(ex.message) }
+    // بعد النجاح والفشل معاً: الرفض (409) يعني غالباً أن الطابور تغيّر من شاشة أخرى
+    finally { setBusy(false); loadQueue() }
   }
 
-  if (err) return <p className="error">{err}</p>
+  if (loadErr && !sessions) return (
+    <div className="load-failed">
+      <p className="error">{loadErr}</p>
+      <button className="ghost" onClick={loadSessions}>إعادة المحاولة</button>
+    </div>
+  )
   if (!sessions) return <p className="empty">جارٍ التحميل…</p>
   if (sessions.length === 0) return <p className="empty">لا جلسات لك اليوم.</p>
 
@@ -62,7 +79,14 @@ export default function DoctorScreen() {
         </div>
       )}
 
-      {!queue ? <p className="empty">جارٍ التحميل…</p> : (
+      {toast}
+
+      {!queue ? (loadErr ? (
+        <div className="load-failed">
+          <p className="error">{loadErr}</p>
+          <button className="ghost" onClick={loadQueue}>إعادة المحاولة</button>
+        </div>
+      ) : <p className="empty">جارٍ التحميل…</p>) : (
         <>
           <div className="card highlight">
             <h3>قيد الكشف الآن</h3>
@@ -88,9 +112,10 @@ export default function DoctorScreen() {
                     </button>
                   )}
                   {/* المريض لم يسمع النداء أو لم يصل بعد — يُعاد بثّه على شاشة الصالة بلا تغيير حالته */}
-                  <button className="ghost" disabled={busy} onClick={() => act(api.clinic.recall, current.id)} style={{ padding: '14px 20px', fontSize: 15 }}>
-                    🔊 إعادة النداء
-                  </button>
+                  {/* معطَّل طوال مدّة خنق الخادم مع عدٍّ ظاهر — فلا تصل ضغطةٌ ثانية لتُرفض */}
+                  <RecallButton apptId={current.id} onError={showToast}
+                    style={{ padding: '14px 20px', fontSize: 15 }} />
+
                   <button disabled={busy} onClick={() => act(api.clinic.done, current.id)} style={{ padding: '14px 28px', fontSize: 15 }}>
                     إنهاء الكشف
                   </button>

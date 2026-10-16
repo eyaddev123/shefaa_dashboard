@@ -434,6 +434,21 @@ td.num { font-variant-numeric: tabular-nums; }
 /* الإعدادات: تغيير لم يُحفظ — يجب أن يُرى قبل مغادرة الصفحة */
 .setting-unsaved { color: var(--status-pending); background: var(--status-pending-bg); }
 .setting-saved-value { font-size: 12px; color: var(--muted); margin-top: 4px; }
+/* ═══ إشعار عابر لأخطاء الأزرار — الشاشة لا تُستبدل ═══ */
+.toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 1100;
+  max-width: min(560px, calc(100vw - 32px)); padding: 12px 18px; border-radius: 12px;
+  font-size: 14px; font-weight: 700; line-height: 1.6; cursor: pointer;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3); animation: toast-in 0.18s ease-out;
+}
+.toast-error { background: var(--status-bad-bg); color: var(--status-bad); border: 1px solid var(--status-bad); }
+.toast-info { background: var(--surface-1); color: var(--text-primary); border: 1px solid var(--border); }
+@keyframes toast-in { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+/* عدّاد إعادة النداء داخل الزرّ */
+.recall-wait { font-weight: 600; opacity: 0.85; }
+/* تحميل أوّل فشل: رسالة مع «إعادة المحاولة» بدل صفحة بيضاء */
+.load-failed { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
 /* ═══ نافذة منبثقة عامة (أول استعمال: تقديم حجز إلى أولوية) ═══ */
 .modal-backdrop {
   position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center;
