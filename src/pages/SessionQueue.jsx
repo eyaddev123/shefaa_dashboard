@@ -72,7 +72,11 @@ function TicketPrint({ appt, doctorName, onDone }) {
 }
 
 function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel, urgent = false, attendance = false }) {
-  const blank = { mobile: '', full_name: '', gender: '', birth_year: '', booking_type: 'walk_in',
+  // نمط الحضور: الحجز العادي غالباً هاتفي (المريض يحضر لاحقاً فيُعلَّم حضوره) — فهو الافتراضي.
+  // والفوري يبقى «حضر شخصياً»: الإسعافي الحضوري يُسجَّل حاضراً فوراً، والهاتفي ينتظر.
+  // ونمط الخانات كما كان: حقل الطريقة يُخفى عند اختيار خانة وتُرسَل القيمة الافتراضية.
+  const defaultBookingType = attendance && !urgent ? 'phone' : 'walk_in'
+  const blank = { mobile: '', full_name: '', gender: '', birth_year: '', booking_type: defaultBookingType,
                   reason: '', visit_type: 'consultation', priority: urgent ? 'urgent' : 'normal' }
   const [form, setForm] = useState(blank)
   const [lookupState, setLookupState] = useState(null) // null | 'checking' | 'found' | 'new'
