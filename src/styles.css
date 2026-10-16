@@ -434,6 +434,32 @@ td.num { font-variant-numeric: tabular-nums; }
 /* الإعدادات: تغيير لم يُحفظ — يجب أن يُرى قبل مغادرة الصفحة */
 .setting-unsaved { color: var(--status-pending); background: var(--status-pending-bg); }
 .setting-saved-value { font-size: 12px; color: var(--muted); margin-top: 4px; }
+/* ═══ نافذة منبثقة عامة (أول استعمال: تقديم حجز إلى أولوية) ═══ */
+.modal-backdrop {
+  position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center;
+  padding: 16px; background: rgba(0, 0, 0, 0.45);
+}
+.modal-card {
+  width: 100%; max-width: 520px; background: var(--surface-1); color: var(--text-primary);
+  border: 1px solid var(--border); border-radius: 16px; padding: 22px 24px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+}
+.prio-choices { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+/* زرّ اختيار: عنوان بارز وتحته سطر يشرح الأثر — ملوّن بنوع الأولوية */
+button.prio-choice {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 3px; text-align: start;
+  padding: 12px 16px; border-radius: 12px; background: transparent; color: var(--text-primary);
+  border: 1.5px solid var(--border);
+}
+button.prio-choice:hover:not(:disabled) { filter: none; }
+.prio-choice .prio-label { font-size: 15px; font-weight: 800; }
+.prio-choice .prio-hint { font-size: 12px; font-weight: 500; color: var(--text-secondary); }
+button.prio-bad { border-color: var(--status-bad); }
+button.prio-bad .prio-label { color: var(--status-bad); }
+button.prio-bad:hover:not(:disabled) { background: var(--status-bad-bg); }
+button.prio-warn { border-color: var(--status-pending); }
+button.prio-warn .prio-label { color: var(--status-pending); }
+button.prio-warn:hover:not(:disabled) { background: var(--status-pending-bg); }
 /* بطاقة وصول الطبيب */
 .attn-arrival { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .attn-arrival-time { font-size: 22px; font-weight: 800; color: var(--primary); }

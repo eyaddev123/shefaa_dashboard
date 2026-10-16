@@ -606,6 +606,75 @@ function SlotList({ sessionId, fees, onBooked, acceptsUrgent = true }) {
   )
 }
 
+// ═══ نافذة تقديم حجز إلى أولوية ═══
+// ثلاثة أزرار بدل كتابة النوع باليد. والشرح تحت كل زر يتبع نمط الجلسة: في الخانات
+// تُزاح مواعيد المنتظرين، وفي الحضور لا إزاحة (الإسعافي وحده يتقدّم). النتيجة تُعرض
+// داخل النافذة لا في alert. الخادم هو الحارس (DOCTOR_NO_URGENT وغيره) — رسالته تُعرض كما هي.
+function PriorityPicker({ appt, attendance, onClose, onDone }) {
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState(null)
+  const [result, setResult] = useState(null)
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape' && !busy) onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [busy])
+  const choices = [
+    ['urgent', 'إسعافي', 'bad', attendance
+      ? 'يُسجَّل حاضراً ويتصدّر الحاضرين — يُنادى بعد المريض الحالي'
+      : 'يتصدّر الطابور، ومواعيد المنتظرين بعده تتأجل'],
+    ['elderly', 'كبير السن', 'warn', attendance
+      ? 'شارة تنبيه فقط — مكانه بترتيب حضوره'
+      : 'يتقدّم المنتظرين، ومواعيدهم تتأجل'],
+    ['infant', 'رضيع', 'warn', attendance
+      ? 'شارة تنبيه فقط — مكانه بترتيب حضوره'
+      : 'يتقدّم المنتظرين، ومواعيدهم تتأجل'],
+  ]
+  const pick = async (priority) => {
+    setBusy(true); setErr(null)
+    try {
+      const r = await api.clinic.prioritize(appt.id, priority)
+      setResult(attendance
+        ? (priority === 'urgent' ? 'تم — سُجّل حاضراً ويتصدّر الحاضرين.' : 'تم — أُضيفت الشارة، ومكانه بترتيب حضوره.')
+        : `تم التقديم — تأجّل ${r.delayed_count} موعداً بمقدار مدة كشف واحدة.`)
+      onDone()
+    } catch (ex) { setErr(ex.message) }
+    finally { setBusy(false) }
+  }
+  return (
+    <div className="modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose() }}>
+      <div className="modal-card" role="dialog" aria-modal="true" aria-labelledby="prio-title">
+        <h3 id="prio-title">تقديم الدور {appt.queue_number} — {appt.full_name}</h3>
+        {result ? (
+          <>
+            <p className="bf-note bf-note-ok" style={{ marginTop: 10 }}>{result}</p>
+            <div className="bf-actions" style={{ marginTop: 16 }}>
+              <button autoFocus onClick={onClose}>حسناً</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="subtitle" style={{ marginTop: 4 }}>اختر نوع الأولوية:</p>
+            <div className="prio-choices">
+              {choices.map(([key, label, cls, hint]) => (
+                <button key={key} type="button" className={`prio-choice prio-${cls}`}
+                  disabled={busy} onClick={() => pick(key)}>
+                  <span className="prio-label">{label}</span>
+                  <span className="prio-hint">{hint}</span>
+                </button>
+              ))}
+            </div>
+            {err && <p className="error" style={{ marginTop: 10 }}>{err}</p>}
+            <div className="bf-actions" style={{ marginTop: 14 }}>
+              <button type="button" className="ghost" disabled={busy} onClick={onClose}>إلغاء</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ═══════════════ نمط الحضور ═══════════════
 // مكوّنات منفصلة لا تفرّعات داخل مكوّنات نمط الخانات — فيبقى ذاك كما كان حرفياً.
 
@@ -861,21 +930,12 @@ export default function SessionQueue() {
     catch (ex) { alert(ex.message) }
   }
 
-  // ترقية حجز قائم إلى أولوية (تبيّن أنه حالة فورية أو كبير بالسن أو رضيع بعد الحجز)
-  const prioritize = async (apptId) => {
-    const choice = prompt('نوع الأولوية؟ اكتب: فوري / كبير / رضيع')
-    if (!choice) return
-    const map = { 'فوري': 'urgent', 'كبير': 'elderly', 'رضيع': 'infant' }
-    const priority = map[choice.trim()]
-    if (!priority) return alert('اكتب واحدة من: فوري / كبير / رضيع')
-    try {
-      const r = await api.clinic.prioritize(apptId, priority)
-      alert(attendance
-        ? (priority === 'urgent' ? 'تم — سُجّل حاضراً ويتصدّر الحاضرين' : 'تم — أُضيفت الشارة، ومكانه بترتيب حضوره')
-        : `تم التقديم — تأجّل ${r.delayed_count} موعداً بمقدار مدة كشف واحدة`)
-      load()
-    } catch (ex) { alert(ex.message) }
-  }
+  // ترقية حجز قائم إلى أولوية (تبيّن أنه حالة فورية أو كبير بالسن أو رضيع بعد الحجز).
+  // تفتح نافذة اختيار بثلاثة أزرار — كان prompt() يطلب كتابة «فوري/كبير/رضيع» باليد،
+  // وأي خطأ إملائي يُسقط العملية.
+  const [prioritizing, setPrioritizing] = useState(null)   // الحجز المطلوب تقديمه
+  const prioritize = (apptId) =>
+    setPrioritizing(data.appointments.find((a) => String(a.id) === String(apptId)) || null)
 
   if (err) return <p className="error">{err}</p>
   if (!data) return <p className="empty">جارٍ التحميل…</p>
@@ -999,6 +1059,15 @@ export default function SessionQueue() {
           patient={completing.patient}
           onCancel={() => setCompleting(null)}
           onSubmit={(patch) => arrive(completing.appt.id, patch)}
+        />
+      )}
+
+      {prioritizing && (
+        <PriorityPicker
+          appt={prioritizing}
+          attendance={attendance}
+          onClose={() => setPrioritizing(null)}
+          onDone={load}
         />
       )}
 
