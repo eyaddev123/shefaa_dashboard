@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { api, APPOINTMENT_STATUSES, BOOKING_TYPES, VISIT_TYPES, PRIORITIES, DELAY_CAUSES, fmtMoney, fmtTime, toLatinDigits } from '../api.js'
+import { api, APPOINTMENT_STATUSES, BOOKING_TYPES, VISIT_TYPES, PRIORITIES, DELAY_CAUSES, WEEKDAYS, fmtMoney, fmtTime, toLatinDigits } from '../api.js'
 import { AttendanceBadge, urgentRowClass, isAttendanceSession, usePolling, fmtClock, FlowModeTag, FLOW_MODE_LABELS } from '../attendance-ui.jsx'
 import { useRole } from '../RoleContext.jsx'
 import { useToast, RecallButton } from '../action-feedback.jsx'
@@ -402,6 +402,9 @@ function PostponeDialog({ appt, currentSessionId, onClose, onDone }) {
     return d.toISOString().slice(0, 10)
   })
   const [sessions, setSessions] = useState(null)
+  // تاريخٌ بلا جلسات أخرى: لماذا؟ { kind: 'only_current' | 'not_generated' | 'no_schedule', doctors }
+  const [emptyWhy, setEmptyWhy] = useState(null)
+  const { role } = useRole()
   const [targetId, setTargetId] = useState('')
   const [reason, setReason] = useState('')
   const [err, setErr] = useState(null)
@@ -409,11 +412,29 @@ function PostponeDialog({ appt, currentSessionId, onClose, onDone }) {
   const [done, setDone] = useState(null)
 
   useEffect(() => {
-    setSessions(null); setTargetId('')
+    setSessions(null); setTargetId(''); setEmptyWhy(null)
+    let stale = false   // تاريخٌ غُيّر قبل وصول الرد: لا نكتب فوق التاريخ الجديد
     api.clinic.sessions(date)
-      .then((rows) => setSessions(rows.filter((r) => String(r.id) !== String(currentSessionId))))
-      .catch((e) => setErr(e.message))
+      .then(async (rows) => {
+        const others = rows.filter((r) => String(r.id) !== String(currentSessionId))
+        let why = null
+        if (others.length === 0) {
+          // ★ «لا جلسات» كانت رسالةً واحدة لثلاث حالات، فيظن الموظف أن الدكتور لا يعمل يومها
+          // بينما جلساتها لم تُولَّد بعد. التوليد يبقى قرار مشرف العيادات — نقول الحقيقة فقط.
+          if (rows.length > 0) why = { kind: 'only_current' }
+          else {
+            const { schedules } = await api.clinic.schedulesForDate(date)
+            const doctors = [...new Set(schedules.map((x) => x.doctor_name))]
+            why = doctors.length ? { kind: 'not_generated', doctors } : { kind: 'no_schedule' }
+          }
+        }
+        if (!stale) { setSessions(others); setEmptyWhy(why) }
+      })
+      .catch((e) => { if (!stale) setErr(e.message) })
+    return () => { stale = true }
   }, [date, currentSessionId])
+
+  const dayName = WEEKDAYS[new Date(`${date}T00:00:00`).getDay()]
 
   const submit = async (e) => {
     e.preventDefault()
@@ -460,8 +481,19 @@ function PostponeDialog({ appt, currentSessionId, onClose, onDone }) {
                 </option>
               ))}
             </select>
-            {sessions && sessions.length === 0 && (
-              <small className="hint">لا جلسات أخرى في هذا التاريخ — جرّب تاريخاً آخر</small>
+            {emptyWhy?.kind === 'only_current' && (
+              <small className="hint">لا جلسات أخرى في هذا التاريخ غير الجلسة الحالية — جرّب تاريخاً آخر</small>
+            )}
+            {emptyWhy?.kind === 'not_generated' && (
+              <small className="hint warn-hint">
+                عند {emptyWhy.doctors.join('، ')} دوام يوم {dayName}، لكن جلسات هذا التاريخ لم تُولَّد بعد —{' '}
+                {role === 'clinic_admin'
+                  ? 'ولّدها من «لوحة العيادات اليومية» ثم عُد إلى هنا'
+                  : 'اطلب من مشرف العيادات توليدها من لوحة العيادات'}
+              </small>
+            )}
+            {emptyWhy?.kind === 'no_schedule' && (
+              <small className="hint">لا دوام لأي دكتور يوم {dayName} — اختر تاريخاً آخر</small>
             )}
           </div>
           <div className="field" style={{ minWidth: 260 }}>

@@ -179,6 +179,8 @@ export const api = {
       http(`/clinic/appointments/${appointmentId}/postpone`, { method: 'POST', body: JSON.stringify(body) }),
     // جلسات يوم ما (لاختيار الجلسة الهدف عند التأجيل)
     sessions: (date) => http(`/clinic/sessions?date=${date}`),
+    // دوامات يوم الأسبوع لتاريخٍ ما — تميّز «لا دوام» عن «دوامٌ لم تُولَّد جلساته»
+    schedulesForDate: (date) => http(`/clinic/schedules/for-date?date=${encodeURIComponent(date)}`),
     // بلا مصادقة — الشاشة العامة وموقع المريض
     publicBoard: () => http('/public/clinic/board'),
     // رمز الجهاز يمرّ في الاستعلام: EventSource لا يقبل ترويسات مخصّصة
