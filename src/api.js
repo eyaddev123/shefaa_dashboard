@@ -152,6 +152,13 @@ export const api = {
     done: (appointmentId) => http(`/clinic/appointments/${appointmentId}/done`, { method: 'POST' }),
     noShow: (appointmentId) => http(`/clinic/appointments/${appointmentId}/no-show`, { method: 'POST' }),
     recall: (appointmentId) => http(`/clinic/appointments/${appointmentId}/recall`, { method: 'POST' }),
+    // ── نمط الحضور ──
+    // بدء الكشف: منفصل عن النداء — يسجّل started_at وحده
+    start: (appointmentId) => http(`/clinic/appointments/${appointmentId}/start`, { method: 'POST' }),
+    // وصول الطبيب: مرة واحدة لجلسة اليوم، والتصحيح بوقت HH:MM يترك أثراً
+    doctorArrived: (sessionId) => http(`/clinic/sessions/${sessionId}/doctor-arrived`, { method: 'POST' }),
+    fixDoctorArrival: (sessionId, time) =>
+      http(`/clinic/sessions/${sessionId}/doctor-arrived`, { method: 'PATCH', body: JSON.stringify({ time }) }),
     // تأجيل موعد إلى جلسة أخرى — ينشئ حجزاً جديداً ويُعلّم القديم «مؤجَّل»
     postpone: (appointmentId, body) =>
       http(`/clinic/appointments/${appointmentId}/postpone`, { method: 'POST', body: JSON.stringify(body) }),

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { api, APPOINTMENT_STATUSES, BOOKING_TYPES, VISIT_TYPES, PRIORITIES, DELAY_CAUSES, fmtMoney, fmtTime, toLatinDigits } from '../api.js'
+import { AttendanceBadge, urgentRowClass, isAttendanceSession, usePolling, fmtClock } from '../attendance-ui.jsx'
 
 // شارة الأولوية — تُبرز من يتقدّم الطابور وسببه
 function priorityBadge(priority) {
@@ -69,7 +70,7 @@ function TicketPrint({ appt, doctorName, onDone }) {
   )
 }
 
-function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel, urgent = false }) {
+function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel, urgent = false, attendance = false }) {
   const blank = { mobile: '', full_name: '', gender: '', birth_year: '', booking_type: 'walk_in',
                   reason: '', visit_type: 'consultation', priority: urgent ? 'urgent' : 'normal' }
   const [form, setForm] = useState(blank)
@@ -274,9 +275,16 @@ function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel, urgent = f
       {/* تحذير الأولوية: سطرٌ كامل تحت الصفّ لا داخل خانة ضيّقة تكسر محاذاتها */}
       {form.priority !== 'normal' && (
         <p className={`bf-note ${form.priority === 'urgent' ? 'bf-note-urgent' : 'bf-note-warn'}`}>
-          {form.priority === 'urgent'
-            ? '⚠ يتصدّر الطابور — يُنادى بعد المريض الحالي مباشرة، ومواعيد المنتظرين تتأجل'
-            : '⚠ يتقدّم كل المنتظرين، ومواعيدهم تتأجل'}
+          {/* نمط الحضور لا إزاحة فيه — النصّ القديم («مواعيدهم تتأجل») يكذب هناك */}
+          {attendance
+            ? (form.priority === 'urgent'
+              ? (form.booking_type === 'phone'
+                ? '⚠ إسعافي هاتفي — لا يتقدّم قبل حضوره، ثم يتصدّر الحاضرين'
+                : '⚠ يُسجَّل حاضراً ويتصدّر الحاضرين — يُنادى بعد المريض الحالي')
+              : 'شارة تنبيه فقط — مكانه بترتيب حضوره كغيره')
+            : form.priority === 'urgent'
+              ? '⚠ يتصدّر الطابور — يُنادى بعد المريض الحالي مباشرة، ومواعيد المنتظرين تتأجل'
+              : '⚠ يتقدّم كل المنتظرين، ومواعيدهم تتأجل'}
         </p>
       )}
 
@@ -591,6 +599,182 @@ function SlotList({ sessionId, fees, onBooked, acceptsUrgent = true }) {
   )
 }
 
+// ═══════════════ نمط الحضور ═══════════════
+// مكوّنات منفصلة لا تفرّعات داخل مكوّنات نمط الخانات — فيبقى ذاك كما كان حرفياً.
+
+// الحجز في نمط الحضور: نفس نموذج الحجز تماماً، بلا اختيار وقت (لا خانات أصلاً)
+function AttendanceBooking({ sessionId, fees, acceptsUrgent, onBooked }) {
+  const [open, setOpen] = useState(null)   // null | 'normal' | 'urgent'
+  return (
+    <>
+      {!open && (
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <button onClick={() => setOpen('normal')}>+ حجز جديد</button>
+          {/* الخادم هو الحارس (DOCTOR_NO_URGENT) — الإخفاء تجميل */}
+          {acceptsUrgent && <button className="urgent-btn" onClick={() => setOpen('urgent')}>حجز فوري</button>}
+        </div>
+      )}
+      {open && (
+        <div className="slot-booking-form">
+          <BookingForm
+            key={open}
+            sessionId={sessionId}
+            slotTime={null}
+            fees={fees}
+            urgent={open === 'urgent'}
+            attendance
+            onBooked={(appt) => { setOpen(null); onBooked(appt) }}
+            onCancel={() => setOpen(null)}
+          />
+        </div>
+      )}
+    </>
+  )
+}
+
+// وصول الطبيب: زرٌّ مرة واحدة، ثم الوقت مع «تصحيح» يترك أثراً يُعرض تحته
+function DoctorArrivalCard({ data, onChanged }) {
+  const [busy, setBusy] = useState(false)
+  const run = async (fn) => {
+    setBusy(true)
+    try { await fn(); onChanged() } catch (ex) { alert(ex.message) } finally { setBusy(false) }
+  }
+  const fix = () => {
+    const t = prompt('الوقت الصحيح لوصول الطبيب (ساعة:دقيقة، مثل 09:40)', fmtClock(data.doctor_arrived_at))
+    if (t) run(() => api.clinic.fixDoctorArrival(data.id, toLatinDigits(t).trim()))
+  }
+  return (
+    <div className="card">
+      <div className="attn-arrival">
+        <div>
+          <h3 style={{ marginBottom: 4 }}>وصول الطبيب</h3>
+          {data.doctor_arrived_at ? (
+            <>
+              <span className="attn-arrival-time" dir="ltr">{fmtClock(data.doctor_arrived_at)}</span>
+              <span className="muted" style={{ marginInlineStart: 8, fontSize: 13 }}>
+                (بداية الدوام <span dir="ltr">{fmtTime(data.start_time)}</span>
+                {data.doctor_arrived_by_name && ` · سجّله ${data.doctor_arrived_by_name}`})
+              </span>
+            </>
+          ) : <span className="muted">لم يُسجَّل بعد</span>}
+        </div>
+        {data.doctor_arrived_at
+          ? <button className="ghost" disabled={busy} onClick={fix}>تصحيح الوقت</button>
+          : <button disabled={busy} onClick={() => run(() => api.clinic.doctorArrived(data.id))}>وصل الطبيب</button>}
+      </div>
+      {/* الأثر: كل تصحيح بقيمته السابقة ومن صحّحه ومتى */}
+      {data.doctor_arrival_history?.length > 0 && (
+        <ul className="attn-arrival-history">
+          {data.doctor_arrival_history.map((h, i) => (
+            <li key={i}>
+              صُحّح من <span dir="ltr">{fmtClock(h.previous_value)}</span> إلى <span dir="ltr">{fmtClock(h.new_value)}</span>
+              {' '}— {h.changed_by_name || '—'} عند <span dir="ltr">{fmtClock(h.changed_at)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+// طابور نمط الحضور: بترتيب الخادم (قيد الكشف، ثم الحاضرون — الإسعافي أولاً ثم الأقدم
+// حضوراً — ثم من لم يحضر). لا عمود موعد ولا انتظار متوقَّع: لا خانات ولا تقدير هنا.
+function AttendanceQueueTable({ data, actions }) {
+  const { arrive, cancel, prioritize, setPostponing } = actions
+  return (
+    <div className="card">
+      <h3>الطابور ({data.appointments.length})</h3>
+      <p className="subtitle" style={{ marginTop: -6 }}>
+        الدور بترتيب <strong>الحضور</strong>: الإسعافي الحاضر أولاً، ثم الأقدم حضوراً.
+        رقم الدور على البطاقة للتعريف فقط ولا يتغيّر.
+      </p>
+      <table style={{ marginTop: 14 }}>
+        <thead>
+          <tr>
+            <th>الدور</th><th>الاسم</th><th>الموبايل</th><th>نوع الزيارة</th><th>السعر</th>
+            <th>وقت الحضور</th><th>الحالة</th><th>قبله</th><th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.appointments.map((a) => (
+            <tr key={a.id} className={urgentRowClass(a)}>
+              <td className="num">{a.queue_number}<AttendanceBadge priority={a.priority} /></td>
+              <td>{a.full_name}</td>
+              <td dir="ltr">{a.mobile}</td>
+              <td>
+                {VISIT_TYPES[a.visit_type] || a.visit_type}
+                {a.followup_override_by && (
+                  <span className="badge warn" style={{ marginInlineStart: 6 }}
+                    title={a.followup_override_reason || ''}>تجاوز</span>
+                )}
+              </td>
+              <td className="num">{fmtMoney(a.fee)}</td>
+              <td dir="ltr">{a.arrived_at ? fmtClock(a.arrived_at) : '—'}</td>
+              <td>{appointmentBadge(a.status)}</td>
+              <td className="num">{a.ahead_count ?? '—'}</td>
+              <td>
+                {['waiting', 'arrived'].includes(a.status) && a.priority === 'normal'
+                  && data.accepts_urgent !== false && (
+                  <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }}
+                    onClick={() => prioritize(a.id)}>تقديم</button>
+                )}{' '}
+                {a.status === 'waiting' && (
+                  <>
+                    <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }} onClick={() => arrive(a.id)}>حضر</button>{' '}
+                    <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }} onClick={() => cancel(a.id)}>إلغاء</button>
+                  </>
+                )}{' '}
+                {['waiting', 'arrived'].includes(a.status) && (
+                  <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }}
+                    onClick={() => setPostponing(a)}>تأجيل</button>
+                )}
+              </td>
+            </tr>
+          ))}
+          {data.appointments.length === 0 && <tr><td colSpan={9} className="empty">لا حجوزات بعد في هذه الجلسة</td></tr>}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+// «لسا بانتظار»: المحجوزون غير الحاضرين — ظاهرة دائماً (الطبيب قد يُنهي مبكراً).
+// لا إلغاء ولا عدم حضور تلقائي: الإنسان يقرّر لكل واحد.
+function PendingArrivalList({ data, onChanged }) {
+  const pending = data.appointments.filter((a) => a.status === 'waiting')
+  const noShow = async (a) => {
+    if (!confirm(`تعليم الدور ${a.queue_number} (${a.full_name}) «ما حضر»؟`)) return
+    try { await api.clinic.noShow(a.id); onChanged() } catch (ex) { alert(ex.message) }
+  }
+  return (
+    <div className="card attn-pending-card">
+      <h3>لسا بانتظار ({pending.length})</h3>
+      <p className="subtitle" style={{ marginTop: -6 }}>
+        محجوزون لم يحضروا بعد. لا يظهرون للطبيب ولا يوقفون أحداً — وعند الإقفال يقرّر الاستقبال لكلٍّ منهم.
+      </p>
+      {pending.length === 0 ? <p className="empty">لا أحد — كل المحجوزين حضروا أو أُقفلت حالتهم.</p> : (
+        <table>
+          <thead><tr><th>الدور</th><th>الاسم</th><th>الموبايل</th><th>طريقة الحجز</th><th></th></tr></thead>
+          <tbody>
+            {pending.map((a) => (
+              <tr key={a.id}>
+                <td className="num">{a.queue_number}<AttendanceBadge priority={a.priority} /></td>
+                <td>{a.full_name}</td>
+                <td dir="ltr">{a.mobile || '—'}</td>
+                <td>{BOOKING_TYPES[a.booking_type] || a.booking_type}</td>
+                <td>
+                  <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }}
+                    onClick={() => noShow(a)}>ما حضر</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  )
+}
+
 export default function SessionQueue() {
   const { id } = useParams()
   const [data, setData] = useState(null)
@@ -600,6 +784,11 @@ export default function SessionQueue() {
 
   const load = () => api.clinic.queue(id).then(setData).catch((e) => setErr(e.message))
   useEffect(() => { load() }, [id])
+
+  // نمط الحضور: الطبيب ينادي ويُنهي من شاشته — تحديث دوري كي لا يرى الاستقبال طابوراً قديماً.
+  // نمط الخانات يبقى كما كان (بلا تحديث دوري).
+  const attendance = isAttendanceSession(data)
+  usePolling(load, attendance)
 
   // ★ الحضور: إن رفض الخادم لنقص المعلومات، نفتح نموذج الإكمال مباشرةً بدل عرض
   // خطأ يترك الموظف يخمّن ما ينقص ومن أين يُكمله.
@@ -643,7 +832,9 @@ export default function SessionQueue() {
     if (!priority) return alert('اكتب واحدة من: فوري / كبير / رضيع')
     try {
       const r = await api.clinic.prioritize(apptId, priority)
-      alert(`تم التقديم — تأجّل ${r.delayed_count} موعداً بمقدار مدة كشف واحدة`)
+      alert(attendance
+        ? (priority === 'urgent' ? 'تم — سُجّل حاضراً ويتصدّر الحاضرين' : 'تم — أُضيفت الشارة، ومكانه بترتيب حضوره')
+        : `تم التقديم — تأجّل ${r.delayed_count} موعداً بمقدار مدة كشف واحدة`)
       load()
     } catch (ex) { alert(ex.message) }
   }
@@ -655,7 +846,7 @@ export default function SessionQueue() {
 
   return (
     <>
-      <h2>طابور {data.doctor_name}</h2>
+      <h2>طابور {data.doctor_name}{attendance && <span className="attn-mode-tag">نمط الحضور</span>}</h2>
       <p className="subtitle">
         {data.specialty || '—'} · {fmtTime(data.start_time)} – {fmtTime(data.end_time)} ·
         مدة الكشف المتوقعة {data.expected_visit_minutes} دقيقة ·
@@ -664,6 +855,22 @@ export default function SessionQueue() {
         الإيراد المتوقع {fmtMoney(data.expected_revenue)}
       </p>
 
+      {attendance && <DoctorArrivalCard data={data} onChanged={load} />}
+
+      {attendance ? (
+        <div className="card">
+          <h3>حجز دور</h3>
+          <p className="subtitle" style={{ marginTop: -6, marginBottom: 14 }}>
+            الحجز حجزُ مكان لا وقت — الدور يتحدّد بترتيب الحضور.
+          </p>
+          <AttendanceBooking
+            sessionId={id}
+            fees={{ consultation_fee: data.consultation_fee, followup_fee: data.followup_fee }}
+            acceptsUrgent={data.accepts_urgent !== false}
+            onBooked={(appt) => setTicket(appt)}
+          />
+        </div>
+      ) : (
       <div className="card">
         <h3>حجز دور — خانات اليوم</h3>
         <p className="subtitle" style={{ marginTop: -6, marginBottom: 14 }}>
@@ -676,6 +883,7 @@ export default function SessionQueue() {
           onBooked={(appt) => setTicket(appt)}
         />
       </div>
+      )}
 
       {/* المريض الحالي وزر إعادة النداء — الاستقبال هو من يرى المريض لا يتحرّك */}
       {(() => {
@@ -763,6 +971,14 @@ export default function SessionQueue() {
         />
       )}
 
+      {attendance && (
+        <>
+          <AttendanceQueueTable data={data} actions={{ arrive, cancel, prioritize, setPostponing }} />
+          <PendingArrivalList data={data} onChanged={load} />
+        </>
+      )}
+
+      {!attendance && (
       <div className="card">
         <h3>الطابور ({data.appointments.length})</h3>
         <p className="subtitle" style={{ marginTop: -6 }}>
@@ -820,6 +1036,7 @@ export default function SessionQueue() {
           </tbody>
         </table>
       </div>
+      )}
     </>
   )
 }

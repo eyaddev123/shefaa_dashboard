@@ -401,6 +401,34 @@ td.num { font-variant-numeric: tabular-nums; }
   color: var(--primary); letter-spacing: 0.02em;
 }
 
+/* ═══ نمط الحضور ═══ */
+/* الإسعافي الحاضر: صف أحمر في قائمتي الطبيب والاستقبال. بعد .doc-row-next عمداً:
+   إسعافيٌّ هو «التالي» يبقى أحمر — الحالة أهمّ من موضعها. */
+.attn-row-urgent td { background: var(--status-bad-bg); color: var(--status-bad); font-weight: 700; }
+.attn-row-urgent td:first-child { box-shadow: inset -4px 0 0 var(--status-bad); }
+/* شارة نمط الجلسة في عنوان الشاشة */
+.attn-mode-tag {
+  display: inline-block; margin-inline-start: 10px; padding: 2px 10px; border-radius: 999px;
+  font-size: 12px; font-weight: 700; vertical-align: middle;
+  color: var(--status-review); background: var(--status-review-bg);
+}
+/* «بدء الكشف»: أخضر ومفصول بمسافة واضحة عن «إنهاء الكشف» — زرّان متجاوران
+   بنفس الشكل يُضغط أحدهما مكان الآخر، والإنهاء بلا بدء يُسقط القياس */
+.attn-start-btn {
+  padding: 14px 24px; font-size: 15px;
+  background: var(--status-good); border-color: var(--status-good); color: #fff;
+  margin-inline-end: 28px;
+}
+.attn-start-btn:hover:not(:disabled) { filter: brightness(1.08); background: var(--status-good); }
+/* الأخضر في الوضع الداكن فاتح (#4ade80): الأبيض عليه لا يُقرأ — نصّ داكن (نمط زرّ واتساب) */
+:root[data-theme='dark'] .attn-start-btn { color: #06301b; }
+/* بطاقة وصول الطبيب */
+.attn-arrival { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.attn-arrival-time { font-size: 22px; font-weight: 800; color: var(--primary); }
+.attn-arrival-history { margin: 8px 0 0; padding: 0; list-style: none; font-size: 12px; color: var(--muted); }
+/* «لسا بانتظار»: المحجوزون غير الحاضرين — قائمة إقفال لا إنذار */
+.attn-pending-card { border-inline-start: 4px solid var(--muted); }
+
 .badge.blue { color: var(--status-review); background: var(--status-review-bg); }
 .badge.good { color: var(--status-good); background: var(--status-good-bg); }
 .badge.bad { color: var(--status-bad); background: var(--status-bad-bg); }

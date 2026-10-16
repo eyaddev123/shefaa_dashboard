@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, fmtTime, todayLocal } from '../api.js'
+import { AttendanceBadge, urgentRowClass, isAttendanceSession, usePolling, fmtClock } from '../attendance-ui.jsx'
 
 export default function DoctorScreen() {
   const [sessions, setSessions] = useState(null)
@@ -21,6 +22,11 @@ export default function DoctorScreen() {
   }
   useEffect(() => { loadQueue() }, [sessionId])
 
+  // ★ نمط الحضور: الاستقبال يعلّم الحضور فيتغيّر الطابور من خارج هذه الشاشة — تحديث دوري.
+  // نمط الخانات يبقى كما كان (بلا تحديث دوري).
+  const attendance = isAttendanceSession(queue)
+  usePolling(loadQueue, attendance && !!sessionId)
+
   const act = async (fn, apptId) => {
     setBusy(true); setErr(null)
     try { await fn(apptId); loadQueue() }
@@ -34,7 +40,10 @@ export default function DoctorScreen() {
 
   const current = queue?.appointments.find((a) => a.status === 'in_service')
   const arrivedWaiting = queue?.appointments.filter((a) => a.status === 'arrived') || []
-  const stillWaiting = queue?.appointments.filter((a) => a.status === 'waiting') || []
+  // نمط الحضور: الغائب لا يظهر للطبيب ولا يوقف أحداً — القائمة للحاضرين وحدهم.
+  // والترتيب من الخادم (الإسعافي الحاضر أولاً ثم الأقدم حضوراً).
+  const stillWaiting = attendance ? []
+    : queue?.appointments.filter((a) => a.status === 'waiting') || []
   const nextUp = arrivedWaiting[0]
 
   return (
@@ -60,11 +69,24 @@ export default function DoctorScreen() {
             {current ? (
               <div className="action-row">
                 <div>
-                  <div style={{ fontSize: 32, fontWeight: 800, color: 'var(--primary)' }}>الدور {current.queue_number}</div>
+                  <div style={{ fontSize: 32, fontWeight: 800, color: 'var(--primary)' }}>
+                    الدور {current.queue_number}
+                    {attendance && <AttendanceBadge priority={current.priority} />}
+                  </div>
                   <div style={{ color: 'var(--text-secondary)' }}>{current.full_name}</div>
                   {current.reason && <div style={{ color: 'var(--muted)', fontSize: 13, marginTop: 4 }}>سبب الزيارة: {current.reason}</div>}
+                  {attendance && current.started_at && (
+                    <div style={{ color: 'var(--muted)', fontSize: 13, marginTop: 4 }}>بدأ الكشف {fmtClock(current.started_at)}</div>
+                  )}
                 </div>
                 <div style={{ display: 'flex', gap: 10 }}>
+                  {/* ★ بدء الكشف منفصل عن النداء: بين النداء ودخول المريض الغرفة دقائق لا
+                      تُحسب من الكشف. إنهاءٌ بلا بدء يُستبعد من حساب المدة — لا تخمين. */}
+                  {attendance && !current.started_at && (
+                    <button className="attn-start-btn" disabled={busy} onClick={() => act(api.clinic.start, current.id)}>
+                      ▶ بدء الكشف
+                    </button>
+                  )}
                   {/* المريض لم يسمع النداء أو لم يصل بعد — يُعاد بثّه على شاشة الصالة بلا تغيير حالته */}
                   <button className="ghost" disabled={busy} onClick={() => act(api.clinic.recall, current.id)} style={{ padding: '14px 20px', fontSize: 15 }}>
                     🔊 إعادة النداء
@@ -84,7 +106,10 @@ export default function DoctorScreen() {
             {nextUp ? (
               <div className="action-row">
                 <div>
-                  <div style={{ fontSize: 22, fontWeight: 700 }}>الدور {nextUp.queue_number} — {nextUp.full_name}</div>
+                  <div style={{ fontSize: 22, fontWeight: 700 }}>
+                    الدور {nextUp.queue_number} — {nextUp.full_name}
+                    {attendance && <AttendanceBadge priority={nextUp.priority} />}
+                  </div>
                   {nextUp.reason && <div style={{ color: 'var(--muted)', fontSize: 13 }}>{nextUp.reason}</div>}
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
@@ -107,11 +132,13 @@ export default function DoctorScreen() {
           {/* الطابور كامل: مَن وصل ومَن لم يصل في مكان واحد، بالترتيب */}
           <div className="card">
             <h3>
-              الطابور كامل ({arrivedWaiting.length + stillWaiting.length})
-              <span className="doc-queue-legend">
-                <span className="doc-dot doc-dot-here" /> وصل ({arrivedWaiting.length})
-                <span className="doc-dot doc-dot-away" /> لم يصل ({stillWaiting.length})
-              </span>
+              {attendance ? `الحاضرون (${arrivedWaiting.length})` : `الطابور كامل (${arrivedWaiting.length + stillWaiting.length})`}
+              {!attendance && (
+                <span className="doc-queue-legend">
+                  <span className="doc-dot doc-dot-here" /> وصل ({arrivedWaiting.length})
+                  <span className="doc-dot doc-dot-away" /> لم يصل ({stillWaiting.length})
+                </span>
+              )}
             </h3>
             {arrivedWaiting.length + stillWaiting.length === 0 ? (
               <p className="empty">لا أحد بانتظار الدور — الجميع انتهى أو لم يُحجز بعد.</p>
@@ -123,9 +150,10 @@ export default function DoctorScreen() {
                 <tbody>
                   {/* الحاضرون أولاً — هم مَن يُنادى منهم فعلياً */}
                   {arrivedWaiting.map((a) => (
-                    <tr key={a.id} className={a.id === nextUp?.id ? 'doc-row-next' : undefined}>
+                    <tr key={a.id} className={[a.id === nextUp?.id ? 'doc-row-next' : '',
+                      attendance ? urgentRowClass(a) : ''].filter(Boolean).join(' ') || undefined}>
                       <td className="num">{a.queue_number}</td>
-                      <td>{a.full_name}</td>
+                      <td>{a.full_name}{attendance && <AttendanceBadge priority={a.priority} />}</td>
                       <td>
                         <span className="badge good">وصل</span>
                         {a.id === nextUp?.id && <span className="doc-next-tag">التالي</span>}

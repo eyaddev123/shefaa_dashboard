@@ -11,6 +11,10 @@ function SettingRow({ setting, onSaved }) {
   const dirty = String(value) !== String(setting.value ?? '')
 
   const save = async () => {
+    // تبديل النمط قرارٌ يمسّ سير العيادة كلها — تأكيدٌ صريح بأثره الحقيقي
+    if (setting.key === 'clinic_flow_mode' && !confirm(
+      'يسري النمط الجديد على الجلسات التي تُولَّد بعد الحفظ فقط.\n' +
+      'جلسات اليوم المولَّدة مسبقاً تبقى على نمطها. متابعة؟')) return
     setBusy(true); setSaved(false); setErr(null)
     try {
       await api.updateSetting(setting.key, value)
@@ -29,7 +33,13 @@ function SettingRow({ setting, onSaved }) {
         )}
       </div>
       <div className="setting-control">
-        {setting.value_type === 'bool' ? (
+        {setting.key === 'clinic_flow_mode' ? (
+          // قائمة مغلقة (CHECK في القاعدة + فحص في الخادم) — لا حقل نصّي يُكتب فيه خطأ
+          <select id={`set-${setting.key}`} value={value} onChange={(e) => { setValue(e.target.value); setSaved(false) }}>
+            <option value="slots">الخانات الزمنية (القديم)</option>
+            <option value="attendance">ترتيب الحضور</option>
+          </select>
+        ) : setting.value_type === 'bool' ? (
           <select id={`set-${setting.key}`} value={value} onChange={(e) => { setValue(e.target.value); setSaved(false) }}>
             <option value="true">مفعّل</option>
             <option value="false">معطّل</option>
