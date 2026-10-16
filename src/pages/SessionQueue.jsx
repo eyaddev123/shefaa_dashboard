@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { api, APPOINTMENT_STATUSES, BOOKING_TYPES, VISIT_TYPES, PRIORITIES, DELAY_CAUSES, fmtMoney, fmtTime, toLatinDigits } from '../api.js'
+import { api, APPOINTMENT_STATUSES, BOOKING_TYPES, VISIT_TYPES, PRIORITIES, DELAY_CAUSES, WEEKDAYS, addDays, todayLocal, fmtMoney, fmtTime, toLatinDigits } from '../api.js'
+import { AttendanceBadge, urgentRowClass, isAttendanceSession, usePolling, fmtClock, FlowModeTag, FLOW_MODE_LABELS } from '../attendance-ui.jsx'
+import { useRole } from '../RoleContext.jsx'
+import { useToast, RecallButton } from '../action-feedback.jsx'
 
 // شارة الأولوية — تُبرز من يتقدّم الطابور وسببه
 function priorityBadge(priority) {
@@ -69,8 +72,12 @@ function TicketPrint({ appt, doctorName, onDone }) {
   )
 }
 
-function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel, urgent = false }) {
-  const blank = { mobile: '', full_name: '', gender: '', birth_year: '', booking_type: 'walk_in',
+function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel, urgent = false, attendance = false }) {
+  // نمط الحضور: الحجز العادي غالباً هاتفي (المريض يحضر لاحقاً فيُعلَّم حضوره) — فهو الافتراضي.
+  // والفوري يبقى «حضر شخصياً»: الإسعافي الحضوري يُسجَّل حاضراً فوراً، والهاتفي ينتظر.
+  // ونمط الخانات كما كان: حقل الطريقة يُخفى عند اختيار خانة وتُرسَل القيمة الافتراضية.
+  const defaultBookingType = attendance && !urgent ? 'phone' : 'walk_in'
+  const blank = { mobile: '', full_name: '', gender: '', birth_year: '', booking_type: defaultBookingType,
                   reason: '', visit_type: 'consultation', priority: urgent ? 'urgent' : 'normal' }
   const [form, setForm] = useState(blank)
   const [lookupState, setLookupState] = useState(null) // null | 'checking' | 'found' | 'new'
@@ -274,9 +281,16 @@ function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel, urgent = f
       {/* تحذير الأولوية: سطرٌ كامل تحت الصفّ لا داخل خانة ضيّقة تكسر محاذاتها */}
       {form.priority !== 'normal' && (
         <p className={`bf-note ${form.priority === 'urgent' ? 'bf-note-urgent' : 'bf-note-warn'}`}>
-          {form.priority === 'urgent'
-            ? '⚠ يتصدّر الطابور — يُنادى بعد المريض الحالي مباشرة، ومواعيد المنتظرين تتأجل'
-            : '⚠ يتقدّم كل المنتظرين، ومواعيدهم تتأجل'}
+          {/* نمط الحضور لا إزاحة فيه — النصّ القديم («مواعيدهم تتأجل») يكذب هناك */}
+          {attendance
+            ? (form.priority === 'urgent'
+              ? (form.booking_type === 'phone'
+                ? '⚠ إسعافي هاتفي — لا يتقدّم قبل حضوره، ثم يتصدّر الحاضرين'
+                : '⚠ يُسجَّل حاضراً ويتصدّر الحاضرين — يُنادى بعد المريض الحالي')
+              : 'شارة تنبيه فقط — مكانه بترتيب حضوره كغيره')
+            : form.priority === 'urgent'
+              ? '⚠ يتصدّر الطابور — يُنادى بعد المريض الحالي مباشرة، ومواعيد المنتظرين تتأجل'
+              : '⚠ يتقدّم كل المنتظرين، ومواعيدهم تتأجل'}
         </p>
       )}
 
@@ -340,12 +354,14 @@ function CompletePatientForm({ appt, missing, patient, onCancel, onSubmit }) {
       <p className="subtitle" style={{ marginTop: -6 }}>
         الدور {appt?.queue_number} · هذه المعلومات أُجّلت عند الحجز وتلزم قبل تعليم الحضور.
       </p>
-      <form onSubmit={submit}>
-        <div className="inline" style={{ flexWrap: 'wrap' }}>
+      {/* بنية نموذج الحجز نفسها (booking-form + bf-row): صفٌّ محاذى من الأعلى، وكل حقل
+          عمودٌ ثابت (تسمية، مُدخَل، تلميح) — فتلميح الموبايل لا يرفع مُدخَله عن جاريه. */}
+      <form className="booking-form cpf-form" onSubmit={submit}>
+        <div className="bf-row cpf-row">
           {need('mobile') && (
             <div className="field">
               <label>رقم الموبايل</label>
-              <input value={form.mobile} dir="ltr" inputMode="numeric" required autoFocus
+              <input value={form.mobile} dir="ltr" inputMode="numeric" required autoFocus placeholder="09XXXXXXXX"
                 onChange={(e) => setForm((f) => ({ ...f, mobile: toLatinDigits(e.target.value) }))} />
               <small className="hint">به يتابع المريض دوره في «دوري»</small>
             </div>
@@ -361,12 +377,12 @@ function CompletePatientForm({ appt, missing, patient, onCancel, onSubmit }) {
           {need('birth_year') && (
             <div className="field">
               <label>سنة الميلاد</label>
-              <input value={form.birth_year} inputMode="numeric" style={{ width: 110 }} required
+              <input value={form.birth_year} inputMode="numeric" placeholder="1990" required
                 onChange={(e) => setForm((f) => ({ ...f, birth_year: toLatinDigits(e.target.value) }))} />
             </div>
           )}
         </div>
-        <div className="action-row" style={{ marginTop: 12 }}>
+        <div className="bf-actions">
           <button type="submit" disabled={busy}>{busy ? 'جارٍ الحفظ…' : 'حفظ وتعليم الحضور'}</button>
           <button type="button" className="ghost" onClick={onCancel}>إلغاء</button>
         </div>
@@ -380,12 +396,14 @@ function CompletePatientForm({ appt, missing, patient, onCancel, onSubmit }) {
 // تختار الجلسة الهدف (نفس الدكتور أو غيره) وتكتب السبب. الخادم ينشئ الحجز الجديد
 // بنفس قواعد الحجز — فرفضُه (جلسة ممتلئة أو ليوم مضى) يظهر كما هو بلا تفسير محلي.
 function PostponeDialog({ appt, currentSessionId, onClose, onDone }) {
-  const [date, setDate] = useState(() => {
-    // الغد افتراضاً: التأجيل يعني «ليس اليوم» في أغلب الحالات
-    const d = new Date(); d.setDate(d.getDate() + 1)
-    return d.toISOString().slice(0, 10)
-  })
+  // الغد افتراضاً: التأجيل يعني «ليس اليوم» في أغلب الحالات.
+  // ⚠️ من أجزاء التاريخ المحلية لا toISOString(): تلك بتوقيت UTC، فبين منتصف الليل
+  // والثالثة فجراً بتوقيت دمشق كانت تعطي تاريخ اليوم بدل الغد.
+  const [date, setDate] = useState(() => addDays(todayLocal(), 1))
   const [sessions, setSessions] = useState(null)
+  // تاريخٌ بلا جلسات أخرى: لماذا؟ { kind: 'only_current' | 'not_generated' | 'no_schedule', doctors }
+  const [emptyWhy, setEmptyWhy] = useState(null)
+  const { role } = useRole()
   const [targetId, setTargetId] = useState('')
   const [reason, setReason] = useState('')
   const [err, setErr] = useState(null)
@@ -393,11 +411,29 @@ function PostponeDialog({ appt, currentSessionId, onClose, onDone }) {
   const [done, setDone] = useState(null)
 
   useEffect(() => {
-    setSessions(null); setTargetId('')
+    setSessions(null); setTargetId(''); setEmptyWhy(null)
+    let stale = false   // تاريخٌ غُيّر قبل وصول الرد: لا نكتب فوق التاريخ الجديد
     api.clinic.sessions(date)
-      .then((rows) => setSessions(rows.filter((r) => String(r.id) !== String(currentSessionId))))
-      .catch((e) => setErr(e.message))
+      .then(async (rows) => {
+        const others = rows.filter((r) => String(r.id) !== String(currentSessionId))
+        let why = null
+        if (others.length === 0) {
+          // ★ «لا جلسات» كانت رسالةً واحدة لثلاث حالات، فيظن الموظف أن الدكتور لا يعمل يومها
+          // بينما جلساتها لم تُولَّد بعد. التوليد يبقى قرار مشرف العيادات — نقول الحقيقة فقط.
+          if (rows.length > 0) why = { kind: 'only_current' }
+          else {
+            const { schedules } = await api.clinic.schedulesForDate(date)
+            const doctors = [...new Set(schedules.map((x) => x.doctor_name))]
+            why = doctors.length ? { kind: 'not_generated', doctors } : { kind: 'no_schedule' }
+          }
+        }
+        if (!stale) { setSessions(others); setEmptyWhy(why) }
+      })
+      .catch((e) => { if (!stale) setErr(e.message) })
+    return () => { stale = true }
   }, [date, currentSessionId])
+
+  const dayName = WEEKDAYS[new Date(`${date}T00:00:00`).getDay()]
 
   const submit = async (e) => {
     e.preventDefault()
@@ -444,8 +480,19 @@ function PostponeDialog({ appt, currentSessionId, onClose, onDone }) {
                 </option>
               ))}
             </select>
-            {sessions && sessions.length === 0 && (
-              <small className="hint">لا جلسات أخرى في هذا التاريخ — جرّب تاريخاً آخر</small>
+            {emptyWhy?.kind === 'only_current' && (
+              <small className="hint">لا جلسات أخرى في هذا التاريخ غير الجلسة الحالية — جرّب تاريخاً آخر</small>
+            )}
+            {emptyWhy?.kind === 'not_generated' && (
+              <small className="hint warn-hint">
+                عند {emptyWhy.doctors.join('، ')} دوام يوم {dayName}، لكن جلسات هذا التاريخ لم تُولَّد بعد —{' '}
+                {role === 'clinic_admin'
+                  ? 'ولّدها من «لوحة العيادات اليومية» ثم عُد إلى هنا'
+                  : 'اطلب من مشرف العيادات توليدها من لوحة العيادات'}
+              </small>
+            )}
+            {emptyWhy?.kind === 'no_schedule' && (
+              <small className="hint">لا دوام لأي دكتور يوم {dayName} — اختر تاريخاً آخر</small>
             )}
           </div>
           <div className="field" style={{ minWidth: 260 }}>
@@ -591,15 +638,339 @@ function SlotList({ sessionId, fees, onBooked, acceptsUrgent = true }) {
   )
 }
 
+// ═══ نافذة تقديم حجز إلى أولوية ═══
+// ثلاثة أزرار بدل كتابة النوع باليد. والشرح تحت كل زر يتبع نمط الجلسة: في الخانات
+// تُزاح مواعيد المنتظرين، وفي الحضور لا إزاحة (الإسعافي وحده يتقدّم). النتيجة تُعرض
+// داخل النافذة لا في alert. الخادم هو الحارس (DOCTOR_NO_URGENT وغيره) — رسالته تُعرض كما هي.
+function PriorityPicker({ appt, attendance, onClose, onDone }) {
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState(null)
+  const [result, setResult] = useState(null)
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape' && !busy) onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [busy])
+  const choices = [
+    ['urgent', 'إسعافي', 'bad', attendance
+      ? 'يُسجَّل حاضراً ويتصدّر الحاضرين — يُنادى بعد المريض الحالي'
+      : 'يتصدّر الطابور، ومواعيد المنتظرين بعده تتأجل'],
+    ['elderly', 'كبير السن', 'warn', attendance
+      ? 'شارة تنبيه فقط — مكانه بترتيب حضوره'
+      : 'يتقدّم المنتظرين، ومواعيدهم تتأجل'],
+    ['infant', 'رضيع', 'warn', attendance
+      ? 'شارة تنبيه فقط — مكانه بترتيب حضوره'
+      : 'يتقدّم المنتظرين، ومواعيدهم تتأجل'],
+  ]
+  const pick = async (priority) => {
+    setBusy(true); setErr(null)
+    try {
+      const r = await api.clinic.prioritize(appt.id, priority)
+      setResult(attendance
+        ? (priority === 'urgent' ? 'تم — سُجّل حاضراً ويتصدّر الحاضرين.' : 'تم — أُضيفت الشارة، ومكانه بترتيب حضوره.')
+        : `تم التقديم — تأجّل ${r.delayed_count} موعداً بمقدار مدة كشف واحدة.`)
+      onDone()
+    } catch (ex) { setErr(ex.message) }
+    finally { setBusy(false) }
+  }
+  return (
+    <div className="modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose() }}>
+      <div className="modal-card" role="dialog" aria-modal="true" aria-labelledby="prio-title">
+        <h3 id="prio-title">تقديم الدور {appt.queue_number} — {appt.full_name}</h3>
+        {result ? (
+          <>
+            <p className="bf-note bf-note-ok" style={{ marginTop: 10 }}>{result}</p>
+            <div className="bf-actions" style={{ marginTop: 16 }}>
+              <button autoFocus onClick={onClose}>حسناً</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="subtitle" style={{ marginTop: 4 }}>اختر نوع الأولوية:</p>
+            <div className="prio-choices">
+              {choices.map(([key, label, cls, hint]) => (
+                <button key={key} type="button" className={`prio-choice prio-${cls}`}
+                  disabled={busy} onClick={() => pick(key)}>
+                  <span className="prio-label">{label}</span>
+                  <span className="prio-hint">{hint}</span>
+                </button>
+              ))}
+            </div>
+            {err && <p className="error" style={{ marginTop: 10 }}>{err}</p>}
+            <div className="bf-actions" style={{ marginTop: 14 }}>
+              <button type="button" className="ghost" disabled={busy} onClick={onClose}>إلغاء</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ═══════════════ نمط الحضور ═══════════════
+// مكوّنات منفصلة لا تفرّعات داخل مكوّنات نمط الخانات — فيبقى ذاك كما كان حرفياً.
+
+// ═══ لافتة: الجلسة بنمطٍ غير الإعداد الحالي ═══
+// يوم التبديل: الإعداد صار «الحضور» وجلسة اليوم وُلدت بالخانات قبله، فلا يتغيّر شيء
+// ويظن الموظف التبديل معطّلاً. اللافتة تقول السبب، والتحويل لمشرف العيادات وللجلسة
+// الفارغة وحدها — الخادم هو الحارس (403 لغيره، 409 لجلسة فيها حجز)، والإخفاء تجميل.
+function FlowModeMismatch({ data, onChanged, onError }) {
+  const { role } = useRole()
+  const [busy, setBusy] = useState(false)
+  if (!data.flow_mode_setting || data.flow_mode_setting === data.flow_mode) return null
+  const born = FLOW_MODE_LABELS[data.flow_mode], now = FLOW_MODE_LABELS[data.flow_mode_setting]
+  const empty = data.appointments.length === 0
+  const convert = async () => {
+    if (!confirm(`تحويل هذه الجلسة إلى ${now}؟`)) return
+    setBusy(true)
+    try { await api.clinic.switchSessionMode(data.id, data.flow_mode_setting); onChanged() }
+    catch (ex) { onError(ex.message) }
+    finally { setBusy(false) }
+  }
+  return (
+    <div className="attn-mismatch" role="status">
+      <div>
+        هذه الجلسة وُلدت بـ<strong>{born}</strong>، والإعداد الحالي «{now}» — التبديل يسري على الجلسات الجديدة.
+        {!empty && <> ولهذه الجلسة حجوزات، فتبقى على نمطها.</>}
+      </div>
+      {empty && role === 'clinic_admin' && (
+        <button disabled={busy} onClick={convert}>تحويل هذه الجلسة إلى {now}</button>
+      )}
+      {empty && role !== 'clinic_admin' && <span className="muted">تحويلها لمشرف العيادات.</span>}
+    </div>
+  )
+}
+
+// الحجز في نمط الحضور: نفس نموذج الحجز تماماً، بلا اختيار وقت (لا خانات أصلاً)
+// ═══ صفّ البطاقات الثلاث (نمط الحضور) ═══
+// «حجز دور» ثم «قيد الكشف الآن» ثم «وصول الطبيب» في صفٍّ واحد مضغوط (من اليمين)، فيظهر
+// جدول الطابور بلا تمرير على شاشة ١٣٦٦×٧٦٨. نموذج الحجز نفسه أكبر من بطاقة صغيرة، فيُفتح
+// بعرض الصفحة **تحت** الصفّ (AttendanceBookingForm) — نفس النموذج بلا تغيير.
+
+// بطاقة الحجز: الزرّان فقط
+function AttendanceBookingCard({ acceptsUrgent, open, onOpen }) {
+  return (
+    <div className="card attn-compact">
+      <h3>حجز دور</h3>
+      <p className="attn-compact-hint">حجزُ مكانٍ لا وقت — الدور بترتيب الحضور</p>
+      <div className="attn-compact-actions">
+        <button disabled={!!open} onClick={() => onOpen('normal')}>+ حجز جديد</button>
+        {/* الخادم هو الحارس (DOCTOR_NO_URGENT) — الإخفاء تجميل */}
+        {acceptsUrgent && <button className="urgent-btn" disabled={!!open} onClick={() => onOpen('urgent')}>حجز فوري</button>}
+      </div>
+    </div>
+  )
+}
+
+// نموذج الحجز بعرض الصفحة تحت الصفّ — BookingForm نفسه حرفياً
+function AttendanceBookingForm({ sessionId, fees, open, onClose, onBooked }) {
+  if (!open) return null
+  return (
+    <div className="card">
+      <h3>{open === 'urgent' ? 'حجز فوري' : 'حجز جديد'}</h3>
+      <div className="slot-booking-form">
+        <BookingForm
+          key={open}
+          sessionId={sessionId}
+          slotTime={null}
+          fees={fees}
+          urgent={open === 'urgent'}
+          attendance
+          onBooked={(appt) => { onClose(); onBooked(appt) }}
+          onCancel={onClose}
+        />
+      </div>
+    </div>
+  )
+}
+
+// قيد الكشف الآن — مضغوط، ورقم الدور كبير يُقرأ بلمحة. فارغٌ بنفس الارتفاع (الشبكة تمدّ الثلاث).
+function AttendanceCurrentCard({ current, recalled, onRecalled, onError }) {
+  return (
+    <div className={`card attn-compact ${current ? 'highlight' : ''}`}>
+      <h3>قيد الكشف الآن</h3>
+      {current ? (
+        <div className="attn-current">
+          <div className="attn-current-who">
+            <div className="attn-current-num">الدور {current.queue_number}<AttendanceBadge priority={current.priority} /></div>
+            <div className="attn-current-name">{current.full_name}</div>
+          </div>
+          <div className="attn-current-recall">
+            <RecallButton apptId={current.id} onError={onError} onDone={onRecalled} />
+            {recalled && (
+              <div className="attn-compact-hint">
+                أُعيد النداء {new Date(recalled).toLocaleTimeString('ar', { hour: '2-digit', minute: '2-digit' })}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : <p className="attn-compact-empty">لا أحد قيد الكشف</p>}
+    </div>
+  )
+}
+
+// وصول الطبيب: زرٌّ مرة واحدة، ثم الوقت مع «تصحيح» يترك أثراً يُعرض تحته
+function DoctorArrivalCard({ data, onChanged, onError }) {
+  const [busy, setBusy] = useState(false)
+  const run = async (fn) => {
+    setBusy(true)
+    try { await fn(); onChanged() } catch (ex) { onError(ex.message) } finally { setBusy(false) }
+  }
+  const fix = () => {
+    const t = prompt('الوقت الصحيح لوصول الطبيب (ساعة:دقيقة، مثل 09:40)', fmtClock(data.doctor_arrived_at))
+    if (t) run(() => api.clinic.fixDoctorArrival(data.id, toLatinDigits(t).trim()))
+  }
+  const history = data.doctor_arrival_history || []
+  // الأثر لا يضيع حين تنطوي البطاقة: كل تصحيح بقيمته السابقة ومن صحّحه ومتى — في تلميح السطر
+  const trail = history.map((h) =>
+    `صُحّح من ${fmtClock(h.previous_value)} إلى ${fmtClock(h.new_value)} — ${h.changed_by_name || '—'} عند ${fmtClock(h.changed_at)}`).join('\n')
+  return (
+    <div className="card attn-compact">
+      <h3>وصول الطبيب</h3>
+      {data.doctor_arrived_at ? (
+        // بعد التسجيل: سطرٌ واحد — الوقت ورابط «تصحيح»
+        <div className="attn-arrival-line" title={[
+          `بداية الدوام ${fmtTime(data.start_time)}`,
+          data.doctor_arrived_by_name && `سجّله ${data.doctor_arrived_by_name}`,
+          trail,
+        ].filter(Boolean).join('\n')}>
+          <span className="attn-arrival-time" dir="ltr">{fmtClock(data.doctor_arrived_at)}</span>
+          {history.length > 0 && <span className="attn-compact-hint">صُحّح {history.length === 1 ? 'مرة' : `${history.length} مرات`}</span>}
+          <button className="link-btn" disabled={busy} onClick={fix}>تصحيح</button>
+        </div>
+      ) : (
+        <>
+          <p className="attn-compact-hint">لم يُسجَّل بعد · بداية الدوام <span dir="ltr">{fmtTime(data.start_time)}</span></p>
+          <div className="attn-compact-actions">
+            <button disabled={busy} onClick={() => run(() => api.clinic.doctorArrived(data.id))}>وصل الطبيب</button>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+// طابور نمط الحضور: بترتيب الخادم (قيد الكشف، ثم الحاضرون — الإسعافي أولاً ثم الأقدم
+// حضوراً — ثم من لم يحضر). لا عمود موعد ولا انتظار متوقَّع: لا خانات ولا تقدير هنا.
+function AttendanceQueueTable({ data, actions }) {
+  const { arrive, cancel, prioritize, setPostponing } = actions
+  return (
+    <div className="card">
+      <h3>الطابور ({data.appointments.length})</h3>
+      <p className="subtitle" style={{ marginTop: -6 }}>
+        الدور بترتيب <strong>الحضور</strong>: الإسعافي الحاضر أولاً، ثم الأقدم حضوراً.
+        رقم الدور على البطاقة للتعريف فقط ولا يتغيّر.
+      </p>
+      <table style={{ marginTop: 14 }}>
+        <thead>
+          <tr>
+            <th>الدور</th><th>الاسم</th><th>الموبايل</th><th>نوع الزيارة</th><th>السعر</th>
+            <th>وقت الحضور</th><th>الحالة</th><th>قبله</th><th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.appointments.map((a) => (
+            <tr key={a.id} className={urgentRowClass(a)}>
+              <td className="num">{a.queue_number}<AttendanceBadge priority={a.priority} /></td>
+              <td>{a.full_name}</td>
+              <td dir="ltr">{a.mobile}</td>
+              <td>
+                {VISIT_TYPES[a.visit_type] || a.visit_type}
+                {a.followup_override_by && (
+                  <span className="badge warn" style={{ marginInlineStart: 6 }}
+                    title={a.followup_override_reason || ''}>تجاوز</span>
+                )}
+              </td>
+              <td className="num" style={{ whiteSpace: 'nowrap' }}>{fmtMoney(a.fee)}</td>
+              <td dir="ltr">{a.arrived_at ? fmtClock(a.arrived_at) : '—'}</td>
+              <td>{appointmentBadge(a.status)}</td>
+              <td className="num">{a.ahead_count ?? '—'}</td>
+              <td>
+                {['waiting', 'arrived'].includes(a.status) && a.priority === 'normal'
+                  && data.accepts_urgent !== false && (
+                  <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }}
+                    onClick={() => prioritize(a.id)}>تقديم</button>
+                )}{' '}
+                {a.status === 'waiting' && (
+                  <>
+                    <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }} onClick={() => arrive(a.id)}>حضر</button>{' '}
+                    <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }} onClick={() => cancel(a.id)}>إلغاء</button>
+                  </>
+                )}{' '}
+                {['waiting', 'arrived'].includes(a.status) && (
+                  <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }}
+                    onClick={() => setPostponing(a)}>تأجيل</button>
+                )}
+              </td>
+            </tr>
+          ))}
+          {data.appointments.length === 0 && <tr><td colSpan={9} className="empty">لا حجوزات بعد في هذه الجلسة</td></tr>}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+// «لسا بانتظار»: المحجوزون غير الحاضرين — ظاهرة دائماً (الطبيب قد يُنهي مبكراً).
+// لا إلغاء ولا عدم حضور تلقائي: الإنسان يقرّر لكل واحد.
+function PendingArrivalList({ data, onChanged, onError }) {
+  const pending = data.appointments.filter((a) => a.status === 'waiting')
+  const noShow = async (a) => {
+    if (!confirm(`تعليم الدور ${a.queue_number} (${a.full_name}) «ما حضر»؟`)) return
+    try { await api.clinic.noShow(a.id); onChanged() } catch (ex) { onError(ex.message) }
+  }
+  return (
+    <div className="card attn-pending-card">
+      <h3>لسا بانتظار ({pending.length})</h3>
+      <p className="subtitle" style={{ marginTop: -6 }}>
+        محجوزون لم يحضروا بعد. لا يظهرون للطبيب ولا يوقفون أحداً — وعند الإقفال يقرّر الاستقبال لكلٍّ منهم.
+      </p>
+      {pending.length === 0 ? <p className="empty">لا أحد — كل المحجوزين حضروا أو أُقفلت حالتهم.</p> : (
+        <table>
+          <thead><tr><th>الدور</th><th>الاسم</th><th>الموبايل</th><th>طريقة الحجز</th><th></th></tr></thead>
+          <tbody>
+            {pending.map((a) => (
+              <tr key={a.id}>
+                <td className="num">{a.queue_number}<AttendanceBadge priority={a.priority} /></td>
+                <td>{a.full_name}</td>
+                <td dir="ltr">{a.mobile || '—'}</td>
+                <td>{BOOKING_TYPES[a.booking_type] || a.booking_type}</td>
+                <td>
+                  <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }}
+                    onClick={() => noShow(a)}>ما حضر</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  )
+}
+
 export default function SessionQueue() {
   const { id } = useParams()
   const [data, setData] = useState(null)
-  const [err, setErr] = useState(null)
+  // ★ الخطأ لا يستبدل الشاشة: loadErr لأوّل تحميل فقط (ومعه «إعادة المحاولة»)، وبعده
+  // إشعارٌ عابر والطابور الأخير باقٍ — انقطاعٌ في التحديث الدوري كان يُفرغ الصفحة حتى
+  // يُعيد الموظف تحميلها بيده. وأخطاء الأزرار إشعارٌ لا alert() يوقف الشاشة.
+  const [loadErr, setLoadErr] = useState(null)
+  const [toast, showToast] = useToast()
   const [ticket, setTicket] = useState(null)
   const [recalled, setRecalled] = useState(null)   // وقت آخر إعادة نداء — تأكيدٌ مرئي للموظف
+  const [bookingOpen, setBookingOpen] = useState(null)   // نمط الحضور: null | 'normal' | 'urgent'
 
-  const load = () => api.clinic.queue(id).then(setData).catch((e) => setErr(e.message))
+  const load = () => api.clinic.queue(id).then((d) => { setData(d); setLoadErr(null) })
+    .catch((e) => {
+      if (data) showToast(`تعذّر تحديث الطابور — يُعاد المحاولة تلقائياً (${e.message})`)
+      else setLoadErr(e.message)
+    })
   useEffect(() => { load() }, [id])
+
+  // نمط الحضور: الطبيب ينادي ويُنهي من شاشته — تحديث دوري كي لا يرى الاستقبال طابوراً قديماً.
+  // نمط الخانات يبقى كما كان (بلا تحديث دوري).
+  const attendance = isAttendanceSession(data)
+  usePolling(load, attendance)
 
   // ★ الحضور: إن رفض الخادم لنقص المعلومات، نفتح نموذج الإكمال مباشرةً بدل عرض
   // خطأ يترك الموظف يخمّن ما ينقص ومن أين يُكمله.
@@ -612,14 +983,14 @@ export default function SessionQueue() {
         setCompleting({ appt, missing: ex.data.missing_fields || [], patient: ex.data.patient || {} })
         return
       }
-      alert(ex.message)
+      showToast(ex.message); load()
     }
   }
 
   const cancel = async (apptId) => {
     if (!confirm('إلغاء هذا الحجز؟')) return
     try { await api.clinic.updateAppointment(apptId, { status: 'cancelled' }); load() }
-    catch (ex) { alert(ex.message) }
+    catch (ex) { showToast(ex.message); load() }
   }
 
   // ── تأجيل موعد إلى جلسة أخرى ──
@@ -628,34 +999,27 @@ export default function SessionQueue() {
   const [postponing, setPostponing] = useState(null)   // الحجز المطلوب تأجيله
 
   // إعادة النداء: الاستقبال يرى المريض لا يتحرّك — يُعاد بثّ النداء بلا تغيير حالته.
-  // الخادم يخنقها مرّة كل عشر ثوانٍ لكل حجز، فرسالة 429 تُعرض كما هي.
-  const recall = async (apptId) => {
-    try { await api.clinic.recall(apptId); setRecalled(Date.now()) }
-    catch (ex) { alert(ex.message) }
-  }
+  // الخادم يخنقها مرّة كل عشر ثوانٍ لكل حجز، فالزرّ (RecallButton) معطَّل طوال المدّة بعدّاد.
 
-  // ترقية حجز قائم إلى أولوية (تبيّن أنه حالة فورية أو كبير بالسن أو رضيع بعد الحجز)
-  const prioritize = async (apptId) => {
-    const choice = prompt('نوع الأولوية؟ اكتب: فوري / كبير / رضيع')
-    if (!choice) return
-    const map = { 'فوري': 'urgent', 'كبير': 'elderly', 'رضيع': 'infant' }
-    const priority = map[choice.trim()]
-    if (!priority) return alert('اكتب واحدة من: فوري / كبير / رضيع')
-    try {
-      const r = await api.clinic.prioritize(apptId, priority)
-      alert(`تم التقديم — تأجّل ${r.delayed_count} موعداً بمقدار مدة كشف واحدة`)
-      load()
-    } catch (ex) { alert(ex.message) }
-  }
+  // ترقية حجز قائم إلى أولوية (تبيّن أنه حالة فورية أو كبير بالسن أو رضيع بعد الحجز).
+  // تفتح نافذة اختيار بثلاثة أزرار — كان prompt() يطلب كتابة «فوري/كبير/رضيع» باليد،
+  // وأي خطأ إملائي يُسقط العملية.
+  const [prioritizing, setPrioritizing] = useState(null)   // الحجز المطلوب تقديمه
+  const prioritize = (apptId) =>
+    setPrioritizing(data.appointments.find((a) => String(a.id) === String(apptId)) || null)
 
-  if (err) return <p className="error">{err}</p>
-  if (!data) return <p className="empty">جارٍ التحميل…</p>
+  if (!data) return loadErr ? (
+    <div className="load-failed">
+      <p className="error">{loadErr}</p>
+      <button className="ghost" onClick={load}>إعادة المحاولة</button>
+    </div>
+  ) : <p className="empty">جارٍ التحميل…</p>
 
   if (ticket) return <TicketPrint appt={ticket} doctorName={data.doctor_name} onDone={() => { setTicket(null); load() }} />
 
   return (
     <>
-      <h2>طابور {data.doctor_name}</h2>
+      <h2>طابور {data.doctor_name}<FlowModeTag mode={data.flow_mode} /></h2>
       <p className="subtitle">
         {data.specialty || '—'} · {fmtTime(data.start_time)} – {fmtTime(data.end_time)} ·
         مدة الكشف المتوقعة {data.expected_visit_minutes} دقيقة ·
@@ -664,6 +1028,30 @@ export default function SessionQueue() {
         الإيراد المتوقع {fmtMoney(data.expected_revenue)}
       </p>
 
+      {toast}
+
+      <FlowModeMismatch data={data} onChanged={load} onError={showToast} />
+
+      {attendance ? (
+        <>
+          {/* صفٌّ واحد من اليمين: حجز دور · قيد الكشف الآن · وصول الطبيب.
+              يتكدّس عمودياً على الشاشات الضيّقة (CSS) */}
+          <div className="attn-top-row">
+            <AttendanceBookingCard acceptsUrgent={data.accepts_urgent !== false}
+              open={bookingOpen} onOpen={setBookingOpen} />
+            <AttendanceCurrentCard current={data.appointments.find((a) => a.status === 'in_service')}
+              recalled={recalled} onRecalled={() => setRecalled(Date.now())} onError={showToast} />
+            <DoctorArrivalCard data={data} onChanged={load} onError={showToast} />
+          </div>
+          <AttendanceBookingForm
+            sessionId={id}
+            fees={{ consultation_fee: data.consultation_fee, followup_fee: data.followup_fee }}
+            open={bookingOpen}
+            onClose={() => setBookingOpen(null)}
+            onBooked={(appt) => setTicket(appt)}
+          />
+        </>
+      ) : (
       <div className="card">
         <h3>حجز دور — خانات اليوم</h3>
         <p className="subtitle" style={{ marginTop: -6, marginBottom: 14 }}>
@@ -676,9 +1064,11 @@ export default function SessionQueue() {
           onBooked={(appt) => setTicket(appt)}
         />
       </div>
+      )}
 
-      {/* المريض الحالي وزر إعادة النداء — الاستقبال هو من يرى المريض لا يتحرّك */}
-      {(() => {
+      {/* المريض الحالي وزر إعادة النداء — الاستقبال هو من يرى المريض لا يتحرّك.
+          (نمط الحضور يعرضه في صفّ البطاقات أعلاه — هذه بطاقة نمط الخانات كما هي) */}
+      {!attendance && (() => {
         const current = data.appointments.find((a) => a.status === 'in_service')
         if (!current) return null
         return (
@@ -692,9 +1082,8 @@ export default function SessionQueue() {
                 <div style={{ color: 'var(--text-secondary)' }}>{current.full_name}</div>
               </div>
               <div style={{ textAlign: 'center' }}>
-                <button className="ghost" onClick={() => recall(current.id)} style={{ padding: '12px 20px', fontSize: 15 }}>
-                  🔊 إعادة النداء
-                </button>
+                <RecallButton apptId={current.id} onError={showToast} onDone={() => setRecalled(Date.now())}
+                  style={{ padding: '12px 20px', fontSize: 15 }} />
                 {recalled && (
                   <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 5 }}>
                     أُعيد النداء {new Date(recalled).toLocaleTimeString('ar', { hour: '2-digit', minute: '2-digit' })}
@@ -754,6 +1143,15 @@ export default function SessionQueue() {
         />
       )}
 
+      {prioritizing && (
+        <PriorityPicker
+          appt={prioritizing}
+          attendance={attendance}
+          onClose={() => setPrioritizing(null)}
+          onDone={load}
+        />
+      )}
+
       {postponing && (
         <PostponeDialog
           appt={postponing}
@@ -763,6 +1161,14 @@ export default function SessionQueue() {
         />
       )}
 
+      {attendance && (
+        <>
+          <AttendanceQueueTable data={data} actions={{ arrive, cancel, prioritize, setPostponing }} />
+          <PendingArrivalList data={data} onChanged={load} onError={showToast} />
+        </>
+      )}
+
+      {!attendance && (
       <div className="card">
         <h3>الطابور ({data.appointments.length})</h3>
         <p className="subtitle" style={{ marginTop: -6 }}>
@@ -820,6 +1226,7 @@ export default function SessionQueue() {
           </tbody>
         </table>
       </div>
+      )}
     </>
   )
 }

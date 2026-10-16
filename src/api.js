@@ -2,14 +2,23 @@ export const getToken = () => localStorage.getItem('token')
 
 async function http(path, options = {}) {
   const token = getToken()
-  const res = await fetch(`/api${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options.headers,
-    },
-  })
+  let res
+  try {
+    res = await fetch(`/api${path}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...options.headers,
+      },
+    })
+  } catch {
+    // انقطاع الشبكة: fetch يرمي «Failed to fetch» بالإنجليزية — رسالة عربية مفهومة بدلها
+    const err = new Error('تعذّر الاتصال بالخادم — تحقّق من الشبكة وأعد المحاولة')
+    err.status = 0
+    err.data = { code: 'NETWORK_ERROR' }
+    throw err
+  }
   if (res.status === 401 && path !== '/auth/login') {
     localStorage.removeItem('token')
     window.dispatchEvent(new Event('auth-expired'))
@@ -17,7 +26,10 @@ async function http(path, options = {}) {
   const data = await res.json().catch(() => ({}))
   if (!res.ok) {
     // نُرفق جسم الخطأ كاملاً بالاستثناء ليقرأ المتصل تفاصيله (مثل code و followup)
-    const err = new Error(data.error || `HTTP ${res.status}`)
+    // بلا رسالة من خادمنا (وسيطٌ ردّ 502/504 والخادم متوقف): «HTTP 502» لا تعني شيئاً للموظف
+    const err = new Error(data.error || (res.status >= 500
+      ? `الخادم لا يستجيب الآن (${res.status}) — أعد المحاولة بعد قليل`
+      : `HTTP ${res.status}`))
     err.status = res.status
     err.data = data
     throw err
@@ -152,11 +164,23 @@ export const api = {
     done: (appointmentId) => http(`/clinic/appointments/${appointmentId}/done`, { method: 'POST' }),
     noShow: (appointmentId) => http(`/clinic/appointments/${appointmentId}/no-show`, { method: 'POST' }),
     recall: (appointmentId) => http(`/clinic/appointments/${appointmentId}/recall`, { method: 'POST' }),
+    // ── نمط الحضور ──
+    // بدء الكشف: منفصل عن النداء — يسجّل started_at وحده
+    start: (appointmentId) => http(`/clinic/appointments/${appointmentId}/start`, { method: 'POST' }),
+    // وصول الطبيب: مرة واحدة لجلسة اليوم، والتصحيح بوقت HH:MM يترك أثراً
+    doctorArrived: (sessionId) => http(`/clinic/sessions/${sessionId}/doctor-arrived`, { method: 'POST' }),
+    fixDoctorArrival: (sessionId, time) =>
+      http(`/clinic/sessions/${sessionId}/doctor-arrived`, { method: 'PATCH', body: JSON.stringify({ time }) }),
+    // تحويل نمط جلسة مولَّدة — لمشرف العيادات، وللجلسة الفارغة فقط (الخادم يرفض غيرها بـ 409)
+    switchSessionMode: (sessionId, flowMode) =>
+      http(`/clinic/sessions/${sessionId}/flow-mode`, { method: 'PATCH', body: JSON.stringify({ flow_mode: flowMode }) }),
     // تأجيل موعد إلى جلسة أخرى — ينشئ حجزاً جديداً ويُعلّم القديم «مؤجَّل»
     postpone: (appointmentId, body) =>
       http(`/clinic/appointments/${appointmentId}/postpone`, { method: 'POST', body: JSON.stringify(body) }),
     // جلسات يوم ما (لاختيار الجلسة الهدف عند التأجيل)
     sessions: (date) => http(`/clinic/sessions?date=${date}`),
+    // دوامات يوم الأسبوع لتاريخٍ ما — تميّز «لا دوام» عن «دوامٌ لم تُولَّد جلساته»
+    schedulesForDate: (date) => http(`/clinic/schedules/for-date?date=${encodeURIComponent(date)}`),
     // بلا مصادقة — الشاشة العامة وموقع المريض
     publicBoard: () => http('/public/clinic/board'),
     // رمز الجهاز يمرّ في الاستعلام: EventSource لا يقبل ترويسات مخصّصة

@@ -401,6 +401,120 @@ td.num { font-variant-numeric: tabular-nums; }
   color: var(--primary); letter-spacing: 0.02em;
 }
 
+/* ═══ نمط الحضور ═══ */
+/* الإسعافي الحاضر: صف أحمر في قائمتي الطبيب والاستقبال. بعد .doc-row-next عمداً:
+   إسعافيٌّ هو «التالي» يبقى أحمر — الحالة أهمّ من موضعها. */
+.attn-row-urgent td { background: var(--status-bad-bg); color: var(--status-bad); font-weight: 700; }
+.attn-row-urgent td:first-child { box-shadow: inset -4px 0 0 var(--status-bad); }
+/* شارة نمط الجلسة في عنوان الشاشة */
+.attn-mode-tag {
+  display: inline-block; margin-inline-start: 10px; padding: 2px 10px; border-radius: 999px;
+  font-size: 12px; font-weight: 700; vertical-align: middle;
+  color: var(--status-review); background: var(--status-review-bg);
+}
+/* «بدء الكشف»: أخضر ومفصول بمسافة واضحة عن «إنهاء الكشف» — زرّان متجاوران
+   بنفس الشكل يُضغط أحدهما مكان الآخر، والإنهاء بلا بدء يُسقط القياس */
+.attn-start-btn {
+  padding: 14px 24px; font-size: 15px;
+  background: var(--status-good); border-color: var(--status-good); color: #fff;
+  margin-inline-end: 28px;
+}
+.attn-start-btn:hover:not(:disabled) { filter: brightness(1.08); background: var(--status-good); }
+/* الأخضر في الوضع الداكن فاتح (#4ade80): الأبيض عليه لا يُقرأ — نصّ داكن (نمط زرّ واتساب) */
+:root[data-theme='dark'] .attn-start-btn { color: #06301b; }
+/* شارة نمط الخانات: محايدة (القديم ليس خطأ) لكنها مرئية */
+.attn-mode-tag.attn-mode-slots { color: var(--text-secondary); background: var(--grid); }
+/* لافتة: الجلسة بنمطٍ غير الإعداد الحالي (يوم التبديل) */
+.attn-mismatch {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
+  padding: 14px 18px; margin-bottom: 18px; border-radius: 12px;
+  background: var(--status-pending-bg); border: 1px solid var(--status-pending); color: var(--text-primary);
+}
+.attn-mismatch strong { color: var(--status-pending); }
+/* الإعدادات: تغيير لم يُحفظ — يجب أن يُرى قبل مغادرة الصفحة */
+.setting-unsaved { color: var(--status-pending); background: var(--status-pending-bg); }
+.setting-saved-value { font-size: 12px; color: var(--muted); margin-top: 4px; }
+/* ═══ صفّ البطاقات الثلاث أعلى شاشة الاستقبال (نمط الحضور) ═══
+   حجز دور · قيد الكشف الآن · وصول الطبيب — صفٌّ واحد مضغوط كي يظهر جدول الطابور بلا تمرير
+   على ١٣٦٦×٧٦٨. الشبكة تمدّ البطاقات لارتفاعٍ واحد (البطاقة الفارغة بارتفاع جاراتها).
+   وعلى الشاشات الضيّقة تتكدّس عمودياً كما كانت. */
+.attn-top-row {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px;
+  margin-bottom: 16px; align-items: stretch;
+}
+.attn-top-row > .card { margin-bottom: 0; }
+.card.attn-compact { padding: 12px 16px; display: flex; flex-direction: column; gap: 6px; overflow: visible; }
+.card.attn-compact h3 { font-size: 13.5px; margin-bottom: 0; color: var(--text-secondary); }
+.attn-compact-hint { margin: 0; font-size: 12px; color: var(--muted); line-height: 1.5; }
+.attn-compact-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: auto; }
+.attn-compact-actions button, .attn-compact-actions .urgent-btn { padding: 8px 16px; font-size: 13px; }
+.attn-compact-empty { margin: auto 0; font-size: 13px; color: var(--muted); }
+/* قيد الكشف: الرقم كبير يُقرأ بلمحة، والاسم وزرّ النداء بجانبه */
+.attn-current { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.attn-current-num { font-size: 28px; font-weight: 800; color: var(--primary); line-height: 1.15; display: flex; align-items: center; }
+.attn-current-name { font-size: 13px; color: var(--text-secondary); }
+.attn-current-recall { text-align: center; }
+.attn-current-recall button { padding: 8px 14px; font-size: 13px; }
+/* وصول الطبيب بعد التسجيل: سطرٌ واحد — الوقت ورابط التصحيح */
+.attn-arrival-line { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.attn-arrival-line .attn-arrival-time { font-size: 22px; }
+button.link-btn {
+  background: none; border: none; padding: 0; color: var(--accent-text);
+  font-size: 12.5px; font-weight: 700; text-decoration: underline; cursor: pointer;
+}
+button.link-btn:hover:not(:disabled) { filter: none; opacity: 0.8; }
+@media (max-width: 1000px) {
+  .attn-top-row { grid-template-columns: 1fr; }
+}
+
+/* ═══ إشعار عابر لأخطاء الأزرار — الشاشة لا تُستبدل ═══ */
+.toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 1100;
+  max-width: min(560px, calc(100vw - 32px)); padding: 12px 18px; border-radius: 12px;
+  font-size: 14px; font-weight: 700; line-height: 1.6; cursor: pointer;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3); animation: toast-in 0.18s ease-out;
+}
+.toast-error { background: var(--status-bad-bg); color: var(--status-bad); border: 1px solid var(--status-bad); }
+.toast-info { background: var(--surface-1); color: var(--text-primary); border: 1px solid var(--border); }
+@keyframes toast-in { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+/* عدّاد إعادة النداء داخل الزرّ */
+.recall-wait { font-weight: 600; opacity: 0.85; }
+/* تحميل أوّل فشل: رسالة مع «إعادة المحاولة» بدل صفحة بيضاء */
+.load-failed { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+/* ═══ نافذة منبثقة عامة (أول استعمال: تقديم حجز إلى أولوية) ═══ */
+.modal-backdrop {
+  position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center;
+  padding: 16px; background: rgba(0, 0, 0, 0.45);
+}
+.modal-card {
+  width: 100%; max-width: 520px; background: var(--surface-1); color: var(--text-primary);
+  border: 1px solid var(--border); border-radius: 16px; padding: 22px 24px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+}
+.prio-choices { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+/* زرّ اختيار: عنوان بارز وتحته سطر يشرح الأثر — ملوّن بنوع الأولوية */
+button.prio-choice {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 3px; text-align: start;
+  padding: 12px 16px; border-radius: 12px; background: transparent; color: var(--text-primary);
+  border: 1.5px solid var(--border);
+}
+button.prio-choice:hover:not(:disabled) { filter: none; }
+.prio-choice .prio-label { font-size: 15px; font-weight: 800; }
+.prio-choice .prio-hint { font-size: 12px; font-weight: 500; color: var(--text-secondary); }
+button.prio-bad { border-color: var(--status-bad); }
+button.prio-bad .prio-label { color: var(--status-bad); }
+button.prio-bad:hover:not(:disabled) { background: var(--status-bad-bg); }
+button.prio-warn { border-color: var(--status-pending); }
+button.prio-warn .prio-label { color: var(--status-pending); }
+button.prio-warn:hover:not(:disabled) { background: var(--status-pending-bg); }
+/* بطاقة وصول الطبيب */
+.attn-arrival { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.attn-arrival-time { font-size: 22px; font-weight: 800; color: var(--primary); }
+.attn-arrival-history { margin: 8px 0 0; padding: 0; list-style: none; font-size: 12px; color: var(--muted); }
+/* «لسا بانتظار»: المحجوزون غير الحاضرين — قائمة إقفال لا إنذار */
+.attn-pending-card { border-inline-start: 4px solid var(--muted); }
+
 .badge.blue { color: var(--status-review); background: var(--status-review-bg); }
 .badge.good { color: var(--status-good); background: var(--status-good-bg); }
 .badge.bad { color: var(--status-bad); background: var(--status-bad-bg); }
@@ -1172,6 +1286,11 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
 .bf-note-ok { color: var(--status-good); }
 
 .bf-followup { display: flex; flex-direction: column; gap: 8px; }
+
+/* نموذج استكمال المريض عند الحضور: حقلٌ إلى ثلاثة (الناقص وحده يظهر)، فأعمدة تتسع
+   بعددها لا قياساتٌ ثابتة. السقف يمنع حقلاً وحيداً من التمدّد بعرض الشاشة كلها. */
+.cpf-form { margin-top: 6px; }
+.cpf-row { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); max-width: 720px; }
 .bf-actions { display: flex; gap: 8px; }
 
 /* شاشات أضيق: الصفوف تتحوّل إلى عمودين ثم عمود واحد */
