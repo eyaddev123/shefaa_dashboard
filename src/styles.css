@@ -434,6 +434,39 @@ td.num { font-variant-numeric: tabular-nums; }
 /* الإعدادات: تغيير لم يُحفظ — يجب أن يُرى قبل مغادرة الصفحة */
 .setting-unsaved { color: var(--status-pending); background: var(--status-pending-bg); }
 .setting-saved-value { font-size: 12px; color: var(--muted); margin-top: 4px; }
+/* ═══ صفّ البطاقات الثلاث أعلى شاشة الاستقبال (نمط الحضور) ═══
+   حجز دور · قيد الكشف الآن · وصول الطبيب — صفٌّ واحد مضغوط كي يظهر جدول الطابور بلا تمرير
+   على ١٣٦٦×٧٦٨. الشبكة تمدّ البطاقات لارتفاعٍ واحد (البطاقة الفارغة بارتفاع جاراتها).
+   وعلى الشاشات الضيّقة تتكدّس عمودياً كما كانت. */
+.attn-top-row {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px;
+  margin-bottom: 16px; align-items: stretch;
+}
+.attn-top-row > .card { margin-bottom: 0; }
+.card.attn-compact { padding: 12px 16px; display: flex; flex-direction: column; gap: 6px; overflow: visible; }
+.card.attn-compact h3 { font-size: 13.5px; margin-bottom: 0; color: var(--text-secondary); }
+.attn-compact-hint { margin: 0; font-size: 12px; color: var(--muted); line-height: 1.5; }
+.attn-compact-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: auto; }
+.attn-compact-actions button, .attn-compact-actions .urgent-btn { padding: 8px 16px; font-size: 13px; }
+.attn-compact-empty { margin: auto 0; font-size: 13px; color: var(--muted); }
+/* قيد الكشف: الرقم كبير يُقرأ بلمحة، والاسم وزرّ النداء بجانبه */
+.attn-current { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.attn-current-num { font-size: 28px; font-weight: 800; color: var(--primary); line-height: 1.15; display: flex; align-items: center; }
+.attn-current-name { font-size: 13px; color: var(--text-secondary); }
+.attn-current-recall { text-align: center; }
+.attn-current-recall button { padding: 8px 14px; font-size: 13px; }
+/* وصول الطبيب بعد التسجيل: سطرٌ واحد — الوقت ورابط التصحيح */
+.attn-arrival-line { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.attn-arrival-line .attn-arrival-time { font-size: 22px; }
+button.link-btn {
+  background: none; border: none; padding: 0; color: var(--accent-text);
+  font-size: 12.5px; font-weight: 700; text-decoration: underline; cursor: pointer;
+}
+button.link-btn:hover:not(:disabled) { filter: none; opacity: 0.8; }
+@media (max-width: 1000px) {
+  .attn-top-row { grid-template-columns: 1fr; }
+}
+
 /* ═══ إشعار عابر لأخطاء الأزرار — الشاشة لا تُستبدل ═══ */
 .toast {
   position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 1100;

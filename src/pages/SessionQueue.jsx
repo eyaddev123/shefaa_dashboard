@@ -742,32 +742,70 @@ function FlowModeMismatch({ data, onChanged, onError }) {
 }
 
 // الحجز في نمط الحضور: نفس نموذج الحجز تماماً، بلا اختيار وقت (لا خانات أصلاً)
-function AttendanceBooking({ sessionId, fees, acceptsUrgent, onBooked }) {
-  const [open, setOpen] = useState(null)   // null | 'normal' | 'urgent'
+// ═══ صفّ البطاقات الثلاث (نمط الحضور) ═══
+// «حجز دور» ثم «قيد الكشف الآن» ثم «وصول الطبيب» في صفٍّ واحد مضغوط (من اليمين)، فيظهر
+// جدول الطابور بلا تمرير على شاشة ١٣٦٦×٧٦٨. نموذج الحجز نفسه أكبر من بطاقة صغيرة، فيُفتح
+// بعرض الصفحة **تحت** الصفّ (AttendanceBookingForm) — نفس النموذج بلا تغيير.
+
+// بطاقة الحجز: الزرّان فقط
+function AttendanceBookingCard({ acceptsUrgent, open, onOpen }) {
   return (
-    <>
-      {!open && (
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <button onClick={() => setOpen('normal')}>+ حجز جديد</button>
-          {/* الخادم هو الحارس (DOCTOR_NO_URGENT) — الإخفاء تجميل */}
-          {acceptsUrgent && <button className="urgent-btn" onClick={() => setOpen('urgent')}>حجز فوري</button>}
+    <div className="card attn-compact">
+      <h3>حجز دور</h3>
+      <p className="attn-compact-hint">حجزُ مكانٍ لا وقت — الدور بترتيب الحضور</p>
+      <div className="attn-compact-actions">
+        <button disabled={!!open} onClick={() => onOpen('normal')}>+ حجز جديد</button>
+        {/* الخادم هو الحارس (DOCTOR_NO_URGENT) — الإخفاء تجميل */}
+        {acceptsUrgent && <button className="urgent-btn" disabled={!!open} onClick={() => onOpen('urgent')}>حجز فوري</button>}
+      </div>
+    </div>
+  )
+}
+
+// نموذج الحجز بعرض الصفحة تحت الصفّ — BookingForm نفسه حرفياً
+function AttendanceBookingForm({ sessionId, fees, open, onClose, onBooked }) {
+  if (!open) return null
+  return (
+    <div className="card">
+      <h3>{open === 'urgent' ? 'حجز فوري' : 'حجز جديد'}</h3>
+      <div className="slot-booking-form">
+        <BookingForm
+          key={open}
+          sessionId={sessionId}
+          slotTime={null}
+          fees={fees}
+          urgent={open === 'urgent'}
+          attendance
+          onBooked={(appt) => { onClose(); onBooked(appt) }}
+          onCancel={onClose}
+        />
+      </div>
+    </div>
+  )
+}
+
+// قيد الكشف الآن — مضغوط، ورقم الدور كبير يُقرأ بلمحة. فارغٌ بنفس الارتفاع (الشبكة تمدّ الثلاث).
+function AttendanceCurrentCard({ current, recalled, onRecalled, onError }) {
+  return (
+    <div className={`card attn-compact ${current ? 'highlight' : ''}`}>
+      <h3>قيد الكشف الآن</h3>
+      {current ? (
+        <div className="attn-current">
+          <div className="attn-current-who">
+            <div className="attn-current-num">الدور {current.queue_number}<AttendanceBadge priority={current.priority} /></div>
+            <div className="attn-current-name">{current.full_name}</div>
+          </div>
+          <div className="attn-current-recall">
+            <RecallButton apptId={current.id} onError={onError} onDone={onRecalled} />
+            {recalled && (
+              <div className="attn-compact-hint">
+                أُعيد النداء {new Date(recalled).toLocaleTimeString('ar', { hour: '2-digit', minute: '2-digit' })}
+              </div>
+            )}
+          </div>
         </div>
-      )}
-      {open && (
-        <div className="slot-booking-form">
-          <BookingForm
-            key={open}
-            sessionId={sessionId}
-            slotTime={null}
-            fees={fees}
-            urgent={open === 'urgent'}
-            attendance
-            onBooked={(appt) => { setOpen(null); onBooked(appt) }}
-            onCancel={() => setOpen(null)}
-          />
-        </div>
-      )}
-    </>
+      ) : <p className="attn-compact-empty">لا أحد قيد الكشف</p>}
+    </div>
   )
 }
 
@@ -782,35 +820,31 @@ function DoctorArrivalCard({ data, onChanged, onError }) {
     const t = prompt('الوقت الصحيح لوصول الطبيب (ساعة:دقيقة، مثل 09:40)', fmtClock(data.doctor_arrived_at))
     if (t) run(() => api.clinic.fixDoctorArrival(data.id, toLatinDigits(t).trim()))
   }
+  const history = data.doctor_arrival_history || []
+  // الأثر لا يضيع حين تنطوي البطاقة: كل تصحيح بقيمته السابقة ومن صحّحه ومتى — في تلميح السطر
+  const trail = history.map((h) =>
+    `صُحّح من ${fmtClock(h.previous_value)} إلى ${fmtClock(h.new_value)} — ${h.changed_by_name || '—'} عند ${fmtClock(h.changed_at)}`).join('\n')
   return (
-    <div className="card">
-      <div className="attn-arrival">
-        <div>
-          <h3 style={{ marginBottom: 4 }}>وصول الطبيب</h3>
-          {data.doctor_arrived_at ? (
-            <>
-              <span className="attn-arrival-time" dir="ltr">{fmtClock(data.doctor_arrived_at)}</span>
-              <span className="muted" style={{ marginInlineStart: 8, fontSize: 13 }}>
-                (بداية الدوام <span dir="ltr">{fmtTime(data.start_time)}</span>
-                {data.doctor_arrived_by_name && ` · سجّله ${data.doctor_arrived_by_name}`})
-              </span>
-            </>
-          ) : <span className="muted">لم يُسجَّل بعد</span>}
+    <div className="card attn-compact">
+      <h3>وصول الطبيب</h3>
+      {data.doctor_arrived_at ? (
+        // بعد التسجيل: سطرٌ واحد — الوقت ورابط «تصحيح»
+        <div className="attn-arrival-line" title={[
+          `بداية الدوام ${fmtTime(data.start_time)}`,
+          data.doctor_arrived_by_name && `سجّله ${data.doctor_arrived_by_name}`,
+          trail,
+        ].filter(Boolean).join('\n')}>
+          <span className="attn-arrival-time" dir="ltr">{fmtClock(data.doctor_arrived_at)}</span>
+          {history.length > 0 && <span className="attn-compact-hint">صُحّح {history.length === 1 ? 'مرة' : `${history.length} مرات`}</span>}
+          <button className="link-btn" disabled={busy} onClick={fix}>تصحيح</button>
         </div>
-        {data.doctor_arrived_at
-          ? <button className="ghost" disabled={busy} onClick={fix}>تصحيح الوقت</button>
-          : <button disabled={busy} onClick={() => run(() => api.clinic.doctorArrived(data.id))}>وصل الطبيب</button>}
-      </div>
-      {/* الأثر: كل تصحيح بقيمته السابقة ومن صحّحه ومتى */}
-      {data.doctor_arrival_history?.length > 0 && (
-        <ul className="attn-arrival-history">
-          {data.doctor_arrival_history.map((h, i) => (
-            <li key={i}>
-              صُحّح من <span dir="ltr">{fmtClock(h.previous_value)}</span> إلى <span dir="ltr">{fmtClock(h.new_value)}</span>
-              {' '}— {h.changed_by_name || '—'} عند <span dir="ltr">{fmtClock(h.changed_at)}</span>
-            </li>
-          ))}
-        </ul>
+      ) : (
+        <>
+          <p className="attn-compact-hint">لم يُسجَّل بعد · بداية الدوام <span dir="ltr">{fmtTime(data.start_time)}</span></p>
+          <div className="attn-compact-actions">
+            <button disabled={busy} onClick={() => run(() => api.clinic.doctorArrived(data.id))}>وصل الطبيب</button>
+          </div>
+        </>
       )}
     </div>
   )
@@ -847,7 +881,7 @@ function AttendanceQueueTable({ data, actions }) {
                     title={a.followup_override_reason || ''}>تجاوز</span>
                 )}
               </td>
-              <td className="num">{fmtMoney(a.fee)}</td>
+              <td className="num" style={{ whiteSpace: 'nowrap' }}>{fmtMoney(a.fee)}</td>
               <td dir="ltr">{a.arrived_at ? fmtClock(a.arrived_at) : '—'}</td>
               <td>{appointmentBadge(a.status)}</td>
               <td className="num">{a.ahead_count ?? '—'}</td>
@@ -924,6 +958,7 @@ export default function SessionQueue() {
   const [toast, showToast] = useToast()
   const [ticket, setTicket] = useState(null)
   const [recalled, setRecalled] = useState(null)   // وقت آخر إعادة نداء — تأكيدٌ مرئي للموظف
+  const [bookingOpen, setBookingOpen] = useState(null)   // نمط الحضور: null | 'normal' | 'urgent'
 
   const load = () => api.clinic.queue(id).then((d) => { setData(d); setLoadErr(null) })
     .catch((e) => {
@@ -997,21 +1032,25 @@ export default function SessionQueue() {
 
       <FlowModeMismatch data={data} onChanged={load} onError={showToast} />
 
-      {attendance && <DoctorArrivalCard data={data} onChanged={load} onError={showToast} />}
-
       {attendance ? (
-        <div className="card">
-          <h3>حجز دور</h3>
-          <p className="subtitle" style={{ marginTop: -6, marginBottom: 14 }}>
-            الحجز حجزُ مكان لا وقت — الدور يتحدّد بترتيب الحضور.
-          </p>
-          <AttendanceBooking
+        <>
+          {/* صفٌّ واحد من اليمين: حجز دور · قيد الكشف الآن · وصول الطبيب.
+              يتكدّس عمودياً على الشاشات الضيّقة (CSS) */}
+          <div className="attn-top-row">
+            <AttendanceBookingCard acceptsUrgent={data.accepts_urgent !== false}
+              open={bookingOpen} onOpen={setBookingOpen} />
+            <AttendanceCurrentCard current={data.appointments.find((a) => a.status === 'in_service')}
+              recalled={recalled} onRecalled={() => setRecalled(Date.now())} onError={showToast} />
+            <DoctorArrivalCard data={data} onChanged={load} onError={showToast} />
+          </div>
+          <AttendanceBookingForm
             sessionId={id}
             fees={{ consultation_fee: data.consultation_fee, followup_fee: data.followup_fee }}
-            acceptsUrgent={data.accepts_urgent !== false}
+            open={bookingOpen}
+            onClose={() => setBookingOpen(null)}
             onBooked={(appt) => setTicket(appt)}
           />
-        </div>
+        </>
       ) : (
       <div className="card">
         <h3>حجز دور — خانات اليوم</h3>
@@ -1027,8 +1066,9 @@ export default function SessionQueue() {
       </div>
       )}
 
-      {/* المريض الحالي وزر إعادة النداء — الاستقبال هو من يرى المريض لا يتحرّك */}
-      {(() => {
+      {/* المريض الحالي وزر إعادة النداء — الاستقبال هو من يرى المريض لا يتحرّك.
+          (نمط الحضور يعرضه في صفّ البطاقات أعلاه — هذه بطاقة نمط الخانات كما هي) */}
+      {!attendance && (() => {
         const current = data.appointments.find((a) => a.status === 'in_service')
         if (!current) return null
         return (
