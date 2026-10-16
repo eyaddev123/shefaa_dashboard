@@ -159,6 +159,9 @@ export const api = {
     doctorArrived: (sessionId) => http(`/clinic/sessions/${sessionId}/doctor-arrived`, { method: 'POST' }),
     fixDoctorArrival: (sessionId, time) =>
       http(`/clinic/sessions/${sessionId}/doctor-arrived`, { method: 'PATCH', body: JSON.stringify({ time }) }),
+    // تحويل نمط جلسة مولَّدة — لمشرف العيادات، وللجلسة الفارغة فقط (الخادم يرفض غيرها بـ 409)
+    switchSessionMode: (sessionId, flowMode) =>
+      http(`/clinic/sessions/${sessionId}/flow-mode`, { method: 'PATCH', body: JSON.stringify({ flow_mode: flowMode }) }),
     // تأجيل موعد إلى جلسة أخرى — ينشئ حجزاً جديداً ويُعلّم القديم «مؤجَّل»
     postpone: (appointmentId, body) =>
       http(`/clinic/appointments/${appointmentId}/postpone`, { method: 'POST', body: JSON.stringify(body) }),

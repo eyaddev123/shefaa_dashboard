@@ -422,6 +422,18 @@ td.num { font-variant-numeric: tabular-nums; }
 .attn-start-btn:hover:not(:disabled) { filter: brightness(1.08); background: var(--status-good); }
 /* الأخضر في الوضع الداكن فاتح (#4ade80): الأبيض عليه لا يُقرأ — نصّ داكن (نمط زرّ واتساب) */
 :root[data-theme='dark'] .attn-start-btn { color: #06301b; }
+/* شارة نمط الخانات: محايدة (القديم ليس خطأ) لكنها مرئية */
+.attn-mode-tag.attn-mode-slots { color: var(--text-secondary); background: var(--grid); }
+/* لافتة: الجلسة بنمطٍ غير الإعداد الحالي (يوم التبديل) */
+.attn-mismatch {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
+  padding: 14px 18px; margin-bottom: 18px; border-radius: 12px;
+  background: var(--status-pending-bg); border: 1px solid var(--status-pending); color: var(--text-primary);
+}
+.attn-mismatch strong { color: var(--status-pending); }
+/* الإعدادات: تغيير لم يُحفظ — يجب أن يُرى قبل مغادرة الصفحة */
+.setting-unsaved { color: var(--status-pending); background: var(--status-pending-bg); }
+.setting-saved-value { font-size: 12px; color: var(--muted); margin-top: 4px; }
 /* بطاقة وصول الطبيب */
 .attn-arrival { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .attn-arrival-time { font-size: 22px; font-weight: 800; color: var(--primary); }

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { addDays, api, dayLabel, SESSION_STATUSES, fmtTime, todayLocal } from '../api.js'
 import { useRole } from '../RoleContext.jsx'
+import { FlowModeTag } from '../attendance-ui.jsx'
 
 function sessionBadge(status) {
   const cls = status === 'in_progress' ? 'good' : status === 'cancelled' ? 'bad' : status === 'closed' ? '' : 'warn'
@@ -83,7 +84,7 @@ export default function ClinicBoard() {
         ) : (
           <table>
             <thead>
-              <tr><th>الدكتور</th><th>الاختصاص</th><th>الوقت</th><th>الحالة</th><th>الطابور</th><th></th></tr>
+              <tr><th>الدكتور</th><th>الاختصاص</th><th>الوقت</th><th>النمط</th><th>الحالة</th><th>الطابور</th><th></th></tr>
             </thead>
             <tbody>
               {sessions.map((s) => (
@@ -91,6 +92,8 @@ export default function ClinicBoard() {
                   <td>{s.doctor_name}</td>
                   <td>{s.specialty || '—'}</td>
                   <td className="num">{fmtTime(s.start_time)} – {fmtTime(s.end_time)}</td>
+                  {/* نمط الجلسة يُثبَّت عند توليدها — يُعرض كي لا يُفاجأ أحد يوم التبديل */}
+                  <td><FlowModeTag mode={s.flow_mode} /></td>
                   <td>{sessionBadge(s.status)}</td>
                   <td className="num">{s.active_count} نشِط / {s.total_count} إجمالي</td>
                   <td><button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }}>فتح الطابور</button></td>

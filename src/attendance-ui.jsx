@@ -4,6 +4,15 @@ import { useEffect, useRef } from 'react'
 
 export const isAttendanceSession = (s) => s?.flow_mode === 'attendance'
 
+export const FLOW_MODE_LABELS = { slots: 'نمط الخانات', attendance: 'نمط الحضور' }
+
+// شارة نمط الجلسة — في **النمطين** لا في الحضور وحده: يوم التبديل كانت جلسة الخانات
+// بلا أي علامة، فلم يكن على الشاشة ما يقول «هذه الجلسة ما زالت بالنمط القديم».
+export function FlowModeTag({ mode }) {
+  if (!mode) return null
+  return <span className={`attn-mode-tag attn-mode-${mode}`}>{FLOW_MODE_LABELS[mode] || mode}</span>
+}
+
 // شارة الأولوية بأسماء قصيرة تُقرأ من بعيد. الإسعافي أحمر (وحده يتقدّم)،
 // والكبير والرضيع شارةٌ للتنبيه لا أسبقية — مكانهم بترتيب حضورهم كغيرهم.
 const BADGES = { urgent: ['إسعافي', 'bad'], elderly: ['كبير السن', 'warn'], infant: ['رضيع', 'warn'] }

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { api, APPOINTMENT_STATUSES, BOOKING_TYPES, VISIT_TYPES, PRIORITIES, DELAY_CAUSES, fmtMoney, fmtTime, toLatinDigits } from '../api.js'
-import { AttendanceBadge, urgentRowClass, isAttendanceSession, usePolling, fmtClock } from '../attendance-ui.jsx'
+import { AttendanceBadge, urgentRowClass, isAttendanceSession, usePolling, fmtClock, FlowModeTag, FLOW_MODE_LABELS } from '../attendance-ui.jsx'
+import { useRole } from '../RoleContext.jsx'
 
 // شارة الأولوية — تُبرز من يتقدّم الطابور وسببه
 function priorityBadge(priority) {
@@ -602,6 +603,37 @@ function SlotList({ sessionId, fees, onBooked, acceptsUrgent = true }) {
 // ═══════════════ نمط الحضور ═══════════════
 // مكوّنات منفصلة لا تفرّعات داخل مكوّنات نمط الخانات — فيبقى ذاك كما كان حرفياً.
 
+// ═══ لافتة: الجلسة بنمطٍ غير الإعداد الحالي ═══
+// يوم التبديل: الإعداد صار «الحضور» وجلسة اليوم وُلدت بالخانات قبله، فلا يتغيّر شيء
+// ويظن الموظف التبديل معطّلاً. اللافتة تقول السبب، والتحويل لمشرف العيادات وللجلسة
+// الفارغة وحدها — الخادم هو الحارس (403 لغيره، 409 لجلسة فيها حجز)، والإخفاء تجميل.
+function FlowModeMismatch({ data, onChanged }) {
+  const { role } = useRole()
+  const [busy, setBusy] = useState(false)
+  if (!data.flow_mode_setting || data.flow_mode_setting === data.flow_mode) return null
+  const born = FLOW_MODE_LABELS[data.flow_mode], now = FLOW_MODE_LABELS[data.flow_mode_setting]
+  const empty = data.appointments.length === 0
+  const convert = async () => {
+    if (!confirm(`تحويل هذه الجلسة إلى ${now}؟`)) return
+    setBusy(true)
+    try { await api.clinic.switchSessionMode(data.id, data.flow_mode_setting); onChanged() }
+    catch (ex) { alert(ex.message) }
+    finally { setBusy(false) }
+  }
+  return (
+    <div className="attn-mismatch" role="status">
+      <div>
+        هذه الجلسة وُلدت بـ<strong>{born}</strong>، والإعداد الحالي «{now}» — التبديل يسري على الجلسات الجديدة.
+        {!empty && <> ولهذه الجلسة حجوزات، فتبقى على نمطها.</>}
+      </div>
+      {empty && role === 'clinic_admin' && (
+        <button disabled={busy} onClick={convert}>تحويل هذه الجلسة إلى {now}</button>
+      )}
+      {empty && role !== 'clinic_admin' && <span className="muted">تحويلها لمشرف العيادات.</span>}
+    </div>
+  )
+}
+
 // الحجز في نمط الحضور: نفس نموذج الحجز تماماً، بلا اختيار وقت (لا خانات أصلاً)
 function AttendanceBooking({ sessionId, fees, acceptsUrgent, onBooked }) {
   const [open, setOpen] = useState(null)   // null | 'normal' | 'urgent'
@@ -846,7 +878,7 @@ export default function SessionQueue() {
 
   return (
     <>
-      <h2>طابور {data.doctor_name}{attendance && <span className="attn-mode-tag">نمط الحضور</span>}</h2>
+      <h2>طابور {data.doctor_name}<FlowModeTag mode={data.flow_mode} /></h2>
       <p className="subtitle">
         {data.specialty || '—'} · {fmtTime(data.start_time)} – {fmtTime(data.end_time)} ·
         مدة الكشف المتوقعة {data.expected_visit_minutes} دقيقة ·
@@ -854,6 +886,8 @@ export default function SessionQueue() {
         {' '}(خلال {data.followup_window_days} أيام) ·
         الإيراد المتوقع {fmtMoney(data.expected_revenue)}
       </p>
+
+      <FlowModeMismatch data={data} onChanged={load} />
 
       {attendance && <DoctorArrivalCard data={data} onChanged={load} />}
 
