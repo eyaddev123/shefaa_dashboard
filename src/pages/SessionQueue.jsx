@@ -349,12 +349,14 @@ function CompletePatientForm({ appt, missing, patient, onCancel, onSubmit }) {
       <p className="subtitle" style={{ marginTop: -6 }}>
         الدور {appt?.queue_number} · هذه المعلومات أُجّلت عند الحجز وتلزم قبل تعليم الحضور.
       </p>
-      <form onSubmit={submit}>
-        <div className="inline" style={{ flexWrap: 'wrap' }}>
+      {/* بنية نموذج الحجز نفسها (booking-form + bf-row): صفٌّ محاذى من الأعلى، وكل حقل
+          عمودٌ ثابت (تسمية، مُدخَل، تلميح) — فتلميح الموبايل لا يرفع مُدخَله عن جاريه. */}
+      <form className="booking-form cpf-form" onSubmit={submit}>
+        <div className="bf-row cpf-row">
           {need('mobile') && (
             <div className="field">
               <label>رقم الموبايل</label>
-              <input value={form.mobile} dir="ltr" inputMode="numeric" required autoFocus
+              <input value={form.mobile} dir="ltr" inputMode="numeric" required autoFocus placeholder="09XXXXXXXX"
                 onChange={(e) => setForm((f) => ({ ...f, mobile: toLatinDigits(e.target.value) }))} />
               <small className="hint">به يتابع المريض دوره في «دوري»</small>
             </div>
@@ -370,12 +372,12 @@ function CompletePatientForm({ appt, missing, patient, onCancel, onSubmit }) {
           {need('birth_year') && (
             <div className="field">
               <label>سنة الميلاد</label>
-              <input value={form.birth_year} inputMode="numeric" style={{ width: 110 }} required
+              <input value={form.birth_year} inputMode="numeric" placeholder="1990" required
                 onChange={(e) => setForm((f) => ({ ...f, birth_year: toLatinDigits(e.target.value) }))} />
             </div>
           )}
         </div>
-        <div className="action-row" style={{ marginTop: 12 }}>
+        <div className="bf-actions">
           <button type="submit" disabled={busy}>{busy ? 'جارٍ الحفظ…' : 'حفظ وتعليم الحضور'}</button>
           <button type="button" className="ghost" onClick={onCancel}>إلغاء</button>
         </div>

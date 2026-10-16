@@ -1212,6 +1212,11 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
 .bf-note-ok { color: var(--status-good); }
 
 .bf-followup { display: flex; flex-direction: column; gap: 8px; }
+
+/* نموذج استكمال المريض عند الحضور: حقلٌ إلى ثلاثة (الناقص وحده يظهر)، فأعمدة تتسع
+   بعددها لا قياساتٌ ثابتة. السقف يمنع حقلاً وحيداً من التمدّد بعرض الشاشة كلها. */
+.cpf-form { margin-top: 6px; }
+.cpf-row { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); max-width: 720px; }
 .bf-actions { display: flex; gap: 8px; }
 
 /* شاشات أضيق: الصفوف تتحوّل إلى عمودين ثم عمود واحد */
