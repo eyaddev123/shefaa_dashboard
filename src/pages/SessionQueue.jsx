@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { api, APPOINTMENT_STATUSES, BOOKING_TYPES, VISIT_TYPES, PRIORITIES, DELAY_CAUSES, WEEKDAYS, fmtMoney, fmtTime, toLatinDigits } from '../api.js'
+import { api, APPOINTMENT_STATUSES, BOOKING_TYPES, VISIT_TYPES, PRIORITIES, DELAY_CAUSES, WEEKDAYS, addDays, todayLocal, fmtMoney, fmtTime, toLatinDigits } from '../api.js'
 import { AttendanceBadge, urgentRowClass, isAttendanceSession, usePolling, fmtClock, FlowModeTag, FLOW_MODE_LABELS } from '../attendance-ui.jsx'
 import { useRole } from '../RoleContext.jsx'
 import { useToast, RecallButton } from '../action-feedback.jsx'
@@ -396,11 +396,10 @@ function CompletePatientForm({ appt, missing, patient, onCancel, onSubmit }) {
 // تختار الجلسة الهدف (نفس الدكتور أو غيره) وتكتب السبب. الخادم ينشئ الحجز الجديد
 // بنفس قواعد الحجز — فرفضُه (جلسة ممتلئة أو ليوم مضى) يظهر كما هو بلا تفسير محلي.
 function PostponeDialog({ appt, currentSessionId, onClose, onDone }) {
-  const [date, setDate] = useState(() => {
-    // الغد افتراضاً: التأجيل يعني «ليس اليوم» في أغلب الحالات
-    const d = new Date(); d.setDate(d.getDate() + 1)
-    return d.toISOString().slice(0, 10)
-  })
+  // الغد افتراضاً: التأجيل يعني «ليس اليوم» في أغلب الحالات.
+  // ⚠️ من أجزاء التاريخ المحلية لا toISOString(): تلك بتوقيت UTC، فبين منتصف الليل
+  // والثالثة فجراً بتوقيت دمشق كانت تعطي تاريخ اليوم بدل الغد.
+  const [date, setDate] = useState(() => addDays(todayLocal(), 1))
   const [sessions, setSessions] = useState(null)
   // تاريخٌ بلا جلسات أخرى: لماذا؟ { kind: 'only_current' | 'not_generated' | 'no_schedule', doctors }
   const [emptyWhy, setEmptyWhy] = useState(null)
