@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '../api.js'
 import { withTitle } from '../announce.js'
 import { callAudio, loadSettings } from '../call-audio.js'
-import { roomClip } from '../audio-clips.js'
+import { roomClip, CLIP_TEXT } from '../audio-clips.js'
 
 // شبكة أمان فقط: البثّ المباشر (SSE) هو مصدر التحديث الفعلي، وهذه السحبة تُصلح
 // أي فرق لو انقطع الاتصال دون أن يلاحظ المتصفح
@@ -297,7 +297,9 @@ export default function PublicDisplay() {
               onChange={(e) => patchSettings({ repeats: Number(e.target.value) })} />
           </label>
           {callAudio.missingClips().length > 0 && (
-            <p className="pd-missing">مقاطع ناقصة: {callAudio.missingClips().join('، ')}</p>
+            // الاسم ومعه النصّ المطلوب تسجيله — «room-3 («الغرفة الثالثة»)» — فيعرف من يسجّل ماذا يقول
+            <p className="pd-missing">مقاطع ناقصة: {callAudio.missingClips()
+              .map((c) => (CLIP_TEXT[c] ? `${c} («${CLIP_TEXT[c]}»)` : c)).join('، ')}</p>
           )}
         </div>
       )}

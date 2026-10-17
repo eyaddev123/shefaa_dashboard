@@ -6,7 +6,7 @@
 // جهاز الشاشة إطلاقاً — فتصمت الشاشة بلا خطأ ظاهر. التسجيلات الجاهزة هي الأساس،
 // وقراءة المتصفح احتياطٌ للمقطع الناقص وحده (انظر announce.js).
 
-import { arabicNumber } from './announce.js'
+import { arabicNumber, roomText } from './announce.js'
 
 // أسماء الملفات لاتينية بلا مسافات: أسماء عربية في نظام الملفات وفي عناوين HTTP
 // تُرمَّز (percent-encode) فتصير عرضةً لاختلاف الترميز بين الخادم والمتصفح.
@@ -56,6 +56,10 @@ export function numberToClips(n) {
   return rest ? [...hundreds, FIXED_CLIPS.and, ...under100(rest)] : hundreds
 }
 
+// الغرف المسجَّلة (ملف لكل غرفة) — ١ إلى ١٠، و٧–١٠ احتياطية للمستقبل.
+// لا تُحمَّل مسبقاً كلها: الشاشة تحمّل غرف الدكاترة العاملين اليوم وحدها.
+export const RECORDED_ROOMS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']
+
 // النصّ المنطوق لكل مقطع — مرجعٌ واحد يقرأه AUDIO.md ويُستعمل في
 // الاحتياط الآلي (speechSynthesis) عند غياب ملف المقطع.
 export const CLIP_TEXT = {
@@ -67,6 +71,8 @@ export const CLIP_TEXT = {
   ...Object.fromEntries(TEENS_CLIPS.map((c, i) => [c, arabicNumber(i + 10)])),
   ...Object.fromEntries(TENS_CLIPS.filter(Boolean).map((c, i) => [c, arabicNumber((i + 2) * 10)])),
   ...Object.fromEntries(HUNDREDS_CLIPS.slice(1).map((c, i) => [c, arabicNumber((i + 1) * 100)])),
+  // الغرف بالصيغة الترتيبية كما سُجّلت: room-3 ⇒ «الغرفة الثالثة»
+  ...Object.fromEntries(RECORDED_ROOMS.map((r) => [roomClip(r), roomText(r)])),
 }
 
 // كل المقاطع غير الغرف — تُحمَّل مسبقاً عند فتح الصفحة، لا وقت النداء.
