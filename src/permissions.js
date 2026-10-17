@@ -27,6 +27,14 @@ export const canSeeDoctorsPage = (role) =>
 export const canSeeClinicBoard = (role) =>
   role === 'clinic_admin' || role === 'clinic_reception' || role === 'board' || role === SUPER_ADMIN || role === MANAGER
 
+// كتالوج إجراءات العيادة: مسؤول العيادات يكتب، المجلس والمشرف العام والمدير يطالعون.
+// الاستقبال لا يرى الصفحة — المفعَّل منها يظهر له داخل قائمة الإضافة على الحجز فقط.
+export const canSeeProceduresPage = (role) =>
+  role === 'clinic_admin' || role === 'board' || role === SUPER_ADMIN || role === MANAGER
+
+// إضافة إجراء على حجز وإزالته — الاستقبال ومسؤول العيادات (الخادم يحصر الاستقبال بيوم الجلسة)
+export const canEditAppointmentProcedures = (role) => role === 'clinic_admin' || role === 'clinic_reception'
+
 // شاشة الطبيب الخاصة — مربوطة بسجلّ دكتور، فلا معنى لها لغير الطبيب
 export const canSeeDoctorScreen = (role) => role === 'doctor'
 
@@ -53,6 +61,7 @@ export const ROUTE_ACCESS = {
   '/reconciliation': (role) => role === 'officer' || role === 'accountant',
   '/search': canSearchAid,
   '/clinic/doctors': canSeeDoctorsPage,
+  '/clinic/procedures': canSeeProceduresPage,
   '/clinic/board': canSeeClinicBoard,
   '/clinic/session': canSeeClinicBoard,
   '/clinic/doctor': canSeeDoctorScreen,
