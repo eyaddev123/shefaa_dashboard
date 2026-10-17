@@ -4,7 +4,7 @@
 // نداءتان إن نادى دكتوران في نفس اللحظة. هنا نفكّ كل المقاطع مسبقاً إلى AudioBuffer
 // فيبدأ التشغيل فوراً، ونصطفّ المقاطع بأنفسنا فلا تتراكب أبداً.
 
-import { ALL_NUMBER_CLIPS, CLIP_TEXT, FIXED_CLIPS, buildCallClips, roomClip } from './audio-clips.js'
+import { ALL_NUMBER_CLIPS, CLIP_TEXT, FIXED_CLIPS, RECORDED_ROOMS, buildCallClips, roomClip } from './audio-clips.js'
 import { announcementText, speak, speechSupported } from './announce.js'
 
 const CLIP_DIR = '/audio/calls'
@@ -42,6 +42,16 @@ export const saveSettings = (s) => {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
+// ═══ مدّة انتظار القراءة الآلية ═══
+// speechSynthesis لا يُعطي مدّةً قبل النطق، وonend غير موثوق على بعض الأجهزة (يتأخّر
+// أو لا يقع) فلا نعلّق النداءة عليه. نقدّرها من طول النصّ بمعدّل نطقٍ محافظ مع هامش:
+// تقديرٌ زائد يترك سكتةً قصيرة، وناقصٌ يجعل المقطع التالي يتراكب على القراءة.
+const SPEECH_MS_PER_CHAR = 95
+const SPEECH_MIN_MS = 700
+const SPEECH_SENTENCE_MS = 2500
+const speechMsFor = (text) =>
+  Math.max(SPEECH_MIN_MS, Math.round(String(text).length * SPEECH_MS_PER_CHAR))
+
 // ═══ مقاطع لها بديلٌ مولَّد في المتصفح ═══
 // غياب ملفها **ليس نقصاً**: النغمة تُركَّب بـ Web Audio (synthChime) — وchime.mp3 غائبٌ
 // عمداً. كان يُعامَل كمقطع ناقص فيُطلق القراءة الآلية بعد **كل** نداءة: يسمع المرضى
@@ -55,6 +65,7 @@ class CallAudio {
     this.buffers = new Map()      // اسم المقطع → AudioBuffer
     this.missing = new Set()      // مقاطع غائبة — حُذّر عنها مرّة ولا تُعاد المحاولة
     this.substituted = new Set()  // غائبة ولها بديلٌ مولَّد — ليست نقصاً ولا تُعاد المحاولة
+    this.inflight = new Map()     // اسم المقطع → وعد الجلب الجاري (يمنع الجلب المزدوج والتخطّي)
     this.queue = []
     this.playing = false
     this.settings = loadSettings()
@@ -88,13 +99,32 @@ class CallAudio {
     const Ctx = window.AudioContext || window.webkitAudioContext
     if (!Ctx) return
     this.ctx = this.ctx || new Ctx()
-    const names = [...new Set([...ALL_NUMBER_CLIPS, ...roomClips])]
+    // غرف اليوم أولاً ثم **كلّ** الغرف المسجَّلة: الاكتفاء بغرف اللوحة كان يُسكت
+    // نداءةَ أيّ غرفةٍ لم تكن على اللوحة لحظة التحميل (جلسة تبدأ لاحقاً، أو دكتور
+    // بلا غرفة ثمّ تُسنَد له). والملفّات ٢٥ ك.ب للواحد — عشرُها أرخص من نداءةٍ صامتة.
+    const names = [...new Set([...ALL_NUMBER_CLIPS, ...roomClips,
+      ...RECORDED_ROOMS.map(roomClip)])]
     await Promise.all(names.map((n) => this.fetchClip(n)))
     this.notify()
   }
 
-  async fetchClip(name) {
-    if (this.buffers.has(name) || this.missing.has(name) || this.substituted.has(name)) return
+  /**
+   * يجلب مقطعاً **مرّةً واحدة** ويعيد وعدَه المحفوظ. السبب: `playCall` كان يفحص
+   * `buffers.has()` فحصاً **لحظياً**؛ فنداءةٌ تصل والجلب لم ينتهِ تجد الخزانة فارغة
+   * فتتخطّى المقطع صامتةً وتُطلق القارئ الآلي فوق التسجيلات — صوتان معاً. بحفظ الوعد
+   * ينتظره النداء بدل أن يفترض غيابه.
+   */
+  fetchClip(name) {
+    if (this.buffers.has(name) || this.missing.has(name) || this.substituted.has(name))
+      return Promise.resolve()
+    const inflight = this.inflight.get(name)
+    if (inflight) return inflight
+    const p = this.doFetchClip(name).finally(() => this.inflight.delete(name))
+    this.inflight.set(name, p)
+    return p
+  }
+
+  async doFetchClip(name) {
     try {
       const res = await fetch(`${CLIP_DIR}/${encodeURIComponent(name)}${CLIP_EXT}?v=${encodeURIComponent(AUDIO_VERSION)}`)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -148,19 +178,50 @@ class CallAudio {
    */
   async playCall(card) {
     const clips = buildCallClips(card)
-    // الناقص فعلاً وحده يُطلق القراءة الآلية — لا ما له بديلٌ مولَّد
+
+    // ═══ انتظر مقاطع هذه النداءة قبل الحكم بغيابها ═══
+    // جوهر العطب القديم: الحكم كان لحظياً. غرفةٌ لم تُحمَّل مسبقاً (دكتور بلا غرفة
+    // على اللوحة، أو غرفة ١٠، أو جلسة بدأت بعد التحميل) تجد خزانتها فارغة فتُتخطّى
+    // ويقرأ الآلي الجملة فوق التسجيلات. هنا نجلب الناقص وننتظره أولاً — والجلب
+    // محفوظٌ بالوعد فلا يتكرّر ولا يُعاد لمقطعٍ ثبت غيابه.
+    await Promise.all(clips.map((c) => this.fetchClip(c)))
+
+    // الناقص فعلاً — يُحسب **بعد** الانتظار لا قبله، وإلا عاد العطب نفسه من بابٍ آخر.
     const missingInCall = clips.filter((c) => !this.buffers.has(c) && !SYNTHESIZED_CLIPS.has(c))
+    if (missingInCall.length) {
+      // سطرٌ صريح يقرأه من يسجّل المقاطع: أيُّ مقطعٍ رُمّم آلياً في هذه النداءة بعينها
+      console.warn(`[audio] رُمّم آلياً في النداءة: ${missingInCall.join(', ')}`)
+    }
+
+    // ═══ هل نقرأ الجملة كلّها آلياً أم نرمّم الناقص وحده؟ ═══
+    // القراءة الكاملة فوق تسجيلاتٍ تعمل = صوتان متراكبان، وهو ما سُمع في الصالة.
+    // فالقاعدة: إن حضرت كلّ المقاطع فلا قراءة آلية إطلاقاً. وإن نقص بعضها رُمّم
+    // الناقص **في موضعه** بين التسجيلات، فتبقى الجملة واحدة متّصلة بصوتَين لا جملتين.
+    // ولا تُقرأ الجملة كاملةً إلا إن غاب كلُّ كلامها (فلا شيء يُتراكب عليه).
+    const spokenOf = (name) => CLIP_TEXT[name] || ''
+    const speechClips = clips.filter((c) => !SYNTHESIZED_CLIPS.has(c))
+    const allSpeechMissing = speechClips.length > 0
+      && speechClips.every((c) => !this.buffers.has(c))
+
+    if (allSpeechMissing && speechSupported()) {
+      // لا تسجيل واحد حاضر — اقرأ الجملة كاملةً، فهي كل ما يُسمع
+      // (قرارٌ مثبَّت: لا يُنطق اسم الدكتور — announcementText تُستدعى بلا doctor_name.)
+      if (clips.includes('chime') && !this.buffers.has('chime')) await this.synthChime()
+      speak(announcementText({ queue_number: card.queue_number, room: card.room }), { times: 1 })
+      await sleep(SPEECH_SENTENCE_MS)
+      return
+    }
 
     for (const name of clips) {
       if (name === 'chime' && !this.buffers.has(name)) { await this.synthChime(); continue }
-      if (this.buffers.has(name)) await this.playBuffer(name)
-    }
-
-    // احتياط القراءة الآلية: التسجيلات هي الأساس، وهذه تُنقذ النداءة إن نقص منها مقطع.
-    // (قرارٌ مثبَّت: لا يُنطق اسم الدكتور — announcementText تُستدعى بلا doctor_name.)
-    if (missingInCall.length && speechSupported()) {
-      speak(announcementText({ queue_number: card.queue_number, room: card.room }), { times: 1 })
-      await sleep(2500)
+      if (this.buffers.has(name)) { await this.playBuffer(name); continue }
+      // مقطعٌ ناقصٌ وسط نداءةٍ عاملة: يُقرأ آلياً **وحده وفي موضعه**، والانتظار
+      // بقدر طوله لا بثابتٍ واحد، وإلا تراكب على ما بعده.
+      const text = spokenOf(name)
+      if (text && speechSupported()) {
+        speak(text, { times: 1 })
+        await sleep(speechMsFor(text))
+      }
     }
   }
 
