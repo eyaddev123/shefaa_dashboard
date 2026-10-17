@@ -159,6 +159,33 @@ export const api = {
       { method: 'POST', body: JSON.stringify(patient ? { patient } : {}) }),
     updateAppointment: (appointmentId, body) =>
       http(`/clinic/appointments/${appointmentId}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+    // ═══ تعديل الحجز ═══
+    // تغيير الحالة: قائمة واحدة لكل الحالات، بملاحظة اختيارية
+    setAppointmentStatus: (appointmentId, status, note) =>
+      http(`/clinic/appointments/${appointmentId}/status`,
+        { method: 'PATCH', body: JSON.stringify({ status, note: note || undefined }) }),
+    undoNoShow: (appointmentId, reason) =>
+      http(`/clinic/appointments/${appointmentId}/undo-no-show`,
+        { method: 'POST', body: JSON.stringify({ reason }) }),
+    // حفظٌ واحد: بيانات المريض + نوع الزيارة + الأولوية في ذرّةٍ واحدة
+    saveAppointmentDetails: (appointmentId, body) =>
+      http(`/clinic/appointments/${appointmentId}/details`,
+        { method: 'PATCH', body: JSON.stringify(body) }),
+    fixPatientData: (appointmentId, body) =>
+      http(`/clinic/appointments/${appointmentId}/patient-data`,
+        { method: 'PATCH', body: JSON.stringify(body) }),
+    changePatient: (appointmentId, body) =>
+      http(`/clinic/appointments/${appointmentId}/change-patient`,
+        { method: 'POST', body: JSON.stringify(body) }),
+    changeVisitType: (appointmentId, body) =>
+      http(`/clinic/appointments/${appointmentId}/visit-type`,
+        { method: 'PATCH', body: JSON.stringify(body) }),
+    downgradePriority: (appointmentId, reason) =>
+      http(`/clinic/appointments/${appointmentId}/priority`,
+        { method: 'PATCH', body: JSON.stringify({ priority: 'normal', reason }) }),
+    appointmentHistory: (appointmentId) =>
+      http(`/clinic/appointments/${appointmentId}/history`),
     mySessions: (date) => http(`/clinic/my-sessions?date=${date}`),
     call: (appointmentId) => http(`/clinic/appointments/${appointmentId}/call`, { method: 'POST' }),
     done: (appointmentId) => http(`/clinic/appointments/${appointmentId}/done`, { method: 'POST' }),

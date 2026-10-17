@@ -4,7 +4,7 @@ import { api, APPOINTMENT_STATUSES, BOOKING_TYPES, VISIT_TYPES, PRIORITIES, DELA
 import { AttendanceBadge, urgentRowClass, isAttendanceSession, usePolling, fmtClock, FlowModeTag, FLOW_MODE_LABELS } from '../attendance-ui.jsx'
 import { useRole } from '../RoleContext.jsx'
 import { useToast, RecallButton } from '../action-feedback.jsx'
-import { canEditAppointmentProcedures } from '../permissions.js'
+import { canEditAppointmentProcedures, canEditBooking } from '../permissions.js'
 
 // شارة الأولوية — تُبرز من يتقدّم الطابور وسببه
 function priorityBadge(priority) {
@@ -340,20 +340,22 @@ function CompletePatientForm({ appt, missing, patient, onCancel, onSubmit }) {
     e.preventDefault()
     setErr(null); setBusy(true)
     try {
-      await onSubmit({
-        mobile: form.mobile.trim() || null,
-        gender: form.gender || null,
-        birth_year: form.birth_year ? Number(form.birth_year) : null,
-      })
+      // نُرسل ما كُتب فقط: إرسال null يمحو قيمةً مسجَّلة مسبقاً
+      const patch = {}
+      if (form.mobile.trim()) patch.mobile = form.mobile.trim()
+      if (form.gender) patch.gender = form.gender
+      if (form.birth_year) patch.birth_year = Number(form.birth_year)
+      await onSubmit(patch)
     } catch (ex) { setErr(ex.message) }
     finally { setBusy(false) }
   }
 
   return (
     <div className="card highlight">
-      <h3>استكمال معلومات المريض — {appt?.full_name}</h3>
+      <h3>معلومات المريض (اختيارية) — {appt?.full_name}</h3>
       <p className="subtitle" style={{ marginTop: -6 }}>
-        الدور {appt?.queue_number} · هذه المعلومات أُجّلت عند الحجز وتلزم قبل تعليم الحضور.
+        الدور {appt?.queue_number} · أكملها إن تيسّر، أو علّم الحضور بدونها —
+        لا شيء منها يمنع الحضور.
       </p>
       {/* بنية نموذج الحجز نفسها (booking-form + bf-row): صفٌّ محاذى من الأعلى، وكل حقل
           عمودٌ ثابت (تسمية، مُدخَل، تلميح) — فتلميح الموبايل لا يرفع مُدخَله عن جاريه. */}
@@ -362,7 +364,7 @@ function CompletePatientForm({ appt, missing, patient, onCancel, onSubmit }) {
           {need('mobile') && (
             <div className="field">
               <label>رقم الموبايل</label>
-              <input value={form.mobile} dir="ltr" inputMode="numeric" required autoFocus placeholder="09XXXXXXXX"
+              <input value={form.mobile} dir="ltr" inputMode="numeric" autoFocus placeholder="09XXXXXXXX"
                 onChange={(e) => setForm((f) => ({ ...f, mobile: toLatinDigits(e.target.value) }))} />
               <small className="hint">به يتابع المريض دوره في «دوري»</small>
             </div>
@@ -370,7 +372,7 @@ function CompletePatientForm({ appt, missing, patient, onCancel, onSubmit }) {
           {need('gender') && (
             <div className="field">
               <label>الجنس</label>
-              <select value={form.gender} onChange={set('gender')} required>
+              <select value={form.gender} onChange={set('gender')}>
                 <option value="">—</option><option value="male">ذكر</option><option value="female">أنثى</option>
               </select>
             </div>
@@ -378,13 +380,19 @@ function CompletePatientForm({ appt, missing, patient, onCancel, onSubmit }) {
           {need('birth_year') && (
             <div className="field">
               <label>سنة الميلاد</label>
-              <input value={form.birth_year} inputMode="numeric" placeholder="1990" required
+              <input value={form.birth_year} inputMode="numeric" placeholder="1990"
                 onChange={(e) => setForm((f) => ({ ...f, birth_year: toLatinDigits(e.target.value) }))} />
             </div>
           )}
         </div>
         <div className="bf-actions">
-          <button type="submit" disabled={busy}>{busy ? 'جارٍ الحفظ…' : 'حفظ وتعليم الحضور'}</button>
+          <button type="submit" disabled={busy}>{busy ? 'جارٍ الحفظ…' : 'حفظ وحضر'}</button>
+          <button type="button" className="ghost" disabled={busy}
+            onClick={async () => {
+              setErr(null); setBusy(true)
+              // بلا تعديل: يمرّ الحضور وتبقى الشارة «بيانات ناقصة» تذكيراً
+              try { await onSubmit({}) } catch (ex) { setErr(ex.message) } finally { setBusy(false) }
+            }}>حضر بدون إكمال</button>
           <button type="button" className="ghost" onClick={onCancel}>إلغاء</button>
         </div>
         {err && <p className="error">{err}</p>}
@@ -883,6 +891,273 @@ function AppointmentDetails({ appt, session, onChanged, onToast }) {
         <div><dt>وقت الحضور</dt><dd dir="ltr">{appt.arrived_at ? fmtClock(appt.arrived_at) : '—'}</dd></div>
       </dl>
       <AppointmentProcedures appt={appt} session={session} onChanged={onChanged} onToast={onToast} />
+      <BookingEdits appt={appt} session={session} onChanged={onChanged} onToast={onToast} />
+      <BookingHistory appt={appt} session={session} onToast={onToast} />
+    </div>
+  )
+}
+
+// المعلومات المؤجَّلة: اختيارية عند الحجز والحضور معاً، وتُستكمل متى تيسّر.
+// الاسم الثلاثي وحده إلزاميّ — عند الحجز.
+const MISSING_FIELDS = [
+  { key: 'mobile', label: 'رقم الموبايل' },
+  { key: 'gender', label: 'الجنس' },
+  { key: 'birth_year', label: 'سنة الميلاد' },
+]
+const missingOf = (appt) => MISSING_FIELDS.filter((f) => !appt[f.key])
+
+// شارة «بيانات ناقصة» على صفّ الطابور — تبقى حتى تُستكمل، وتُفصح عن الناقص
+// في tooltip فلا يحتاج الموظف فتح التفاصيل ليعرف ما ينقص.
+function MissingBadge({ appt }) {
+  const m = missingOf(appt)
+  if (m.length === 0) return null
+  return <span className="badge warn sm" title={`ينقص: ${m.map((f) => f.label).join('، ')}`}>بيانات ناقصة</span>
+}
+
+// ═══ تعديل الحجز — ما أُدخل خطأً يُصحَّح من «تفاصيل» ═══
+// كل تعديل له زرّه وحقوله: الزرّ الواحد الجامع يُخفي ما يتغيّر فعلاً.
+// الأزرار تُخفى حسب الدور والحالة — والخادم هو الحارس الفعلي، وهذا لئلا
+// يضغط الموظف زرّاً سيُرفض.
+function BookingEdits({ appt, session, onChanged, onToast }) {
+  const { role } = useRole()
+  const [busy, setBusy] = useState(false)
+  const [newStatus, setNewStatus] = useState('')
+  const [note, setNote] = useState('')
+  const [swap, setSwap] = useState(false)       // لوحة «تغيير المريض»
+  const [search, setSearch] = useState('')
+  const [found, setFound] = useState(null)
+  const [swapForm, setSwapForm] = useState({})
+  const [swapReason, setSwapReason] = useState('')
+  const [override, setOverride] = useState('')  // سبب تجاوز شرط المراجعة
+
+  // الحقول قابلة للتحرير مباشرةً — تُبدأ من القائم وتُزامَن إن تغيّر من الخادم
+  const initial = () => ({
+    full_name: appt.full_name || '', mobile: appt.mobile || '',
+    gender: appt.gender || '', birth_year: appt.birth_year || '',
+    visit_type: appt.visit_type, priority: appt.priority || 'normal',
+  })
+  const [form, setForm] = useState(initial)
+  useEffect(() => { setForm(initial()) }, [appt.id, appt.full_name, appt.mobile,
+    appt.gender, appt.birth_year, appt.visit_type, appt.priority]) // eslint-disable-line
+
+  const dayOk = role === 'clinic_admin' || session.session_day === session.server_today
+  const frozen = ['cancelled', 'postponed'].includes(appt.status)
+  const canEdit = canEditBooking(role) && !frozen && dayOk
+  const canStatus = canEditBooking(role) && appt.status !== 'postponed' && dayOk
+  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
+
+  // ما تغيّر فعلاً عن القائم — فلا نُرسل حقولاً لم تُمَسّ
+  const dirty = () => {
+    const d = {}
+    const base = initial()
+    for (const k of Object.keys(base))
+      if (String(form[k] ?? '') !== String(base[k] ?? '')) d[k] = form[k]
+    return d
+  }
+  const hasChanges = Object.keys(dirty()).length > 0
+
+  const run = async (fn, okMsg) => {
+    setBusy(true)
+    try { const r = await fn(); onToast(r?.message || okMsg, 'success'); onChanged(); return r }
+    catch (ex) { onToast(ex.message) }
+    finally { setBusy(false) }
+  }
+
+  const save = async () => {
+    const d = dirty()
+    if (Object.keys(d).length === 0) return
+    if (override.trim()) d.followup_override_reason = override.trim()
+    if (note.trim()) d.note = note.trim()
+    await run(() => api.clinic.saveAppointmentDetails(appt.id, d), 'حُفظت التعديلات')
+    setOverride('')
+  }
+
+  // الإلغاء و«لم يحضر» يُستأذن فيهما باسم المريض: يُخرجان المريض من الطابور،
+  // وضغطةٌ خاطئة تُربك الدور أمام الناس.
+  const saveStatus = async () => {
+    if (!newStatus) return
+    if (['cancelled', 'no_show'].includes(newStatus)) {
+      const who = `الدور ${appt.queue_number}${appt.full_name ? ` (${appt.full_name})` : ''}`
+      const what = newStatus === 'cancelled' ? 'إلغاء حجز' : 'تعليم «لم يحضر» لـ'
+      if (!confirm(`${what} ${who}؟`)) return
+    }
+    await run(() => api.clinic.setAppointmentStatus(appt.id, newStatus, note.trim()), 'تغيّرت الحالة')
+    setNewStatus(''); setNote('')
+  }
+
+  // بحث المرضى: موبايلاً أو اسماً (مطابقة الاسم تامّة)، والردّ مريضٌ واحد
+  // أو { candidates } أو null — نُسوّيها قائمةً.
+  const doSearch = async () => {
+    const q = search.trim()
+    if (q.length < 2) return
+    const digits = toLatinDigits(q).replace(/\D/g, '')
+    setBusy(true)
+    try {
+      const r = await api.clinic.lookupPatientBy(digits.length >= 6 ? { mobile: q } : { full_name: q })
+      setFound(r == null ? [] : (r.candidates || [r]))
+    } catch (ex) { onToast(ex.message) } finally { setBusy(false) }
+  }
+  const closeSwap = () => { setSwap(false); setSearch(''); setFound(null); setSwapForm({}); setSwapReason('') }
+
+  if (!canEditBooking(role)) return null
+  const missing = MISSING_FIELDS.filter((f) => !appt[f.key])
+
+  return (
+    <div className="booking-edits">
+      <h4>بيانات الحجز</h4>
+      {frozen && <p className="appt-procs-empty">
+        {appt.status === 'cancelled' ? 'الحجز ملغى — غيّر حالته أولاً لتعديل بياناته.'
+          : 'الحجز مؤجَّل — عدّل الحجز الجديد.'}</p>}
+      {!frozen && !dayOk && <p className="appt-procs-empty">
+        التعديل في يوم الجلسة فقط — للتصحيح بعد ذلك راجِع مشرف العيادات.</p>}
+
+      {canStatus && (
+        <div className="booking-status-row">
+          <label>تغيير الحالة</label>
+          <select value={newStatus} onChange={(e) => setNewStatus(e.target.value)}>
+            <option value="">{APPOINTMENT_STATUSES[appt.status] || appt.status} (الحالية)…</option>
+            {Object.entries(APPOINTMENT_STATUSES).filter(([k]) => k !== appt.status)
+              .map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select>
+          <input placeholder="ملاحظة (اختيارية)…" value={note} onChange={(e) => setNote(e.target.value)} />
+          <button disabled={busy || !newStatus} onClick={saveStatus}>حفظ الحالة</button>
+        </div>
+      )}
+
+      {canEdit && (
+        <>
+          {missing.length > 0 && (
+            <p className="hint booking-missing-hint">
+              ينقص: {missing.map((f) => f.label).join('، ')} — اختيارية، تُستكمل متى تيسّر.
+            </p>
+          )}
+          <div className="booking-edit-fields">
+            <label>الاسم الثلاثي
+              <input value={form.full_name} onChange={set('full_name')} /></label>
+            <label>الموبايل
+              <input value={form.mobile} onChange={set('mobile')} dir="ltr" /></label>
+            <label>الجنس
+              <select value={form.gender} onChange={set('gender')}>
+                <option value="">—</option><option value="male">ذكر</option><option value="female">أنثى</option>
+              </select></label>
+            <label>سنة الميلاد
+              <input value={form.birth_year} onChange={set('birth_year')} dir="ltr" /></label>
+            <label>نوع الزيارة
+              <select value={form.visit_type} onChange={set('visit_type')}>
+                {Object.entries(VISIT_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              </select></label>
+            <label>الأولوية
+              <select value={form.priority} onChange={set('priority')}>
+                <option value="normal">عادي</option>
+                <option value="urgent">إسعافي</option>
+                <option value="elderly">كبير بالعمر</option>
+                <option value="infant">رضيع</option>
+              </select></label>
+          </div>
+          {form.visit_type === 'followup' && form.visit_type !== appt.visit_type && (
+            <input placeholder="سبب تجاوز شرط المراجعة (إن طُلب)…"
+              value={override} onChange={(e) => setOverride(e.target.value)} />
+          )}
+          <div className="booking-edit-buttons">
+            <button disabled={busy || !hasChanges} onClick={save}>حفظ</button>
+            {hasChanges && <button className="ghost" onClick={() => setForm(initial())}>تراجع</button>}
+            <button className="link-btn" onClick={() => setSwap((v) => !v)}>
+              اختير المريض الخطأ؟ تغيير المريض
+            </button>
+          </div>
+        </>
+      )}
+
+      {canEdit && swap && (
+        <div className="booking-edit-panel">
+          <p className="hint">يُربط هذا الحجز وحده بمريضٍ آخر — سجلّ المريض الحالي لا يُمَسّ.</p>
+          <div className="booking-edit-fields">
+            <input placeholder="ابحث بالاسم الكامل أو الموبايل…" value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); doSearch() } }} />
+            <button className="ghost" disabled={busy} onClick={doSearch}>بحث</button>
+          </div>
+          {found && found.length > 0 && (
+            <ul className="booking-edit-results">
+              {found.map((p) => (
+                <li key={p.id}>
+                  <span>{p.full_name} <span dir="ltr" className="muted">{p.mobile || '—'}</span></span>
+                  <button className="ghost" disabled={busy || swapReason.trim().length < 3}
+                    onClick={() => run(() => api.clinic.changePatient(appt.id,
+                      { patient_id: p.id, reason: swapReason.trim() }), 'تغيّر المريض').then(closeSwap)}>اختر</button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {found && found.length === 0 && <p className="appt-procs-empty">لا نتائج — أو أنشئ مريضاً جديداً أدناه.</p>}
+          <div className="booking-edit-fields">
+            <input placeholder="أو: اسم مريض جديد (ثلاثي)"
+              onChange={(e) => setSwapForm((f) => ({ ...f, full_name: e.target.value }))} />
+            <input placeholder="موبايله" dir="ltr"
+              onChange={(e) => setSwapForm((f) => ({ ...f, mobile: e.target.value }))} />
+          </div>
+          <input placeholder="سبب التغيير (إلزامي)…" value={swapReason}
+            onChange={(e) => setSwapReason(e.target.value)} />
+          <div className="booking-edit-buttons">
+            <button disabled={busy || swapReason.trim().length < 3 || !swapForm.full_name}
+              onClick={() => run(() => api.clinic.changePatient(appt.id,
+                { ...swapForm, reason: swapReason.trim() }), 'تغيّر المريض').then(closeSwap)}>إنشاء وربط</button>
+            <button className="ghost" onClick={closeSwap}>إلغاء</button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+
+// ═══ سجلّ تعديلات الحجز ═══
+// يُحمَّل عند فتح «تفاصيل» — أثرٌ لكل تغيير: ماذا ومن ومتى ولماذا.
+const EDIT_FIELD_LABELS = {
+  status: 'الحالة', patient_id: 'المريض', visit_type: 'نوع الزيارة', fee: 'الأجر',
+  priority: 'الأولوية', slot_time: 'الخانة الزمنية',
+  'patient.full_name': 'اسم المريض', 'patient.mobile': 'الموبايل',
+  'patient.gender': 'الجنس', 'patient.birth_year': 'سنة الميلاد',
+}
+const EDIT_VALUE_LABELS = {
+  ...APPOINTMENT_STATUSES, ...VISIT_TYPES,
+  normal: 'عادي', urgent: 'إسعافي', elderly: 'مسنّ', infant: 'رضيع',
+  male: 'ذكر', female: 'أنثى',
+}
+const editValue = (v) => (v == null || v === '' ? '—' : (EDIT_VALUE_LABELS[v] || v))
+
+function BookingHistory({ appt, session, onToast }) {
+  const [rows, setRows] = useState(null)
+  useEffect(() => {
+    let alive = true
+    api.clinic.appointmentHistory(appt.id)
+      .then((r) => { if (alive) setRows(r) })
+      .catch((e) => { if (alive) { setRows([]); onToast(e.message) } })
+    return () => { alive = false }
+  }, [appt.id])
+
+  if (!rows || rows.length === 0) return null
+  return (
+    <div className="booking-history">
+      <h4>سجلّ التعديلات</h4>
+      <table className="appt-procs-table">
+        <tbody>
+          {rows.map((h) => (
+            <tr key={h.id}>
+              <td>{EDIT_FIELD_LABELS[h.field] || h.field}</td>
+              <td className="booking-history-change">
+                <span className="muted">{editValue(h.old_value)}</span>
+                {' ← '}
+                <strong>{editValue(h.new_value)}</strong>
+              </td>
+              <td className="appt-procs-meta">
+                {h.changed_by_name || '—'} <span dir="ltr">{whenAt(h.changed_at, session.session_day)}</span>
+                {h.reason && <span className="proc-removed-why">{h.reason}</span>}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }
@@ -1034,8 +1309,8 @@ function AttendanceQueueTable({ data, actions }) {
             <Fragment key={a.id}>
             <tr className={urgentRowClass(a)}>
               <td className="num">{a.queue_number}<AttendanceBadge priority={a.priority} /></td>
-              <td>{a.full_name}</td>
-              <td dir="ltr">{a.mobile}</td>
+              <td>{a.full_name} <MissingBadge appt={a} /></td>
+              <td dir="ltr">{a.mobile || '—'}</td>
               <td>
                 {VISIT_TYPES[a.visit_type] || a.visit_type}
                 {a.followup_override_by && (
@@ -1047,7 +1322,9 @@ function AttendanceQueueTable({ data, actions }) {
               <td dir="ltr">{a.arrived_at ? fmtClock(a.arrived_at) : '—'}</td>
               <td>{appointmentBadge(a.status)}</td>
               <td className="num">{a.ahead_count ?? '—'}</td>
-              <td>
+              {/* فجوةٌ حقيقية بين الأزرار: «حضر» و«إلغاء» كانا متلاصقَين
+                  فيُضغط الخطأ منهما بسهولة، وأثرهما متناقض */}
+              <td className="queue-row-actions">
                 {['waiting', 'arrived'].includes(a.status) && a.priority === 'normal'
                   && data.accepts_urgent !== false && (
                   <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }}
@@ -1149,19 +1426,24 @@ export default function SessionQueue() {
   const attendance = isAttendanceSession(data)
   usePolling(load, attendance)
 
-  // ★ الحضور: إن رفض الخادم لنقص المعلومات، نفتح نموذج الإكمال مباشرةً بدل عرض
-  // خطأ يترك الموظف يخمّن ما ينقص ومن أين يُكمله.
+  // ★ الحضور لا يُحجب أبداً (قرارٌ مقصود).
+  // كان الخادم يرفضه لنقص المعلومات فيقف المريض والموظف يسأله والدور ينتظر.
+  // الآن: إن نقص شيء نعرض نموذجاً **اختيارياً** فيه «حفظ وحضر» و«حضر بدون
+  // إكمال» — والموظف يقرّر. وإن لم ينقص شيء يمرّ الحضور مباشرةً بلا نموذج.
   const [completing, setCompleting] = useState(null)   // { appt, missing, patient }
-  const arrive = async (apptId, patientPatch) => {
+  const doArrive = async (apptId, patientPatch) => {
     try { await api.clinic.arrive(apptId, patientPatch); setCompleting(null); load() }
-    catch (ex) {
-      if (ex.data?.code === 'PATIENT_INFO_INCOMPLETE') {
-        const appt = data.appointments.find((a) => String(a.id) === String(apptId))
-        setCompleting({ appt, missing: ex.data.missing_fields || [], patient: ex.data.patient || {} })
-        return
-      }
-      showToast(ex.message); load()
-    }
+    catch (ex) { showToast(ex.message); load() }
+  }
+  const arrive = async (apptId, patientPatch) => {
+    if (patientPatch) return doArrive(apptId, patientPatch)   // قادمٌ من النموذج
+    const appt = data.appointments.find((a) => String(a.id) === String(apptId))
+    const missing = appt ? missingOf(appt) : []
+    if (missing.length === 0) return doArrive(apptId)
+    setCompleting({
+      appt, missing: missing.map((f) => f.key),
+      patient: { mobile: appt.mobile, gender: appt.gender, birth_year: appt.birth_year },
+    })
   }
 
   const cancel = async (apptId) => {
