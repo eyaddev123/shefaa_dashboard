@@ -4,6 +4,7 @@ import { api, APPOINTMENT_STATUSES, BOOKING_TYPES, VISIT_TYPES, PRIORITIES, DELA
 import { AttendanceBadge, urgentRowClass, isAttendanceSession, usePolling, fmtClock, FlowModeTag, FLOW_MODE_LABELS } from '../attendance-ui.jsx'
 import { useRole } from '../RoleContext.jsx'
 import { useToast, RecallButton } from '../action-feedback.jsx'
+import { canEditAppointmentProcedures } from '../permissions.js'
 
 // شارة الأولوية — تُبرز من يتقدّم الطابور وسببه
 function priorityBadge(priority) {
@@ -853,10 +854,25 @@ function DoctorArrivalCard({ data, onChanged, onError }) {
   )
 }
 
+// ═══ السعر في صفّ الطابور ═══
+// بلا إجراءات: سعر الزيارة كما كان. ومعها ثلاثة أسطر: المعاينة، الإجراءات، الإجمالي.
+// كلماتٌ لا «+» و«=»: الرمز المحايد في أول سطرٍ عربي ينقلب موضعه بخوارزمية الاتجاه.
+// للعرض وحده — لا شيء يُكتب في الخزينة.
+function FeeCell({ appt }) {
+  if (!appt.procedures_total) return <>{fmtMoney(appt.fee)}</>
+  return (
+    <span className="fee-breakdown">
+      <span>{VISIT_TYPES[appt.visit_type] || 'زيارة'} {fmtMoney(appt.fee)}</span>
+      <span>إجراءات {fmtMoney(appt.procedures_total)}</span>
+      <strong>الإجمالي {fmtMoney(appt.total)}</strong>
+    </span>
+  )
+}
+
 // ═══ تفاصيل الحجز — سطرٌ ينفتح تحت صفّ الطابور ═══
 // رمز الوصول هنا دائماً: حين تُعطَّل بطاقة الحجز لا يُعرض الرمز في أي مكان آخر،
 // والمريض قد يطلبه لاحقاً لمتابعة دوره من «دوري».
-function AppointmentDetails({ appt }) {
+function AppointmentDetails({ appt, session, onChanged, onToast }) {
   return (
     <div className="appt-details">
       <dl className="appt-details-grid">
@@ -866,6 +882,123 @@ function AppointmentDetails({ appt }) {
         <div><dt>وقت الحجز</dt><dd dir="ltr">{appt.booked_at ? fmtClock(appt.booked_at) : '—'}</dd></div>
         <div><dt>وقت الحضور</dt><dd dir="ltr">{appt.arrived_at ? fmtClock(appt.arrived_at) : '—'}</dd></div>
       </dl>
+      <AppointmentProcedures appt={appt} session={session} onChanged={onChanged} onToast={onToast} />
+    </div>
+  )
+}
+
+// وقت الإضافة/الإزالة: الساعة وحدها إن كانت في يوم الجلسة، وإلا بالتاريخ (تصحيحٌ متأخّر)
+const whenAt = (ts, sessionDay) => {
+  const day = new Date(ts).toLocaleDateString('en-CA')
+  return day === sessionDay ? fmtClock(ts) : `${day} ${fmtClock(ts)}`
+}
+
+// ═══ إجراءات الحجز ═══
+// تُضاف بعد دخول المريض فقط (قيد الكشف أو انتهى). السعر من الكتالوج ولا يُعدَّل هنا.
+// الاستقبال في يوم الجلسة وحده، ومسؤول العيادات أي وقت — والخادم هو الحارس، والإخفاء هنا
+// يقول السبب بدل زرٍّ يُرفض. الإزالة بسبب إلزامي، والمُزال يبقى ظاهراً مشطوباً بأثره.
+function AppointmentProcedures({ appt, session, onChanged, onToast }) {
+  const { role } = useRole()
+  const [catalog, setCatalog] = useState(null)
+  const [pick, setPick] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [removing, setRemoving] = useState(null)   // id السطر الجاري إزالته
+  const [reason, setReason] = useState('')
+  const lines = appt.procedures || []
+  const entered = ['in_service', 'done'].includes(appt.status)
+  const dayOk = role === 'clinic_admin' || session.session_day === session.server_today
+  const canEdit = canEditAppointmentProcedures(role) && entered && dayOk
+
+  useEffect(() => {
+    if (!canEdit || catalog) return
+    api.clinic.procedures().then((r) => setCatalog(r.filter((p) => p.is_active))).catch((e) => onToast(e.message))
+  }, [canEdit])
+
+  const activeIds = new Set(lines.filter((l) => !l.removed_at).map((l) => String(l.procedure_id)))
+  const choices = (catalog || []).filter((p) => !activeIds.has(String(p.id)))
+  const chosen = choices.find((p) => String(p.id) === pick)
+
+  const add = async () => {
+    if (!chosen) return
+    setBusy(true)
+    try {
+      await api.clinic.addAppointmentProcedure(appt.id, chosen.id)
+      onToast(`أُضيف «${chosen.name}» — ${fmtMoney(chosen.price)}`, 'success'); setPick(''); onChanged()
+    } catch (ex) { onToast(ex.message) }
+    finally { setBusy(false) }
+  }
+  const remove = async (line) => {
+    if (!reason.trim()) return
+    setBusy(true)
+    try {
+      await api.clinic.removeAppointmentProcedure(appt.id, line.id, reason.trim())
+      onToast(`أُزيل «${line.name}»`, 'success'); setRemoving(null); setReason(''); onChanged()
+    } catch (ex) { onToast(ex.message) }
+    finally { setBusy(false) }
+  }
+
+  return (
+    <div className="appt-procs">
+      <h4>الإجراءات</h4>
+      {lines.length === 0 ? <p className="appt-procs-empty">لا إجراءات على هذا الحجز.</p> : (
+        <table className="appt-procs-table">
+          <tbody>
+            {lines.map((l) => (
+              <tr key={l.id} className={l.removed_at ? 'proc-removed' : undefined}>
+                <td>{l.name}</td>
+                <td className="num">{fmtMoney(l.price)}</td>
+                <td className="appt-procs-meta">
+                  أضافه {l.added_by_name || '—'} <span dir="ltr">{whenAt(l.added_at, session.session_day)}</span>
+                  {l.removed_at && (
+                    <span className="proc-removed-why">
+                      أزاله {l.removed_by_name || '—'} <span dir="ltr">{whenAt(l.removed_at, session.session_day)}</span> — {l.removed_reason}
+                    </span>
+                  )}
+                </td>
+                <td>
+                  {!l.removed_at && canEdit && removing !== l.id && (
+                    <button className="ghost" style={{ padding: '2px 10px', fontSize: 11.5 }}
+                      onClick={() => { setRemoving(l.id); setReason('') }}>إزالة</button>
+                  )}
+                  {removing === l.id && (
+                    <span className="proc-remove-form">
+                      <input value={reason} autoFocus placeholder="سبب الإزالة (إلزامي)" aria-label="سبب الإزالة"
+                        onChange={(e) => setReason(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') remove(l) }} />
+                      <button style={{ padding: '3px 10px', fontSize: 11.5 }} disabled={busy || !reason.trim()}
+                        onClick={() => remove(l)}>تأكيد الإزالة</button>
+                      <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }}
+                        onClick={() => setRemoving(null)}>إلغاء</button>
+                    </span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      <p className="appt-procs-total">
+        {VISIT_TYPES[appt.visit_type] || 'زيارة'} {fmtMoney(appt.fee)} + إجراءات {fmtMoney(appt.procedures_total || 0)}
+        {' '}= <strong>{fmtMoney(appt.total ?? appt.fee)}</strong>
+      </p>
+      {canEditAppointmentProcedures(role) && (
+        canEdit ? (
+          <div className="proc-add">
+            <select value={pick} onChange={(e) => setPick(e.target.value)} aria-label="الإجراء">
+              <option value="">{catalog === null ? 'جارٍ التحميل…' : choices.length ? '— اختر إجراءً —' : 'لا إجراءات متاحة'}</option>
+              {choices.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+            {/* السعر للقراءة فقط — من الكتالوج، ولا يُرسَل للخادم أصلاً */}
+            <span className="proc-add-price">{chosen ? fmtMoney(chosen.price) : '—'}</span>
+            <button disabled={!chosen || busy} onClick={add}>+ إضافة إجراء</button>
+          </div>
+        ) : (
+          <p className="appt-procs-hint">
+            {!entered ? 'تُضاف الإجراءات بعد دخول المريض على الطبيب.'
+              : 'انتهى يوم هذه الجلسة — الإضافة والإزالة الآن لمسؤول العيادات.'}
+          </p>
+        )
+      )}
     </div>
   )
 }
@@ -881,7 +1014,7 @@ function DetailsToggle({ open, onToggle }) {
 // طابور نمط الحضور: بترتيب الخادم (قيد الكشف، ثم الحاضرون — الإسعافي أولاً ثم الأقدم
 // حضوراً — ثم من لم يحضر). لا عمود موعد ولا انتظار متوقَّع: لا خانات ولا تقدير هنا.
 function AttendanceQueueTable({ data, actions }) {
-  const { arrive, cancel, prioritize, setPostponing, openDetails, toggleDetails } = actions
+  const { arrive, cancel, prioritize, setPostponing, openDetails, toggleDetails, reload, toast } = actions
   return (
     <div className="card">
       <h3>الطابور ({data.appointments.length})</h3>
@@ -910,7 +1043,7 @@ function AttendanceQueueTable({ data, actions }) {
                     title={a.followup_override_reason || ''}>تجاوز</span>
                 )}
               </td>
-              <td className="num" style={{ whiteSpace: 'nowrap' }}>{fmtMoney(a.fee)}</td>
+              <td className="num" style={{ whiteSpace: 'nowrap' }}><FeeCell appt={a} /></td>
               <td dir="ltr">{a.arrived_at ? fmtClock(a.arrived_at) : '—'}</td>
               <td>{appointmentBadge(a.status)}</td>
               <td className="num">{a.ahead_count ?? '—'}</td>
@@ -934,7 +1067,9 @@ function AttendanceQueueTable({ data, actions }) {
               </td>
             </tr>
             {openDetails === a.id && (
-              <tr className="appt-details-row"><td colSpan={9}><AppointmentDetails appt={a} /></td></tr>
+              <tr className="appt-details-row"><td colSpan={9}>
+                <AppointmentDetails appt={a} session={data} onChanged={reload} onToast={toast} />
+              </td></tr>
             )}
             </Fragment>
           ))}
@@ -1072,6 +1207,7 @@ export default function SessionQueue() {
         معاينة {fmtMoney(data.consultation_fee)} · مراجعة {fmtMoney(data.followup_fee)}
         {' '}(خلال {data.followup_window_days} أيام) ·
         الإيراد المتوقع {fmtMoney(data.expected_revenue)}
+        {/* يشمل الإجراءات — للعرض وحده، لا يُكتب في الخزينة */}
       </p>
 
       {toast}
@@ -1211,7 +1347,8 @@ export default function SessionQueue() {
 
       {attendance && (
         <>
-          <AttendanceQueueTable data={data} actions={{ arrive, cancel, prioritize, setPostponing, openDetails, toggleDetails }} />
+          <AttendanceQueueTable data={data} actions={{ arrive, cancel, prioritize, setPostponing, openDetails, toggleDetails, reload: load,
+            toast: (msg, kind) => showToast(msg, kind, kind === 'success' ? 3500 : 6000) }} />
           <PendingArrivalList data={data} onChanged={load} onError={showToast} />
         </>
       )}
@@ -1244,7 +1381,7 @@ export default function SessionQueue() {
                       title={a.followup_override_reason || ''}>تجاوز</span>
                   )}
                 </td>
-                <td className="num">{fmtMoney(a.fee)}</td>
+                <td className="num"><FeeCell appt={a} /></td>
                 <td><SlotCell appt={a} /></td>
                 <td>{appointmentBadge(a.status)}</td>
                 <td className="num">
@@ -1272,7 +1409,10 @@ export default function SessionQueue() {
                 </td>
               </tr>
               {openDetails === a.id && (
-                <tr className="appt-details-row"><td colSpan={9}><AppointmentDetails appt={a} /></td></tr>
+                <tr className="appt-details-row"><td colSpan={9}>
+                  <AppointmentDetails appt={a} session={data} onChanged={load}
+                    onToast={(msg, kind) => showToast(msg, kind, kind === 'success' ? 3500 : 6000)} />
+                </td></tr>
               )}
               </Fragment>
             ))}

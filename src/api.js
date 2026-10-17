@@ -174,6 +174,17 @@ export const api = {
     // تحويل نمط جلسة مولَّدة — لمشرف العيادات، وللجلسة الفارغة فقط (الخادم يرفض غيرها بـ 409)
     switchSessionMode: (sessionId, flowMode) =>
       http(`/clinic/sessions/${sessionId}/flow-mode`, { method: 'PATCH', body: JSON.stringify({ flow_mode: flowMode }) }),
+    // ── إجراءات العيادة ──
+    // الكتالوج: الاستقبال يتسلّم المفعَّل وحده من الخادم نفسه
+    procedures: () => http('/clinic/procedures'),
+    addProcedure: (body) => http('/clinic/procedures', { method: 'POST', body: JSON.stringify(body) }),
+    updateProcedure: (id, body) => http(`/clinic/procedures/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+    // على الحجز: لا سعر يُرسَل — الخادم ينسخه من الكتالوج
+    addAppointmentProcedure: (appointmentId, procedureId) => http(`/clinic/appointments/${appointmentId}/procedures`,
+      { method: 'POST', body: JSON.stringify({ procedure_id: procedureId }) }),
+    removeAppointmentProcedure: (appointmentId, lineId, reason) =>
+      http(`/clinic/appointments/${appointmentId}/procedures/${lineId}/remove`,
+        { method: 'POST', body: JSON.stringify({ reason }) }),
     // تأجيل موعد إلى جلسة أخرى — ينشئ حجزاً جديداً ويُعلّم القديم «مؤجَّل»
     postpone: (appointmentId, body) =>
       http(`/clinic/appointments/${appointmentId}/postpone`, { method: 'POST', body: JSON.stringify(body) }),
