@@ -168,6 +168,10 @@ export const api = {
     undoNoShow: (appointmentId, reason) =>
       http(`/clinic/appointments/${appointmentId}/undo-no-show`,
         { method: 'POST', body: JSON.stringify({ reason }) }),
+    // حفظٌ واحد: بيانات المريض + نوع الزيارة + الأولوية في ذرّةٍ واحدة
+    saveAppointmentDetails: (appointmentId, body) =>
+      http(`/clinic/appointments/${appointmentId}/details`,
+        { method: 'PATCH', body: JSON.stringify(body) }),
     fixPatientData: (appointmentId, body) =>
       http(`/clinic/appointments/${appointmentId}/patient-data`,
         { method: 'PATCH', body: JSON.stringify(body) }),
