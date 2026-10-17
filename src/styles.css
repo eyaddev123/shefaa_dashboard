@@ -971,7 +971,8 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
 .pd-time { font-size: clamp(22px, 2.6vw, 48px); font-weight: 800; color: #7fd6b8; }
 .pd-date { font-size: clamp(11px, 1vw, 19px); color: #b3c6c2; }
 .pd-tools { display: flex; align-items: center; gap: 0.6vw; }
-.pd-dot { width: clamp(8px, 0.8vw, 14px); aspect-ratio: 1; border-radius: 50%; }
+/* height صريح لا aspect-ratio: الأخيرة غائبة في Chrome 66 فيبقى الارتفاع صفراً */
+.pd-dot { width: clamp(8px, 0.8vw, 14px); height: clamp(8px, 0.8vw, 14px); border-radius: 50%; }
 .pd-dot-on { background: #14b8a6; }
 .pd-dot-off { background: #f0b37e; animation: pd-blink 1.2s ease-in-out infinite; }
 .pd-icon-btn {
@@ -995,44 +996,63 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
   flex: 1;                       /* تأخذ ما تبقّى من الارتفاع بعد الترويسة واللافتات */
   display: grid;
   grid-template-columns: repeat(var(--cols, 3), 1fr);
-  gap: 1.2vh 1.2vw;
-  align-content: stretch;
+  /* ═══ الصفوف تملأ الارتفاع كلّه ═══
+     بلا grid-template-rows صريحة كانت الصفوف تأخذ ارتفاع محتواها فقط، فتتكدّس
+     البطاقات في الأعلى ويبقى نصف الشاشة السفلي فارغاً على تلفاز الصالة.
+     1fr لكل صفّ يقسم المتاح بالتساوي مهما كان عدد الصفوف. */
+  grid-template-rows: repeat(var(--rows, 1), 1fr);
+  gap: var(--pd-gap, 10px);
   min-height: 0;                 /* بلا هذا يتجاوز المحتوى الشبكة فيظهر تمرير */
+  min-width: 0;
 }
 .pd-card {
   display: grid;
   grid-template-rows: auto 1fr auto;
-  gap: 0.6vh;
+  gap: 0.3vh;
+  /* تملأ خانتها طولاً وعرضاً — min-*:0 يمنع المحتوى من تمديدها خارج الخانة */
+  width: 100%;
+  height: 100%;
   min-height: 0;
+  min-width: 0;
+  box-sizing: border-box;
   text-align: center;
   background: #10201e;
   border: 2px solid rgba(127, 214, 184, 0.18);
   border-radius: 1.4vh;
-  padding: 1.2vh 1vw;
+  padding: 0.8vh 0.8vw;
 }
 /* ترويسة البطاقة: كتلة مرنة عمودية بأسطر لا تتراكب. الاعتماد على ارتفاع
    السطر وحده جعل «يُخدَم الآن» يركب على الاختصاص عند أربع بطاقات. */
 .pd-card-head {
-  display: flex; flex-direction: column; gap: 0.2vh;
+  /* gap في flex غائبة في Chrome 66 (تلفاز الصالة) فتُتجاهَل بصمت — الهوامش بديلٌ يعمل في الكل */
+  display: flex; flex-direction: column;
   min-height: min-content; flex: none;
 }
+.pd-card-head > * + * { margin-top: 0.2vh; }
 .pd-doctor {
-  font-size: clamp(14px, 1.5vw, 30px); font-weight: 800; line-height: 1.3;
+  font-size: var(--pd-doctor, 20px); font-weight: 800; line-height: 1.15;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .pd-specialty {
-  font-size: clamp(10px, 0.95vw, 18px); color: #b3c6c2; line-height: 1.4;
+  font-size: var(--pd-specialty, 13px); color: #b3c6c2; line-height: 1.15;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
 .pd-current-wrap {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 0.4vh; min-height: 0;
+  min-height: 0;
   overflow: hidden;   /* يقصّ الفائض بدل أن يدفعه فوق الترويسة */
 }
-/* الاختصاص و«يُخدَم الآن» قد يُقصّان عند الضيق الشديد، أما الرقم فلا */
-.pd-label { flex: none; }
-.pd-label { font-size: clamp(10px, 0.9vw, 17px); color: #7fd6b8; font-weight: 700; }
+.pd-current-wrap > * + * { margin-top: 0.4vh; }   /* بديل gap — انظر .pd-card-head */
+/* الصفّ الأفقي: الغرفة بجانب الرقم حين لا يتّسع الارتفاع لسطرَين (انظر cardFonts) */
+.pd-current-row { flex-direction: row; justify-content: center; align-items: center; }
+.pd-current-row > * + * { margin-top: 0; margin-inline-start: 0.45em; }
+/* ═══ لا يُسحق أيٌّ من الثلاثة ═══
+   flex الافتراضي يسمح بالانكماش (flex-shrink:1) فيصير صندوق الغرفة ٩px بينما
+   خطّها ٥٨px: تُرسم خارج صندوقها فيقصّها overflow:hidden وتختفي تماماً من الشاشة.
+   flex:none لكلٍّ منها يُبقي لكلٍّ ارتفاع محتواه الحقيقي. */
+.pd-label, .pd-room { flex: none; }
+.pd-label { font-size: var(--pd-label, 15px); color: #7fd6b8; font-weight: 700; line-height: 1.2; }
 /* الرقم الحالي هو بطل الشاشة: يُقرأ من آخر الصالة */
 .pd-number {
   /* ═══ الرقم لا ينكمش أبداً ═══
@@ -1042,47 +1062,42 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
      أدنى يضمن للرقم مكانه دائماً. */
   flex: none;
   min-height: 1em;
-  /* يتبع ارتفاع البطاقة (cqh) لا النافذة: في نافذة قصيرة تقصر البطاقة فيصغر
-     الرقم معها بدل أن يفيض. وvmin احتياطٌ لمتصفّح بلا حاويات استعلام. */
-  font-size: clamp(32px, 9vmin, 120px);
+  /* المقاس يُحسب في JS من مقاس البطاقة (cardFonts) ويصل متغيّرَ CSS:
+     container queries غائبة في Chrome 66 — متصفّح تلفاز الصالة. */
+  font-size: var(--pd-number, 56px);
   font-weight: 800; color: #14b8a6;
-  line-height: 1;
+  line-height: 1.02;
 }
 
-/* ═══ المقاسات تتبع **البطاقة** لا النافذة (container queries) ═══
-   بطاقة دكتور وحيد تملأ الشاشة فيكبر كل ما فيها؛ وأربع بطاقات تتقاسمها فيصغر بالنسبة
-   نفسها — بلا سقوفٍ ثابتة بالبكسل (كان الرقم يقف عند 120px في بطاقة طولها ~900px).
-   min(cqh, cqw): الأضيق يحكم، فلا يفيض الرقم عرضاً في بطاقة طويلة ضيّقة ولا طولاً في
-   عريضة قصيرة. وصفّ «التالي/بعده» flex:none محجوزٌ دائماً — الرقم يأخذ ما بقي.
-   الميزانية العمودية (≈٧٥٪ من البطاقة كحدٍّ أقصى): ترويسة ~١٤ + «يُخدَم» ٤ + رقم ≤٣٤
-   + غرفة ٦ + صفّ التالي ~١٨ — فيبقى هامشٌ للفجوات والحشو (قيس: لا فيض في ١–٤ بطاقات).
-   وارتفاع سطر الاسم والاختصاص ≥١٫٥: حروف Cairo أطول من سطر ١٫٣ فيقصّها overflow:hidden. */
-@supports (container-type: size) {
-  /* بادئة .pd-card: أعلى تخصيصاً من القواعد الأساسية بعدها ومن أي media قديم — فلا يغلبها الترتيب */
-  .pd-card { container-type: size; }
-  .pd-card .pd-doctor { font-size: clamp(14px, min(5.5cqh, 5cqw), 72px); line-height: 1.55; }
-  .pd-card .pd-specialty { font-size: clamp(10px, min(3.4cqh, 3cqw), 40px); line-height: 1.6; }
-  .pd-card .pd-label { font-size: clamp(10px, min(3.4cqh, 3cqw), 40px); }
-  .pd-card .pd-number { font-size: clamp(32px, min(34cqh, 32cqw), 480px); }
-  .pd-card .pd-room { font-size: clamp(12px, min(5.5cqh, 5cqw), 64px); }
-  .pd-card .pd-upcoming { flex: none; gap: max(1.2vw, 8cqw); }
-  .pd-card .pd-up-label { font-size: clamp(10px, min(3.6cqh, 3.2cqw), 44px); }
-  .pd-card .pd-up-num { font-size: clamp(18px, min(11.5cqh, 10cqw), 160px); line-height: 1.15; }
-}
 .pd-number.pd-dim { color: rgba(127, 214, 184, 0.3); }
+/* ═══ الغرفة: ثانية الأهمية بعد الرقم ═══
+   عدّة أطباء يتشاركون رقم «التالي» في اللحظة نفسها، فالغرفة هي ما يميّز النداء.
+   كانت 24px بلونٍ باهت فلا تُقرأ من آخر الصالة. الآن مقاسٌ محسوب، ولونٌ فاتح
+   على خلفيةٍ صريحة (تباينٌ عالٍ لا شفافية خافتة). */
 .pd-room {
-  font-size: clamp(12px, 1.2vw, 24px); font-weight: 800; color: #7fd6b8;
-  margin-top: 0.4vh;   /* يفصلها عن الرقم الضخم فلا تبدو ملتصقة بذيله */
+  font-size: var(--pd-room, 28px);
+  font-weight: 800;
+  color: #0b1615;
+  background: #7fd6b8;
+  border-radius: 0.5em;
+  padding: 0.08em 0.5em;
+  margin-top: 0.3vh;
+  line-height: 1.25;
+  display: inline-block;
+  max-width: 100%;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
 /* الرقمان الجايان */
 .pd-upcoming {
-  display: flex; justify-content: center; gap: 1.2vw;
-  padding-top: 0.7vh; border-top: 1px solid rgba(127, 214, 184, 0.18);
+  display: flex; justify-content: center;
+  padding-top: 0.6vh; border-top: 1px solid rgba(127, 214, 184, 0.18);
+  flex: none;
 }
+.pd-upcoming > * + * { margin-inline-start: 2.2em; }   /* بديل gap — يتبع حجم خطّ الصفّ */
 .pd-up { display: flex; flex-direction: column; align-items: center; }
-.pd-up-label { font-size: clamp(9px, 0.8vw, 15px); color: #7d938f; font-weight: 700; }
-.pd-up-num { font-size: clamp(18px, 2.2vw, 44px); font-weight: 800; }
+.pd-up-label { font-size: var(--pd-up-label, 13px); color: #9fb4b0; font-weight: 700; line-height: 1.2; }
+.pd-up-num { font-size: var(--pd-up-num, 24px); font-weight: 800; line-height: 1.1; }
 .pd-up-num.pd-dim { color: rgba(238, 247, 245, 0.28); }
 
 /* بطاقة العيادة المنادية — إطار متوهّج يربط الصوت بالمكان */
@@ -1618,7 +1633,7 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
   .public-display-card { padding: 20px 16px; border-radius: 16px; }
   /* (أُزيلت مقاسات ثابتة قديمة لـ .pd-doctor/.pd-number — 19px/54px — كانت تُجمّد الرقم عند
      54px على أي تلفاز يُبلغ المتصفح بعرضٍ أقل من 1024 مهما كبر ارتفاعه. المقاسات الآن
-     تتبع البطاقة، انظر @supports (container-type) عند تعريف .pd-card.) */
+     تتبع البطاقة، وتُحسب في JS — انظر cardFonts في PublicDisplay.jsx.) */
 
   /* رقم النداء 190px يفيض عرض الجوال — clamp يُبقيه أكبر ما تحتمله الشاشة */
   .pd-banner-inner { padding: 32px 24px; border-radius: 24px; width: min(92vw, 560px); }
