@@ -9,6 +9,13 @@ import { announcementText, speak, speechSupported } from './announce.js'
 
 const CLIP_DIR = '/audio/calls'
 const CLIP_EXT = '.mp3'    // مدعوم في كل متصفح حديث، وحجمه أصغر من wav لشاشةٍ تحمّل ٤٠ مقطعاً
+
+// ═══ نسخة التسجيلات — ارفعها **كلما تغيّر أي تسجيل** ═══
+// أسماء المقاطع ثابتة (room-3.mp3)، و/audio/ يُخدَم بـ max-age=7d وCloudflare يخزّنه
+// على حافّته المدة نفسها ويتجاهل إعادة التحميل القسرية من المتصفح. فتسجيلٌ جديد بالاسم
+// نفسه قد لا يصل الشاشة أسبوعاً. ?v= يجعل العنوان جديداً فيُجلب من الخادم مباشرة.
+// القيمة نصٌّ حرّ يصف التغيير؛ وتصل الشاشة مع الحزمة الجديدة (index.html غير مخزَّن).
+export const AUDIO_VERSION = '2026-10-17-ordinal-rooms'
 export const SETTINGS_KEY = 'display-audio-settings'
 
 // حدود الطابور: نداءات متأخّرة لا قيمة لها — المريض الذي نودي قبل دقيقة إمّا دخل
@@ -89,7 +96,7 @@ class CallAudio {
   async fetchClip(name) {
     if (this.buffers.has(name) || this.missing.has(name) || this.substituted.has(name)) return
     try {
-      const res = await fetch(`${CLIP_DIR}/${encodeURIComponent(name)}${CLIP_EXT}`)
+      const res = await fetch(`${CLIP_DIR}/${encodeURIComponent(name)}${CLIP_EXT}?v=${encodeURIComponent(AUDIO_VERSION)}`)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const buf = await this.ctx.decodeAudioData(await res.arrayBuffer())
       this.buffers.set(name, buf)
