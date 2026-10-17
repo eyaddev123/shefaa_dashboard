@@ -2,28 +2,43 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import legacy from '@vitejs/plugin-legacy'
 
-// شاشة الصالة تلفازُ أندرويد بمتصفّحٍ مدمج قديم. حزمةُ Vite الافتراضية
-// (هدف 'modules') تَخرج بـ `??` و`?.` — ومصدرُها React نفسها لا شيفرتنا — فيعجز
-// المتصفّح القديم عن **تحليلها** فيموت السكربت قبل أوّل سطر: صفحةٌ بيضاء بعنوانٍ
-// سليم (العنوان من HTML لا من JS). وأسوأ منه أنّ `<script type="module">` تتجاهله
-// تلك المتصفّحاتُ بصمتٍ تامّ بلا خطأ أصلاً.
+// ═══ شاشة الصالة: تلفاز أندرويد ٩ بـ WebView/Chrome 66 ═══
 //
-// plugin-legacy يحلّ الاثنين: يُنزِل الصياغة إلى ES5 ويُخرج نسخةً ثانية بـ
-// `nomodule` مع polyfills، فالمتصفّحُ الحديث يأخذ الحزمة الحديثة (بلا بطء)
-// والقديمُ يأخذ البديل.
+// الدرس الذي كلّفنا جولةً كاملة: Chrome 66 **يدعم** `type="module"`، فيأخذ
+// الحزمة **الحديثة** ولا يمسّ حزمة `nomodule` إطلاقاً. فحزمةُ ES5 وحدَها لا
+// تُنقذه — المتصفّح لا يطلبها أصلاً.
+//
+// وهو يحلّل الصياغةَ الحديثة بلا عناء، لكنّه يفتقر **دوالَّ** أحدثَ منه:
+// Object.fromEntries (Chrome 73) وPromise.prototype.finally (Chrome 63+)
+// وsغيرهما. فيُحمَّل الملفّ ويُحلَّل ثمّ يموت عند أوّل نداء:
+//   Uncaught TypeError: Object.fromEntries is not a function
+// وهذا ما صوّرناه على الشاشة فعلاً.
+//
+// لذلك نحتاج **الاثنين معاً**:
+//   modernPolyfills — يحقن الدوالّ الناقصة في الحزمة الحديثة نفسها (حسب
+//                      الاستعمال الفعليّ، فلا تنتفخ الحزمة بلا داع)
+//   targets للحزمة القديمة — تبقى لمن لا يفهم module أصلاً
 export default defineConfig({
   plugins: [
     react(),
     legacy({
-      // أندرويد ٥–٧ (WebView 4.4+) تغطّي تلفازات الصالة وأجهزةَ الاستقبال القديمة
+      // الحزمة القديمة (nomodule): لمن لا يدعم ES modules إطلاقاً
       targets: ['defaults', 'Android >= 5', 'Chrome >= 49', 'not IE 11'],
-      // الصياغةُ وحدَها لا تكفي: الحزمةُ القديمة تحتاج Promise/Map/Set وغيرها
       additionalLegacyPolyfills: ['regenerator-runtime/runtime'],
       renderLegacyChunks: true,
+      // ═══ المفتاح ═══
+      // `true` = اكتشافٌ حسب الاستعمال: يفحص ما تستدعيه الشيفرة فعلاً ويحقن
+      // ما ينقص هدفَ `build.target` أدناه. أرخص من قائمةٍ يدويّة وأضمن منها —
+      // قائمتُنا اليدويّة كانت ستُغفل Promise.finally.
+      modernPolyfills: true,
     }),
   ],
-  // لا نضبط build.target هنا: plugin-legacy يملكه (يُخرج حزمتين — حديثةً
-  // وأخرى ES5 بـ nomodule)، وضبطُه يدوياً يُطلق تحذيراً ويُتجاهَل.
+  build: {
+    // هدفُ الحزمة الحديثة. plugin-legacy يحترمه ويبني modernPolyfills عليه،
+    // فخفضُه إلى chrome66 يجعل كلَّ دالّةٍ أحدثَ منه تُحقن تلقائياً.
+    // (التحذير السابق «overrode build.target» كان لأنّ modernPolyfills مطفأة.)
+    target: ['chrome66', 'edge79', 'firefox67', 'safari12'],
+  },
   server: {
     port: 5173,
     proxy: {
