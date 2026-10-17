@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { api } from '../api.js'
 import { withTitle } from '../announce.js'
 import { callAudio, loadSettings } from '../call-audio.js'
@@ -16,17 +16,134 @@ const DAILY_RELOAD_HOUR = 3      // إعادة تحميل مسكّرة: تتخل
 // بأنفسنا لأنّ رمز الجهاز قد يُرفض (401) فلا معنى لمحاولةٍ كل ثانية.
 const RETRY_MS = [1000, 2000, 5000, 10000, 30000]
 
-// توزيع البطاقات على أعمدة: ١←١، ٢←٢، ٣←٣، ٤←٢ (٢×٢)، وما فوق←٣.
-// أربع عيادات في ٢×٢ لا ٣+١: صفٌّ أخير ببطاقة وحيدة ممدودة يبدو خللاً ويُهدر
-// نصف الشاشة. وفوق ذلك تتكاثر الصفوف والبطاقات تتقلّص معاً بـ grid لا بالتمرير.
+// ═══ توزيع البطاقات: نختار الشبكة التي تُكبّر البطاقة فعلاً ═══
 //
-// ⚠️ إلا على نافذة **عريضة وقصيرة**: صفّان في ارتفاع ضئيل يسحقان البطاقة حتى
-// يختفي «يُخدَم الآن» ورقم الغرفة. فإن قصر الارتفاع نُسطّح الكل في صفٍّ واحد —
-// البطاقة تضيق عرضاً ويبقى محتواها كاملاً، وهذا أهون من محتوى مبتور.
-const gridCols = (n, wide = false) => {
-  if (n <= 3) return Math.max(1, n)
-  if (n === 4) return wide ? 4 : 2
-  return wide ? Math.min(n, 6) : 3
+// التوزيع الثابت («٣ أعمدة لما فوق الأربعة») كان يُخرج ٧ بطاقات صفوفاً ٣+٣+١:
+// بطاقةٌ يتيمة في صفٍّ وحدها، ونصف الشاشة السفلي فارغ على تلفاز الصالة.
+//
+// البديل: نجرّب كل عدد أعمدة ممكن ونقيس **مساحة البطاقة الناتجة** بالبكسل
+// (من عرض الشبكة وارتفاعها الحقيقيَّين)، ونأخذ الأكبر. ثم نرجّح التوازن:
+// شبكةٌ تترك صفّاً أخيرَ شبهَ فارغ تُخصم، فيخرج ٧ ⇒ ٤+٣ لا ٣+٣+١.
+//
+// ولماذا لا نسبة ثابتة للبطاقة: البطاقة تملأ خانتها مهما كانت — المهم أن تكون
+// الخانة أكبر ما يمكن وأقرب إلى مربّع، فالنصّ يكبر معها.
+const AR_CARD_IDEAL = 1.25   // نسبة عرض/ارتفاع مفضّلة للبطاقة (أعرض قليلاً من مربّع)
+
+export function pickGrid(n, gridW, gridH) {
+  if (n <= 1) return { cols: 1, rows: 1 }
+  if (!gridW || !gridH) return { cols: Math.min(n, 3), rows: Math.ceil(n / Math.min(n, 3)) }
+
+  let best = null
+  for (let cols = 1; cols <= n; cols++) {
+    const rows = Math.ceil(n / cols)
+    const cw = gridW / cols
+    const ch = gridH / rows
+    // مساحة الخانة — المقياس الأول: بطاقة أكبر = نصّ أكبر
+    const area = cw * ch
+    // عقوبة الانحراف عن النسبة المفضّلة: خانةٌ شريطيّة (طويلة ضيّقة أو عريضة
+    // مسطّحة) مساحتها كبيرة لكنّ النصّ فيها يبقى صغيراً، فالأضيق يحكمه.
+    const ar = cw / ch
+    const arPenalty = Math.min(ar / AR_CARD_IDEAL, AR_CARD_IDEAL / ar)
+    // عقوبة الصفّ الأخير الناقص: ٧ في ٣ أعمدة تترك صفّاً فيه بطاقة من ثلاث.
+    const lastRow = n - (rows - 1) * cols
+    const balance = lastRow / cols
+    // ═══ الارتفاع أندرُ من العرض ═══
+    // البطاقة تحتاج ارتفاعاً أدنى لتحمل: اسم + رقم + غرفة + صفّ التالي. فشبكةٌ
+    // بصفوفٍ كثيرة تُقصّر البطاقة حتى يُقصّ محتواها مهما اتّسع عرضها. (٩ أطباء
+    // على ٩٦٠×٥٤٠: ٣×٣ تعطي بطاقة ١٣٦px فيُقصّ الرقم، و٥+٤ تعطي ٢٠٠px فتسلم.)
+    const MIN_CARD_H = 150
+    const heightPenalty = ch >= MIN_CARD_H ? 1 : Math.pow(ch / MIN_CARD_H, 2)
+    const score = area * arPenalty * heightPenalty * (0.55 + 0.45 * balance)
+    if (!best || score > best.score) best = { cols, rows, score }
+  }
+  return { cols: best.cols, rows: best.rows }
+}
+
+// توزيع بطاقات الصفّ الأخير حين لا يكتمل: تُوسَّط بدل أن تنزوي في جانب.
+// CSS Grid وحده لا يُوسّط صفّاً ناقصاً، فنُزيح أولى بطاقاته بـ grid-column-start.
+// (grid-column-start مدعوم في Chrome 66 — لا subgrid ولا شيء حديث.)
+export function lastRowOffset(n, cols) {
+  const lastRow = n - (Math.ceil(n / cols) - 1) * cols
+  if (lastRow === cols) return 0
+  return Math.floor((cols - lastRow) / 2)
+}
+
+// ═══ مقاسات البطاقة — محسوبة بالـ JS لا بـ CSS ═══
+//
+// لماذا لا CSS: المقاسات كلها كانت داخل @supports (container-type: size)،
+// وChrome 66 — متصفّح تلفاز الصالة — **لا يملكها**. فيسقط إلى القواعد الأساسية
+// المبنيّة على vw بسقوفٍ ثابتة (clamp(10px, 0.9vw, 17px)): على شاشة 1920 يعطي
+// 17px لـ«يُخدَم الآن» و24px للغرفة. هذه هي «النقاط الصغيرة» التي تُرى من بعيد.
+//
+// فنحسبها من **مقاس البطاقة نفسه**، ولكلّ عنصرٍ حدٌّ أدنى بالبكسل يُقرأ من ٤–٥ م.
+// الترتيب البصري مقصود: الرقم ← الغرفة ← الاسم ← التالي/بعده ← الاختصاص.
+const MIN = { number: 56, room: 28, doctor: 20, label: 15, upNum: 24, upLabel: 13, specialty: 13 }
+
+export function cardFonts(cardW, cardH) {
+  if (!cardW || !cardH) return null
+  // الأضيق يحكم: نصٌّ مربوط بالعرض وحده يفيض طولاً في بطاقة عريضة قصيرة، والعكس.
+  const base = Math.min(cardW, cardH * 1.35)
+  const px = (frac, min) => Math.max(min, Math.round(base * frac))
+  // ═══ الميزانية العمودية: مقيسة لا مخمَّنة ═══
+  // البطاقة ثلاثة صفوف (grid: auto 1fr auto). قياسٌ فعلي بالمتصفّح أعطى
+  // الترويسة ≈٢٢٪ وصفّ التالي ≈٢١٪ والوسط ≈٤٨٪ من ارتفاع البطاقة.
+  // والوسط يحمل ثلاثة: «يُخدَم الآن» ثم الرقم ثم الغرفة — ومجموع ارتفاعاتها
+  // الصندوقية يجب أن يبقى **داخل** الوسط، وإلا فاضت الغرفة فقصّها overflow
+  // واختفت من الشاشة (رُصد فعلاً: صندوقها ٩px وخطّها ٥٨px).
+  //
+  // ارتفاع الصندوق ≈ الخطّ × ارتفاع السطر. فنوزّع الوسط بنسبٍ تجمع إلى ١:
+  //   «يُخدَم الآن» ١٦٪ · الرقم ٥٤٪ · الغرفة ٢٢٪ · ٨٪ للفجوات والحشو.
+  // نصيب الوسط من البطاقة. الترويسة وصفّ «التالي» يتناسبان مع الخطّ أيضاً،
+  // فنسبتهما شبه ثابتة: قياسٌ فعلي أعطى الوسط ٤٦–٤٨٪ عند ٧ و٩ بطاقات.
+  // ونأخذ ٤٦٪ لا أكثر: التقدير الزائد يُخفي الغرفة تماماً (خطأٌ صامت لا يُرى
+  // إلا في الصالة)، والناقص يصغّر الخطّ قليلاً فقط (خطأٌ مرئي وقابل للضبط).
+  // بطاقةٌ قليلة العدد تملك فائض ارتفاع (الترويسة وصفّ التالي لا ينموان بنفس
+  // النسبة)، فنعطيها نصيباً أكبر من الوسط. والصغيرة تبقى على ٤٦٪ المقيسة.
+  const midH = cardH * (cardH >= 600 ? 0.56 : cardH >= 380 ? 0.50 : 0.46)
+  // الخطّ = نصيب الصندوق ÷ ارتفاع السطر (number 1.02، room 1.25 + حشو 0.16em)
+  const numberByH = (midH * 0.54) / 1.02
+  const roomByH = (midH * 0.22) / 1.41
+  // الرقم بطل الشاشة: الأضيق بين نصيبه العمودي وعرض البطاقة يحكم
+  let number = Math.max(MIN.number, Math.round(Math.min(cardW * 0.44, numberByH)))
+  // الغرفة ثانية الأهمية: عدّة أطباء يتشاركون رقم «التالي» فالغرفة هي المميِّز
+  let room = Math.max(MIN.room, Math.round(Math.min(cardW * 0.15, roomByH)))
+
+  // ═══ حين لا يتّسع الوسط للحدّين الأدنيين معاً ═══
+  // (٩ أطباء على ١٣٦٦×٧٦٨: البطاقة ١٩٩px، الترويسة وصفّ التالي يأخذان ١٠٢ فيبقى
+  // ٦٨ بينما «يُخدَم الآن» + الرقم + الغرفة تحتاج ١١٦.) الحدّ الأدنى يمنع «النقاط
+  // الصغيرة» لكنّه إن تجاوز المتاح فاضت الغرفة فقصّها overflow واختفت **بلا أثر**
+  // — وهو أسوأ عطبٍ ممكن: الغرفة ثانية الأهمية.
+  //
+  // فبدل تصغير الخطّ إلى ما لا يُقرأ، نُقلّل **عدد الأسطر**:
+  //   أولاً: يسقط «يُخدَم الآن» — الرقم الضخم تحت اسم الدكتور مفهومٌ بذاته.
+  //   ثم: الغرفة تُختصر إلى رقمها («٦» بدل «الغرفة ٦») وتنتقل بجانب الرقم.
+  const labelH = () => Math.max(MIN.label, Math.min(px(0.062, MIN.label), Math.round(room * 0.7)))
+  const budget = midH * 0.95
+  const needed = (withLabel, roomBeside) =>
+    number * 1.02 + (roomBeside ? 0 : room * 1.41) + (withLabel ? labelH() * 1.2 : 0)
+
+  let showLabel = true
+  let roomBeside = false
+  if (needed(showLabel, roomBeside) > budget) showLabel = false
+  if (needed(showLabel, roomBeside) > budget) roomBeside = true
+  if (needed(showLabel, roomBeside) > budget) {
+    // آخر ما يُضحّى به: الرقم ينزل إلى حدّه الأدنى — والغرفة تبقى كما هي
+    number = Math.max(MIN.number, Math.floor((budget - 0) / 1.02))
+  }
+  const roomCompact = roomBeside
+  const doctor = Math.min(px(0.105, MIN.doctor), Math.round(room * 0.88))
+  const upNum = Math.min(px(0.105, MIN.upNum), Math.round(room * 0.88))
+  return {
+    number,
+    room,
+    roomCompact,
+    showLabel,
+    doctor,
+    upNum,
+    label: Math.min(px(0.062, MIN.label), Math.round(doctor * 0.8)),
+    upLabel: Math.min(px(0.052, MIN.upLabel), Math.round(doctor * 0.7)),
+    specialty: Math.min(px(0.055, MIN.specialty), Math.round(doctor * 0.7)),
+  }
 }
 
 const two = (n) => String(n).padStart(2, '0')
@@ -55,6 +172,11 @@ export default function PublicDisplay() {
   const [viewH, setViewH] = useState(() => (typeof window !== 'undefined' ? window.innerHeight : 0))
   // البطاقات التي تغيّر رقمها حديثاً — تُومض ليلفت التغيّر النظر حتى لو الصوت مقفول
   const [flashing, setFlashing] = useState({})
+
+  // مقاس الشبكة الفعلي بالبكسل — منه تُحسب الأعمدة ومقاسات الخطّ.
+  // يُقاس بعد الرسم لا يُخمَّن: الترويسة واللافتات تتغيّر فيتغيّر المتاح.
+  const gridRef = useRef(null)
+  const [gridBox, setGridBox] = useState({ w: 0, h: 0 })
 
   const bannerTimer = useRef(null)
   const flashTimers = useRef({})
@@ -134,6 +256,29 @@ export default function PublicDisplay() {
     setAudioReady(callAudio.unlocked)
     return () => { callAudio.onStateChange = null }
   }, [])
+
+  // ── قياس الشبكة: المصدر الوحيد لمقاسات الخطّ على التلفاز ──
+  // Chrome 66 بلا container queries، فلا سبيل لربط الخطّ بالبطاقة من CSS.
+  // نقيس بالـ JS بعد الرسم ونمرّر المقاسات متغيّراتِ CSS.
+  useLayoutEffect(() => {
+    const measure = () => {
+      const el = gridRef.current
+      if (!el) return
+      const r = el.getBoundingClientRect()
+      const w = Math.round(r.width)
+      const h = Math.round(r.height)
+      setGridBox((p) => (p.w === w && p.h === h ? p : { w, h }))
+    }
+    measure()
+    // ResizeObserver غائبة في بعض متصفّحات التلفاز — القياس عند تغيّر viewH
+    // والبيانات يكفي، وهذه تحسينٌ لمن يملكها.
+    let ro
+    if (typeof ResizeObserver === 'function' && gridRef.current) {
+      ro = new ResizeObserver(measure)
+      ro.observe(gridRef.current)
+    }
+    return () => { if (ro) ro.disconnect() }
+  }, [viewH, data?.board?.length, !!data?.urgent_delays, audioReady, showSettings, err])
 
   // ── وميض البطاقة عند تغيّر رقمها ──
   const flashDoctor = useCallback((key) => {
@@ -278,6 +423,26 @@ export default function PublicDisplay() {
     else document.documentElement.requestFullscreen?.().catch(() => {})
   }
 
+  // ═══ الشبكة والمقاسات: تُحسب من مقاس الشبكة المقيس لا من النافذة ═══
+  const docCount = data?.board?.length || 0
+  const grid = pickGrid(docCount, gridBox.w, gridBox.h)
+  const offset = lastRowOffset(docCount, grid.cols)
+  // الفجوات تُطرح قبل القسمة وإلا حُسبت البطاقة أكبر مما هي فطفح النصّ
+  const GAP = 10
+  const cardW = grid.cols ? (gridBox.w - GAP * (grid.cols - 1)) / grid.cols : 0
+  const cardH = grid.rows ? (gridBox.h - GAP * (grid.rows - 1)) / grid.rows : 0
+  const fonts = cardFonts(cardW, cardH)
+  // متغيّرات CSS: قيمٌ بالبكسل محسوبة هنا، فتعمل على Chrome 66 بلا container queries
+  const fontVars = fonts ? {
+    '--pd-number': `${fonts.number}px`,
+    '--pd-room': `${fonts.room}px`,
+    '--pd-doctor': `${fonts.doctor}px`,
+    '--pd-label': `${fonts.label}px`,
+    '--pd-up-num': `${fonts.upNum}px`,
+    '--pd-up-label': `${fonts.upLabel}px`,
+    '--pd-specialty': `${fonts.specialty}px`,
+  } : {}
+
   const offlineLong = offlineSince && Date.now() - offlineSince > OFFLINE_ALERT_MS
   const clock = `${two(now.getHours())}:${two(now.getMinutes())}`
   const dateText = `${AR_DAYS[now.getDay()]} ${now.getDate()} ${AR_MONTHS[now.getMonth()]} ${now.getFullYear()}`
@@ -349,12 +514,19 @@ export default function PublicDisplay() {
       ) : data.board.length === 0 ? (
         <p className="pd-msg">لا عيادات مفتوحة حالياً</p>
       ) : (
-        <div className="pd-grid" style={{ '--cols': gridCols(data.board.length, wide) }}>
-          {data.board.map((b) => (
+        <div
+          className="pd-grid"
+          ref={gridRef}
+          style={{ '--cols': grid.cols, '--rows': grid.rows, '--pd-gap': `${GAP}px`, ...fontVars }}
+        >
+          {data.board.map((b, i) => (
             <div
               key={b.doctor_name}
               className={`pd-card ${flashing[b.doctor_name] ? 'pd-flash' : ''} ${
                 banner && banner.doctor_name === b.doctor_name ? 'pd-card-active' : ''}`}
+              /* أولى بطاقات الصفّ الأخير تُزاح لتوسيطه — الصفوف الكاملة بلا إزاحة */
+              style={offset && i === docCount - (docCount - (grid.rows - 1) * grid.cols)
+                ? { gridColumnStart: offset + 1 } : undefined}
             >
               <div className="pd-card-head">
                 {/* اسم الدكتور يظهر ولا يُنطق أبداً — ولا اسم مريض هنا إطلاقاً */}
@@ -362,12 +534,19 @@ export default function PublicDisplay() {
                 <div className="pd-specialty">{b.specialty || '—'}</div>
               </div>
 
-              <div className="pd-current-wrap">
-                <div className="pd-label">يُخدَم الآن</div>
+              {/* عند ضيق الارتفاع تُقلَّل الأسطر لا تُصغَّر الخطوط: يسقط «يُخدَم الآن»
+                  أولاً، ثم تنتقل الغرفة بجانب الرقم مختصرةً إلى رقمها. فالغرفة —
+                  ثانية الأهمية — تبقى مقروءةً بدل أن يقصّها الضيق فتختفي بلا أثر. */}
+              <div className={`pd-current-wrap${fonts?.roomCompact ? ' pd-current-row' : ''}`}>
+                {fonts?.showLabel !== false && <div className="pd-label">يُخدَم الآن</div>}
                 <div className={`pd-number ${b.current ? '' : 'pd-dim'}`}>
                   {b.current ? b.current.queue_number : '—'}
                 </div>
-                {b.room && <div className="pd-room">الغرفة {b.room}</div>}
+                {b.room && (
+                  <div className="pd-room" title={`الغرفة ${b.room}`}>
+                    {fonts?.roomCompact ? b.room : `الغرفة ${b.room}`}
+                  </div>
+                )}
               </div>
 
               <div className="pd-upcoming">
