@@ -7,6 +7,69 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <title>جمعية الشفاء الخيرية — لوحة القيادة</title>
+    <!-- ═══ شبكة أمان الشاشة البيضاء ═══
+         سكربت **كلاسيكيّ** عمداً (لا type="module") وبصياغة ES5 خالصة: المتصفّحُ
+         الذي يعجز عن الحزمة هو نفسه الذي يعجز عن module، فلو كُتب هذا بصياغةٍ
+         حديثة لمات معها وبقيت الشاشةُ بيضاء بلا بيان. يطبع نصّ الخطأ على الشاشة
+         بدل البياض، فيُصوَّر من الصالة ويُعرف السبب. -->
+    <script>
+      (function () {
+        var shown = false
+        function show(title, detail) {
+          if (shown) return
+          shown = true
+          try {
+            var d = document.createElement('div')
+            d.setAttribute('dir', 'rtl')
+            d.style.cssText =
+              'position:fixed;inset:0;z-index:99999;background:#0d1514;color:#eef7f5;' +
+              'font:16px/1.8 system-ui,sans-serif;padding:24px;overflow:auto'
+            d.innerHTML =
+              '<h2 style="color:#f08c8c;margin:0 0 12px">تعذّر تشغيل الشاشة</h2>' +
+              '<p style="margin:0 0 8px">صوّر هذه الرسالة وأرسلها للمطوّر:</p>' +
+              '<pre id="shefaa-err" style="white-space:pre-wrap;word-break:break-word;' +
+              'background:#16211f;padding:14px;border-radius:10px;font-size:14px"></pre>' +
+              '<p style="color:#7d938f;font-size:13px">' +
+              'المتصفّح: <span id="shefaa-ua"></span></p>'
+            document.body.appendChild(d)
+            document.getElementById('shefaa-err').appendChild(
+              document.createTextNode(title + '\n\n' + detail))
+            document.getElementById('shefaa-ua').appendChild(
+              document.createTextNode(navigator.userAgent))
+          } catch (e) { /* لم يبقَ ما يُفعل */ }
+        }
+        // طور **الالتقاط** لا الفقاعة: خطأُ تحليلِ ملفٍ خارجي (حزمةٌ فيها `??`
+        // على متصفّحٍ قديم) يقع حدثُه على وسم <script> نفسه ولا يتفقّع إلى window،
+        // فلا يلتقطه المستمعُ العاديّ وتبقى الشاشةُ بيضاء. `true` هنا يلتقطه.
+        window.addEventListener('error', function (e) {
+          var t = e && e.target
+          if (t && t !== window && (t.src || t.href)) {
+            show('تعذّر تحميل ملف', (t.src || t.href) +
+              '\n\nغالباً متصفّح قديم لا يفهم صياغة الملف، أو انقطاع في الشبكة.')
+            return
+          }
+          var m = e && e.message ? e.message : 'خطأ غير معروف'
+          var src = e && e.filename ? e.filename + ':' + e.lineno + ':' + e.colno : ''
+          show('خطأ JavaScript', m + (src ? '\n' + src : ''))
+        }, true)
+        window.addEventListener('unhandledrejection', function (e) {
+          var r = e && e.reason
+          show('وعدٌ مرفوض', (r && (r.stack || r.message)) || String(r))
+        })
+        // الشبكة الأخيرة: لو لم يُركَّب React خلال 8 ثوانٍ فالحزمةُ لم تعمل.
+        // تغطّي الحالتين اللتين لا يقع فيهما حدثُ error أصلاً: `type="module"`
+        // المتجاهَل بصمت، وخطأُ التحليل الذي لا تُبلّغ عنه بعضُ المحرّكات.
+        // ثماني ثوانٍ تكفي شبكةً بطيئة ولا تُبقي الشاشةَ بيضاء طويلاً.
+        window.setTimeout(function () {
+          var root = document.getElementById('root')
+          if (root && root.children.length === 0) {
+            show('لم تُحمّل الواجهة',
+              'تجاهل المتصفّحُ ملفَّ الشيفرة أو عجز عن قراءته.\n' +
+              'غالباً متصفّح قديم لا يدعم JavaScript الحديثة.')
+          }
+        }, 8000)
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

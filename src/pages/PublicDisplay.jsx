@@ -78,18 +78,26 @@ export default function PublicDisplay() {
   // ── نسبة النافذة: تُعيد توزيع البطاقات عند تغيّر المقاس أو دوران الشاشة ──
   useEffect(() => {
     const onResize = () => {
-      setWide(window.innerWidth / window.innerHeight > 2)
-      setViewH(window.innerHeight)
+      const h = window.innerHeight || document.documentElement.clientHeight || 0
+      const w = window.innerWidth || document.documentElement.clientWidth || 0
+      setWide(h > 0 && w / h > 2)
+      if (h > 0) setViewH(h)
     }
     window.addEventListener('resize', onResize)
-    // شريط المتصفح يظهر ويختفي دون resize في بعض المتصفحات؛ وملء الشاشة كذلك
-    window.visualViewport?.addEventListener('resize', onResize)
+    // شريط المتصفح يظهر ويختفي دون resize في بعض المتصفحات؛ وملء الشاشة كذلك.
+    // visualViewport غائبةٌ في متصفّحات أندرويد القديمة — نفحص قبل الاستعمال،
+    // و`resize` أعلاه يكفيها وحدَه. وorientationchange لأن القديم منها لا يُطلق
+    // resize عند الدوران.
+    const vv = typeof window !== 'undefined' ? window.visualViewport : null
+    if (vv && vv.addEventListener) vv.addEventListener('resize', onResize)
     document.addEventListener('fullscreenchange', onResize)
+    window.addEventListener('orientationchange', onResize)
     onResize()
     return () => {
       window.removeEventListener('resize', onResize)
-      window.visualViewport?.removeEventListener('resize', onResize)
+      if (vv && vv.removeEventListener) vv.removeEventListener('resize', onResize)
       document.removeEventListener('fullscreenchange', onResize)
+      window.removeEventListener('orientationchange', onResize)
     }
   }, [])
 
@@ -156,6 +164,17 @@ export default function PublicDisplay() {
     if (!deviceKey) { setErr('رمز جهاز العرض ناقص من الرابط (?key=...)'); return }
 
     let es, retryTimer, closed = false
+
+    // EventSource غائبةٌ في بعض متصفّحات أندرويد القديمة. بلا هذا الفحص يرمي
+    // `new EventSource` فيسقط المكوّن كلّه وتبيضّ الشاشة. البديل: السحبةُ
+    // الدورية (FALLBACK_REFRESH_MS) تُبقي اللوحة محدَّثة بلا نداءٍ صوتيّ.
+    if (typeof window === 'undefined' || typeof window.EventSource === 'undefined') {
+      setLive(false)
+      setErr('متصفّح الجهاز لا يدعم البثّ المباشر — تُحدَّث اللوحة دوريّاً بلا صوت')
+      const poll = setInterval(load, 15000)
+      load()
+      return () => clearInterval(poll)
+    }
 
     const connect = () => {
       if (closed) return
