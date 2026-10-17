@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { api, APPOINTMENT_STATUSES, BOOKING_TYPES, VISIT_TYPES, PRIORITIES, DELAY_CAUSES, WEEKDAYS, addDays, todayLocal, fmtMoney, fmtTime, toLatinDigits } from '../api.js'
 import { AttendanceBadge, urgentRowClass, isAttendanceSession, usePolling, fmtClock, FlowModeTag, FLOW_MODE_LABELS } from '../attendance-ui.jsx'
@@ -395,7 +395,9 @@ function CompletePatientForm({ appt, missing, patient, onCancel, onSubmit }) {
 // ═══ نافذة تأجيل الموعد ═══
 // تختار الجلسة الهدف (نفس الدكتور أو غيره) وتكتب السبب. الخادم ينشئ الحجز الجديد
 // بنفس قواعد الحجز — فرفضُه (جلسة ممتلئة أو ليوم مضى) يظهر كما هو بلا تفسير محلي.
-function PostponeDialog({ appt, currentSessionId, onClose, onDone }) {
+// showTicket: إعداد «عرض بطاقة الحجز بعد الحجز». معطّلاً تُغلق النافذة فور النجاح برسالة
+// قصيرة بدل بطاقة الرمز الجديد — والرمز يبقى ظاهراً في تفاصيل الحجز الجديد.
+function PostponeDialog({ appt, currentSessionId, showTicket, onClose, onDone, onSuccessToast }) {
   // الغد افتراضاً: التأجيل يعني «ليس اليوم» في أغلب الحالات.
   // ⚠️ من أجزاء التاريخ المحلية لا toISOString(): تلك بتوقيت UTC، فبين منتصف الليل
   // والثالثة فجراً بتوقيت دمشق كانت تعطي تاريخ اليوم بدل الغد.
@@ -440,6 +442,7 @@ function PostponeDialog({ appt, currentSessionId, onClose, onDone }) {
     setErr(null); setBusy(true)
     try {
       const r = await api.clinic.postpone(appt.id, { target_session_id: targetId, reason: reason.trim() })
+      if (!showTicket) { onSuccessToast(`تم التأجيل — الدور ${r.queue_number}`); onDone(); return }
       setDone(r)   // نعرض رمز الوصول الجديد ليُعطى للمريض قبل إغلاق النافذة
     } catch (ex) { setErr(ex.message) }
     finally { setBusy(false) }
@@ -850,10 +853,35 @@ function DoctorArrivalCard({ data, onChanged, onError }) {
   )
 }
 
+// ═══ تفاصيل الحجز — سطرٌ ينفتح تحت صفّ الطابور ═══
+// رمز الوصول هنا دائماً: حين تُعطَّل بطاقة الحجز لا يُعرض الرمز في أي مكان آخر،
+// والمريض قد يطلبه لاحقاً لمتابعة دوره من «دوري».
+function AppointmentDetails({ appt }) {
+  return (
+    <div className="appt-details">
+      <dl className="appt-details-grid">
+        <div><dt>رمز الوصول</dt><dd className="appt-code" dir="ltr">{appt.access_code || '—'}</dd></div>
+        <div><dt>رمز البطاقة</dt><dd dir="ltr">{appt.ticket_code || '—'}</dd></div>
+        <div><dt>طريقة الحجز</dt><dd>{BOOKING_TYPES[appt.booking_type] || appt.booking_type}</dd></div>
+        <div><dt>وقت الحجز</dt><dd dir="ltr">{appt.booked_at ? fmtClock(appt.booked_at) : '—'}</dd></div>
+        <div><dt>وقت الحضور</dt><dd dir="ltr">{appt.arrived_at ? fmtClock(appt.arrived_at) : '—'}</dd></div>
+      </dl>
+    </div>
+  )
+}
+
+// زرّ فتح/إغلاق التفاصيل — بنفس شكل أزرار الصفّ
+function DetailsToggle({ open, onToggle }) {
+  return (
+    <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }} aria-expanded={open}
+      onClick={onToggle}>{open ? 'إخفاء' : 'تفاصيل'}</button>
+  )
+}
+
 // طابور نمط الحضور: بترتيب الخادم (قيد الكشف، ثم الحاضرون — الإسعافي أولاً ثم الأقدم
 // حضوراً — ثم من لم يحضر). لا عمود موعد ولا انتظار متوقَّع: لا خانات ولا تقدير هنا.
 function AttendanceQueueTable({ data, actions }) {
-  const { arrive, cancel, prioritize, setPostponing } = actions
+  const { arrive, cancel, prioritize, setPostponing, openDetails, toggleDetails } = actions
   return (
     <div className="card">
       <h3>الطابور ({data.appointments.length})</h3>
@@ -870,7 +898,8 @@ function AttendanceQueueTable({ data, actions }) {
         </thead>
         <tbody>
           {data.appointments.map((a) => (
-            <tr key={a.id} className={urgentRowClass(a)}>
+            <Fragment key={a.id}>
+            <tr className={urgentRowClass(a)}>
               <td className="num">{a.queue_number}<AttendanceBadge priority={a.priority} /></td>
               <td>{a.full_name}</td>
               <td dir="ltr">{a.mobile}</td>
@@ -900,9 +929,14 @@ function AttendanceQueueTable({ data, actions }) {
                 {['waiting', 'arrived'].includes(a.status) && (
                   <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }}
                     onClick={() => setPostponing(a)}>تأجيل</button>
-                )}
+                )}{' '}
+                <DetailsToggle open={openDetails === a.id} onToggle={() => toggleDetails(a.id)} />
               </td>
             </tr>
+            {openDetails === a.id && (
+              <tr className="appt-details-row"><td colSpan={9}><AppointmentDetails appt={a} /></td></tr>
+            )}
+            </Fragment>
           ))}
           {data.appointments.length === 0 && <tr><td colSpan={9} className="empty">لا حجوزات بعد في هذه الجلسة</td></tr>}
         </tbody>
@@ -960,6 +994,14 @@ export default function SessionQueue() {
   const [recalled, setRecalled] = useState(null)   // وقت آخر إعادة نداء — تأكيدٌ مرئي للموظف
   const [bookingOpen, setBookingOpen] = useState(null)   // نمط الحضور: null | 'normal' | 'urgent'
 
+  // بعد الحجز: بطاقة الدور للطباعة إن فُعّل الإعداد، وإلا عودةٌ إلى الطابور برسالة قصيرة.
+  // الرموز وُلّدت وخُزّنت في الحالتين — هذا عرضٌ فقط (رمز الوصول في تفاصيل الحجز).
+  const afterBooked = (appt) => {
+    if (data?.show_booking_ticket) { setTicket(appt); return }
+    showToast(`تم الحجز — الدور ${appt.queue_number}`, 'success', 4000)
+    load()
+  }
+
   const load = () => api.clinic.queue(id).then((d) => { setData(d); setLoadErr(null) })
     .catch((e) => {
       if (data) showToast(`تعذّر تحديث الطابور — يُعاد المحاولة تلقائياً (${e.message})`)
@@ -997,6 +1039,10 @@ export default function SessionQueue() {
   // المريض جاء والدكتور غائب، أو تجاوز دوره نهاية الدوام. ننقل موعده بدل أن
   // يبقى معلّقاً في جلسة انتهت. الخادم ينشئ الحجز الجديد بنفس قواعد الحجز.
   const [postponing, setPostponing] = useState(null)   // الحجز المطلوب تأجيله
+
+  // سطر التفاصيل المفتوح (واحدٌ في كل مرة) — يبقى مفتوحاً عبر التحديث الدوري
+  const [openDetails, setOpenDetails] = useState(null)
+  const toggleDetails = (apptId) => setOpenDetails((cur) => (cur === apptId ? null : apptId))
 
   // إعادة النداء: الاستقبال يرى المريض لا يتحرّك — يُعاد بثّ النداء بلا تغيير حالته.
   // الخادم يخنقها مرّة كل عشر ثوانٍ لكل حجز، فالزرّ (RecallButton) معطَّل طوال المدّة بعدّاد.
@@ -1048,7 +1094,7 @@ export default function SessionQueue() {
             fees={{ consultation_fee: data.consultation_fee, followup_fee: data.followup_fee }}
             open={bookingOpen}
             onClose={() => setBookingOpen(null)}
-            onBooked={(appt) => setTicket(appt)}
+            onBooked={afterBooked}
           />
         </>
       ) : (
@@ -1061,7 +1107,7 @@ export default function SessionQueue() {
           sessionId={id}
           fees={{ consultation_fee: data.consultation_fee, followup_fee: data.followup_fee }}
           acceptsUrgent={data.accepts_urgent !== false}
-          onBooked={(appt) => setTicket(appt)}
+          onBooked={afterBooked}
         />
       </div>
       )}
@@ -1156,6 +1202,8 @@ export default function SessionQueue() {
         <PostponeDialog
           appt={postponing}
           currentSessionId={id}
+          showTicket={!!data.show_booking_ticket}
+          onSuccessToast={(msg) => showToast(msg, 'success', 4000)}
           onClose={() => setPostponing(null)}
           onDone={() => { setPostponing(null); load() }}
         />
@@ -1163,7 +1211,7 @@ export default function SessionQueue() {
 
       {attendance && (
         <>
-          <AttendanceQueueTable data={data} actions={{ arrive, cancel, prioritize, setPostponing }} />
+          <AttendanceQueueTable data={data} actions={{ arrive, cancel, prioritize, setPostponing, openDetails, toggleDetails }} />
           <PendingArrivalList data={data} onChanged={load} onError={showToast} />
         </>
       )}
@@ -1184,7 +1232,8 @@ export default function SessionQueue() {
           </thead>
           <tbody>
             {data.appointments.map((a) => (
-              <tr key={a.id}>
+              <Fragment key={a.id}>
+              <tr>
                 <td className="num">{a.queue_number}{priorityBadge(a.priority)}</td>
                 <td>{a.full_name}</td>
                 <td dir="ltr">{a.mobile}</td>
@@ -1218,9 +1267,14 @@ export default function SessionQueue() {
                   {['waiting', 'arrived'].includes(a.status) && (
                     <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }}
                       onClick={() => setPostponing(a)}>تأجيل</button>
-                  )}
+                  )}{' '}
+                  <DetailsToggle open={openDetails === a.id} onToggle={() => toggleDetails(a.id)} />
                 </td>
               </tr>
+              {openDetails === a.id && (
+                <tr className="appt-details-row"><td colSpan={9}><AppointmentDetails appt={a} /></td></tr>
+              )}
+              </Fragment>
             ))}
             {data.appointments.length === 0 && <tr><td colSpan={9} className="empty">لا حجوزات بعد في هذه الجلسة</td></tr>}
           </tbody>
