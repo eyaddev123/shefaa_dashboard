@@ -4,7 +4,7 @@ import { api, APPOINTMENT_STATUSES, BOOKING_TYPES, VISIT_TYPES, PRIORITIES, DELA
 import { AttendanceBadge, urgentRowClass, isAttendanceSession, usePolling, fmtClock, FlowModeTag, FLOW_MODE_LABELS } from '../attendance-ui.jsx'
 import { useRole } from '../RoleContext.jsx'
 import { useToast, RecallButton } from '../action-feedback.jsx'
-import { canEditAppointmentProcedures } from '../permissions.js'
+import { canEditAppointmentProcedures, canEditBooking } from '../permissions.js'
 
 // شارة الأولوية — تُبرز من يتقدّم الطابور وسببه
 function priorityBadge(priority) {
@@ -883,6 +883,232 @@ function AppointmentDetails({ appt, session, onChanged, onToast }) {
         <div><dt>وقت الحضور</dt><dd dir="ltr">{appt.arrived_at ? fmtClock(appt.arrived_at) : '—'}</dd></div>
       </dl>
       <AppointmentProcedures appt={appt} session={session} onChanged={onChanged} onToast={onToast} />
+      <BookingEdits appt={appt} session={session} onChanged={onChanged} onToast={onToast} />
+      <BookingHistory appt={appt} session={session} onToast={onToast} />
+    </div>
+  )
+}
+
+// ═══ تعديل الحجز — ما أُدخل خطأً يُصحَّح من «تفاصيل» ═══
+// كل تعديل له زرّه وحقوله: الزرّ الواحد الجامع يُخفي ما يتغيّر فعلاً.
+// الأزرار تُخفى حسب الدور والحالة — والخادم هو الحارس الفعلي، وهذا لئلا
+// يضغط الموظف زرّاً سيُرفض.
+function BookingEdits({ appt, session, onChanged, onToast }) {
+  const { role } = useRole()
+  const [panel, setPanel] = useState(null)      // null | 'patient' | 'swap' | 'visit' | 'prio' | 'undo'
+  const [busy, setBusy] = useState(false)
+  const [reason, setReason] = useState('')
+  const [form, setForm] = useState({})
+  const [search, setSearch] = useState('')
+  const [found, setFound] = useState(null)
+
+  const dayOk = role === 'clinic_admin' || session.session_day === session.server_today
+  const frozen = ['cancelled', 'postponed'].includes(appt.status)
+  const canEdit = canEditBooking(role) && !frozen && dayOk
+  // نوع الزيارة بعد الإنهاء: مشرف العيادات وحده (محاسبةٌ لا تقدير)
+  const canVisitType = canEdit && (appt.status !== 'done' || role === 'clinic_admin')
+  const canUndo = canEditBooking(role) && appt.status === 'no_show' && dayOk
+
+  const close = () => { setPanel(null); setReason(''); setForm({}); setSearch(''); setFound(null) }
+  const run = async (fn, okMsg) => {
+    setBusy(true)
+    try { const r = await fn(); onToast(r?.message || okMsg, 'success'); close(); onChanged() }
+    catch (ex) { onToast(ex.message) }
+    finally { setBusy(false) }
+  }
+
+  // بحث المرضى يقبل موبايلاً أو اسماً (مطابقة الاسم تامّة لا جزئية)، ويردّ
+  // مريضاً واحداً أو { candidates } أو null — نُسوّيها هنا إلى قائمة.
+  const doSearch = async () => {
+    const q = search.trim()
+    if (q.length < 2) return
+    const digits = toLatinDigits(q).replace(/\D/g, '')
+    setBusy(true)
+    try {
+      const r = await api.clinic.lookupPatientBy(
+        digits.length >= 6 ? { mobile: q } : { full_name: q })
+      setFound(r == null ? [] : (r.candidates || [r]))
+    } catch (ex) { onToast(ex.message) }
+    finally { setBusy(false) }
+  }
+
+  if (!canEditBooking(role)) return null
+
+  return (
+    <div className="booking-edits">
+      <h4>تصحيح الحجز</h4>
+      {frozen && <p className="appt-procs-empty">
+        {appt.status === 'cancelled' ? 'الحجز ملغى — لا يُعدَّل.' : 'الحجز مؤجَّل — عدّل الحجز الجديد.'}</p>}
+      {!frozen && !dayOk && <p className="appt-procs-empty">
+        التعديل في يوم الجلسة فقط — للتصحيح بعد ذلك راجِع مشرف العيادات.</p>}
+
+      {(canEdit || canUndo) && !panel && (
+        <div className="booking-edits-actions">
+          {canUndo && <button className="ghost" onClick={() => setPanel('undo')}>تراجع عن «لم يحضر»</button>}
+          {canEdit && <button className="ghost" onClick={() => { setPanel('patient'); setForm({}) }}>تصحيح بيانات المريض</button>}
+          {canEdit && <button className="ghost" onClick={() => setPanel('swap')}>تغيير المريض</button>}
+          {canVisitType && <button className="ghost" onClick={() => setPanel('visit')}>
+            نوع الزيارة ({VISIT_TYPES[appt.visit_type]})</button>}
+          {canEdit && appt.priority !== 'normal' && ['waiting', 'arrived'].includes(appt.status) && (
+            <button className="ghost" onClick={() => setPanel('prio')}>إعادة إلى «عادي»</button>)}
+        </div>
+      )}
+
+      {panel === 'undo' && (
+        <div className="booking-edit-panel">
+          <p className="hint">يعود المريض إلى مكانه في ترتيب الوصول. إن شُغلت خانته الزمنية يعود بلا خانة.</p>
+          <input placeholder="سبب التراجع (إلزامي)…" value={reason} onChange={(e) => setReason(e.target.value)} />
+          <div className="booking-edit-buttons">
+            <button disabled={busy || reason.trim().length < 3}
+              onClick={() => run(() => api.clinic.undoNoShow(appt.id, reason.trim()), 'أُعيد إلى الطابور')}>تأكيد</button>
+            <button className="ghost" onClick={close}>إلغاء</button>
+          </div>
+        </div>
+      )}
+
+      {panel === 'patient' && (
+        <div className="booking-edit-panel">
+          <p className="hint">تصحيح خطأ إملائي — يُعدّل سجلّ المريض فيسري على كل حجوزاته.</p>
+          <div className="booking-edit-fields">
+            <input placeholder="الاسم الثلاثي" defaultValue={appt.patient_name || ''}
+              onChange={(e) => setForm((f) => ({ ...f, full_name: e.target.value }))} />
+            <input placeholder="الموبايل" dir="ltr" defaultValue={appt.mobile || ''}
+              onChange={(e) => setForm((f) => ({ ...f, mobile: e.target.value }))} />
+            <select defaultValue={appt.gender || ''} onChange={(e) => setForm((f) => ({ ...f, gender: e.target.value }))}>
+              <option value="">الجنس…</option><option value="male">ذكر</option><option value="female">أنثى</option>
+            </select>
+            <input placeholder="سنة الميلاد" dir="ltr" defaultValue={appt.birth_year || ''}
+              onChange={(e) => setForm((f) => ({ ...f, birth_year: e.target.value }))} />
+          </div>
+          <div className="booking-edit-buttons">
+            <button disabled={busy || Object.keys(form).length === 0}
+              onClick={() => run(() => api.clinic.fixPatientData(appt.id, form), 'صُحّحت البيانات')}>حفظ</button>
+            <button className="ghost" onClick={close}>إلغاء</button>
+          </div>
+        </div>
+      )}
+
+      {panel === 'swap' && (
+        <div className="booking-edit-panel">
+          <p className="hint">اختير المريض الخطأ عند الحجز — يُربط هذا الحجز وحده بمريضٍ آخر.</p>
+          <div className="booking-edit-fields">
+            <input placeholder="ابحث بالاسم أو الموبايل…" value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); doSearch() } }} />
+            <button className="ghost" disabled={busy} onClick={doSearch}>بحث</button>
+          </div>
+          {found && found.length > 0 && (
+            <ul className="booking-edit-results">
+              {found.map((p) => (
+                <li key={p.id}>
+                  <span>{p.full_name} <span dir="ltr" className="muted">{p.mobile || '—'}</span></span>
+                  <button className="ghost" disabled={busy || reason.trim().length < 3}
+                    onClick={() => run(() => api.clinic.changePatient(appt.id,
+                      { patient_id: p.id, reason: reason.trim() }), 'تغيّر المريض')}>اختر</button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {found && found.length === 0 && <p className="appt-procs-empty">لا نتائج — أو أنشئ مريضاً جديداً أدناه.</p>}
+          <div className="booking-edit-fields">
+            <input placeholder="أو: اسم مريض جديد (ثلاثي)"
+              onChange={(e) => setForm((f) => ({ ...f, full_name: e.target.value }))} />
+            <input placeholder="موبايله" dir="ltr"
+              onChange={(e) => setForm((f) => ({ ...f, mobile: e.target.value }))} />
+          </div>
+          <input placeholder="سبب التغيير (إلزامي)…" value={reason} onChange={(e) => setReason(e.target.value)} />
+          <div className="booking-edit-buttons">
+            <button disabled={busy || reason.trim().length < 3 || !form.full_name}
+              onClick={() => run(() => api.clinic.changePatient(appt.id,
+                { ...form, reason: reason.trim() }), 'تغيّر المريض')}>إنشاء وربط</button>
+            <button className="ghost" onClick={close}>إلغاء</button>
+          </div>
+        </div>
+      )}
+
+      {panel === 'visit' && (
+        <div className="booking-edit-panel">
+          <p className="hint">
+            يُعاد احتساب الأجر من أسعار الدكتور الحالية. الإجراءات المضافة لا تتأثّر.
+          </p>
+          <input placeholder="سبب تجاوز شرط المراجعة (إن طُلب)…"
+            onChange={(e) => setForm((f) => ({ ...f, followup_override_reason: e.target.value }))} />
+          <div className="booking-edit-buttons">
+            {['consultation', 'followup'].filter((v) => v !== appt.visit_type).map((v) => (
+              <button key={v} disabled={busy}
+                onClick={() => run(() => api.clinic.changeVisitType(appt.id, { visit_type: v, ...form }),
+                  `صار ${VISIT_TYPES[v]}`)}>حوّل إلى {VISIT_TYPES[v]}</button>
+            ))}
+            <button className="ghost" onClick={close}>إلغاء</button>
+          </div>
+        </div>
+      )}
+
+      {panel === 'prio' && (
+        <div className="booking-edit-panel">
+          <p className="hint">
+            يعود إلى ترتيب الوصول العادي. الإزاحات التي طُبّقت على مواعيد الآخرين
+            <strong> لا تُعكس</strong> — مواعيدهم أُبلغت لهم بالفعل.
+          </p>
+          <input placeholder="سبب الإعادة (إلزامي)…" value={reason} onChange={(e) => setReason(e.target.value)} />
+          <div className="booking-edit-buttons">
+            <button disabled={busy || reason.trim().length < 3}
+              onClick={() => run(() => api.clinic.downgradePriority(appt.id, reason.trim()), 'أُعيد إلى العادي')}>تأكيد</button>
+            <button className="ghost" onClick={close}>إلغاء</button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ═══ سجلّ تعديلات الحجز ═══
+// يُحمَّل عند فتح «تفاصيل» — أثرٌ لكل تغيير: ماذا ومن ومتى ولماذا.
+const EDIT_FIELD_LABELS = {
+  status: 'الحالة', patient_id: 'المريض', visit_type: 'نوع الزيارة', fee: 'الأجر',
+  priority: 'الأولوية', slot_time: 'الخانة الزمنية',
+  'patient.full_name': 'اسم المريض', 'patient.mobile': 'الموبايل',
+  'patient.gender': 'الجنس', 'patient.birth_year': 'سنة الميلاد',
+}
+const EDIT_VALUE_LABELS = {
+  ...APPOINTMENT_STATUSES, ...VISIT_TYPES,
+  normal: 'عادي', urgent: 'إسعافي', elderly: 'مسنّ', infant: 'رضيع',
+  male: 'ذكر', female: 'أنثى',
+}
+const editValue = (v) => (v == null || v === '' ? '—' : (EDIT_VALUE_LABELS[v] || v))
+
+function BookingHistory({ appt, session, onToast }) {
+  const [rows, setRows] = useState(null)
+  useEffect(() => {
+    let alive = true
+    api.clinic.appointmentHistory(appt.id)
+      .then((r) => { if (alive) setRows(r) })
+      .catch((e) => { if (alive) { setRows([]); onToast(e.message) } })
+    return () => { alive = false }
+  }, [appt.id])
+
+  if (!rows || rows.length === 0) return null
+  return (
+    <div className="booking-history">
+      <h4>سجلّ التعديلات</h4>
+      <table className="appt-procs-table">
+        <tbody>
+          {rows.map((h) => (
+            <tr key={h.id}>
+              <td>{EDIT_FIELD_LABELS[h.field] || h.field}</td>
+              <td className="booking-history-change">
+                <span className="muted">{editValue(h.old_value)}</span>
+                {' ← '}
+                <strong>{editValue(h.new_value)}</strong>
+              </td>
+              <td className="appt-procs-meta">
+                {h.changed_by_name || '—'} <span dir="ltr">{whenAt(h.changed_at, session.session_day)}</span>
+                {h.reason && <span className="proc-removed-why">{h.reason}</span>}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }

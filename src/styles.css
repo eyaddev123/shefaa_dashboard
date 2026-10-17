@@ -1739,3 +1739,25 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
 .proc-add select { width: auto; flex: 0 1 300px; min-width: 200px; }
 .proc-add-price { min-width: 90px; font-weight: 700; color: var(--primary); }
 .proc-inactive > td { opacity: 0.55; }
+
+/* ═══ تصحيح الحجز وسجلّ تعديلاته (تفاصيل الحجز) ═══ */
+.booking-edits, .booking-history { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--grid); }
+.booking-edits h4, .booking-history h4 { font-size: 13px; margin-bottom: 8px; color: var(--text-secondary); }
+.booking-edits-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.booking-edits-actions button { padding: 4px 12px; font-size: 12px; }
+.booking-edit-panel {
+  margin-top: 8px; padding: 10px 12px; border-radius: 10px;
+  background: var(--primary-soft); border: 1px solid var(--grid);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.booking-edit-panel .hint { font-size: 12px; line-height: 1.7; color: var(--text-secondary); margin: 0; }
+.booking-edit-fields { display: flex; flex-wrap: wrap; gap: 8px; }
+.booking-edit-fields input, .booking-edit-fields select { flex: 1 1 150px; font-size: 13px; }
+.booking-edit-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+.booking-edit-buttons button { padding: 5px 14px; font-size: 12.5px; }
+.booking-edit-results { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.booking-edit-results li {
+  display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  padding: 6px 10px; border-radius: 8px; background: var(--surface-1); font-size: 13px;
+}
+.booking-history-change { white-space: nowrap; }
