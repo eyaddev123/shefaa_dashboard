@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { api, WEEKDAYS, fmtMoney, fmtTime } from '../api.js'
+import { api, WEEKDAYS, fmtMoney, fmtTime, todayLocal } from '../api.js'
 
 function NewDoctorForm({ onCreated }) {
   const blank = { name: '', specialty: '', phone: '', consultation_fee: '', followup_fee: '',
@@ -53,7 +53,8 @@ function NewDoctorForm({ onCreated }) {
 }
 
 function NewScheduleForm({ doctorId, onCreated }) {
-  const blank = { weekday: '3', start_time: '16:00', end_time: '19:00', capacity: '' }
+  const blank = { weekday: '3', start_time: '16:00', end_time: '19:00', capacity: '',
+    repeat_weeks: '1', anchor_date: '' }
   const [form, setForm] = useState(blank)
   const [hasBreak, setHasBreak] = useState(false)
   const [breakTimes, setBreakTimes] = useState({ break_start: '17:00', break_end: '17:30' })
@@ -64,12 +65,16 @@ function NewScheduleForm({ doctorId, onCreated }) {
     e.preventDefault()
     setErr(null)
     try {
+      const biweekly = form.repeat_weeks === '2'
       await api.clinic.addSchedule(doctorId, {
         ...form,
         weekday: Number(form.weekday),
         capacity: form.capacity ? Number(form.capacity) : null,
         break_start: hasBreak ? breakTimes.break_start : null,
         break_end: hasBreak ? breakTimes.break_end : null,
+        repeat_weeks: biweekly ? 2 : 1,
+        // المرساة للثنائي وحده — القاعدة ترفض مرساةً على قالبٍ أسبوعي
+        anchor_date: biweekly ? form.anchor_date : null,
       })
       setForm(blank); setHasBreak(false); onCreated()
     } catch (ex) { setErr(ex.message) }
@@ -85,6 +90,21 @@ function NewScheduleForm({ doctorId, onCreated }) {
       <div className="field"><label>من</label><input type="time" value={form.start_time} onChange={set('start_time')} required /></div>
       <div className="field"><label>إلى</label><input type="time" value={form.end_time} onChange={set('end_time')} required /></div>
       <div className="field"><label>السعة (اختياري)</label><input type="number" min="1" value={form.capacity} onChange={set('capacity')} /></div>
+      {/* ═══ التكرار: دكتوران يتناوبان على السبت يأخذ كلٌّ منهما مرساةً تبعد أسبوعاً ═══ */}
+      <div className="field">
+        <label>التكرار</label>
+        <select value={form.repeat_weeks} onChange={set('repeat_weeks')}>
+          <option value="1">كل أسبوع</option>
+          <option value="2">كل أسبوعين</option>
+        </select>
+      </div>
+      {form.repeat_weeks === '2' && (
+        <div className="field">
+          <label>أول تاريخ عمل</label>
+          <input type="date" value={form.anchor_date} onChange={set('anchor_date')} required />
+          <span className="hint">يجب أن يقع في {WEEKDAYS[form.weekday]}</span>
+        </div>
+      )}
       <div className="field" style={{ justifyContent: 'flex-end' }}>
         <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 400 }}>
           <input type="checkbox" checked={hasBreak} onChange={(e) => setHasBreak(e.target.checked)} style={{ width: 'auto' }} />
@@ -158,11 +178,16 @@ function DoctorRow({ doctor, onChanged }) {
                   ? <p className="empty">لا يوجد جدول دوام بعد لهذا الدكتور.</p>
                   : (
                     <table style={{ marginTop: 6 }}>
-                      <thead><tr><th>اليوم</th><th>من</th><th>إلى</th><th>السعة</th><th></th></tr></thead>
+                      <thead><tr><th>اليوم</th><th>التكرار</th><th>من</th><th>إلى</th><th>السعة</th><th></th></tr></thead>
                       <tbody>
                         {schedules.map((s) => (
                           <tr key={s.id}>
                             <td>{WEEKDAYS[s.weekday]}</td>
+                            <td>
+                              {s.repeat_weeks === 2
+                                ? <span className="badge warn">كل أسبوعين</span>
+                                : <span className="muted">كل أسبوع</span>}
+                            </td>
                             <td>{fmtTime(s.start_time)}</td>
                             <td>{fmtTime(s.end_time)}</td>
                             <td className="num">{s.capacity || '—'}</td>
@@ -181,6 +206,67 @@ function DoctorRow({ doctor, onChanged }) {
         </tr>
       )}
     </>
+  )
+}
+
+// ═══ معاينة التواريخ القادمة ═══
+// مشرفٌ يضبط دكتورَين متناوبَين لا يملك طريقةً ليتأكّد إلا الانتظار أسبوعين.
+// هذه تعرض من يعمل في كل تاريخ قادم — فيُكتشف خطأ المرساة قبل أن يراه المرضى.
+function SchedulePreview() {
+  const [data, setData] = useState(null)
+  const [err, setErr] = useState(null)
+  const [open, setOpen] = useState(false)
+
+  useEffect(() => {
+    if (!open || data) return
+    api.clinic.schedulePreview(todayLocal(), 6).then(setData).catch((e) => setErr(e.message))
+  }, [open])
+
+  return (
+    <div className="card">
+      <div className="inline" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+        <h3 style={{ margin: 0 }}>معاينة التواريخ القادمة</h3>
+        <button type="button" className="ghost" style={{ padding: '4px 12px', fontSize: 12 }}
+          onClick={() => setOpen((v) => !v)}>
+          {open ? 'إخفاء' : 'عرض من يعمل في كل تاريخ'}
+        </button>
+      </div>
+      {open && (
+        err ? <p className="error">{err}</p>
+        : !data ? <p className="empty">جارٍ التحميل…</p>
+        : data.days.length === 0 ? <p className="empty">لا دوامات مُعرَّفة بعد.</p>
+        : (
+          <table style={{ marginTop: 10 }}>
+            <thead><tr><th>التاريخ</th><th>اليوم</th><th>الدكاترة العاملون</th></tr></thead>
+            <tbody>
+              {data.days.map((d) => (
+                <tr key={d.date}>
+                  <td>{d.date}</td>
+                  <td>{WEEKDAYS[d.weekday]}</td>
+                  <td>
+                    {d.doctors.length === 0
+                      ? <span className="muted">لا أحد</span>
+                      : d.doctors.map((x) => (
+                        <span key={x.doctor_id} style={{ marginInlineEnd: 10 }}>
+                          {x.doctor_name}
+                          {x.room && <span className="muted"> (غرفة {x.room})</span>}
+                          {x.repeat_weeks === 2 && <span className="badge warn" style={{ marginInlineStart: 4 }}>٢ أسبوع</span>}
+                        </span>
+                      ))}
+                    {/* تحذيرٌ لا منع: قد يكون التشارك مقصوداً (دوامان متتاليان) */}
+                    {d.room_clashes.length > 0 && (
+                      <span className="badge bad" style={{ marginInlineStart: 6 }}>
+                        ⚠ غرفة مشتركة: {d.room_clashes.join('، ')}
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )
+      )}
+    </div>
   )
 }
 
@@ -214,6 +300,8 @@ export default function ClinicDoctors() {
           </tbody>
         </table>
       </div>
+
+      <SchedulePreview />
     </>
   )
 }

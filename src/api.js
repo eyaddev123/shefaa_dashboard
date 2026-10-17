@@ -134,6 +134,12 @@ export const api = {
     addSchedule: (doctorId, body) =>
       http(`/clinic/doctors/${doctorId}/schedules`, { method: 'POST', body: JSON.stringify(body) }),
     deleteSchedule: (id) => http(`/clinic/schedules/${id}`, { method: 'DELETE' }),
+    schedulePreview: (from, weeks = 6) =>
+      http(`/clinic/schedules/preview?from=${from}&weeks=${weeks}`),
+    dayDoctors: (date) => http(`/clinic/day-doctors?date=${date}`),
+    apologize: (body) => http('/clinic/apologies', { method: 'POST', body: JSON.stringify(body) }),
+    undoApology: (doctorId, date) =>
+      http(`/clinic/apologies/${doctorId}/${date}`, { method: 'DELETE' }),
     sessions: (date) => http(`/clinic/sessions?date=${date}`),
     generateSessions: (date) =>
       http('/clinic/sessions/generate', { method: 'POST', body: JSON.stringify({ date }) }),
