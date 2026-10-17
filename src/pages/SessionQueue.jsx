@@ -895,9 +895,11 @@ function AppointmentDetails({ appt, session, onChanged, onToast }) {
 // يضغط الموظف زرّاً سيُرفض.
 function BookingEdits({ appt, session, onChanged, onToast }) {
   const { role } = useRole()
-  const [panel, setPanel] = useState(null)      // null | 'patient' | 'swap' | 'visit' | 'prio' | 'undo'
+  const [panel, setPanel] = useState(null)      // null | 'patient' | 'swap' | 'visit' | 'prio'
   const [busy, setBusy] = useState(false)
   const [reason, setReason] = useState('')
+  const [newStatus, setNewStatus] = useState('')   // قائمة تغيير الحالة
+  const [note, setNote] = useState('')
   const [form, setForm] = useState({})
   const [search, setSearch] = useState('')
   const [found, setFound] = useState(null)
@@ -907,14 +909,31 @@ function BookingEdits({ appt, session, onChanged, onToast }) {
   const canEdit = canEditBooking(role) && !frozen && dayOk
   // نوع الزيارة بعد الإنهاء: مشرف العيادات وحده (محاسبةٌ لا تقدير)
   const canVisitType = canEdit && (appt.status !== 'done' || role === 'clinic_admin')
-  const canUndo = canEditBooking(role) && appt.status === 'no_show' && dayOk
+  // تغيير الحالة متاحٌ لكل حجزٍ غير مؤجَّل (الملغى داخلٌ فيه — يُستعاد منه)
+  const canStatus = canEditBooking(role) && appt.status !== 'postponed' && dayOk
 
-  const close = () => { setPanel(null); setReason(''); setForm({}); setSearch(''); setFound(null) }
+  const close = () => {
+    setPanel(null); setReason(''); setForm({}); setSearch(''); setFound(null)
+    setNewStatus(''); setNote('')
+  }
   const run = async (fn, okMsg) => {
     setBusy(true)
     try { const r = await fn(); onToast(r?.message || okMsg, 'success'); close(); onChanged() }
     catch (ex) { onToast(ex.message) }
     finally { setBusy(false) }
+  }
+
+  // حفظ الحالة الجديدة. الإلغاء و«لم يحضر» يُستأذن فيهما باسم المريض:
+  // يُخرجان المريض من الطابور، وضغطةٌ خاطئة تُربك الدور أمام الناس.
+  const saveStatus = async () => {
+    if (!newStatus) return
+    if (['cancelled', 'no_show'].includes(newStatus)) {
+      const who = `الدور ${appt.queue_number}${appt.full_name ? ` (${appt.full_name})` : ''}`
+      const what = newStatus === 'cancelled' ? 'إلغاء حجز' : 'تعليم «لم يحضر» لـ'
+      if (!confirm(`${what} ${who}؟`)) return
+    }
+    await run(() => api.clinic.setAppointmentStatus(appt.id, newStatus, note.trim()),
+      'تغيّرت الحالة')
   }
 
   // بحث المرضى يقبل موبايلاً أو اسماً (مطابقة الاسم تامّة لا جزئية)، ويردّ
@@ -944,7 +963,6 @@ function BookingEdits({ appt, session, onChanged, onToast }) {
 
       {(canEdit || canUndo) && !panel && (
         <div className="booking-edits-actions">
-          {canUndo && <button className="ghost" onClick={() => setPanel('undo')}>تراجع عن «لم يحضر»</button>}
           {canEdit && <button className="ghost" onClick={() => { setPanel('patient'); setForm({}) }}>تصحيح بيانات المريض</button>}
           {canEdit && <button className="ghost" onClick={() => setPanel('swap')}>تغيير المريض</button>}
           {canVisitType && <button className="ghost" onClick={() => setPanel('visit')}>
@@ -954,15 +972,17 @@ function BookingEdits({ appt, session, onChanged, onToast }) {
         </div>
       )}
 
-      {panel === 'undo' && (
-        <div className="booking-edit-panel">
-          <p className="hint">يعود المريض إلى مكانه في ترتيب الوصول. إن شُغلت خانته الزمنية يعود بلا خانة.</p>
-          <input placeholder="سبب التراجع (إلزامي)…" value={reason} onChange={(e) => setReason(e.target.value)} />
-          <div className="booking-edit-buttons">
-            <button disabled={busy || reason.trim().length < 3}
-              onClick={() => run(() => api.clinic.undoNoShow(appt.id, reason.trim()), 'أُعيد إلى الطابور')}>تأكيد</button>
-            <button className="ghost" onClick={close}>إلغاء</button>
-          </div>
+      {canStatus && (
+        <div className="booking-status-row">
+          <label>تغيير الحالة</label>
+          <select value={newStatus} onChange={(e) => setNewStatus(e.target.value)}>
+            <option value="">{APPOINTMENT_STATUSES[appt.status] || appt.status} (الحالية)…</option>
+            {Object.entries(APPOINTMENT_STATUSES)
+              .filter(([k]) => k !== appt.status)
+              .map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select>
+          <input placeholder="ملاحظة (اختيارية)…" value={note} onChange={(e) => setNote(e.target.value)} />
+          <button disabled={busy || !newStatus} onClick={() => saveStatus()}>حفظ</button>
         </div>
       )}
 
@@ -970,7 +990,7 @@ function BookingEdits({ appt, session, onChanged, onToast }) {
         <div className="booking-edit-panel">
           <p className="hint">تصحيح خطأ إملائي — يُعدّل سجلّ المريض فيسري على كل حجوزاته.</p>
           <div className="booking-edit-fields">
-            <input placeholder="الاسم الثلاثي" defaultValue={appt.patient_name || ''}
+            <input placeholder="الاسم الثلاثي" defaultValue={appt.full_name || ''}
               onChange={(e) => setForm((f) => ({ ...f, full_name: e.target.value }))} />
             <input placeholder="الموبايل" dir="ltr" defaultValue={appt.mobile || ''}
               onChange={(e) => setForm((f) => ({ ...f, mobile: e.target.value }))} />

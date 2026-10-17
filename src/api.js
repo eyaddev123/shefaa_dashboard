@@ -160,7 +160,11 @@ export const api = {
     updateAppointment: (appointmentId, body) =>
       http(`/clinic/appointments/${appointmentId}`, { method: 'PATCH', body: JSON.stringify(body) }),
 
-    // ═══ تعديل الحجز والتراجع عن «لم يحضر» ═══
+    // ═══ تعديل الحجز ═══
+    // تغيير الحالة: قائمة واحدة لكل الحالات، بملاحظة اختيارية
+    setAppointmentStatus: (appointmentId, status, note) =>
+      http(`/clinic/appointments/${appointmentId}/status`,
+        { method: 'PATCH', body: JSON.stringify({ status, note: note || undefined }) }),
     undoNoShow: (appointmentId, reason) =>
       http(`/clinic/appointments/${appointmentId}/undo-no-show`,
         { method: 'POST', body: JSON.stringify({ reason }) }),
