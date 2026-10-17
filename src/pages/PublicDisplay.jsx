@@ -47,6 +47,12 @@ export default function PublicDisplay() {
   // نسبة النافذة: أعرض من 2:1 تعني ارتفاعاً لا يكفي صفّين من البطاقات
   const [wide, setWide] = useState(
     () => typeof window !== 'undefined' && window.innerWidth / window.innerHeight > 2)
+  // ═══ الارتفاع المرئي الفعلي بالبكسل ═══
+  // 100vh في متصفحات التلفاز (وبعض الأجهزة اللوحية) = الشاشة كاملةً **بما تحت شريط
+  // المتصفح**، فتطول اللوحة عن المرئي ويُقصّ صفّ «التالي/بعده» أسفلها — حدث على شاشة
+  // الصالة. innerHeight هو المرئي فعلاً في كل متصفح، فنثبّت الارتفاع عليه ونحدّثه مع
+  // كل تغيّر (مقاس، ملء شاشة، ظهور الشريط). وCSS يبقى احتياطاً (100dvh ثم 100vh).
+  const [viewH, setViewH] = useState(() => (typeof window !== 'undefined' ? window.innerHeight : 0))
   // البطاقات التي تغيّر رقمها حديثاً — تُومض ليلفت التغيّر النظر حتى لو الصوت مقفول
   const [flashing, setFlashing] = useState({})
 
@@ -71,10 +77,20 @@ export default function PublicDisplay() {
 
   // ── نسبة النافذة: تُعيد توزيع البطاقات عند تغيّر المقاس أو دوران الشاشة ──
   useEffect(() => {
-    const onResize = () => setWide(window.innerWidth / window.innerHeight > 2)
+    const onResize = () => {
+      setWide(window.innerWidth / window.innerHeight > 2)
+      setViewH(window.innerHeight)
+    }
     window.addEventListener('resize', onResize)
+    // شريط المتصفح يظهر ويختفي دون resize في بعض المتصفحات؛ وملء الشاشة كذلك
+    window.visualViewport?.addEventListener('resize', onResize)
+    document.addEventListener('fullscreenchange', onResize)
     onResize()
-    return () => window.removeEventListener('resize', onResize)
+    return () => {
+      window.removeEventListener('resize', onResize)
+      window.visualViewport?.removeEventListener('resize', onResize)
+      document.removeEventListener('fullscreenchange', onResize)
+    }
   }, [])
 
   // ── إعادة تحميل مسكّرة مرّة باليوم ──
@@ -248,7 +264,7 @@ export default function PublicDisplay() {
   const dateText = `${AR_DAYS[now.getDay()]} ${now.getDate()} ${AR_MONTHS[now.getMonth()]} ${now.getFullYear()}`
 
   return (
-    <div className="pd-root" dir="rtl">
+    <div className="pd-root" dir="rtl" style={viewH ? { height: `${viewH}px` } : undefined}>
       {/* لافتة الصوت المقفول: كبيرة وقابلة للضغط — بدون ضغطةٍ صريحة يمنع المتصفح كل صوت */}
       {!audioReady && (
         <button type="button" className="pd-audio-gate" onClick={enableAudio}>

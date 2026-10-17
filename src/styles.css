@@ -945,7 +945,10 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
    نفس الصفحة تزبط على 720p و1080p بلا أي تمرير. الارتفاع مقسَّم بـ grid لا
    بهوامش ثابتة — الهامش الثابت يدفع آخر سطر خارج الشاشة على الشاشة الأقصر. */
 .pd-root {
+  /* الارتفاع الفعلي يُثبَّت من JS (innerHeight) — هذان احتياط: dvh = المرئي فعلاً حيث
+     يُدعم، و vh لما قبله. (100vh وحده يشمل ما تحت شريط المتصفح في التلفاز فيُقصّ الأسفل.) */
   height: 100vh;
+  height: 100dvh;
   /* عدد الأبناء متغيّر (لافتة صوت؟ لافتة تأخير؟). flex عمودي أبسط من grid هنا:
      الترتيب يتبع ترتيب العناصر في JSX، وشبكة البطاقات وحدها تتمدّد (flex:1). */
   display: flex;
@@ -1045,9 +1048,25 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
   line-height: 1;
 }
 
+/* ═══ المقاسات تتبع **البطاقة** لا النافذة (container queries) ═══
+   بطاقة دكتور وحيد تملأ الشاشة فيكبر كل ما فيها؛ وأربع بطاقات تتقاسمها فيصغر بالنسبة
+   نفسها — بلا سقوفٍ ثابتة بالبكسل (كان الرقم يقف عند 120px في بطاقة طولها ~900px).
+   min(cqh, cqw): الأضيق يحكم، فلا يفيض الرقم عرضاً في بطاقة طويلة ضيّقة ولا طولاً في
+   عريضة قصيرة. وصفّ «التالي/بعده» flex:none محجوزٌ دائماً — الرقم يأخذ ما بقي.
+   الميزانية العمودية (≈٧٥٪ من البطاقة كحدٍّ أقصى): ترويسة ~١٤ + «يُخدَم» ٤ + رقم ≤٣٤
+   + غرفة ٦ + صفّ التالي ~١٨ — فيبقى هامشٌ للفجوات والحشو (قيس: لا فيض في ١–٤ بطاقات).
+   وارتفاع سطر الاسم والاختصاص ≥١٫٥: حروف Cairo أطول من سطر ١٫٣ فيقصّها overflow:hidden. */
 @supports (container-type: size) {
+  /* بادئة .pd-card: أعلى تخصيصاً من القواعد الأساسية بعدها ومن أي media قديم — فلا يغلبها الترتيب */
   .pd-card { container-type: size; }
-  .pd-number { font-size: clamp(32px, 34cqh, 120px); }
+  .pd-card .pd-doctor { font-size: clamp(14px, min(5.5cqh, 5cqw), 72px); line-height: 1.55; }
+  .pd-card .pd-specialty { font-size: clamp(10px, min(3.4cqh, 3cqw), 40px); line-height: 1.6; }
+  .pd-card .pd-label { font-size: clamp(10px, min(3.4cqh, 3cqw), 40px); }
+  .pd-card .pd-number { font-size: clamp(32px, min(34cqh, 32cqw), 480px); }
+  .pd-card .pd-room { font-size: clamp(12px, min(5.5cqh, 5cqw), 64px); }
+  .pd-card .pd-upcoming { flex: none; gap: max(1.2vw, 8cqw); }
+  .pd-card .pd-up-label { font-size: clamp(10px, min(3.6cqh, 3.2cqw), 44px); }
+  .pd-card .pd-up-num { font-size: clamp(18px, min(11.5cqh, 10cqw), 160px); line-height: 1.15; }
 }
 .pd-number.pd-dim { color: rgba(127, 214, 184, 0.3); }
 .pd-room {
@@ -1596,9 +1615,9 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
   .public-display-logo { font-size: 32px; }
   .public-display-grid { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
   .public-display-card { padding: 20px 16px; border-radius: 16px; }
-  .pd-doctor { font-size: 19px; }
-  .pd-number { font-size: 54px; }
-  .pd-next-number { font-size: 24px; }
+  /* (أُزيلت مقاسات ثابتة قديمة لـ .pd-doctor/.pd-number — 19px/54px — كانت تُجمّد الرقم عند
+     54px على أي تلفاز يُبلغ المتصفح بعرضٍ أقل من 1024 مهما كبر ارتفاعه. المقاسات الآن
+     تتبع البطاقة، انظر @supports (container-type) عند تعريف .pd-card.) */
 
   /* رقم النداء 190px يفيض عرض الجوال — clamp يُبقيه أكبر ما تحتمله الشاشة */
   .pd-banner-inner { padding: 32px 24px; border-radius: 24px; width: min(92vw, 560px); }
