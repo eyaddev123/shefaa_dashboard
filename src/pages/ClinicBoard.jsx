@@ -13,6 +13,118 @@ function sessionBadge(status) {
   return <span className={`badge ${cls}`}>{SESSION_STATUSES[status] || status}</span>
 }
 
+// ═══ نافذة الاعتذار — من داخل النظام لا من المتصفّح ═══
+//
+// prompt() وconfirm() نوافذُ المتصفّح: أزرارها بالإنكليزية، وخطّها خطّ النظام،
+// وتكتب اسم الموقع فوقها، ولا تعرف الثيم الداكن. ناشزةٌ عن كل شاشات النظام.
+//
+// وهي تجمع الخطوتين في نافذةٍ واحدة: السبب أولاً، فإن ردّ الخادم بوجود حجوزات
+// عُرضت أسماء المرضى وهواتفهم **داخل النافذة نفسها** — لا نافذةٌ ثانية تُفقد
+// السياق، ولا سلسلةُ confirm متتابعة.
+function ApologyDialog({ doctor, date, onClose, onDone }) {
+  const [reason, setReason] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState(null)
+  const [bookings, setBookings] = useState(null)   // غير null ⇒ مرحلة التأكيد
+
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape' && !busy) onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [busy, onClose])
+
+  const submit = async (confirmIt) => {
+    setBusy(true); setErr(null)
+    try {
+      await api.clinic.apologize({
+        doctor_id: doctor.doctor_id, date,
+        reason: reason.trim() || null,
+        ...(confirmIt ? { confirm: true } : {}),
+      })
+      onDone()
+    } catch (ex) {
+      // حجوزاتٌ قائمة: نعرضها ونطلب تأكيداً صريحاً. ولا يُلغى ولا يُنقل شيءٌ
+      // تلقائياً — من يتّصل بالمرضى بشرٌ يقرّر.
+      if (ex.data?.code === 'HAS_BOOKINGS') { setBookings(ex.data.bookings); setErr(ex.message) }
+      else setErr(ex.message)
+    } finally { setBusy(false) }
+  }
+
+  return (
+    <div className="modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose() }}>
+      <div className="modal-card" role="dialog" aria-modal="true" aria-labelledby="apology-title">
+        <h3 id="apology-title">تعليم «معتذر» — {doctor.doctor_name}</h3>
+        <p className="subtitle" style={{ marginTop: 4 }}>
+          لن يظهر على شاشة الصالة ولا في قوائم الاستقبال، ولن يُقبل حجزٌ عليه في هذا اليوم.
+        </p>
+
+        {!bookings ? (
+          <>
+            <div className="field" style={{ marginTop: 12 }}>
+              <label htmlFor="apology-reason">السبب (اختياري)</label>
+              <input id="apology-reason" autoFocus value={reason} maxLength={200}
+                placeholder="مثلاً: سفر، أو ظرف طارئ"
+                onChange={(e) => setReason(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !busy) submit(false) }} />
+            </div>
+            {err && <p className="error" style={{ marginTop: 10 }}>{err}</p>}
+            <div className="bf-actions" style={{ marginTop: 16 }}>
+              <button type="button" className="ghost" disabled={busy} onClick={onClose}>إلغاء</button>
+              <button type="button" disabled={busy} onClick={() => submit(false)}>
+                {busy ? 'جارٍ…' : 'تعليم معتذر'}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="error" style={{ marginTop: 12 }}>{err}</p>
+            <p className="subtitle" style={{ marginTop: 10 }}>
+              لن يُلغى أيُّ حجز ولن يُنقل تلقائياً — اتّصل بهم أولاً:
+            </p>
+            <ul className="apology-bookings">
+              {bookings.map((b) => (
+                <li key={b.id}>
+                  <span>{b.full_name}</span>
+                  {b.mobile
+                    ? <a href={`tel:${b.mobile}`} dir="ltr">{b.mobile}</a>
+                    : <span className="muted">بلا رقم</span>}
+                </li>
+              ))}
+            </ul>
+            <div className="bf-actions" style={{ marginTop: 16 }}>
+              <button type="button" className="ghost" disabled={busy} onClick={onClose}>تراجع</button>
+              <button type="button" className="danger" disabled={busy} onClick={() => submit(true)}>
+                {busy ? 'جارٍ…' : `تأكيد رغم ${bookings.length} حجزاً`}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ═══ نافذة تأكيد عامّة — بديل confirm() ═══
+function ConfirmDialog({ title, body, confirmLabel, onConfirm, onClose, busy }) {
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape' && !busy) onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [busy, onClose])
+  return (
+    <div className="modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose() }}>
+      <div className="modal-card" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+        <h3 id="confirm-title">{title}</h3>
+        <p className="subtitle" style={{ marginTop: 6 }}>{body}</p>
+        <div className="bf-actions" style={{ marginTop: 16 }}>
+          <button type="button" className="ghost" disabled={busy} onClick={onClose}>لا، اتركه</button>
+          <button type="button" autoFocus disabled={busy} onClick={onConfirm}>{confirmLabel}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ═══ دكاترة اليوم — لمشرف العيادات (والمدير/المجلس اطّلاعاً) ═══
 //
 // تُبنى من **القوالب** لا من الجلسات: الدكتور يعتذر فجراً قبل التوليد، فلو بُنيت
@@ -24,29 +136,14 @@ function DayDoctors({ date, canEdit, onChanged }) {
   const [data, setData] = useState(null)
   const [err, setErr] = useState(null)
   const [busy, setBusy] = useState(null)
+  const [apologizing, setApologizing] = useState(null)   // الدكتور قيد التعليم
+  const [askUndo, setAskUndo] = useState(null)           // {doctor, warning} بعد جلسةٍ يدوية
 
   const load = () => api.clinic.dayDoctors(date).then(setData).catch((e) => setErr(e.message))
   useEffect(() => { setData(null); setErr(null); load() }, [date])
 
-  const apologize = async (d) => {
-    const reason = prompt(`سبب اعتذار ${d.doctor_name} (اختياري):`)
-    if (reason === null) return            // أُلغي
-    setBusy(d.doctor_id); setErr(null)
-    try {
-      await api.clinic.apologize({ doctor_id: d.doctor_id, date, reason: reason || null })
-    } catch (ex) {
-      // حجوزات قائمة: نعرض المرضى وهواتفهم ثم نطلب تأكيداً صريحاً.
-      // ولا يُلغى ولا يُنقل شيءٌ تلقائياً — من يتّصل بالمرضى بشرٌ يقرّر.
-      if (ex.data?.code === 'HAS_BOOKINGS') {
-        const list = ex.data.bookings
-          .map((b) => `• ${b.full_name}${b.mobile ? ` — ${b.mobile}` : ''}`).join('\n')
-        if (!confirm(`${ex.message}\n\n${list}\n\nتأكيد تعليم «معتذر»؟`)) { setBusy(null); return }
-        try {
-          await api.clinic.apologize({ doctor_id: d.doctor_id, date, reason: reason || null, confirm: true })
-        } catch (e2) { setErr(e2.message); setBusy(null); return }
-      } else { setErr(ex.message); setBusy(null); return }
-    }
-    setBusy(null); await load(); onChanged()
+  const afterApology = async () => {
+    setApologizing(null); await load(); onChanged()
   }
 
   const undo = async (d) => {
@@ -64,13 +161,22 @@ function DayDoctors({ date, canEdit, onChanged }) {
         doctor_id: d.doctor_id, session_date: date,
         start_time: d.start_time || '09:00', end_time: d.end_time || '13:00',
       })
-      // الاعتذار **يبقى** مانعاً — لا يُلغى ضمناً بإنشاء الجلسة
-      if (r.warning_code === 'DOCTOR_APOLOGIZED'
-          && confirm(`${r.warning}\n\nإلغاء الاعتذار الآن؟`)) {
-        await api.clinic.undoApology(d.doctor_id, date)
+      // الاعتذار **يبقى** مانعاً — لا يُلغى ضمناً بإنشاء الجلسة، بل يُسأل عنه
+      if (r.warning_code === 'DOCTOR_APOLOGIZED') {
+        setBusy(null); await load()
+        setAskUndo({ doctor: d, warning: r.warning })
+        return
       }
     } catch (ex) { setErr(ex.message) }
     setBusy(null); await load(); onChanged()
+  }
+
+  const confirmUndo = async () => {
+    const d = askUndo.doctor
+    setBusy(d.doctor_id)
+    try { await api.clinic.undoApology(d.doctor_id, date) }
+    catch (ex) { setErr(ex.message) }
+    setBusy(null); setAskUndo(null); await load(); onChanged()
   }
 
   if (err && !data) return <p className="error">{err}</p>
@@ -116,7 +222,7 @@ function DayDoctors({ date, canEdit, onChanged }) {
                 ) : (
                   <>
                     <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }}
-                      disabled={busy === d.doctor_id} onClick={() => apologize(d)}>معتذر</button>
+                      disabled={busy === d.doctor_id} onClick={() => setApologizing(d)}>معتذر</button>
                     {d.off_week && !d.session_id && (
                       <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5, marginInlineStart: 6 }}
                         disabled={busy === d.doctor_id} onClick={() => makeSession(d)}>إنشاء جلسة</button>
@@ -128,6 +234,20 @@ function DayDoctors({ date, canEdit, onChanged }) {
           ))}
         </tbody>
       </table>
+
+      {apologizing && (
+        <ApologyDialog doctor={apologizing} date={date}
+          onClose={() => setApologizing(null)} onDone={afterApology} />
+      )}
+      {askUndo && (
+        <ConfirmDialog
+          title="الدكتور معلَّم معتذر لهذا اليوم"
+          body={`${askUndo.warning} — هل تُلغي الاعتذار الآن ليُقبل الحجز على الجلسة الجديدة؟`}
+          confirmLabel="نعم، ألغِ الاعتذار"
+          busy={busy === askUndo.doctor.doctor_id}
+          onConfirm={confirmUndo}
+          onClose={() => { setAskUndo(null); onChanged() }} />
+      )}
     </div>
   )
 }
