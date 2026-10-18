@@ -137,6 +137,39 @@ export const api = {
     schedulePreview: (from, weeks = 6) =>
       http(`/clinic/schedules/preview?from=${from}&weeks=${weeks}`),
     dayDoctors: (date) => http(`/clinic/day-doctors?date=${date}`),
+    closeSession: (id) => http(`/clinic/sessions/${id}/close`, { method: 'POST' }),
+    reopenSession: (id) => http(`/clinic/sessions/${id}/reopen`, { method: 'POST' }),
+    // ═══ التصدير: تنزيل ملفٍّ لا JSON ═══
+    // رابطٌ عاديّ <a href> لا يحمل ترويسة Authorization، فالخادم يردّ 401.
+    // فنجلبه بـ fetch ونصنع رابطاً مؤقّتاً من الـblob — والاسم العربي يُقرأ
+    // من Content-Disposition الذي يرسله الخادم.
+    exportExcel: async ({ from, to, doctorId }) => {
+      const q = new URLSearchParams({ from, to: to || from })
+      if (doctorId) q.set('doctor_id', String(doctorId))
+      const res = await fetch(`/api/clinic/export?${q}`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        const err = new Error(data.error || `تعذّر التصدير (${res.status})`)
+        err.status = res.status; err.data = data
+        throw err
+      }
+      const cd = res.headers.get('content-disposition') || ''
+      const star = /filename\*=UTF-8''([^;]+)/i.exec(cd)
+      const name = star ? decodeURIComponent(star[1]) : `عيادات-${from}.xlsx`
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = name
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      // الإفراج مؤجَّل: الإلغاء الفوري يقطع التنزيل في بعض المتصفّحات
+      setTimeout(() => URL.revokeObjectURL(url), 10000)
+      return name
+    },
     apologize: (body) => http('/clinic/apologies', { method: 'POST', body: JSON.stringify(body) }),
     undoApology: (doctorId, date) =>
       http(`/clinic/apologies/${doctorId}/${date}`, { method: 'DELETE' }),

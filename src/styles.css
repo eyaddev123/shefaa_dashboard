@@ -1919,3 +1919,16 @@ button.danger:hover:not(:disabled) { filter: brightness(1.08); }
 /* «+N»: ما لم يتّسع له ارتفاع البطاقة — فلا تُقصّ القائمة بصمت */
 .od-more { color: #7fd6b8; font-weight: 800; }
 .od-empty { font-size: var(--od-label, 13px); color: #7d938f; margin-top: 0.6vh; }
+
+/* ═══ «انتهى الدوام» على شاشة الصالة ═══
+   البطاقة تبقى إلى آخر اليوم (اختفاؤها يُقلق من ينتظر ويظنّ دكتوره أُلغي)،
+   لكنها تبهت فلا تزاحم بصرياً من يعمل. ولا container queries هنا: المقاس
+   يتبع --pd-room المحسوب في JS — Chrome 66 لا يملك غيرها. */
+.pd-card-closed { opacity: 0.45; }
+.pd-closed {
+  font-size: var(--pd-room, 28px);
+  font-weight: 800;
+  color: #9fb4b0;
+  line-height: 1.3;
+  white-space: nowrap;
+}

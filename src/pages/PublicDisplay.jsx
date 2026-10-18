@@ -395,7 +395,8 @@ export default function PublicDisplay() {
             <div
               key={b.doctor_name}
               className={`pd-card ${flashing[b.doctor_name] ? 'pd-flash' : ''} ${
-                banner && banner.doctor_name === b.doctor_name ? 'pd-card-active' : ''}`}
+                banner && banner.doctor_name === b.doctor_name ? 'pd-card-active' : ''} ${
+                b.closed ? 'pd-card-closed' : ''}`}
               /* أولى بطاقات الصفّ الأخير تُزاح لتوسيطه — الصفوف الكاملة بلا إزاحة */
               style={offset && i === docCount - (docCount - (grid.rows - 1) * grid.cols)
                 ? { gridColumnStart: offset + 1 } : undefined}
@@ -409,11 +410,21 @@ export default function PublicDisplay() {
               {/* عند ضيق الارتفاع تُقلَّل الأسطر لا تُصغَّر الخطوط: يسقط «يُخدَم الآن»
                   أولاً، ثم تنتقل الغرفة بجانب الرقم مختصرةً إلى رقمها. فالغرفة —
                   ثانية الأهمية — تبقى مقروءةً بدل أن يقصّها الضيق فتختفي بلا أثر. */}
+              {/* ═══ «انتهى الدوام» ═══
+                  العلم يأتي محسوباً من الخادم (closed) — لا منطق جديد يصل
+                  متصفّح التلفاز القديم. والبطاقة تبقى إلى آخر اليوم باهتة:
+                  اختفاؤها يُقلق من ينتظر ويظنّ دكتوره أُلغي. */}
               <div className={`pd-current-wrap${fonts?.roomCompact ? ' pd-current-row' : ''}`}>
-                {fonts?.showLabel !== false && <div className="pd-label">يُخدَم الآن</div>}
-                <div className={`pd-number ${b.current ? '' : 'pd-dim'}`}>
-                  {b.current ? b.current.queue_number : '—'}
-                </div>
+                {b.closed ? (
+                  <div className="pd-closed">انتهى الدوام</div>
+                ) : (
+                  <>
+                    {fonts?.showLabel !== false && <div className="pd-label">يُخدَم الآن</div>}
+                    <div className={`pd-number ${b.current ? '' : 'pd-dim'}`}>
+                      {b.current ? b.current.queue_number : '—'}
+                    </div>
+                  </>
+                )}
                 {b.room && (
                   <div className="pd-room" title={`الغرفة ${b.room}`}>
                     {fonts?.roomCompact ? b.room : `الغرفة ${b.room}`}
@@ -421,7 +432,8 @@ export default function PublicDisplay() {
                 )}
               </div>
 
-              <div className="pd-upcoming">
+              {/* لا «التالي/بعده» لعيادةٍ انتهى دوامها — لا أحد ينتظر */}
+              <div className="pd-upcoming" style={b.closed ? { visibility: 'hidden' } : undefined}>
                 <div className="pd-up">
                   <span className="pd-up-label">التالي</span>
                   <span className={`pd-up-num ${b.next ? '' : 'pd-dim'}`}>{b.next?.queue_number ?? '—'}</span>
