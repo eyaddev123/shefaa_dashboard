@@ -31,6 +31,7 @@ import ClinicProcedures from './pages/ClinicProcedures.jsx'
 import SessionQueue from './pages/SessionQueue.jsx'
 import DoctorScreen from './pages/DoctorScreen.jsx'
 import PublicDisplay from './pages/PublicDisplay.jsx'
+import OrderDisplay from './pages/OrderDisplay.jsx'
 import PatientTurn from './pages/PatientTurn.jsx'
 
 const I = {
@@ -215,7 +216,7 @@ function Shell() {
   )
 }
 
-const PUBLIC_PATHS = ['/display', '/my-turn']
+const PUBLIC_PATHS = ['/display', '/order', '/my-turn']
 
 // الصفحتان العامتان (شاشة التابلت وموقع المريض) بلا مصادقة إطلاقاً — تُلتقطان
 // قبل RoleProvider/Shell كي لا تُفرض عليهما شاشة تسجيل الدخول أو الشريط الجانبي
@@ -225,6 +226,8 @@ function Root() {
     return (
       <Routes>
         <Route path="/display" element={<PublicDisplay />} />
+        {/* الشاشة الثانية: ترتيب الدور كاملاً — بلا صوت، ونفس حارس الرمز */}
+        <Route path="/order" element={<OrderDisplay />} />
         <Route path="/my-turn" element={<PatientTurn />} />
       </Routes>
     )

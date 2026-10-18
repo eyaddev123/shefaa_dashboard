@@ -1853,3 +1853,69 @@ button.danger {
   background: var(--status-bad); color: #fff; border-color: var(--status-bad);
 }
 button.danger:hover:not(:disabled) { filter: brightness(1.08); }
+
+/* ═══════════════════════════════════════════════════════════════════
+   شاشة «الدور» (/order) — التلفاز الثاني
+   تشارك .pd-root و.pd-head و.pd-grid مع شاشة النداء، وتخصّ بطاقتها بـ .od-*
+   ولا container queries ولا flex gap ولا aspect-ratio: متصفّح التلفاز Chrome 66
+   يتجاهلها بصمت — المقاسات تصل متغيّراتِ CSS محسوبةً من JS (orderFonts).
+   ═══════════════════════════════════════════════════════════════════ */
+.od-card {
+  display: grid;
+  grid-template-rows: auto auto 1fr;   /* ترويسة · الحالي · القائمة تأخذ الباقي */
+  gap: 0.4vh;
+  width: 100%; height: 100%;
+  min-height: 0; min-width: 0;
+  box-sizing: border-box;
+  text-align: center;
+  background: #10201e;
+  border: 2px solid rgba(127, 214, 184, 0.18);
+  border-radius: 1.4vh;
+  padding: 0.8vh 0.8vw;
+  overflow: hidden;
+}
+.od-head { min-height: 0; }
+.od-doctor {
+  font-size: var(--od-doctor, 20px); font-weight: 800; line-height: 1.15;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* الغرفة شريحةٌ عالية التباين كما في شاشة النداء — ثاني ما يُبحث عنه */
+.od-room {
+  display: inline-block; margin-top: 0.3vh;
+  font-size: var(--od-room, 22px); font-weight: 800; line-height: 1.25;
+  color: #0b1615; background: #7fd6b8;
+  border-radius: 0.5em; padding: 0.04em 0.45em;
+  max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.od-label { font-size: var(--od-label, 13px); color: #7fd6b8; font-weight: 700; line-height: 1.2; }
+.od-current { min-height: 0; }
+.od-current-num {
+  display: block;
+  font-size: var(--od-current, 44px); font-weight: 800; color: #14b8a6; line-height: 1.05;
+}
+.od-current-num.pd-dim { color: rgba(127, 214, 184, 0.3); }
+
+.od-list-wrap {
+  /* عمودٌ مرن: العنوان ثابت، والقائمة تأخذ الباقي وتُقصّ عنده.
+     بلا flex كان المحتوى يمتدّ فيتجاوز البطاقة ويُقصّ من أسفل الشاشة بدل
+     أن يُختصر بـ«+N» — والفرق أنّ المقصوص لا يُعلن عن نفسه. */
+  display: flex; flex-direction: column;
+  min-height: 0; overflow: hidden;
+  border-top: 1px solid rgba(127, 214, 184, 0.18);
+  padding-top: 0.5vh;
+}
+.od-list-wrap > .od-list-label { flex: none; }
+.od-list-label { margin-bottom: 0.3vh; }
+.od-list {
+  list-style: none; margin: 0; padding: 0;
+  font-size: var(--od-item, 18px); font-weight: 800; line-height: 1.45;
+  /* حارسٌ أخير: مهما اختلّ حساب عدد الأسطر لا يفيض شيءٌ خارج البطاقة */
+  flex: 1 1 auto; min-height: 0; overflow: hidden;
+}
+/* صفٌّ أفقي بلا flex gap: الهامش بين الابنَين يعمل في كل متصفّح */
+.od-list li { display: block; white-space: nowrap; }
+.od-idx { color: #7d938f; font-weight: 700; }
+.od-num { margin-inline-start: 0.4em; color: #eef7f5; }
+/* «+N»: ما لم يتّسع له ارتفاع البطاقة — فلا تُقصّ القائمة بصمت */
+.od-more { color: #7fd6b8; font-weight: 800; }
+.od-empty { font-size: var(--od-label, 13px); color: #7d938f; margin-top: 0.6vh; }
