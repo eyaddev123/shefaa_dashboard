@@ -138,6 +138,8 @@ function DayDoctors({ date, canEdit, onChanged }) {
   const [busy, setBusy] = useState(null)
   const [apologizing, setApologizing] = useState(null)   // الدكتور قيد التعليم
   const [askUndo, setAskUndo] = useState(null)           // {doctor, warning} بعد جلسةٍ يدوية
+  const [exportTo, setExportTo] = useState('')           // مدى التصدير: فارغ = يومٌ واحد
+  const [exporting, setExporting] = useState(null)
 
   const load = () => api.clinic.dayDoctors(date).then(setData).catch((e) => setErr(e.message))
   useEffect(() => { setData(null); setErr(null); load() }, [date])
@@ -171,6 +173,14 @@ function DayDoctors({ date, canEdit, onChanged }) {
     setBusy(null); await load(); onChanged()
   }
 
+  // التصدير: دكتورٌ بعينه أو الكلّ. الخطأ يُعرض ولا يُستبدَل بالشاشة.
+  const doExport = async (doctorId) => {
+    setExporting(doctorId || 'all'); setErr(null)
+    try { await api.clinic.exportExcel({ from: date, to: exportTo || date, doctorId }) }
+    catch (ex) { setErr(ex.message) }
+    finally { setExporting(null) }
+  }
+
   const confirmUndo = async () => {
     const d = askUndo.doctor
     setBusy(d.doctor_id)
@@ -185,10 +195,25 @@ function DayDoctors({ date, canEdit, onChanged }) {
 
   return (
     <div className="card">
-      <h3 style={{ marginTop: 0 }}>دكاترة اليوم ({data.doctors.length})</h3>
-      <p className="subtitle" style={{ marginTop: -4 }}>
-        المتوقَّعون حسب جداول الدوام — حتى لو لم تُولَّد جلساتهم بعد.
-      </p>
+      <div className="inline" style={{ justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+        <div>
+          <h3 style={{ marginTop: 0, marginBottom: 2 }}>دكاترة اليوم ({data.doctors.length})</h3>
+          <p className="subtitle" style={{ margin: 0 }}>
+            المتوقَّعون حسب جداول الدوام — حتى لو لم تُولَّد جلساتهم بعد.
+          </p>
+        </div>
+        <div className="inline" style={{ alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          {/* مدى اختياري: فارغ = يوم اللوحة وحده */}
+          <label className="muted" style={{ whiteSpace: 'nowrap' }}>إلى تاريخ</label>
+          <input type="date" value={exportTo} min={date}
+            onChange={(e) => setExportTo(e.target.value)}
+            title="اتركه فارغاً لتصدير هذا اليوم وحده" />
+          <button type="button" className="ghost" style={{ padding: '4px 12px', fontSize: 12 }}
+            disabled={exporting !== null} onClick={() => doExport(null)}>
+            {exporting === 'all' ? 'جارٍ…' : '⬇ تصدير كل الدكاترة'}
+          </button>
+        </div>
+      </div>
       {err && <p className="error">{err}</p>}
       <table>
         <thead>
@@ -216,6 +241,14 @@ function DayDoctors({ date, canEdit, onChanged }) {
                 )}
               </td>
               <td>
+                {/* التصدير متاحٌ لمن يراه (مشرف/مدير/مجلس) لا لمن يُعدّل وحده */}
+                <button type="button" className="ghost"
+                  style={{ padding: '3px 10px', fontSize: 11.5, marginInlineEnd: 6 }}
+                  disabled={exporting !== null || d.apologized}
+                  title={d.apologized ? 'المعتذر مستبعَد من التصدير' : 'تنزيل ملفّ إكسل لهذا الدكتور'}
+                  onClick={() => doExport(d.doctor_id)}>
+                  {exporting === d.doctor_id ? '…' : 'Excel'}
+                </button>
                 {canEdit && (d.apologized ? (
                   <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }}
                     disabled={busy === d.doctor_id} onClick={() => undo(d)}>تراجع</button>
@@ -263,6 +296,19 @@ export default function ClinicBoard() {
   const [busy, setBusy] = useState(false)
   const { role } = useRole()
   const navigate = useNavigate()
+  const [busyId, setBusyId] = useState(null)
+  // من يرى الصالة هو من يعرف أنّ الدكتور غادر — الاستقبال والمشرف معاً
+  const canCloseSession = role === 'clinic_admin' || role === 'clinic_reception'
+
+  const toggleClose = async (s) => {
+    setBusyId(s.id); setErr(null)
+    try {
+      if (s.manual_closed_at) await api.clinic.reopenSession(s.id)
+      else await api.clinic.closeSession(s.id)
+      await load()
+    } catch (ex) { setErr(ex.message) }
+    finally { setBusyId(null) }
+  }
 
   const load = () => api.clinic.sessions(date).then(setSessions).catch((e) => setErr(e.message))
   useEffect(() => { setSessions(null); load() }, [date])
@@ -342,9 +388,25 @@ export default function ClinicBoard() {
                   <td className="num">{fmtTime(s.start_time)} – {fmtTime(s.end_time)}</td>
                   {/* نمط الجلسة يُثبَّت عند توليدها — يُعرض كي لا يُفاجأ أحد يوم التبديل */}
                   <td><FlowModeTag mode={s.flow_mode} /></td>
-                  <td>{sessionBadge(s.status)}</td>
+                  <td>
+                    {sessionBadge(s.status)}
+                    {/* «مغلقة» حالةٌ محسوبة تعلو حالة الجلسة المخزّنة:
+                        انتهى الدوام فعلاً وإن بقيت الجلسة «مفتوحة» في القاعدة */}
+                    {s.closed && <span className="badge" style={{ marginInlineStart: 5 }}>مغلقة</span>}
+                  </td>
                   <td className="num">{s.active_count} نشِط / {s.total_count} إجمالي</td>
-                  <td><button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }}>فتح الطابور</button></td>
+                  <td onClick={(e) => e.stopPropagation()}>
+                    <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }}
+                      onClick={() => navigate(`/clinic/session/${s.id}`)}>فتح الطابور</button>
+                    {canCloseSession && (
+                      <button type="button" className="ghost"
+                        style={{ padding: '3px 10px', fontSize: 11.5, marginInlineStart: 6 }}
+                        disabled={busyId === s.id}
+                        onClick={() => toggleClose(s)}>
+                        {busyId === s.id ? '…' : s.manual_closed_at ? 'إعادة فتح' : 'إغلاق العيادة'}
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

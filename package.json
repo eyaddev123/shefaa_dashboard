@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "test:audio": "node test/audio-call-check.mjs",
-    "test:board": "node test/board-layout-check.mjs"
+    "test:board": "node test/board-layout-check.mjs",
+    "test:order": "node test/order-display-check.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",
