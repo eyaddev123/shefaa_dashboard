@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { ProcedureSpecialties } from '../SpecialtyPicker.jsx'
 import { useDialogs } from '../dialogs.jsx'
 import { api, fmtMoney, toLatinDigits, todayLocal } from '../api.js'
 import { useRole } from '../RoleContext.jsx'
@@ -15,16 +16,31 @@ const SETTLEMENT_VIEWERS = ['clinic_admin', 'board', 'super_admin', 'manager']
 
 function NewProcedureForm({ onCreated }) {
   const [form, setForm] = useState({ name: '', price: '', materials: '' })
+  // «عام» افتراضاً: إجراءٌ جديد يظهر للجميع حتى يُسنده المشرف — لا يختفي بصمت
+  const [spec, setSpec] = useState({ isGeneral: true, specialtyIds: [] })
   const [err, setErr] = useState(null)
   const [busy, setBusy] = useState(false)
   const submit = async (e) => {
     e.preventDefault()
     setErr(null); setBusy(true)
     try {
-      await api.clinic.addProcedure({ name: form.name, price: form.price,
+      const created = await api.clinic.addProcedure({ name: form.name, price: form.price,
         // كلفة المواد اختيارية: إن ضُبطت صارت أسطر هذا الإجراء تُسوّى تلقائياً
         default_materials_cost: form.materials === '' ? null : form.materials })
-      setForm({ name: '', price: '', materials: '' }); onCreated(form.name.trim())
+      // الإنشاء يُولّد الإجراء «عامّاً» (قيمة العمود الافتراضية)، والاختصاصات
+      // تُضبط بمسارها الذرّيّ. فلا نناديه إلا إن اختار المشرف غير الافتراضي —
+      // وإخفاقه لا يُضيّع الإجراء: نقول إنّه أُنشئ عامّاً ليُسنده من الجدول.
+      if (!spec.isGeneral && created?.id) {
+        try {
+          await api.clinic.setProcedureSpecialties(created.id,
+            { is_general: false, specialty_ids: spec.specialtyIds.map(Number) })
+        } catch (ex) {
+          setErr(`أُنشئ «${form.name.trim()}» لكن تعذّر إسناد الاختصاصات (${ex.message}) — أسنِدها من الجدول.`)
+        }
+      }
+      setForm({ name: '', price: '', materials: '' })
+      setSpec({ isGeneral: true, specialtyIds: [] })
+      onCreated(form.name.trim())
     } catch (ex) { setErr(ex.message) }
     finally { setBusy(false) }
   }
@@ -42,6 +58,8 @@ function NewProcedureForm({ onCreated }) {
         <input id="new-proc-mat" value={form.materials} inputMode="decimal" placeholder="اتركه فارغاً"
           onChange={(e) => setForm({ ...form, materials: toLatinDigits(e.target.value) })} />
         <span className="hint">إن ضُبطت تُسوّى أسطره تلقائياً</span></div>
+      <ProcedureSpecialties isGeneral={spec.isGeneral} specialtyIds={spec.specialtyIds}
+        canAdd onChange={setSpec} />
       <button type="submit" disabled={busy}>{busy ? 'جارٍ الإضافة…' : 'إضافة إجراء'}</button>
       {err && <p className="error">{err}</p>}
     </form>

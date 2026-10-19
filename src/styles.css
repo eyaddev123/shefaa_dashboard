@@ -2080,3 +2080,42 @@ button.danger:hover:not(:disabled) { filter: brightness(1.08); }
   .dlg-actions { flex-wrap: wrap; }
   .dlg-actions > button { flex: 1 1 calc(50% - 4px); min-width: 0; }
 }
+
+/* ═══ اختيار الاختصاص (SpecialtyPicker) ═══
+   قائمةٌ وزرُّ إضافةٍ بجانبها — لا صفحة إدارةٍ منفصلة تقطع عمل من يضيف دكتوراً. */
+.spec-row { display: flex; align-items: center; gap: 8px; }
+/* القائمة تحتاج عرضاً يكفي أطول اسم («أذن أنف حنجرة») — بلا حدٍّ أدنى كانت
+   تنكمش إلى ٨٠ بكسل فلا يُقرأ منها إلا «— بلا». */
+.spec-row > select, .spec-row > input { flex: 1 1 auto; min-width: 150px; }
+/* حقل الاختصاص يأخذ سطره كاملاً: الزرّ بجانب القائمة لا يسع عموداً ضيّقاً. */
+.field:has(.spec-row) { flex: 1 1 100%; min-width: 280px; }
+.spec-add { flex: none; padding: 6px 12px; font-size: 12px; white-space: nowrap; }
+.spec-warn { color: var(--status-pending); font-weight: 700; }
+/* الكتلة تأخذ سطرها كاملاً داخل النموذج المرن: الحقل الضيّق كان يقصّ أسماء
+   الاختصاصات ويكسر سطر «عام» ثلاثة أسطر. */
+.field:has(.spec-list), .field:has(.spec-general) { flex: 1 1 100%; min-width: 260px; }
+.spec-general {
+  display: flex; align-items: center; gap: 8px;
+  font-weight: 700; margin-bottom: 6px; white-space: nowrap;
+}
+/* صناديق الاختيار: قاعدة `.inline > .field input { width:100% }` أقوى تخصيصاً،
+   فكانت تمدّ المربّع ليملأ السطر ويبقى اسم الاختصاص بعرض صفر. نطابق تخصيصها. */
+.spec-general input[type='checkbox'],
+.spec-item input[type='checkbox'],
+.inline > .field .spec-general input[type='checkbox'],
+.inline > .field .spec-item input[type='checkbox'] {
+  width: 16px; height: 16px; flex: none; margin: 0; accent-color: var(--primary); cursor: pointer;
+}
+.spec-search { width: 100%; }
+.spec-list {
+  margin-top: 6px; max-height: 190px; overflow-y: auto;
+  border: 1px solid var(--border); border-radius: 10px;
+}
+.spec-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px; cursor: pointer; font-size: 13.5px;
+}
+/* الاسم يأخذ ما بقي ولا يُقصّ */
+.spec-item > span { flex: 1 1 auto; min-width: 0; }
+.spec-item + .spec-item { border-top: 1px solid var(--border); }
+

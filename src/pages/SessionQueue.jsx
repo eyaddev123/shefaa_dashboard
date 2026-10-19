@@ -1189,7 +1189,13 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
 
   useEffect(() => {
     if (!canEdit || catalog) return
-    api.clinic.procedures().then((r) => setCatalog(r.filter((p) => p.is_active))).catch((e) => onToast(e.message))
+    // ═══ الترشيح باختصاص **دكتور الحجز** ═══
+    // الاستقبال يضيف لمريض دكتورٍ بعينه، فالقائمة قائمتُه. والخادم يرشّح
+    // ويمنع أيضاً — الواجهة تُخفي وحدها لا تحرس.
+    // والمشرف يرى الكلّ: قد يضيف خارج الاختصاص لحالةٍ استثنائية، ويُعلَّم السطر.
+    const forDoctor = role === 'clinic_admin' ? null : session.doctor_id
+    api.clinic.procedures(forDoctor).then((r) => setCatalog(r.filter((p) => p.is_active)))
+      .catch((e) => onToast(e.message))
   }, [canEdit])
 
   const activeIds = new Set(lines.filter((l) => !l.removed_at).map((l) => String(l.procedure_id)))
@@ -1222,7 +1228,14 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
           <tbody>
             {lines.map((l) => (
               <tr key={l.id} className={l.removed_at ? 'proc-removed' : undefined}>
-                <td>{l.name}</td>
+                <td>
+                  {l.name}
+                  {/* أُضيف خارج اختصاص دكتوره بقرار المشرف — العلامة تُبقي الأثر */}
+                  {l.off_specialty && (
+                    <span className="badge warn" style={{ marginInlineStart: 5, fontSize: 10.5 }}
+                      title="أُضيف خارج اختصاص الدكتور بقرار مشرف العيادات">خارج الاختصاص</span>
+                  )}
+                </td>
                 <td className="num">{fmtMoney(l.price)}</td>
                 <td className="appt-procs-meta">
                   أضافه {l.added_by_name || '—'} <span dir="ltr">{whenAt(l.added_at, session.session_day)}</span>

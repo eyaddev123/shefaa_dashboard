@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
+import { SpecialtyPicker } from '../SpecialtyPicker.jsx'
 import { useDialogs } from '../dialogs.jsx'
 import { Link } from 'react-router-dom'
 import { api, WEEKDAYS, fmtMoney, fmtTime, todayLocal } from '../api.js'
 
 function NewDoctorForm({ onCreated }) {
-  const blank = { name: '', specialty: '', phone: '', consultation_fee: '', followup_fee: '',
+  const blank = { name: '', specialty_id: '', phone: '', consultation_fee: '', followup_fee: '',
                   followup_window_days: '7', expected_visit_minutes: '15', room: '',
                   accepts_urgent: true }
   const [form, setForm] = useState(blank)
@@ -28,7 +29,8 @@ function NewDoctorForm({ onCreated }) {
   return (
     <form className="inline" onSubmit={submit} style={{ marginTop: 14 }}>
       <div className="field"><label>اسم الدكتور</label><input value={form.name} onChange={set('name')} required /></div>
-      <div className="field"><label>الاختصاص</label><input value={form.specialty} onChange={set('specialty')} /></div>
+      <SpecialtyPicker value={form.specialty_id} canAdd
+        onChange={(v) => setForm((f) => ({ ...f, specialty_id: v }))} />
       <div className="field"><label>الجوال</label><input value={form.phone} onChange={set('phone')} /></div>
       {/* رقم الغرفة يُشتقّ منه اسم المقطع الصوتي (room-3.mp3) — الخادم يطبّع
           الأرقام العربية والمسافات، والتنويه هنا يمنع المشكلة من أصلها (AUDIO.md) */}
@@ -281,7 +283,14 @@ function DoctorRow({ doctor, onChanged }) {
     <>
       <tr style={doctor.is_active ? undefined : { opacity: 0.5 }}>
         <td><Link to={`/clinic/doctors/${doctor.id}`}>{doctor.name}</Link></td>
-        <td>{doctor.specialty || '—'}</td>
+        <td>
+          {doctor.specialty_name || doctor.specialty || <span className="muted">—</span>}
+          {/* بلا اختصاص ⇒ يرى الإجراءات العامّة وحدها — تحذيرٌ ظاهر لا صمت */}
+          {!doctor.specialty_id && (
+            <span className="badge warn" style={{ marginInlineStart: 5 }}
+              title="سيرى الإجراءات العامّة وحدها حتى يُختار اختصاصه">بلا اختصاص</span>
+          )}
+        </td>
         <td>{doctor.phone || '—'}</td>
         <td className="num">{fmtMoney(doctor.consultation_fee)}</td>
         <td className="num">{fmtMoney(doctor.followup_fee)}</td>

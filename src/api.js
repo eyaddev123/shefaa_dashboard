@@ -258,7 +258,16 @@ export const api = {
       http(`/clinic/sessions/${sessionId}/flow-mode`, { method: 'PATCH', body: JSON.stringify({ flow_mode: flowMode }) }),
     // ── إجراءات العيادة ──
     // الكتالوج: الاستقبال يتسلّم المفعَّل وحده من الخادم نفسه
-    procedures: () => http('/clinic/procedures'),
+    // forDoctor: ترشيح الكتالوج باختصاص دكتورٍ بعينه (الاستقبال يمرّره من الحجز).
+    // والطبيب يُرشَّح باختصاصه هو في الخادم بلا معاملة.
+    procedures: (forDoctor) =>
+      http(`/clinic/procedures${forDoctor ? `?active=1&for_doctor=${forDoctor}` : ''}`),
+    // ── الاختصاصات ──
+    specialties: () => http('/clinic/specialties'),
+    addSpecialty: (name) =>
+      http('/clinic/specialties', { method: 'POST', body: JSON.stringify({ name }) }),
+    setProcedureSpecialties: (id, body) =>
+      http(`/clinic/procedures/${id}/specialties`, { method: 'PUT', body: JSON.stringify(body) }),
     addProcedure: (body) => http('/clinic/procedures', { method: 'POST', body: JSON.stringify(body) }),
     updateProcedure: (id, body) => http(`/clinic/procedures/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
     // على الحجز: لا سعر يُرسَل — الخادم ينسخه من الكتالوج
