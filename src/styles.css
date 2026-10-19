@@ -1943,3 +1943,93 @@ button.danger:hover:not(:disabled) { filter: brightness(1.08); }
 }
 /* سطر تسويةٍ حصّة الشفاء فيه سالبة — تحذيرٌ لا منع */
 .row-warn > td { background: var(--status-pending-bg); }
+
+/* ═══════════════════════════════════════════════════════════════════
+   شاشة الطبيب — أزرار العمل وقائمة الإجراءات
+   الطبيب يستعملها على الهاتف واللوحي أيضاً: الأزرار الضخمة كانت تفيض عن
+   الشاشة الضيّقة ويُكسر نصّها سطرين («إنهاء / الكشف»).
+   ═══════════════════════════════════════════════════════════════════ */
+.doc-actions {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  align-items: center;
+}
+/* مقاسٌ عاديّ، والنصّ سطرٌ واحد دائماً، والأيقونة بجانبه لا فوقه */
+.doc-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 9px 16px; font-size: 14px; line-height: 1.2;
+  white-space: nowrap;
+}
+.doc-btn-start {
+  background: var(--status-good); border-color: var(--status-good); color: #fff;
+}
+.doc-btn-start:hover:not(:disabled) { filter: brightness(1.08); background: var(--status-good); }
+/* فاصلٌ مرئيّ قبل «إنهاء الكشف»: الضغطة الخاطئة هنا تُنهي كشفاً لم يبدأ */
+.doc-btn-done { margin-inline-start: 18px; }
+
+/* ── الشاشة الضيّقة: صفّان من زرّين بعرضٍ كامل، ولا فيض ──
+   ⚠️ قاعدةٌ قائمة عند 639px تفرض على آخر أبناء .action-row صفّاً واحداً
+   بـ flex:1 لكل زرّ — فتُحشر الأربعة في سطرٍ واحد يتداخل نصّه ويُقصّ طرفاه.
+   فنُبطلها هنا بتخصيصٍ أعلى (.action-row .doc-actions) لا بـ !important. */
+@media (max-width: 639px) {
+  .action-row > .doc-actions:last-child:not(:first-child) {
+    width: 100%; display: flex; flex-wrap: wrap; gap: 8px;
+  }
+  /* `> button` في القاعدة القديمة يطابق الزرّ مباشرةً، فنرفع التخصيص بفئة
+     الزرّ نفسه لا بـ !important — وإلا بقي flex:1 يحشر الأربعة في سطر. */
+  .action-row > .doc-actions > .doc-btn,
+  .action-row > .doc-actions > * > .doc-btn,
+  .action-row > .doc-actions > button.doc-btn {
+    flex: 1 1 calc(50% - 4px); min-width: 0; width: auto;
+  }
+  /* DoneProcedure يغلّف زرّه بـ Fragment فيصير ابناً مباشراً — نغطّي الحالتين */
+  .action-row > .doc-actions > * { min-width: 0; }
+  .doc-btn { width: 100%; padding: 11px 8px; font-size: 13.5px; }
+  /* الفاصل يصير عمودياً: الصفّ الثاني منفصلٌ بصرياً عن الأول */
+  .doc-btn-done { margin-inline-start: 0; }
+  /* الشارات تأخذ السطر كاملاً تحت الأزرار */
+  .action-row > .doc-actions > .doc-procs { flex: 1 1 100%; }
+}
+
+/* ── ما أضافه الطبيب على هذا المريض: أسماءٌ فقط ── */
+.doc-procs {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  margin-top: 10px;
+  /* سطرٌ مستقلّ أسفل الأزرار: وضعُها بينها يشقّ الصفّين على الشاشة الضيّقة */
+  flex: 1 1 100%; width: 100%;
+}
+.doc-procs-label { font-size: 12.5px; color: var(--text-secondary); font-weight: 700; }
+.doc-proc-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 6px 3px 10px; border-radius: 999px;
+  font-size: 12.5px; font-weight: 700;
+  color: var(--status-good); background: var(--status-good-bg);
+}
+.doc-proc-x {
+  all: unset; cursor: pointer; line-height: 1;
+  font-size: 15px; font-weight: 800; padding: 0 3px; border-radius: 50%;
+  color: var(--status-bad);
+}
+.doc-proc-x:hover { background: var(--status-bad-bg); }
+.doc-proc-x:disabled { opacity: 0.4; cursor: default; }
+
+/* ── نافذة الاختيار: بحثٌ ومربّعات اختيار ── */
+.doc-proc-search {
+  width: 100%; margin-top: 10px;
+}
+.doc-proc-list {
+  margin-top: 10px; max-height: 320px; overflow-y: auto;
+  border: 1px solid var(--border); border-radius: 12px;
+}
+.doc-proc-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 14px; cursor: pointer; font-size: 14.5px; font-weight: 700;
+}
+.doc-proc-row + .doc-proc-row { border-top: 1px solid var(--border); }
+.doc-proc-row:hover:not(.is-added) { background: var(--surface-2, rgba(127,214,184,0.07)); }
+.doc-proc-row input { width: auto; margin: 0; flex: none; }
+/* المضاف سابقاً: مؤشَّرٌ ومعطَّل — لا يُضاف مرّتين (والخادم يحرسها أيضاً) */
+.doc-proc-row.is-added { opacity: 0.6; cursor: default; }
+.doc-proc-done {
+  margin-inline-start: auto; font-size: 11.5px; font-weight: 700;
+  color: var(--status-good);
+}
