@@ -497,7 +497,7 @@ export default function PublicDisplay() {
             <div className="pd-banner-number">{banner.queue_number}</div>
             <div className="pd-banner-dest">
               {banner.room
-                ? <>يرجى التوجه إلى <b>الغرفة {banner.room}</b></>
+                ? <>يرجى التوجه إلى <b>العيادة {banner.room}</b></>
                 : <>يرجى التوجه إلى {withTitle(banner.doctor_name)}</>}
             </div>
           </div>

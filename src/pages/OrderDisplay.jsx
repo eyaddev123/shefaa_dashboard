@@ -275,7 +275,8 @@ export default function OrderDisplay() {
                   ? { gridColumnStart: offset + 1 } : undefined}>
                 <div className="od-head">
                   <div className="od-doctor">{b.doctor_name}</div>
-                  {b.room && <div className="od-room">الغرفة {b.room}</div>}
+                  {/* «العيادة» على الشاشة، و«الغرفة» في الصوت كما سُجّل */}
+                  {b.room && <div className="od-room">العيادة {b.room}</div>}
                 </div>
 
                 <div className="od-current">

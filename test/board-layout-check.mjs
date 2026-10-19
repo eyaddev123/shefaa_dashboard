@@ -215,6 +215,42 @@ const run = async () => {
     }
   }
 
+  // ═══ بطاقة النداء: التسمية «العيادة» ═══
+  // فحصُ البطاقات وحدها لا يكفي: بطاقة النداء تظهر عند حدث call فقط، وقد بقيت
+  // تقول «الغرفة» بعد تغيير التسمية — لا يراها إلا من ينادي.
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1920, height: 1080 } })
+    await ctx.addInitScript((snap) => {
+      const orig = CSS.supports.bind(CSS)
+      CSS.supports = (...a) => /container-type|aspect-ratio/.test(a.join(' ')) ? false : orig(...a)
+      class FakeES {
+        constructor() { this.l = {}; window.__sse = this
+          setTimeout(() => { if (this.onopen) this.onopen({})
+            ;(this.l.snapshot || []).forEach((f) => f({ data: JSON.stringify(snap) })) }, 30) }
+        addEventListener(t, f) { (this.l[t] = this.l[t] || []).push(f) }
+        removeEventListener() {} close() {}
+        emit(t, d) { (this.l[t] || []).forEach((f) => f({ data: JSON.stringify(d) })) }
+      }
+      window.EventSource = FakeES
+    }, mkBoard(2, 3))
+    const page = await ctx.newPage()
+    await page.goto(`${BASE}/display?key=test`, { waitUntil: 'load' })
+    await page.waitForTimeout(900)
+    await page.evaluate(() => window.__sse.emit('call', {
+      queue_number: 7, room: '1', doctor_name: 'د. ضياء الدين المنقل 1',
+      specialty: 'باطنية', seq: 99, repeat: false }))
+    await page.waitForTimeout(900)
+    const ban = await page.evaluate(() => {
+      const el = document.querySelector('.pd-banner')
+      return { shown: !!el, text: el ? el.innerText : '' }
+    })
+    ok(ban.shown, 'بطاقة النداء: لم تظهر عند حدث call')
+    ok(/العيادة/.test(ban.text), `بطاقة النداء: ★ التسمية يجب أن تكون «العيادة» — ${ban.text}`)
+    ok(!/الغرفة/.test(ban.text), `بطاقة النداء: ★ ظهرت «الغرفة» — ${ban.text}`)
+    console.log(`  بطاقة النداء │ ${ban.text.replace(/\n/g, ' · ')}`)
+    await ctx.close()
+  }
+
   await browser.close()
   stop()
 
