@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
+import { useDialogs } from '../dialogs.jsx'
 import { useParams } from 'react-router-dom'
 import { api, APPOINTMENT_STATUSES, BOOKING_TYPES, VISIT_TYPES, PRIORITIES, DELAY_CAUSES, WEEKDAYS, addDays, todayLocal, fmtMoney, fmtTime, toLatinDigits } from '../api.js'
 import { AttendanceBadge, urgentRowClass, isAttendanceSession, usePolling, fmtClock, FlowModeTag, FLOW_MODE_LABELS } from '../attendance-ui.jsx'
@@ -727,13 +728,19 @@ function PriorityPicker({ appt, attendance, onClose, onDone }) {
 // ويظن الموظف التبديل معطّلاً. اللافتة تقول السبب، والتحويل لمشرف العيادات وللجلسة
 // الفارغة وحدها — الخادم هو الحارس (403 لغيره، 409 لجلسة فيها حجز)، والإخفاء تجميل.
 function FlowModeMismatch({ data, onChanged, onError }) {
+  const dlg = useDialogs()
   const { role } = useRole()
   const [busy, setBusy] = useState(false)
   if (!data.flow_mode_setting || data.flow_mode_setting === data.flow_mode) return null
   const born = FLOW_MODE_LABELS[data.flow_mode], now = FLOW_MODE_LABELS[data.flow_mode_setting]
   const empty = data.appointments.length === 0
   const convert = async () => {
-    if (!confirm(`تحويل هذه الجلسة إلى ${now}؟`)) return
+    const ok = await dlg.confirm({
+      title: 'تحويل نمط الجلسة',
+      body: `تحويل هذه الجلسة إلى ${now}؟`,
+      confirmLabel: 'حوّل',
+    })
+    if (!ok) return
     setBusy(true)
     try { await api.clinic.switchSessionMode(data.id, data.flow_mode_setting); onChanged() }
     catch (ex) { onError(ex.message) }
@@ -823,13 +830,20 @@ function AttendanceCurrentCard({ current, recalled, onRecalled, onError }) {
 
 // وصول الطبيب: زرٌّ مرة واحدة، ثم الوقت مع «تصحيح» يترك أثراً يُعرض تحته
 function DoctorArrivalCard({ data, onChanged, onError }) {
+  const dlg = useDialogs()
   const [busy, setBusy] = useState(false)
   const run = async (fn) => {
     setBusy(true)
     try { await fn(); onChanged() } catch (ex) { onError(ex.message) } finally { setBusy(false) }
   }
-  const fix = () => {
-    const t = prompt('الوقت الصحيح لوصول الطبيب (ساعة:دقيقة، مثل 09:40)', fmtClock(data.doctor_arrived_at))
+  const fix = async () => {
+    const t = await dlg.prompt({
+      title: 'تصحيح وقت وصول الطبيب',
+      body: 'الوقت الصحيح (ساعة:دقيقة، مثل 09:40) — ويُحفظ الوقت السابق في الأثر.',
+      defaultValue: fmtClock(data.doctor_arrived_at),
+      placeholder: '09:40',
+      confirmLabel: 'صحّح', required: true,
+    })
     if (t) run(() => api.clinic.fixDoctorArrival(data.id, toLatinDigits(t).trim()))
   }
   const history = data.doctor_arrival_history || []
@@ -912,6 +926,7 @@ function MissingBadge({ appt }) {
 // وعناوين أقسام تملأ الشاشة. الآن: سطر معلوماتٍ صغير، ثمّ صفُّ حقولٍ واحد كلّ
 // قيمةٍ فيه مرّةً واحدة — بزرٍّ واحد يحفظ كلّ ما تغيّر في طلبٍ واحد ذرّيّ.
 function AppointmentDetails({ appt, session, onChanged, onToast }) {
+  const dlg = useDialogs()
   const { role } = useRole()
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState('')
@@ -950,7 +965,13 @@ function AppointmentDetails({ appt, session, onChanged, onToast }) {
     if (['cancelled', 'no_show'].includes(d.status)) {
       const who = `الدور ${appt.queue_number}${appt.full_name ? ` (${appt.full_name})` : ''}`
       const what = d.status === 'cancelled' ? 'إلغاء حجز' : 'تعليم «لم يحضر» لـ'
-      if (!confirm(`${what} ${who}؟`)) return
+      const ok = await dlg.confirm({
+        title: d.status === 'cancelled' ? 'إلغاء الحجز' : 'تعليم «لم يحضر»',
+        body: `${what} ${who}؟`,
+        confirmLabel: d.status === 'cancelled' ? 'إلغاء الحجز' : 'لم يحضر',
+        cancelLabel: 'تراجع', danger: true,
+      })
+      if (!ok) return
     }
     if (note.trim()) d.note = note.trim()
     setBusy(true)
@@ -1344,9 +1365,15 @@ function AttendanceQueueTable({ data, actions }) {
 // «لسا بانتظار»: المحجوزون غير الحاضرين — ظاهرة دائماً (الطبيب قد يُنهي مبكراً).
 // لا إلغاء ولا عدم حضور تلقائي: الإنسان يقرّر لكل واحد.
 function PendingArrivalList({ data, onChanged, onError }) {
+  const dlg = useDialogs()
   const pending = data.appointments.filter((a) => a.status === 'waiting')
   const noShow = async (a) => {
-    if (!confirm(`تعليم الدور ${a.queue_number} (${a.full_name}) «ما حضر»؟`)) return
+    const ok = await dlg.confirm({
+      title: 'تعليم «ما حضر»',
+      body: `تعليم الدور ${a.queue_number} (${a.full_name}) «ما حضر»؟`,
+      confirmLabel: 'ما حضر', cancelLabel: 'تراجع', danger: true,
+    })
+    if (!ok) return
     try { await api.clinic.noShow(a.id); onChanged() } catch (ex) { onError(ex.message) }
   }
   return (
@@ -1379,6 +1406,7 @@ function PendingArrivalList({ data, onChanged, onError }) {
 }
 
 export default function SessionQueue() {
+  const dlg = useDialogs()
   const { id } = useParams()
   const [data, setData] = useState(null)
   // ★ الخطأ لا يستبدل الشاشة: loadErr لأوّل تحميل فقط (ومعه «إعادة المحاولة»)، وبعده
@@ -1431,7 +1459,12 @@ export default function SessionQueue() {
   }
 
   const cancel = async (apptId) => {
-    if (!confirm('إلغاء هذا الحجز؟')) return
+    const ok = await dlg.confirm({
+      title: 'إلغاء الحجز',
+      body: 'إلغاء هذا الحجز؟ يبقى في السجلّ معلَّماً «ملغى».',
+      confirmLabel: 'إلغاء الحجز', cancelLabel: 'تراجع', danger: true,
+    })
+    if (!ok) return
     try { await api.clinic.updateAppointment(apptId, { status: 'cancelled' }); load() }
     catch (ex) { showToast(ex.message); load() }
   }

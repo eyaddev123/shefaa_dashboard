@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useDialogs } from '../dialogs.jsx'
 import { api, fmtMoney, toLatinDigits, todayLocal } from '../api.js'
 import { useRole } from '../RoleContext.jsx'
 import { useToast } from '../action-feedback.jsx'
@@ -49,6 +50,7 @@ function NewProcedureForm({ onCreated }) {
 
 // تعديل الاسم والسعر في الصفّ نفسه
 function EditRow({ proc, onSaved, onCancel }) {
+  const dlg = useDialogs()
   const [name, setName] = useState(proc.name)
   const [price, setPrice] = useState(String(Number(proc.price)))
   const [err, setErr] = useState(null)
@@ -58,9 +60,15 @@ function EditRow({ proc, onSaved, onCancel }) {
     if (name.trim() !== proc.name) body.name = name
     if (Number(price) !== Number(proc.price) || price.trim() === '') body.price = price
     if (Object.keys(body).length === 0) return onCancel()
-    if (body.price !== undefined && !confirm(
-      `تغيير سعر «${proc.name}» من ${fmtMoney(proc.price)} إلى ${fmtMoney(price)}؟\n` +
-      'يسري على ما يُضاف بعد الحفظ فقط — ما أُضيف لحجوزات سابقة يبقى بسعره.')) return
+    if (body.price !== undefined) {
+      const ok = await dlg.confirm({
+        title: 'تغيير السعر',
+        body: `تغيير سعر «${proc.name}» من ${fmtMoney(proc.price)} إلى ${fmtMoney(price)}؟\n`
+          + 'يسري على ما يُضاف بعد الحفظ فقط — ما أُضيف لحجوزات سابقة يبقى بسعره.',
+        confirmLabel: 'غيّر السعر',
+      })
+      if (!ok) return
+    }
     setErr(null); setBusy(true)
     try { await api.clinic.updateProcedure(proc.id, body); onSaved() }
     catch (ex) { setErr(ex.message) }
@@ -220,6 +228,7 @@ function SettlementTab({ canEdit, showToast }) {
 }
 
 export default function ClinicProcedures() {
+  const dlg = useDialogs()
   const [list, setList] = useState(null)
   const [err, setErr] = useState(null)
   const [editing, setEditing] = useState(null)
@@ -232,7 +241,14 @@ export default function ClinicProcedures() {
   useEffect(() => { load() }, [])
 
   const toggleActive = async (p) => {
-    if (p.is_active && !confirm(`تعطيل «${p.name}»؟\nلا يُضاف بعدها لأي حجز، وما أُضيف سابقاً يبقى كما هو.`)) return
+    if (p.is_active) {
+      const ok = await dlg.confirm({
+        title: 'تعطيل الإجراء',
+        body: `تعطيل «${p.name}»؟\nلا يُضاف بعدها لأي حجز، وما أُضيف سابقاً يبقى كما هو.`,
+        confirmLabel: 'تعطيل', danger: true,
+      })
+      if (!ok) return
+    }
     try {
       await api.clinic.updateProcedure(p.id, { is_active: !p.is_active })
       showToast(p.is_active ? `عُطّل «${p.name}»` : `فُعّل «${p.name}»`, 'success', 3000); load()

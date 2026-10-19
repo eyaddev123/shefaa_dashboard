@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useDialogs } from '../dialogs.jsx'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api, AID_TYPES, DECISION_TYPES, RELATIONS, STATUSES, MARITAL_STATUS, maritalLabel, fmtDate, fmtMoney } from '../api.js'
 import { useRole } from '../RoleContext.jsx'
@@ -80,6 +81,7 @@ function NewPersonForm({ familyId, onCreated }) {
 }
 
 export default function FamilyDetail() {
+  const dlg = useDialogs()
   const { id } = useParams()
   const [h, setH] = useState(null)
   const { role, isChairman } = useRole()
@@ -107,23 +109,33 @@ export default function FamilyDetail() {
   const history = standing.filter((x) => x.revoked_at)
 
   const revoke = async (sa) => {
-    const reason = window.prompt('سبب سحب الاعتماد الدائم (إلزامي):')
+    const reason = await dlg.prompt({
+      title: 'سحب الاعتماد الدائم',
+      body: 'سبب السحب (إلزامي) — يُسجَّل في أثر الاعتماد.',
+      placeholder: 'مثلاً: تغيّر وضع الأسرة',
+      confirmLabel: 'سحب الاعتماد', danger: true, required: true,
+    })
     if (!reason || !reason.trim()) return
     setRevoking(sa.id)
     try {
       await api.revokeStandingApproval(sa.id, reason.trim())
       await loadStanding()
-    } catch (e) { window.alert(e.message) }
+    } catch (e) { await dlg.alert({ title: 'تعذّر التنفيذ', body: e.message }) }
     finally { setRevoking(null) }
   }
 
   const reconfirm = async (sa) => {
-    if (!window.confirm('تأكيد أن هوية رب الأسرة الجديدة صحيحة، ورفع تعليق الاعتماد الدائم؟')) return
+    const ok = await dlg.confirm({
+      title: 'رفع تعليق الاعتماد',
+      body: 'تأكيد أن هوية رب الأسرة الجديدة صحيحة، ورفع تعليق الاعتماد الدائم؟',
+      confirmLabel: 'أؤكّد ورفع التعليق',
+    })
+    if (!ok) return
     setConfirming(true)
     try {
       await api.reconfirmStandingApproval(sa.id)
       await loadStanding()
-    } catch (e) { window.alert(e.message) }
+    } catch (e) { await dlg.alert({ title: 'تعذّر التنفيذ', body: e.message }) }
     finally { setConfirming(false) }
   }
 

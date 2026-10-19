@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useDialogs } from '../dialogs.jsx'
 import { api, ROLE_LABELS, ROLE_DESCRIPTIONS, fmtDate } from '../api.js'
 import { useRole } from '../RoleContext.jsx'
 import PasswordInput from '../components/PasswordInput.jsx'
@@ -343,11 +344,18 @@ function RoleEditor({ user, options, onDone }) {
 function UserRow({ user, options, onChanged, isSelf }) {
   const [panel, setPanel] = useState(null) // 'password' | 'role' | null
 
+  const dlg = useDialogs()
   const toggleActive = async () => {
     const verb = user.is_active ? 'إيقاف' : 'تفعيل'
-    if (!confirm(`${verb} حساب ${user.display_name}؟`)) return
+    const ok = await dlg.confirm({
+      title: `${verb} الحساب`,
+      body: `${verb} حساب ${user.display_name}؟`,
+      confirmLabel: verb,
+      danger: user.is_active,   // الإيقاف يمنع الدخول — فعلٌ يستحق التمييز
+    })
+    if (!ok) return
     try { await api.updateUser(user.id, { is_active: !user.is_active }); onChanged() }
-    catch (ex) { alert(ex.message) }
+    catch (ex) { await dlg.alert({ title: 'تعذّر الحفظ', body: ex.message }) }
   }
 
   const close = (msg) => { setPanel(null); if (msg) { onChanged(msg) } }

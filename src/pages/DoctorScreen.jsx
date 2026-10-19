@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useDialogs } from '../dialogs.jsx'
 import { matchesAr } from '../arabic-search.js'
 import { api, fmtTime, todayLocal } from '../api.js'
 import { AttendanceBadge, urgentRowClass, isAttendanceSession, usePolling, fmtClock } from '../attendance-ui.jsx'
@@ -8,12 +9,19 @@ import { useToast, RecallButton } from '../action-feedback.jsx'
 // بالأسماء وحدها — لا مبالغ. ولكلٍّ «×» لتصحيح ضغطةٍ خاطئة وقعت في الغرفة،
 // بتأكيدٍ لأنّ الإزالة تترك أثراً (سبباً ومن أزال) لا تُمحى.
 function AddedProcedures({ appointmentId, added = [], onDone, onError, onChanged }) {
+  // الهوكّان قبل أي return مبكر — قواعد الهوكس تمنع استدعاءً مشروطاً
+  const dlg = useDialogs()
   const [busy, setBusy] = useState(false)
   const live = (added || []).filter((l) => !l.removed_at)
   if (live.length === 0) return null
 
   const remove = async (line) => {
-    if (!confirm(`إزالة «${line.name}» من هذا المريض؟`)) return
+    const ok = await dlg.confirm({
+      title: 'إزالة إجراء',
+      body: `إزالة «${line.name}» من هذا المريض؟`,
+      confirmLabel: 'إزالة', danger: true,
+    })
+    if (!ok) return
     setBusy(true)
     try {
       await api.clinic.removeAppointmentProcedure(appointmentId, line.id, 'أُضيف بالخطأ')

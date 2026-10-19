@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useDialogs } from '../dialogs.jsx'
 import { Link } from 'react-router-dom'
 import { api, WEEKDAYS, fmtMoney, fmtTime, todayLocal } from '../api.js'
 
@@ -249,6 +250,7 @@ function NewScheduleForm({ doctorId, onCreated }) {
 }
 
 function DoctorRow({ doctor, onChanged }) {
+  const dlg = useDialogs()
   const [expanded, setExpanded] = useState(false)
   const [schedules, setSchedules] = useState(null)
   const [shareMsg, setShareMsg] = useState(null)
@@ -261,13 +263,18 @@ function DoctorRow({ doctor, onChanged }) {
 
   const toggleActive = async () => {
     try { await api.clinic.updateDoctor(doctor.id, { is_active: !doctor.is_active }); onChanged() }
-    catch (ex) { alert(ex.message) }
+    catch (ex) { await dlg.alert({ title: 'تعذّر التنفيذ', body: ex.message }) }
   }
 
   const removeSchedule = async (id) => {
-    if (!confirm('حذف موعد الدوام هذا؟')) return
+    const ok = await dlg.confirm({
+      title: 'حذف موعد الدوام',
+      body: 'حذف موعد الدوام هذا؟ لن تُولَّد منه جلساتٌ بعد اليوم.',
+      confirmLabel: 'حذف', danger: true,
+    })
+    if (!ok) return
     try { await api.clinic.deleteSchedule(id); loadSchedules() }
-    catch (ex) { alert(ex.message) }
+    catch (ex) { await dlg.alert({ title: 'تعذّر التنفيذ', body: ex.message }) }
   }
 
   return (

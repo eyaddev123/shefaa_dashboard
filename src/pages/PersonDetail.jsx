@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useDialogs } from '../dialogs.jsx'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api, AID_TYPES, DECISION_TYPES, RELATIONS, STATUSES, MARITAL_STATUS, maritalLabel, fmtDate, fmtDateTime, fmtMoney } from '../api.js'
 import { useRole } from '../RoleContext.jsx'
@@ -111,6 +112,7 @@ function EditForm({ person, onSaved, onCancel }) {
 }
 
 export default function PersonDetail() {
+  const dlg = useDialogs()
   const { id } = useParams()
   const [p, setP] = useState(null)
   const [err, setErr] = useState(null)
@@ -154,10 +156,15 @@ export default function PersonDetail() {
 
       {editing && (
         <EditForm person={p} onCancel={() => setEditing(false)}
-          onSaved={(u) => {
+          onSaved={async (u) => {
             setEditing(false)
             load()
-            if (u.standing_suspended) window.alert('عُدّلت هوية رب الأسرة — عُلّق الاعتماد الدائم بانتظار تأكيد المدير المسؤول.')
+            if (u.standing_suspended) {
+              await dlg.alert({
+                title: 'عُلّق الاعتماد الدائم',
+                body: 'عُدّلت هوية رب الأسرة — عُلّق الاعتماد الدائم بانتظار تأكيد المدير المسؤول.',
+              })
+            }
           }} />
       )}
 
