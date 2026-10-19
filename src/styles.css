@@ -2119,3 +2119,45 @@ button.danger:hover:not(:disabled) { filter: brightness(1.08); }
 .spec-item > span { flex: 1 1 auto; min-width: 0; }
 .spec-item + .spec-item { border-top: 1px solid var(--border); }
 
+
+/* ═══ إعداد الطابعة (PrinterSetup) ═══
+   دليلٌ يُقرأ مرّةً عند التركيب — فالخطوات مرقّمة بارزة، والتحذير مميَّز. */
+.ps-device { display: flex; flex-direction: column; gap: 10px; }
+.ps-toggle { display: flex; align-items: center; gap: 9px; font-weight: 700; font-size: 14.5px; }
+/* القاعدة العامة `.inline > .field input { width:100% }` تبتلع المربّع — نطابق تخصيصها */
+.ps-toggle input[type='checkbox'],
+.inline > .field .ps-toggle input[type='checkbox'] {
+  width: 17px; height: 17px; flex: none; margin: 0; accent-color: var(--primary); cursor: pointer;
+}
+.ps-width { max-width: 220px; }
+.ps-test { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+
+.ps-steps { list-style: none; margin: 6px 0 0; padding: 0; }
+.ps-step { display: flex; gap: 10px; align-items: flex-start; padding: 9px 0; line-height: 1.75; }
+.ps-step + .ps-step { border-top: 1px solid var(--border); }
+.ps-num {
+  flex: none; width: 24px; height: 24px; border-radius: 50%;
+  background: var(--primary); color: #fff; font-size: 12.5px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; margin-top: 2px;
+}
+.ps-cmd {
+  background: var(--surface-2, rgba(127,214,184,0.1)); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 11px; margin: 7px 0 0; font-size: 12.5px;
+  overflow-x: auto; white-space: pre; font-family: ui-monospace, Menlo, Consolas, monospace;
+}
+.ps-note {
+  margin-top: 7px; font-size: 12.5px; color: var(--text-secondary);
+  border-inline-start: 3px solid var(--border); padding-inline-start: 9px;
+}
+/* التحذير الذي لا يجوز أن يُقرأ كملاحظةٍ عابرة: الماك قد يُظهر نافذة الطباعة */
+.ps-note.ps-warn {
+  border-inline-start-color: var(--status-pending);
+  color: var(--text); background: rgba(240, 173, 78, 0.09);
+  border-radius: 0 8px 8px 0; padding: 8px 10px;
+}
+.ps-faults { margin: 4px 0 0; padding-inline-start: 18px; line-height: 1.85; font-size: 13.5px; }
+.ps-faults li { margin-bottom: 5px; }
+.ps-faults code, .ps-step code {
+  background: var(--surface-2, rgba(127,214,184,0.12)); border-radius: 5px;
+  padding: 1px 5px; font-size: 12.5px;
+}

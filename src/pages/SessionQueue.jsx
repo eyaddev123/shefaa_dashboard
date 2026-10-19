@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { useDialogs } from '../dialogs.jsx'
+import { loadPrinter, printTicket, ticketFrom } from '../ticket-print.js'
 import { useParams } from 'react-router-dom'
 import { api, APPOINTMENT_STATUSES, BOOKING_TYPES, VISIT_TYPES, PRIORITIES, DELAY_CAUSES, WEEKDAYS, addDays, todayLocal, fmtMoney, fmtTime, toLatinDigits } from '../api.js'
 import { AttendanceBadge, urgentRowClass, isAttendanceSession, usePolling, fmtClock, FlowModeTag, FLOW_MODE_LABELS } from '../attendance-ui.jsx'
@@ -655,7 +656,7 @@ function SlotList({ sessionId, fees, onBooked, acceptsUrgent = true }) {
 // ثلاثة أزرار بدل كتابة النوع باليد. والشرح تحت كل زر يتبع نمط الجلسة: في الخانات
 // تُزاح مواعيد المنتظرين، وفي الحضور لا إزاحة (الإسعافي وحده يتقدّم). النتيجة تُعرض
 // داخل النافذة لا في alert. الخادم هو الحارس (DOCTOR_NO_URGENT وغيره) — رسالته تُعرض كما هي.
-function PriorityPicker({ appt, attendance, onClose, onDone }) {
+function PriorityPicker({ appt, attendance, onClose, onDone, onArrived }) {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState(null)
   const [result, setResult] = useState(null)
@@ -679,6 +680,8 @@ function PriorityPicker({ appt, attendance, onClose, onDone }) {
     setBusy(true); setErr(null)
     try {
       const r = await api.clinic.prioritize(appt.id, priority)
+      // الترقية إلى «إسعافي» تُسجّل المنتظر حاضراً — فهي مسار حضورٍ يطبع بطاقته
+      if (r?.was_first_arrival && onArrived) onArrived({ ...appt, ...(r || {}) }, r)
       setResult(attendance
         ? (priority === 'urgent' ? 'تم — سُجّل حاضراً ويتصدّر الحاضرين.' : 'تم — أُضيفت الشارة، ومكانه بترتيب حضوره.')
         : `تم التقديم — تأجّل ${r.delayed_count} موعداً بمقدار مدة كشف واحدة.`)
@@ -925,7 +928,7 @@ function MissingBadge({ appt }) {
 // كانت القيم تظهر مرّتين (سطر قراءة فوق حقولٍ تحمل القيم نفسها)، وبزرَّي حفظ
 // وعناوين أقسام تملأ الشاشة. الآن: سطر معلوماتٍ صغير، ثمّ صفُّ حقولٍ واحد كلّ
 // قيمةٍ فيه مرّةً واحدة — بزرٍّ واحد يحفظ كلّ ما تغيّر في طلبٍ واحد ذرّيّ.
-function AppointmentDetails({ appt, session, onChanged, onToast }) {
+function AppointmentDetails({ appt, session, onChanged, onToast, onArrived }) {
   const dlg = useDialogs()
   const { role } = useRole()
   const [busy, setBusy] = useState(false)
@@ -978,7 +981,26 @@ function AppointmentDetails({ appt, session, onChanged, onToast }) {
     try {
       const r = await api.clinic.saveAppointmentDetails(appt.id, d)
       onToast(r?.message || 'حُفظت التعديلات', 'success'); setNote(''); onChanged()
+      // «بانتظار الحضور» ⇒ «حاضر» من هذه اللوحة مسارُ حضورٍ كغيره.
+      // was_first_arrival من الخادم يمنع الطباعة الثانية عند التبديل ذهاباً وإياباً.
+      if (r?.was_first_arrival && onArrived) onArrived({ ...appt, ...(r || {}) }, r)
     } catch (ex) { onToast(ex.message) } finally { setBusy(false) }
+  }
+
+  // إعادة الطباعة تتجاهل الإعداد العام وأوّل الحضور (طلبٌ صريح)، لكنّها
+  // تحترم «هذا الجهاز يطبع»: جهازٌ بلا طابعة لا يُجدي ضغطُ الزرّ فيه.
+  const [reprinting, setReprinting] = useState(false)
+  const reprint = async () => {
+    const printer = loadPrinter()
+    if (!printer.enabled) {
+      onToast('هذا الجهاز غير معلَّمٍ للطباعة — فعّله من «إعداد الطابعة»')
+      return
+    }
+    setReprinting(true)
+    try {
+      const r = await printTicket(ticketFrom(appt, session), printer.width)
+      if (!r.ok) onToast(`تعذّرت الطباعة${r.reason ? ` (${r.reason})` : ''}`)
+    } finally { setReprinting(false) }
   }
 
   const missing = missingOf(appt)
@@ -1030,6 +1052,12 @@ function AppointmentDetails({ appt, session, onChanged, onToast }) {
           </div>
           <div className="ad-actions">
             <button disabled={busy || !hasChanges} onClick={save}>حفظ التعديلات</button>
+            {/* إعادة الطباعة: متاحةٌ دائماً — بطاقةٌ ضاعت، أو إجراءاتٌ أُضيفت
+                بعد الحضور فصار المبلغ غير ما طُبع. لا تتقيّد بالطباعة التلقائية
+                ولا بأوّل حضور: الموظف طلبها صراحةً. */}
+            <button className="ghost" disabled={reprinting} onClick={reprint}>
+              {reprinting ? 'جارٍ الطباعة…' : '🖨 طباعة البطاقة'}
+            </button>
             {hasChanges && <button className="ghost" onClick={() => { setForm(base()); setNote('') }}>تراجع</button>}
             {missing.length > 0 && <span className="ad-missing">ينقص: {missing.map((f) => f.label).join('، ')}</span>}
           </div>
@@ -1307,7 +1335,7 @@ function DetailsToggle({ open, onToggle }) {
 // طابور نمط الحضور: بترتيب الخادم (قيد الكشف، ثم الحاضرون — الإسعافي أولاً ثم الأقدم
 // حضوراً — ثم من لم يحضر). لا عمود موعد ولا انتظار متوقَّع: لا خانات ولا تقدير هنا.
 function AttendanceQueueTable({ data, actions }) {
-  const { arrive, cancel, prioritize, setPostponing, openDetails, toggleDetails, reload, toast } = actions
+  const { arrive, cancel, prioritize, setPostponing, openDetails, toggleDetails, reload, toast, autoPrint } = actions
   return (
     <div className="card">
       <h3>الطابور ({data.appointments.length})</h3>
@@ -1363,7 +1391,8 @@ function AttendanceQueueTable({ data, actions }) {
             </tr>
             {openDetails === a.id && (
               <tr className="appt-details-row"><td colSpan={9}>
-                <AppointmentDetails appt={a} session={data} onChanged={reload} onToast={toast} />
+                <AppointmentDetails appt={a} session={data} onChanged={reload} onToast={toast}
+                  onArrived={autoPrint} />
               </td></tr>
             )}
             </Fragment>
@@ -1434,9 +1463,29 @@ export default function SessionQueue() {
   // بعد الحجز: بطاقة الدور للطباعة إن فُعّل الإعداد، وإلا عودةٌ إلى الطابور برسالة قصيرة.
   // الرموز وُلّدت وخُزّنت في الحالتين — هذا عرضٌ فقط (رمز الوصول في تفاصيل الحجز).
   const afterBooked = (appt) => {
+    // الحجز الفوري الحضوري يُنشأ «حاضراً» بحكم تعريفه (المريض واقفٌ أمام
+    // الموظف) — فهو مسار حضورٍ أيضاً، وبطاقته تُطبع كبقيّة الحضور.
+    if (appt?.status === 'arrived') autoPrint(appt, { was_first_arrival: true })
     if (data?.show_booking_ticket) { setTicket(appt); return }
     showToast(`تم الحجز — الدور ${appt.queue_number}`, 'success', 4000)
     load()
+  }
+
+  // ═══ الطباعة التلقائية عند الحضور ═══
+  // ثلاثة شروطٍ مجتمعة، وأيّها سقط فلا طباعة ولا ضجيج:
+  //   ١) الإعداد العام مفعَّل (مشرف العيادات)
+  //   ٢) **هذا الجهاز** معلَّمٌ أنّه يطبع — الاستقبال جهازان وطابعةٌ واحدة
+  //   ٣) هذا أوّل حضورٍ للحجز (was_first_arrival من الخادم) — فحاضر ⇐ بانتظار
+  //      ⇐ حاضر لا يطبع مرّتين
+  // والفشل لا يمسّ الحضور إطلاقاً: الحضور تمّ على الخادم قبل أن نطبع.
+  const autoPrint = async (appt, res) => {
+    if (!res?.was_first_arrival) return
+    if (!data?.auto_print_arrival_ticket) return
+    const printer = loadPrinter()
+    if (!printer.enabled) return
+    const r = await printTicket(
+      ticketFrom({ ...appt, ...res }, data), printer.width)
+    if (!r.ok) showToast(`حضر المريض، لكن تعذّرت طباعة البطاقة${r.reason ? ` (${r.reason})` : ''}`)
   }
 
   const load = () => api.clinic.queue(id).then((d) => { setData(d); setLoadErr(null) })
@@ -1457,8 +1506,14 @@ export default function SessionQueue() {
   // إكمال» — والموظف يقرّر. وإن لم ينقص شيء يمرّ الحضور مباشرةً بلا نموذج.
   const [completing, setCompleting] = useState(null)   // { appt, missing, patient }
   const doArrive = async (apptId, patientPatch) => {
-    try { await api.clinic.arrive(apptId, patientPatch); setCompleting(null); load() }
-    catch (ex) { showToast(ex.message); load() }
+    try {
+      const res = await api.clinic.arrive(apptId, patientPatch)
+      setCompleting(null); load()
+      // بعد load: البطاقة تُبنى من صفّ الطابور قبل التحديث + ردّ الخادم.
+      // الطباعة بعد نجاح الحضور دائماً — فلا تُلغيه ولا تؤخّره.
+      const appt = data?.appointments?.find((a) => String(a.id) === String(apptId))
+      await autoPrint({ ...appt, ...(res?.patient || {}) }, res)
+    } catch (ex) { showToast(ex.message); load() }
   }
   const arrive = async (apptId, patientPatch) => {
     if (patientPatch) return doArrive(apptId, patientPatch)   // قادمٌ من النموذج
@@ -1642,6 +1697,7 @@ export default function SessionQueue() {
           appt={prioritizing}
           attendance={attendance}
           onClose={() => setPrioritizing(null)}
+          onArrived={autoPrint}
           onDone={load}
         />
       )}
@@ -1660,6 +1716,7 @@ export default function SessionQueue() {
       {attendance && (
         <>
           <AttendanceQueueTable data={data} actions={{ arrive, cancel, prioritize, setPostponing, openDetails, toggleDetails, reload: load,
+            autoPrint,
             toast: (msg, kind) => showToast(msg, kind, kind === 'success' ? 3500 : 6000) }} />
           <PendingArrivalList data={data} onChanged={load} onError={showToast} />
         </>
@@ -1723,6 +1780,7 @@ export default function SessionQueue() {
               {openDetails === a.id && (
                 <tr className="appt-details-row"><td colSpan={9}>
                   <AppointmentDetails appt={a} session={data} onChanged={load}
+                    onArrived={autoPrint}
                     onToast={(msg, kind) => showToast(msg, kind, kind === 'success' ? 3500 : 6000)} />
                 </td></tr>
               )}

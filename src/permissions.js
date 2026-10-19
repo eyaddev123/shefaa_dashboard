@@ -35,6 +35,10 @@ export const canSeeProceduresPage = (role) =>
 // إضافة إجراء على حجز وإزالته — الاستقبال ومسؤول العيادات (الخادم يحصر الاستقبال بيوم الجلسة)
 export const canEditAppointmentProcedures = (role) => role === 'clinic_admin' || role === 'clinic_reception'
 
+// صفحة إعداد الطابعة: الاستقبال يقرؤها ويُعدّ جهازه (الإعداد محلّيٌّ لا يمسّ أحداً)،
+// والمشرف يقرؤها ليساعد. ولا علاقة لها بالإعداد العام (في «الإعدادات»).
+export const canSeePrinterSetup = (role) => role === 'clinic_admin' || role === 'clinic_reception'
+
 // تعديل الحجز (تصحيح بيانات، تغيير مريض، نوع الزيارة، تنزيل الأولوية، التراجع
 // عن «لم يحضر»): الاستقبال ومشرف العيادات. الطبيب لا يُعدّل، والمدير اطّلاع.
 // والخادم هو الحارس — هذا لإخفاء ما لا يُفيد الضغط عليه.
@@ -70,6 +74,7 @@ export const ROUTE_ACCESS = {
   '/clinic/board': canSeeClinicBoard,
   '/clinic/session': canSeeClinicBoard,
   '/clinic/doctor': canSeeDoctorScreen,
+  '/clinic/printer': canSeePrinterSetup,
   '/settings': canSeeSettings,
   '/users': canManageUsers,
 }

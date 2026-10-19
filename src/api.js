@@ -216,10 +216,8 @@ export const api = {
       http(`/clinic/appointments/${appointmentId}`, { method: 'PATCH', body: JSON.stringify(body) }),
 
     // ═══ تعديل الحجز ═══
-    // تغيير الحالة: قائمة واحدة لكل الحالات، بملاحظة اختيارية
-    setAppointmentStatus: (appointmentId, status, note) =>
-      http(`/clinic/appointments/${appointmentId}/status`,
-        { method: 'PATCH', body: JSON.stringify({ status, note: note || undefined }) }),
+    // (الحالة تُغيَّر من لوحة «تفاصيل» ضمن حفظٍ واحد عبر saveAppointmentDetails
+    //  أدناه — ولا مُستدعٍ لمسار /status في الواجهة.)
     undoNoShow: (appointmentId, reason) =>
       http(`/clinic/appointments/${appointmentId}/undo-no-show`,
         { method: 'POST', body: JSON.stringify({ reason }) }),
