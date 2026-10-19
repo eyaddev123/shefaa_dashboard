@@ -18,6 +18,12 @@ const DAILY_RELOAD_HOUR = 3      // إعادة تحميل مسكّرة: تتخل
 // بأنفسنا لأنّ رمز الجهاز قد يُرفض (401) فلا معنى لمحاولةٍ كل ثانية.
 const RETRY_MS = [1000, 2000, 5000, 10000, 30000]
 
+// ═══ المنتظرون المعروضون ═══
+// الحاضرون وحدهم (arrived): من حجز ولم يحضر ليس في الطابور بعد، وإظهاره يُربك
+// من ينتظر فعلاً. والترتيب يأتي من الخادم (ATTENDANCE_ORDER: الإسعافي الحاضر
+// أولاً ثمّ ترتيب الحضور) — فلا نُعيد ترتيبه هنا ولا نكشف سببه.
+export const waitingOf = (b) => (b.queue || []).filter((q) => q.arrived)
+
 const two = (n) => String(n).padStart(2, '0')
 const AR_DAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
 const AR_MONTHS = ['كانون الثاني', 'شباط', 'آذار', 'نيسان', 'أيار', 'حزيران',
@@ -305,6 +311,21 @@ export default function PublicDisplay() {
   const cardH = grid.rows ? (gridBox.h - GAP * (grid.rows - 1)) / grid.rows : 0
   const fonts = cardFonts(cardW, cardH)
   // متغيّرات CSS: قيمٌ بالبكسل محسوبة هنا، فتعمل على Chrome 66 بلا container queries
+  // ═══ كم رقماً يتّسع في البطاقة؟ ═══
+  // يُحسب من التخطيط لا يُقاس بعد الرسم: القياس يأتي متأخّراً دورةً فتُعرض
+  // أرقامٌ تُقصّ بصمت. وعرض الرقم ≈ 0.62 من حجم خطّه لكل خانة، مع فجوة.
+  // والسطور المتاحة من ارتفاع المنطقة المحجوزة لصفّ «التالي».
+  const waitFit = (() => {
+    if (!fonts || !cardW) return 2
+    const digitW = fonts.upNum * 0.62
+    const chipW = digitW * 2.2 + fonts.upNum * 0.5   // رقمان + حشو + فجوة
+    const usable = cardW - 16 - fonts.upLabel * 4    // الحشو وكلمة «التالي:»
+    const perLine = Math.max(1, Math.floor(usable / chipW))
+    // سطران كحدٍّ أقصى: أكثر من ذلك يزاحم الرقم الضخم أو يدفع الغرفة خارج البطاقة
+    const lines = cardH > 420 ? 2 : 1
+    return Math.max(1, perLine * lines)
+  })()
+
   const fontVars = fonts ? {
     '--pd-number': `${fonts.number}px`,
     '--pd-room': `${fonts.room}px`,
@@ -425,24 +446,44 @@ export default function PublicDisplay() {
                     </div>
                   </>
                 )}
+                {/* «العيادة» على الشاشة، و«الغرفة» في الصوت كما سُجّل — نصٌّ فقط */}
                 {b.room && (
-                  <div className="pd-room" title={`الغرفة ${b.room}`}>
-                    {fonts?.roomCompact ? b.room : `الغرفة ${b.room}`}
+                  <div className="pd-room" title={`العيادة ${b.room}`}>
+                    {fonts?.roomCompact ? b.room : `العيادة ${b.room}`}
                   </div>
                 )}
               </div>
 
-              {/* لا «التالي/بعده» لعيادةٍ انتهى دوامها — لا أحد ينتظر */}
-              <div className="pd-upcoming" style={b.closed ? { visibility: 'hidden' } : undefined}>
-                <div className="pd-up">
-                  <span className="pd-up-label">التالي</span>
-                  <span className={`pd-up-num ${b.next ? '' : 'pd-dim'}`}>{b.next?.queue_number ?? '—'}</span>
+              {/* ═══ المنتظرون كاملين بترتيب خدمتهم ═══
+                  «التالي/بعده» كانا يُظهران اثنين فقط، فمن رقمه الخامس لا يعرف
+                  أين هو ويسأل الاستقبال. والقائمة تُظهر الجميع بالترتيب الفعلي
+                  (الإسعافي أولاً ثمّ ترتيب الحضور — يأتي مرتَّباً من الخادم).
+
+                  ★ أرقامٌ فقط: لا اسم، ولا تمييز للإسعافي بلونٍ أو شارة —
+                  تمييزه على شاشةٍ عامة يكشف واقعةً طبية عن شخصٍ بعينه.
+                  والحاضرون وحدهم: من حجز ولم يحضر ليس في الطابور بعد. */}
+              {!b.closed && (
+                <div className="pd-waiting">
+                  {waitingOf(b).length === 0 ? (
+                    <span className="pd-up-label pd-dim">لا أحد بانتظار الدور</span>
+                  ) : (
+                    <>
+                      <span className="pd-up-label">التالي:</span>
+                      <span className="pd-wait-nums">
+                        {waitingOf(b).slice(0, waitFit).map((q, i) => (
+                          <span key={q.queue_number}
+                            className={`pd-wait-num${i === 0 ? ' pd-wait-first' : ''}`}>
+                            {q.queue_number}
+                          </span>
+                        ))}
+                        {waitingOf(b).length > waitFit && (
+                          <span className="pd-wait-more">+{waitingOf(b).length - waitFit}</span>
+                        )}
+                      </span>
+                    </>
+                  )}
                 </div>
-                <div className="pd-up">
-                  <span className="pd-up-label">بعده</span>
-                  <span className={`pd-up-num ${b.after_next ? '' : 'pd-dim'}`}>{b.after_next?.queue_number ?? '—'}</span>
-                </div>
-              </div>
+              )}
             </div>
           ))}
         </div>

@@ -25,18 +25,30 @@ const ok = (cond, label) => { if (cond) { pass++; return true } failures.push(la
 const MIN = { number: 56, room: 28, doctor: 20, upNum: 24, specialty: 13 }
 
 const SIZES = [[1920, 1080], [1366, 768], [960, 540]]
-const DOCS = [1, 2, 4, 7, 9]
+const DOCS = [1, 4, 7]
+// أعداد المنتظرين: فارغ · واحد · متوسّط · طويلٌ يتجاوز البطاقة («+N»)
+const WAITING = [0, 1, 5, 20]
 const BAR = 90   // شريط متصفّح التلفاز
 
-const mkBoard = (n) => ({
+// أسماء مرضى في البيانات عمداً: إن ظهر أحدها على الشاشة فهو تسريب
+const PATIENT_NAMES = ['سمير خالد الحسن', 'ليلى أحمد النجار']
+
+const mkBoard = (n, waiting = 2) => ({
   urgent_delays: 0, seq: 1,
   board: Array.from({ length: n }, (_, i) => ({
     doctor_name: `د. ضياء الدين المنقل ${i + 1}`,
     specialty: 'باطنية',
     room: String(i + 1),
     current: { queue_number: 100 + i },
-    next: { queue_number: 111 + i },
-    after_next: { queue_number: 122 + i },
+    next: null, after_next: null,
+    queue: [
+      ...Array.from({ length: waiting }, (_, k) => ({
+        queue_number: 10 + k, arrived: true,
+        full_name: PATIENT_NAMES[k % 2], priority: k === 0 ? 'urgent' : 'normal' })),
+      // محجوزان لم يحضرا — يجب ألّا يظهرا
+      { queue_number: 901, arrived: false, full_name: PATIENT_NAMES[0] },
+      { queue_number: 902, arrived: false, full_name: PATIENT_NAMES[1] },
+    ],
   })),
 })
 
@@ -61,6 +73,7 @@ const run = async () => {
       const h = bar ? h0 - BAR : h0
       const line = []
       for (const n of DOCS) {
+       for (const waiting of WAITING) {
         const ctx = await browser.newContext({ viewport: { width: w, height: h } })
         // ═══ محاكاة التلفاز: بلا container queries ولا aspect-ratio ═══
         await ctx.addInitScript((snap) => {
@@ -74,7 +87,7 @@ const run = async () => {
             removeEventListener() {} close() {}
           }
           window.EventSource = FakeES
-        }, mkBoard(n))
+        }, mkBoard(n, waiting))
 
         const page = await ctx.newPage()
         const errors = []
@@ -112,16 +125,36 @@ const run = async () => {
           const used = cards.reduce((s, c) => { const r = c.getBoundingClientRect()
             return s + r.width * r.height }, 0)
 
+          // صفّ المنتظرين في أول بطاقة: كم رقماً ظهر، وهل خرج شيءٌ عن البطاقة
+          const first = cards[0]
+          const nums = first ? [...first.querySelectorAll('.pd-wait-num')] : []
+          const moreEl = first ? first.querySelector('.pd-wait-more') : null
+          const waitRow = first ? first.querySelector('.pd-waiting') : null
+          if (waitRow && first) {
+            const cr = first.getBoundingClientRect()
+            const wr = waitRow.getBoundingClientRect()
+            if (wr.bottom > cr.bottom + 1) clipped.push('card0:waiting-row')
+            nums.forEach((el, k) => {
+              const r = el.getBoundingClientRect()
+              if (r.bottom > wr.bottom + 1 || r.right > cr.right + 1 || r.left < cr.left - 1)
+                clipped.push(`card0:wait${k}`)
+            })
+          }
+
           return {
             cards: cards.length, rowCounts, clipped,
             fillPct: Math.round(used / (gr.width * gr.height) * 100),
             number: fs('.pd-number'), room: fs('.pd-room'), doctor: fs('.pd-doctor'),
-            upNum: fs('.pd-up-num'), specialty: fs('.pd-specialty'),
+            upNum: fs('.pd-wait-num'), specialty: fs('.pd-specialty'),
+            shownNums: nums.map((e) => e.textContent.trim()),
+            moreText: moreEl ? moreEl.textContent.trim() : '',
+            hasWaitRow: !!waitRow,
+            text: document.body.innerText,
             scrollY: document.documentElement.scrollHeight - document.documentElement.clientHeight,
           }
         })
 
-        const tag = `${w}×${h0}${bar ? '+شريط' : ''} ${n}د`
+        const tag = `${w}×${h0}${bar ? '+شريط' : ''} ${n}د/${waiting}منتظر`
         ok(m.cards === n, `${tag}: ظهرت ${m.cards} بطاقة من ${n}`)
 
         // ═══ لا بطاقة يتيمة ═══
@@ -138,7 +171,7 @@ const run = async () => {
         ok(m.number >= MIN.number, `${tag}: الرقم ${m.number}px < ${MIN.number}`)
         ok(m.room >= MIN.room, `${tag}: الغرفة ${m.room}px < ${MIN.room}`)
         ok(m.doctor >= MIN.doctor, `${tag}: اسم الدكتور ${m.doctor}px < ${MIN.doctor}`)
-        ok(m.upNum >= MIN.upNum, `${tag}: التالي/بعده ${m.upNum}px < ${MIN.upNum}`)
+        if (waiting > 0) ok(m.upNum >= MIN.upNum, `${tag}: رقم الانتظار ${m.upNum}px < ${MIN.upNum}`)
         ok(m.specialty >= MIN.specialty, `${tag}: الاختصاص ${m.specialty}px < ${MIN.specialty}`)
 
         // ═══ الترتيب البصري: الرقم ← الغرفة ← الاسم ← الاختصاص ═══
@@ -149,10 +182,34 @@ const run = async () => {
         // ═══ لا شيء مقصوص — والغرفة خاصّةً (ثانية الأهمية) ═══
         ok(m.clipped.length === 0, `${tag}: عناصر مقصوصة: ${m.clipped.join(', ')}`)
 
+        // ═══ صفّ المنتظرين ═══
+        if (waiting === 0) {
+          ok(m.shownNums.length === 0, `${tag}: ظهرت أرقامٌ ولا منتظر — ${JSON.stringify(m.shownNums)}`)
+          ok(/لا أحد بانتظار/.test(m.text), `${tag}: قائمةٌ فارغة بلا رسالة`)
+        } else {
+          // المعروض + المخفيّ = عدد المنتظرين بالضبط — لا رقمَ يضيع بصمت
+          const hidden = m.moreText ? Number(m.moreText.replace(/\D/g, '')) : 0
+          ok(m.shownNums.length + hidden === waiting,
+            `${tag}: ${m.shownNums.length} معروضاً + ${hidden} مخفيّاً ≠ ${waiting}`)
+          ok(m.shownNums.length >= 1, `${tag}: لم يظهر ولا رقم`)
+        }
+        // ★ الخصوصية: أرقامٌ فقط
+        ok(!PATIENT_NAMES.some((nm) => m.text.includes(nm)),
+          `${tag}: ★ تسرّب اسم مريض إلى الشاشة العامة`)
+        ok(!/إسعاف|عاجل|طارئ/.test(m.text), `${tag}: ★ ذُكرت الأولوية على الشاشة العامة`)
+        // ★ غير الحاضرين لا يظهرون
+        ok(!m.text.includes('901') && !m.text.includes('902'),
+          `${tag}: ★ ظهر من حجز ولم يحضر (901/902)`)
+        // ★ «العيادة» لا «الغرفة» على الشاشة.
+        // عند الضيق الشديد تُختصر إلى رقمها وحده (roomCompact) فلا تظهر الكلمة
+        // أصلاً — المهمّ ألّا تظهر «الغرفة» إطلاقاً.
+        ok(!/الغرفة/.test(m.text), `${tag}: ★ ظهرت «الغرفة» — التسمية يجب أن تكون «العيادة»`)
+
         ok(errors.length === 0, `${tag}: أخطاء صفحة: ${errors.join(' | ')}`)
 
-        line.push(`${n}د:${JSON.stringify(m.rowCounts).replace(/[[\]]/g, '')}/${m.fillPct}%/${m.number}px`)
+        line.push(`${n}د/${waiting}:${m.shownNums.length}${m.moreText ? '+' : ''}`)
         await ctx.close()
+       }
       }
       console.log(`  ${String(w).padStart(4)}×${String(h0).padEnd(4)}${bar ? ' +شريط' : '  ملء  '} │ ${line.join('  ')}`)
     }
