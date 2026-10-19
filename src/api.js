@@ -138,6 +138,22 @@ export const api = {
       http(`/clinic/schedules/preview?from=${from}&weeks=${weeks}`),
     dayDoctors: (date) => http(`/clinic/day-doctors?date=${date}`),
     closeSession: (id) => http(`/clinic/sessions/${id}/close`, { method: 'POST' }),
+    // ═══ تسوية الإجراءات ═══
+    pendingProcedures: (date, scope, doctorId) => {
+      const q = new URLSearchParams({ date })
+      if (scope) q.set('scope', scope)
+      if (doctorId) q.set('doctor_id', String(doctorId))
+      return http(`/clinic/procedures/pending?${q}`)
+    },
+    settleProcedure: (lineId, body) =>
+      http(`/clinic/procedures/${lineId}/settle`, { method: 'PATCH', body: JSON.stringify(body) }),
+    setDoctorShare: (id, body) =>
+      http(`/clinic/doctors/${id}/share`, { method: 'PATCH', body: JSON.stringify(body) }),
+    doctorProcedureShares: (id) => http(`/clinic/doctors/${id}/procedure-shares`),
+    setDoctorProcedureShare: (id, procId, body) =>
+      http(`/clinic/doctors/${id}/procedure-shares/${procId}`, { method: 'PUT', body: JSON.stringify(body) }),
+    removeDoctorProcedureShare: (id, procId) =>
+      http(`/clinic/doctors/${id}/procedure-shares/${procId}`, { method: 'DELETE' }),
     reopenSession: (id) => http(`/clinic/sessions/${id}/reopen`, { method: 'POST' }),
     // ═══ التصدير: تنزيل ملفٍّ لا JSON ═══
     // رابطٌ عاديّ <a href> لا يحمل ترويسة Authorization، فالخادم يردّ 401.

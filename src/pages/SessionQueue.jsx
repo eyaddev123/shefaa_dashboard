@@ -868,11 +868,21 @@ function DoctorArrivalCard({ data, onChanged, onError }) {
 // للعرض وحده — لا شيء يُكتب في الخزينة.
 function FeeCell({ appt }) {
   if (!appt.procedures_total) return <>{fmtMoney(appt.fee)}</>
+  // ═══ سطر العمل للاستقبال ═══
+  // المبالغ وحدها تقول «كم»، ولا تقول «افعل». والموظف يحتاج جملةً صريحة:
+  // أيّ إجراءٍ أُضيف وكم يُستوفى زيادةً — وإلا مرّ المريض بلا دفع الفرق.
+  const live = (appt.procedures || []).filter((l) => !l.removed_at)
+  const names = live.map((l) => l.name).join('، ')
   return (
     <span className="fee-breakdown">
       <span>{VISIT_TYPES[appt.visit_type] || 'زيارة'} {fmtMoney(appt.fee)}</span>
       <span>إجراءات {fmtMoney(appt.procedures_total)}</span>
       <strong>الإجمالي {fmtMoney(appt.total)}</strong>
+      {names && (
+        <span className="fee-action">
+          إجراء: {names} — خذي {fmtMoney(appt.procedures_total)} زيادة
+        </span>
+      )}
     </span>
   )
 }

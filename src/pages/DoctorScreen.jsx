@@ -3,6 +3,72 @@ import { api, fmtTime, todayLocal } from '../api.js'
 import { AttendanceBadge, urgentRowClass, isAttendanceSession, usePolling, fmtClock } from '../attendance-ui.jsx'
 import { useToast, RecallButton } from '../action-feedback.jsx'
 
+// ═══ «عملت إجراء» — زرٌّ واحد للطبيب ═══
+//
+// بسيطٌ عمداً: زرّ، قائمة، تأكيد. **ولا مبالغ إطلاقاً** — الطبيب يقول ما فعله،
+// والمال شأنُ الاستقبال (الاستيفاء) والمشرف (التقسيم). عرضُ السعر هنا يُقحم
+// الطبيب في حسابٍ ليس له، ويجعل الشاشة تكشف تسعيرةً أمام المريض الجالس قبالته.
+function DoneProcedure({ appointmentId, onDone, onError }) {
+  const [open, setOpen] = useState(false)
+  const [list, setList] = useState(null)
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    if (!open || list) return
+    api.clinic.procedures().then((rows) => setList(rows.filter((p) => p.is_active)))
+      .catch((e) => { onError(e.message); setOpen(false) })
+  }, [open])
+
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape' && !busy) setOpen(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [busy])
+
+  const pick = async (proc) => {
+    setBusy(true)
+    try {
+      await api.clinic.addAppointmentProcedure(appointmentId, proc.id)
+      setOpen(false)
+      onDone(`سُجّل الإجراء: ${proc.name}`)
+    } catch (e) { onError(e.message) }
+    finally { setBusy(false) }
+  }
+
+  return (
+    <>
+      <button type="button" className="ghost" disabled={busy}
+        onClick={() => setOpen(true)} style={{ padding: '14px 20px', fontSize: 15 }}>
+        ✚ عملت إجراء
+      </button>
+      {open && (
+        <div className="modal-backdrop"
+          onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) setOpen(false) }}>
+          <div className="modal-card" role="dialog" aria-modal="true" aria-labelledby="proc-title">
+            <h3 id="proc-title">أيّ إجراء عملت؟</h3>
+            {!list ? <p className="empty">جارٍ التحميل…</p>
+              : list.length === 0 ? <p className="empty">لا إجراءات مُعرَّفة.</p>
+              : (
+                <div className="prio-choices">
+                  {list.map((p) => (
+                    <button key={p.id} type="button" className="prio-choice"
+                      disabled={busy} onClick={() => pick(p)}>
+                      <span className="prio-label">{p.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            <div className="bf-actions" style={{ marginTop: 14 }}>
+              <button type="button" className="ghost" disabled={busy}
+                onClick={() => setOpen(false)}>إلغاء</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
 export default function DoctorScreen() {
   const [sessions, setSessions] = useState(null)
   const [sessionId, setSessionId] = useState(null)
@@ -115,6 +181,10 @@ export default function DoctorScreen() {
                   {/* معطَّل طوال مدّة خنق الخادم مع عدٍّ ظاهر — فلا تصل ضغطةٌ ثانية لتُرفض */}
                   <RecallButton apptId={current.id} onError={showToast}
                     style={{ padding: '14px 20px', fontSize: 15 }} />
+
+                  {/* قبل «إنهاء الكشف»: الإجراء يُسجَّل والمريض ما زال في الغرفة */}
+                  <DoneProcedure appointmentId={current.id}
+                    onDone={showToast} onError={showToast} />
 
                   <button disabled={busy} onClick={() => act(api.clinic.done, current.id)} style={{ padding: '14px 28px', fontSize: 15 }}>
                     إنهاء الكشف

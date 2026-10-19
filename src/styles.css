@@ -1932,3 +1932,14 @@ button.danger:hover:not(:disabled) { filter: brightness(1.08); }
   line-height: 1.3;
   white-space: nowrap;
 }
+
+/* ═══ سطر العمل للاستقبال ═══
+   المبالغ تقول «كم»، وهذا يقول «افعل»: أيّ إجراءٍ أُضيف وكم يُستوفى زيادةً.
+   بارزٌ بلونٍ تحذيريّ فلا يُقرأ كسطرٍ محاسبيّ آخر يمرّ بالعين. */
+.fee-action {
+  display: block; margin-top: 4px;
+  font-size: 11.5px; font-weight: 800; line-height: 1.5;
+  color: var(--status-pending);
+}
+/* سطر تسويةٍ حصّة الشفاء فيه سالبة — تحذيرٌ لا منع */
+.row-warn > td { background: var(--status-pending-bg); }
