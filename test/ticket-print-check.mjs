@@ -184,7 +184,7 @@ for (const c of CASES) {
     m.overflow.length ? JSON.stringify(m.overflow) : '')
   ok(m.bodyW <= Math.round(c.w * MM) + 1, `${tag}: عرض الجسم ≤ عرض الورق`,
     `${m.bodyW} ≤ ${Math.round(c.w * MM)}`)
-  ok(m.cutMm >= 10, `${tag}: فراغ القصّ ≥ ١٠مم`, `${m.cutMm}مم`)
+  ok(m.cutMm >= 7 && m.cutMm <= 10, `${tag}: فراغ القصّ ٨مم تقريباً`, `${m.cutMm}مم`)
 
   const file = `${SHOTS}/ticket-${c.w}mm-${CASES.indexOf(c)}.png`
   await page.screenshot({ path: file, fullPage: true })
@@ -214,6 +214,65 @@ for (const c of CASES) {
   } else {
     ok(false, `${tag}: تعذّرت قراءة MediaBox من الـPDF`)
   }
+  await page.close()
+}
+
+// ═══ ٥ب) الخطّ Cairo من ملفات التطبيق — ويعمل بلا إنترنت ═══
+console.log('\n── ٥ب) خطّ البطاقة ──')
+{
+  const page = await browser.newPage()
+  // اقطع Google كلّياً: الاستقبال قد يعمل على شبكةٍ محلّية بلا إنترنت
+  await page.route('**://fonts.googleapis.com/**', (r) => r.abort())
+  await page.route('**://fonts.gstatic.com/**', (r) => r.abort())
+  const external = []
+  page.on('request', (r) => {
+    const u = r.url()
+    if (/\.woff2?($|\?)/.test(u) && !u.includes('localhost') && !u.includes('127.0.0.1'))
+      external.push(u)
+  })
+  await page.addScriptTag({ content: src })
+  const html = await page.evaluate(() => ticketHtml(
+    { queue_number: 9, full_name: 'محمد أحمد الحسن', birth_year: 1990,
+      visit_type: 'consultation', fee: 15000, procedures: [],
+      doctor_name: 'د. سامر', room: '3' }, 80, null, 'http://x'))
+  ok(/@font-face/.test(html), 'البطاقة تُعرّف الخطّ بنفسها')
+  ok(/cairo-arabic\.woff2/.test(html) && /cairo-latin\.woff2/.test(html),
+    '★ تُحمّل Cairo من ملفات التطبيق (عربي + لاتيني)')
+  ok(!/fonts\.googleapis|fonts\.gstatic/.test(html),
+    '★ لا شيء من شبكةٍ خارجية — تعمل بلا إنترنت')
+  ok(/font-family:\s*'Cairo'/.test(html), 'الجسم بخطّ Cairo')
+  ok(/font-display:\s*block/.test(html),
+    'font-display: block — لا تُطبع ومضةُ خطٍّ بديل')
+  // الأوزان: عاديّ للعموم وثقيلٌ للاسم والمبلغ
+  ok(/\.name \{[^}]*font-weight: 700/.test(html), '★ اسم المريض ثقيل (700)')
+  ok(/\.pay \{[^}]*font-weight: 700/.test(html) || /tr\.total td \{[^}]*font-weight: 700/.test(html),
+    '★ المبلغ ثقيل (700)')
+  ok(/font-weight: 400/.test(html), 'والباقي عاديّ (400)')
+  ok(external.length === 0, 'لا طلب خطٍّ خارجيّ', external.join(' '))
+  await page.close()
+}
+
+// ═══ ٥ج) ارتفاع الصفحة = المحتوى (لا ورق أبيض) ═══
+console.log('\n── ٥ج) الورق لا يزيد عن المحتوى ──')
+{
+  const page = await browser.newPage({ viewport: { width: Math.round(80 * MM), height: 900 } })
+  await page.addScriptTag({ content: src })
+  const r = await page.evaluate((mmPx) => {
+    const data = { queue_number: 7, full_name: 'علي حسن خالد', birth_year: 1990,
+      visit_type: 'consultation', fee: 15000, procedures: [],
+      doctor_name: 'د. هدى', room: '2' }
+    const auto = ticketHtml(data, 80)
+    document.documentElement.innerHTML = auto
+    const measured = Math.ceil(document.querySelector('.t').getBoundingClientRect().height / mmPx)
+    const fixed = ticketHtml(data, 80, measured)
+    return { autoHasAuto: /@page \{ size: 80mm auto/.test(auto),
+             fixedPage: (/@page \{[^}]*\}/.exec(fixed) || [''])[0], measured }
+  }, MM)
+  ok(r.autoHasAuto, 'بلا ارتفاعٍ ⇒ «auto» (كما كانت)')
+  ok(new RegExp(`size: 80mm ${r.measured}mm`).test(r.fixedPage),
+    `★ بارتفاعٍ مقيس ⇒ @page بطول المحتوى (${r.measured}مم)`, r.fixedPage)
+  ok(r.measured > 60 && r.measured < 160,
+    `★ الطول معقول (${r.measured}مم) لا ٢١٠مم ورقةً كاملة`)
   await page.close()
 }
 

@@ -53,11 +53,14 @@ const stamp = (d = new Date()) =>
 // ═══ بناء البطاقة ═══
 // width: 80 أو 58 (مليمتر الورق). المحتوى أضيق من الورق بهامشٍ من الجهتين:
 // الطابعة الحرارية لا تطبع حتى الحافّة، وبلا هامشٍ يُقصّ أوّل الحرف وآخره.
-export function ticketHtml(data, width = 80) {
+// heightMm: طولُ الصفحة بالمليمتر حين نعرفه (بعد قياس المحتوى) — وإلّا «auto».
+// origin: جذر الموقع لتحميل ملفات الخطّ منه (الإطار بلا عنوانٍ يُحَلّ منه مسار).
+export function ticketHtml(data, width = 80, heightMm = null, origin = '') {
   const w = width === 58 ? 58 : 80
   const content = w === 58 ? 48 : 72          // عرض المحتوى الفعلي (مم)
   const big = w === 58 ? 26 : 34              // حجم رقم الدور (مم ⇒ pt تقريبي)
   const base = w === 58 ? 11 : 13
+  const pageH = heightMm ? `${heightMm}mm` : 'auto'
 
   const age = ageFrom(data.birth_year)
   // القائم وحده يُطبع: المُزال سطرٌ ملغيّ، وطباعته تجعل المريض يدفع ثمن ما أُلغي
@@ -83,15 +86,36 @@ export function ticketHtml(data, width = 80) {
 <html lang="ar" dir="rtl"><head><meta charset="utf-8">
 <title>بطاقة الدور</title>
 <style>
-  /* الورق: الطول «auto» — الإيصال يطول بالإجراءات ولا يُقصّ عند حدٍّ ثابت */
-  @page { size: ${w}mm auto; margin: 0; }
+  /* ═══ خطّ Cairo من ملفات التطبيق لا من شبكة خارجية ═══
+     الاستقبال قد يعمل بلا إنترنت (شبكةٌ محلّية والطابعة عليها)، وخطٌّ من CDN
+     يسقط صامتاً فتُطبع البطاقة بخطٍّ آخر. والمسار مطلقٌ من جذر الموقع: الإطار
+     مستندٌ بلا عنوانٍ خاصٍّ به (about:blank) فالمسار النسبيّ لا يُحَلّ.
+     ونُحمّل الوزنين اللذين تستعملهما البطاقة وحدهما (٤٠٠ و٧٠٠). */
+  @font-face {
+    font-family: 'Cairo'; font-style: normal; font-weight: 400 700;
+    font-display: block;   /* block لا swap: لا نريد ومضة خطٍّ بديلٍ تُطبع */
+    src: url('${origin}/fonts/cairo-arabic.woff2') format('woff2');
+    unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891,
+                   U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011,
+                   U+204F, U+2E41, U+FB50-FDFF, U+FE70-FEFF;
+  }
+  @font-face {
+    font-family: 'Cairo'; font-style: normal; font-weight: 400 700;
+    font-display: block;
+    src: url('${origin}/fonts/cairo-latin.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6,
+                   U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F,
+                   U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  }
+  /* الورق: الطول مقيسٌ من المحتوى — انظر ملاحظة printTicket أدناه */
+  @page { size: ${w}mm ${pageH}; margin: 0; }
   * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   html, body { margin: 0; padding: 0; background: #fff; }
   body {
     width: ${w}mm;
-    /* خطوط النظام: لا تحميل من الشبكة — الطابعة لا تنتظر خطاً لا يصل */
-    font-family: "Segoe UI", Tahoma, "Geeza Pro", "Arial", sans-serif;
-    color: #000; font-size: ${base}pt; line-height: 1.45;
+    /* Cairo خطّ التطبيق — والاحتياط خطوط النظام إن تعذّر تحميله */
+    font-family: 'Cairo', "Segoe UI", Tahoma, "Geeza Pro", "Arial", sans-serif;
+    color: #000; font-size: ${base}pt; line-height: 1.45; font-weight: 400;
     /* أسود صريح على أبيض: الحراريّة لا تعرف رمادياً — الرمادي يخرج باهتاً */
     -webkit-font-smoothing: none;
   }
@@ -114,9 +138,10 @@ export function ticketHtml(data, width = 80) {
   table.amounts tr.total td { border-top: 2px solid #000; padding-top: 1.2mm;
                               font-size: ${base + 2}pt; font-weight: 700; }
   .when { font-size: ${base - 2}pt; margin-top: 2mm; direction: ltr; }
-  /* ★ فراغ النهاية: القاطع يقطع على بُعد ~١٠مم من رأس الطباعة، فبلا هذا
-     الفراغ يقطع في آخر سطرٍ من النصّ. */
-  .cut { height: 14mm; }
+  /* ★ فراغ النهاية: القاطع يبعد عن رأس الطباعة بنحو ٨مم، فبلا هذا الفراغ
+     يقطع في آخر سطرٍ من النصّ. وهو داخلٌ في القياس فيصير طول الصفحة =
+     المحتوى + ٨مم بالضبط، لا ورقةً كاملة. */
+  .cut { height: 8mm; }
 </style></head>
 <body><div class="t">
   <div class="org">جمعية الشفاء الخيرية</div>
@@ -164,16 +189,42 @@ export function printTicket(data, width = 80, doc = document) {
       const d = frame.contentDocument || (w && w.document)
       if (!d || !w) return done(false, 'تعذّر إنشاء إطار الطباعة')
 
-      d.open(); d.write(ticketHtml(data, width)); d.close()
+      // جذر الموقع: الإطار مستندٌ مكتوبٌ بـdocument.write فلا عنوان له،
+      // ومسارٌ نسبيٌّ للخطّ لا يُحَلّ. نأخذه من نافذة التطبيق.
+      const origin = (doc.defaultView || window).location.origin
 
-      // مهلة: لو لم يعد onafterprint (أو طُبع صامتاً) لا نُعلّق الوعد أبداً
-      const guard = setTimeout(() => done(true, null), 4000)
+      // ═══ مرّتان: قياسٌ ثمّ طباعة ═══
+      // الطول «auto» يجعل تعريف الصفحة بلا ارتفاع، فيملأ سائق الطابعة الورقة
+      // إلى حدّ المقاس المختار (٢١٠مم عندنا) ويُخرج ورقاً أبيض طويلاً بعد
+      // النصّ. نرسم أوّلاً لنقيس ارتفاع المحتوى الحقيقي، ثمّ نُعيد الرسم
+      // بـ@page بذلك الارتفاع — فيقطع السائق بعد المحتوى مباشرةً.
+      d.open(); d.write(ticketHtml(data, width, null, origin)); d.close()
+
+      const guard = setTimeout(() => done(true, null), 9000)
       w.onafterprint = () => { clearTimeout(guard); done(true, null) }
 
-      // ننتظر رسم المستند قبل الطباعة — طباعةٌ قبل الرسم تخرج ورقةً فارغة
-      const go = () => {
-        try { w.focus(); w.print() }
-        catch (e) { clearTimeout(guard); done(false, e?.message || 'فشل أمر الطباعة') }
+      const MM = 96 / 25.4
+      const go = async () => {
+        try {
+          // ★ ننتظر الخطّ قبل القياس وقبل الطباعة: القياس بخطٍّ بديلٍ يعطي
+          // ارتفاعاً خاطئاً، والطباعة قبل جهوزه تُخرج أوّل بطاقةٍ بخطٍّ آخر.
+          if (d.fonts && d.fonts.ready) {
+            await Promise.race([d.fonts.ready, new Promise((r) => setTimeout(r, 2500))])
+          }
+          // الارتفاع الفعلي للمحتوى + فراغٌ قبل القاطع (CUT_MM داخل البطاقة)
+          const el = d.querySelector('.t') || d.body
+          const measured = Math.ceil((el.getBoundingClientRect().height) / MM)
+          if (measured > 20 && measured < 2000) {
+            d.open(); d.write(ticketHtml(data, width, measured, origin)); d.close()
+            if (d.fonts && d.fonts.ready) {
+              await Promise.race([d.fonts.ready, new Promise((r) => setTimeout(r, 1500))])
+            }
+            await new Promise((r) => setTimeout(r, 80))
+          }
+          w.focus(); w.print()
+        } catch (e) {
+          clearTimeout(guard); done(false, e?.message || 'فشل أمر الطباعة')
+        }
       }
       if (d.readyState === 'complete') setTimeout(go, 60)
       else w.onload = () => setTimeout(go, 60)

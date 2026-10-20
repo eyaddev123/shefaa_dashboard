@@ -119,8 +119,17 @@ export default function PrinterSetup() {
             «<span dir="ltr">Let Windows manage my default printer</span>» وإلّا بدّلها ويندوز وحده.
           </Step>
           <Step n="٤">
-            خصائص الطابعة ← <strong>تفضيلات</strong> ← حجم الورق: <code dir="ltr">80 x 297 mm</code>
-            {' '}(أو <code dir="ltr">80mm Roll</code>). ثمّ <strong>طباعة صفحة اختبار</strong> للتأكّد.
+            <strong>حجم الورق — وهو سبب الورق الأبيض الزائد:</strong> خصائص الطابعة ←
+            <strong> تفضيلات</strong> ← حجم الورق: اختر مقاس <strong>الرول</strong>
+            {' '}(<code dir="ltr">72 x 3276 mm</code> أو ما يُسمّى <code dir="ltr">Roll</code>
+            {' '}/ <code dir="ltr">Receipt</code>) — <strong>لا</strong> {' '}
+            <code dir="ltr">72 x 210 mm</code>.
+            <div className="ps-note">
+              المقاس الثابت (٢١٠مم) يجعل الطابعة تُخرج ورقةً بطول ٢١٠مم مهما قصرت البطاقة،
+              فتخرج نحو <strong>١٠٠مم ورقاً أبيض</strong> بعد كلّ بطاقة. ومقاس الرول يجعلها
+              تقطع بعد المحتوى مباشرةً — والنظام يرسل طول البطاقة الحقيقي مع كلّ طباعة.
+            </div>
+            ثمّ <strong>طباعة صفحة اختبار</strong> للتأكّد.
           </Step>
           <Step n="٥">
             <strong>لتختفي نافذة الطباعة:</strong> انسخ اختصار كروم على سطح المكتب، ثمّ بالزرّ
@@ -147,8 +156,22 @@ export default function PrinterSetup() {
             «الاستخدام» (Use).
           </Step>
           <Step n="٣">
-            اجعلها <strong>الطابعة الافتراضية</strong> من القائمة نفسها، واضبط حجم الورق
-            <code dir="ltr"> 80mm</code> من <strong>تهيئة الصفحة</strong>.
+            اجعلها <strong>الطابعة الافتراضية</strong> من القائمة نفسها.
+            <div className="ps-note">
+              <strong>حجم الورق — سبب الورق الأبيض الزائد:</strong> في نافذة الطباعة اختر
+              {' '}<strong>حجم الورق</strong> = <code dir="ltr">X72MMY3276MM</code>
+              {' '}(مقاس الرول)، <strong>لا</strong> <code dir="ltr">X72MMY210MM</code>.
+              الأخير يُخرج ورقةً بطول ٢١٠مم دائماً — نحو ١٠٠مم ورقٍ أبيض بعد كلّ بطاقة.
+            </div>
+            <div className="ps-note">
+              ولجعله الافتراضَ الدائم (فتستعمله الطباعة الصامتة بلا اختيار)، افتح
+              {' '}<strong>Terminal</strong> ونفّذ:
+              <pre dir="ltr" className="ps-cmd">{`lpoptions -p "$(lpstat -d | sed 's/.*: //')" \\
+  -o PageSize=X72MMY3276MM`}</pre>
+              وللتأكّد من المقاسات المتاحة لطابعتك:
+              <pre dir="ltr" className="ps-cmd">{'lpoptions -p <اسم الطابعة> -l | grep PageSize'}</pre>
+              النجمة <code dir="ltr">*</code> تسبق المقاس المضبوط حالياً.
+            </div>
           </Step>
           <Step n="٤">
             <strong>لتختفي نافذة الطباعة:</strong> افتح <strong>Terminal</strong> وشغّل كروم بالأمر:
