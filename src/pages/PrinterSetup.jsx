@@ -140,13 +140,37 @@ export default function PrinterSetup() {
           </Step>
           <Step n="٣">
             اعرف اسم طابعتك كما يراها النظام:
-            <pre dir="ltr" className="ps-cmd">lpstat -p | awk '{'{'}print $2{'}'}'</pre>
-            ثمّ عدّل <code dir="ltr">config.json</code> وضع الاسم في <code dir="ltr">printer</code>.
+            <div className="ps-note">
+              <strong>ماك:</strong>
+              <pre dir="ltr" className="ps-cmd">lpstat -p | awk '{'{'}print $2{'}'}'</pre>
+            </div>
+            <div className="ps-note">
+              <strong>ويندوز:</strong> سكربت التثبيت يعرضها لك ويسألك أيّها تريد —
+              فلا حاجة لتعديلٍ يدويّ. (وللاطّلاع:
+              {' '}<code dir="ltr">Get-Printer | Select Name</code>)
+              <br />
+              <strong>مهمّ:</strong> اكتب الاسم <strong>كما هو بالضبط</strong> كما يظهر في
+              «الطابعات والماسحات» — بمسافاته وشَرطاته.
+            </div>
+            ثمّ يُحفظ في <code dir="ltr">config.json</code> تحت <code dir="ltr">printer</code>.
           </Step>
           <Step n="٤">
             ثبّته ليعمل تلقائياً عند الدخول:
-            <pre dir="ltr" className="ps-cmd">cd ~/shefaa-print && ./install-mac.sh</pre>
-            السكربت ينشئ LaunchAgent ويُشغّله فوراً.
+            <div className="ps-note">
+              <strong>ماك:</strong>
+              <pre dir="ltr" className="ps-cmd">cd ~/shefaa-print && ./install-mac.sh</pre>
+              ينشئ LaunchAgent ويُشغّله فوراً.
+            </div>
+            <div className="ps-note">
+              <strong>ويندوز:</strong> انقر بالزرّ الأيمن على
+              {' '}<code dir="ltr">install-windows.ps1</code> ثمّ
+              {' '}<strong>«تشغيل باستخدام PowerShell»</strong>.
+              يعرض لك الطابعات المثبّتة ليختار الصحيحة، ويسجّل مهمّةً تعمل عند كلّ دخول.
+              {' '}<em>لا يحتاج صلاحية مسؤول.</em>
+              <br />
+              إن رفض ويندوز تشغيل السكربت، افتح PowerShell ونفّذ:
+              <pre dir="ltr" className="ps-cmd">{`powershell -ExecutionPolicy Bypass -File .\\install-windows.ps1`}</pre>
+            </div>
           </Step>
           <Step n="٥">
             تأكّد: يجب أن تصير اللافتة في أعلى هذه الصفحة <strong>خضراء</strong>.
@@ -155,8 +179,13 @@ export default function PrinterSetup() {
           </Step>
         </ol>
         <div className="ps-note">
-          السجلّ عند الأعطال: <code dir="ltr">~/Library/Logs/shefaa-print.log</code>
-          <br />لإيقافه: <code dir="ltr">launchctl unload ~/Library/LaunchAgents/com.shefaa.print.plist</code>
+          <strong>السجلّ عند الأعطال:</strong>
+          <br />ماك: <code dir="ltr">~/Library/Logs/shefaa-print.log</code>
+          <br />ويندوز: <code dir="ltr">%LOCALAPPDATA%\shefaa-print\shefaa-print.log</code>
+          <br /><br /><strong>لإيقافه:</strong>
+          <br />ماك: <code dir="ltr">launchctl unload ~/Library/LaunchAgents/com.shefaa.print.plist</code>
+          <br />ويندوز: من <strong>«برنامج جدولة المهام»</strong> أوقف المهمّة
+          {' '}<code dir="ltr">ShefaaPrintHelper</code>.
         </div>
       </div>
 

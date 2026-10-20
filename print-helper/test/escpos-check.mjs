@@ -6,7 +6,7 @@
 // عاد كما كان — ونقرأ رأس الأمر بايتاً بايتاً ونقارنه بالمواصفة.
 import { decodePng, encodeGrayPng } from '../src/png.js'
 import { rgbaToBits, buildJob, rasterCmd, feedDots, cutCmd, initCmd, bitAt } from '../src/escpos.js'
-import { writeFileSync, mkdirSync } from 'node:fs'
+import { writeFileSync, mkdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -170,6 +170,27 @@ console.log('\n── ٦) الحرّاس ──')
   ok(big.length === 9, 'تغذيةٌ > ٢٥٥ تُقسَّم أوامر', `${big.length} بايت`)
   ok(big[2] === 255 && big[5] === 255 && big[8] === 90, 'والمجموع صحيح (255+255+90)',
     `${big[2]}+${big[5]}+${big[8]}`)
+}
+
+
+// ═══ ٧) دعم المنصّتين ═══
+console.log('\n── ٧) ماك وويندوز ──')
+{
+  const src = readFileSync(new URL('../src/server.js', import.meta.url), 'utf8')
+  ok(/process\.platform === 'win32'/.test(src), 'يميّز ويندوز')
+  ok(/winspool\.Drv/.test(src), '★ ويندوز: السبولر مباشرةً (winspool)')
+  ok(/pDataType="RAW"/.test(src), '★ ويندوز: وضع RAW — لا يمرّ بـGDI')
+  ok(/copy', '\/b'|'copy', '\/b'/.test(src) || /'copy', '\/b'/.test(src),
+    'ويندوز: احتياط copy /b')
+  ok(/'lp', \['-d', printer, '-o', 'raw'/.test(src), 'ماك/لينكس: lp -o raw')
+  ok(/Win32_Printer/.test(src), 'ويندوز: حالة الطابعة من WMI')
+  ok(/lpstat/.test(src), 'ماك: حالة الطابعة من lpstat')
+  // السجلّ في مكانٍ صحيح لكلّ نظام
+  ok(/AppData', 'Local'/.test(src), 'ويندوز: السجلّ في AppData')
+  ok(/'Library', 'Logs'/.test(src), 'ماك: السجلّ في Library/Logs')
+  // ★ البايتات نفسها لا تختلف بين النظامين — وهو ما يجعل الفحص هنا كافياً
+  ok(!/platform[\s\S]{0,400}rasterCmd|rasterCmd[\s\S]{0,200}platform/.test(src),
+    '★ ترميز ESC/POS واحدٌ للنظامين (لا تفرّع)')
 }
 
 console.log(`\n═══ ${pass} تحقّقاً ناجحاً، ${fails.length} فشلاً ═══`)
