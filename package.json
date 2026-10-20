@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "test:audio": "node test/audio-call-check.mjs",
     "test:board": "node test/board-layout-check.mjs",
-    "test:order": "node test/order-display-check.mjs"
+    "test:order": "node test/order-display-check.mjs",
+    "test:ticket": "node test/ticket-print-check.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

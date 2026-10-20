@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useDialogs } from '../dialogs.jsx'
 import { api, DISEASE_CATEGORIES, SERVICE_TYPES, SERVICE_UNITS, fmtMoney } from '../api.js'
 import { useRole } from '../RoleContext.jsx'
 
@@ -69,6 +70,7 @@ function NewServiceForm({ diseases, onCreated }) {
 }
 
 function PriceCell({ service, canEdit, onSaved }) {
+  const dlg = useDialogs()
   const [editing, setEditing] = useState(false)
   const [price, setPrice] = useState(service.unit_price)
   if (!canEdit) return <span className="num">{fmtMoney(service.unit_price)}</span>
@@ -81,7 +83,7 @@ function PriceCell({ service, canEdit, onSaved }) {
     )
   const save = async () => {
     try { await api.updateService(service.id, { unit_price: Number(price) }); setEditing(false); onSaved() }
-    catch (ex) { alert(ex.message) }
+    catch (ex) { await dlg.alert({ title: 'تعذّر الحفظ', body: ex.message }) }
   }
   return (
     <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
@@ -92,6 +94,7 @@ function PriceCell({ service, canEdit, onSaved }) {
 }
 
 export default function Catalog() {
+  const dlg = useDialogs()
   const [data, setData] = useState(null)
   const [err, setErr] = useState(null)
   const { role } = useRole()
@@ -105,7 +108,7 @@ export default function Catalog() {
 
   const toggleActive = async (s) => {
     try { await api.updateService(s.id, { is_active: !s.is_active }); load() }
-    catch (ex) { alert(ex.message) }
+    catch (ex) { await dlg.alert({ title: 'تعذّر الحفظ', body: ex.message }) }
   }
 
   return (

@@ -1088,6 +1088,32 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
+/* ═══ صفّ المنتظرين: الأرقام كاملةً بترتيب الخدمة ═══
+   بدل «التالي/بعده» (اثنان فقط) — من رقمه الخامس يعرف أين هو بلا سؤال.
+   ولا flex gap: متصفّح التلفاز (Chrome 66) يتجاهلها بصمت، فالهوامش بديلٌ يعمل.
+   والمقاسات تصل متغيّراتِ CSS محسوبةً من JS — لا container queries. */
+.pd-waiting {
+  display: flex; align-items: baseline; justify-content: center;
+  flex: none; min-width: 0;
+  padding-top: 0.6vh; border-top: 1px solid rgba(127, 214, 184, 0.18);
+  overflow: hidden;
+}
+.pd-wait-nums { display: inline-block; margin-inline-start: 0.45em; min-width: 0; }
+.pd-wait-num {
+  display: inline-block;
+  font-size: var(--pd-up-num, 24px); font-weight: 800; line-height: 1.3;
+  color: #eef7f5;
+  margin-inline-end: 0.5em;
+}
+/* الأول هو «التالي» — يتميّز بلونه لا بشارةٍ تكشف شيئاً عن صاحبه */
+.pd-wait-first { color: #14b8a6; }
+/* ما لم يتّسع يُعلن عن نفسه: قصٌّ صامت أسوأ من رقمٍ ناقص */
+.pd-wait-more {
+  display: inline-block;
+  font-size: var(--pd-up-num, 24px); font-weight: 800; line-height: 1.3;
+  color: #7fd6b8;
+}
+
 /* الرقمان الجايان */
 .pd-upcoming {
   display: flex; justify-content: center;
@@ -1932,3 +1958,227 @@ button.danger:hover:not(:disabled) { filter: brightness(1.08); }
   line-height: 1.3;
   white-space: nowrap;
 }
+
+/* ═══ سطر العمل للاستقبال ═══
+   المبالغ تقول «كم»، وهذا يقول «افعل»: أيّ إجراءٍ أُضيف وكم يُستوفى زيادةً.
+   بارزٌ بلونٍ تحذيريّ فلا يُقرأ كسطرٍ محاسبيّ آخر يمرّ بالعين. */
+.fee-action {
+  display: block; margin-top: 4px;
+  font-size: 11.5px; font-weight: 800; line-height: 1.5;
+  color: var(--status-pending);
+}
+/* سطر تسويةٍ حصّة الشفاء فيه سالبة — تحذيرٌ لا منع */
+.row-warn > td { background: var(--status-pending-bg); }
+
+/* ═══════════════════════════════════════════════════════════════════
+   شاشة الطبيب — أزرار العمل وقائمة الإجراءات
+   الطبيب يستعملها على الهاتف واللوحي أيضاً: الأزرار الضخمة كانت تفيض عن
+   الشاشة الضيّقة ويُكسر نصّها سطرين («إنهاء / الكشف»).
+   ═══════════════════════════════════════════════════════════════════ */
+.doc-actions {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  align-items: center;
+}
+/* مقاسٌ عاديّ، والنصّ سطرٌ واحد دائماً، والأيقونة بجانبه لا فوقه */
+.doc-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 9px 16px; font-size: 14px; line-height: 1.2;
+  white-space: nowrap;
+}
+.doc-btn-start {
+  background: var(--status-good); border-color: var(--status-good); color: #fff;
+}
+.doc-btn-start:hover:not(:disabled) { filter: brightness(1.08); background: var(--status-good); }
+/* فاصلٌ مرئيّ قبل «إنهاء الكشف»: الضغطة الخاطئة هنا تُنهي كشفاً لم يبدأ */
+.doc-btn-done { margin-inline-start: 18px; }
+
+/* ── الشاشة الضيّقة: صفّان من زرّين بعرضٍ كامل، ولا فيض ──
+   ⚠️ قاعدةٌ قائمة عند 639px تفرض على آخر أبناء .action-row صفّاً واحداً
+   بـ flex:1 لكل زرّ — فتُحشر الأربعة في سطرٍ واحد يتداخل نصّه ويُقصّ طرفاه.
+   فنُبطلها هنا بتخصيصٍ أعلى (.action-row .doc-actions) لا بـ !important. */
+@media (max-width: 639px) {
+  .action-row > .doc-actions:last-child:not(:first-child) {
+    width: 100%; display: flex; flex-wrap: wrap; gap: 8px;
+  }
+  /* `> button` في القاعدة القديمة يطابق الزرّ مباشرةً، فنرفع التخصيص بفئة
+     الزرّ نفسه لا بـ !important — وإلا بقي flex:1 يحشر الأربعة في سطر. */
+  .action-row > .doc-actions > .doc-btn,
+  .action-row > .doc-actions > * > .doc-btn,
+  .action-row > .doc-actions > button.doc-btn {
+    flex: 1 1 calc(50% - 4px); min-width: 0; width: auto;
+  }
+  /* DoneProcedure يغلّف زرّه بـ Fragment فيصير ابناً مباشراً — نغطّي الحالتين */
+  .action-row > .doc-actions > * { min-width: 0; }
+  .doc-btn { width: 100%; padding: 11px 8px; font-size: 13.5px; }
+  /* الفاصل يصير عمودياً: الصفّ الثاني منفصلٌ بصرياً عن الأول */
+  .doc-btn-done { margin-inline-start: 0; }
+  /* الشارات تأخذ السطر كاملاً تحت الأزرار */
+  .action-row > .doc-actions > .doc-procs { flex: 1 1 100%; }
+}
+
+/* ── ما أضافه الطبيب على هذا المريض: أسماءٌ فقط ── */
+.doc-procs {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  margin-top: 10px;
+  /* سطرٌ مستقلّ أسفل الأزرار: وضعُها بينها يشقّ الصفّين على الشاشة الضيّقة */
+  flex: 1 1 100%; width: 100%;
+}
+.doc-procs-label { font-size: 12.5px; color: var(--text-secondary); font-weight: 700; }
+.doc-proc-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 6px 3px 10px; border-radius: 999px;
+  font-size: 12.5px; font-weight: 700;
+  color: var(--status-good); background: var(--status-good-bg);
+}
+.doc-proc-x {
+  all: unset; cursor: pointer; line-height: 1;
+  font-size: 15px; font-weight: 800; padding: 0 3px; border-radius: 50%;
+  color: var(--status-bad);
+}
+.doc-proc-x:hover { background: var(--status-bad-bg); }
+.doc-proc-x:disabled { opacity: 0.4; cursor: default; }
+
+/* ── نافذة الاختيار: بحثٌ ومربّعات اختيار ── */
+.doc-proc-search {
+  width: 100%; margin-top: 10px;
+}
+.doc-proc-list {
+  margin-top: 10px; max-height: 320px; overflow-y: auto;
+  border: 1px solid var(--border); border-radius: 12px;
+}
+.doc-proc-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 14px; cursor: pointer; font-size: 14.5px; font-weight: 700;
+}
+.doc-proc-row + .doc-proc-row { border-top: 1px solid var(--border); }
+.doc-proc-row:hover:not(.is-added) { background: var(--surface-2, rgba(127,214,184,0.07)); }
+.doc-proc-row input { width: auto; margin: 0; flex: none; }
+/* المضاف سابقاً: مؤشَّرٌ ومعطَّل — لا يُضاف مرّتين (والخادم يحرسها أيضاً) */
+.doc-proc-row.is-added { opacity: 0.6; cursor: default; }
+.doc-proc-done {
+  margin-inline-start: auto; font-size: 11.5px; font-weight: 700;
+  color: var(--status-good);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   نوافذ التأكيد والإدخال (dialogs.jsx) — بديل window.confirm/alert/prompt
+   تلك تكتب «localhost:5173 says» وأزرارها إنكليزية ولا تعرف الثيم.
+   ═══════════════════════════════════════════════════════════════════ */
+.dlg-backdrop { z-index: 1200; }   /* فوق أي نافذةٍ أخرى قد تكون مفتوحة */
+.dlg-card { max-width: 440px; }
+.dlg-title { margin: 0 0 8px; font-size: 17px; }
+.dlg-body {
+  margin: 0; font-size: 14px; line-height: 1.7; color: var(--text-secondary);
+  white-space: pre-line;   /* أسطر النصّ تُحترم بلا وسوم */
+}
+.dlg-input { width: 100%; margin-top: 12px; }
+.dlg-actions {
+  display: flex; justify-content: flex-start; gap: 8px; margin-top: 18px;
+}
+/* على الهاتف: زرّان بعرضٍ كامل — الإبهام يخطئ الأزرار الصغيرة المتلاصقة */
+@media (max-width: 480px) {
+  .dlg-actions { flex-wrap: wrap; }
+  .dlg-actions > button { flex: 1 1 calc(50% - 4px); min-width: 0; }
+}
+
+/* ═══ اختيار الاختصاص (SpecialtyPicker) ═══
+   قائمةٌ وزرُّ إضافةٍ بجانبها — لا صفحة إدارةٍ منفصلة تقطع عمل من يضيف دكتوراً. */
+.spec-row { display: flex; align-items: center; gap: 8px; }
+/* القائمة تحتاج عرضاً يكفي أطول اسم («أذن أنف حنجرة») — بلا حدٍّ أدنى كانت
+   تنكمش إلى ٨٠ بكسل فلا يُقرأ منها إلا «— بلا». */
+.spec-row > select, .spec-row > input { flex: 1 1 auto; min-width: 150px; }
+/* حقل الاختصاص يأخذ سطره كاملاً: الزرّ بجانب القائمة لا يسع عموداً ضيّقاً. */
+.field:has(.spec-row) { flex: 1 1 100%; min-width: 280px; }
+.spec-add { flex: none; padding: 6px 12px; font-size: 12px; white-space: nowrap; }
+.spec-warn { color: var(--status-pending); font-weight: 700; }
+/* الكتلة تأخذ سطرها كاملاً داخل النموذج المرن: الحقل الضيّق كان يقصّ أسماء
+   الاختصاصات ويكسر سطر «عام» ثلاثة أسطر. */
+.field:has(.spec-list), .field:has(.spec-general) { flex: 1 1 100%; min-width: 260px; }
+.spec-general {
+  display: flex; align-items: center; gap: 8px;
+  font-weight: 700; margin-bottom: 6px; white-space: nowrap;
+}
+/* صناديق الاختيار: قاعدة `.inline > .field input { width:100% }` أقوى تخصيصاً،
+   فكانت تمدّ المربّع ليملأ السطر ويبقى اسم الاختصاص بعرض صفر. نطابق تخصيصها. */
+.spec-general input[type='checkbox'],
+.spec-item input[type='checkbox'],
+.inline > .field .spec-general input[type='checkbox'],
+.inline > .field .spec-item input[type='checkbox'] {
+  width: 16px; height: 16px; flex: none; margin: 0; accent-color: var(--primary); cursor: pointer;
+}
+.spec-search { width: 100%; }
+.spec-list {
+  margin-top: 6px; max-height: 190px; overflow-y: auto;
+  border: 1px solid var(--border); border-radius: 10px;
+}
+.spec-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px; cursor: pointer; font-size: 13.5px;
+}
+/* الاسم يأخذ ما بقي ولا يُقصّ */
+.spec-item > span { flex: 1 1 auto; min-width: 0; }
+.spec-item + .spec-item { border-top: 1px solid var(--border); }
+
+
+/* ═══ إعداد الطابعة (PrinterSetup) ═══
+   دليلٌ يُقرأ مرّةً عند التركيب — فالخطوات مرقّمة بارزة، والتحذير مميَّز. */
+.ps-device { display: flex; flex-direction: column; gap: 10px; }
+.ps-toggle { display: flex; align-items: center; gap: 9px; font-weight: 700; font-size: 14.5px; }
+/* القاعدة العامة `.inline > .field input { width:100% }` تبتلع المربّع — نطابق تخصيصها */
+.ps-toggle input[type='checkbox'],
+.inline > .field .ps-toggle input[type='checkbox'] {
+  width: 17px; height: 17px; flex: none; margin: 0; accent-color: var(--primary); cursor: pointer;
+}
+.ps-width { max-width: 220px; }
+.ps-test { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+
+.ps-steps { list-style: none; margin: 6px 0 0; padding: 0; }
+.ps-step { display: flex; gap: 10px; align-items: flex-start; padding: 9px 0; line-height: 1.75; }
+.ps-step + .ps-step { border-top: 1px solid var(--border); }
+.ps-num {
+  flex: none; width: 24px; height: 24px; border-radius: 50%;
+  background: var(--primary); color: #fff; font-size: 12.5px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; margin-top: 2px;
+}
+.ps-cmd {
+  background: var(--surface-2, rgba(127,214,184,0.1)); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 11px; margin: 7px 0 0; font-size: 12.5px;
+  overflow-x: auto; white-space: pre; font-family: ui-monospace, Menlo, Consolas, monospace;
+}
+.ps-note {
+  margin-top: 7px; font-size: 12.5px; color: var(--text-secondary);
+  border-inline-start: 3px solid var(--border); padding-inline-start: 9px;
+}
+/* التحذير الذي لا يجوز أن يُقرأ كملاحظةٍ عابرة: الماك قد يُظهر نافذة الطباعة */
+.ps-note.ps-warn {
+  border-inline-start-color: var(--status-pending);
+  color: var(--text); background: rgba(240, 173, 78, 0.09);
+  border-radius: 0 8px 8px 0; padding: 8px 10px;
+}
+.ps-faults { margin: 4px 0 0; padding-inline-start: 18px; line-height: 1.85; font-size: 13.5px; }
+.ps-faults li { margin-bottom: 5px; }
+.ps-faults code, .ps-step code {
+  background: var(--surface-2, rgba(127,214,184,0.12)); border-radius: 5px;
+  padding: 1px 5px; font-size: 12.5px;
+}
+
+/* ═══ لافتة حالة وسيط الطباعة ═══
+   الموظف يحتاج جواباً فورياً: أتُطبع البطاقات الآن أم لا؟ لونٌ ونقطةٌ وسطر. */
+.ps-status {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 11px 13px; border-radius: 11px; margin-bottom: 14px;
+  border: 1px solid var(--border); background: var(--surface-2, rgba(127,214,184,0.06));
+}
+.ps-status .ps-dot {
+  flex: none; width: 11px; height: 11px; border-radius: 50%;
+  background: var(--muted); margin-top: 5px;
+}
+.ps-status.is-ok   { border-color: rgba(60,160,120,0.45); background: rgba(60,160,120,0.08); }
+.ps-status.is-ok   .ps-dot { background: #3ca078; }
+.ps-status.is-warn { border-color: rgba(240,173,78,0.5);  background: rgba(240,173,78,0.09); }
+.ps-status.is-warn .ps-dot { background: var(--status-pending); }
+.ps-status.is-bad  { border-color: rgba(200,70,70,0.45);  background: rgba(200,70,70,0.07); }
+.ps-status.is-bad  .ps-dot { background: #c84646; }
+.ps-status > div { flex: 1 1 auto; min-width: 0; }
+.ps-status-sub { font-size: 12.5px; color: var(--text-secondary); margin-top: 3px; line-height: 1.6; }
+.ps-recheck { flex: none; padding: 4px 10px; font-size: 12px; white-space: nowrap; }

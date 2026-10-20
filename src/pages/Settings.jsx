@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useDialogs } from '../dialogs.jsx'
 import { api } from '../api.js'
 
 // شاشة الإعدادات العامة: قيم النظام القابلة للتعديل بدل أن تكون أرقاماً مدفونة في الكود.
@@ -6,6 +8,7 @@ import { api } from '../api.js'
 const FLOW_MODE_OPTIONS = { slots: 'الخانات الزمنية (القديم)', attendance: 'ترتيب الحضور' }
 
 function SettingRow({ setting, onSaved, onDirty }) {
+  const dlg = useDialogs()
   const [value, setValue] = useState(setting.value ?? '')
   const [busy, setBusy] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -16,9 +19,15 @@ function SettingRow({ setting, onSaved, onDirty }) {
 
   const save = async () => {
     // تبديل النمط قرارٌ يمسّ سير العيادة كلها — تأكيدٌ صريح بأثره الحقيقي
-    if (setting.key === 'clinic_flow_mode' && !confirm(
-      'يسري النمط الجديد على الجلسات التي تُولَّد بعد الحفظ فقط.\n' +
-      'جلسات اليوم المولَّدة مسبقاً تبقى على نمطها. متابعة؟')) return
+    if (setting.key === 'clinic_flow_mode') {
+      const ok = await dlg.confirm({
+        title: 'تبديل نمط العيادة',
+        body: 'يسري النمط الجديد على الجلسات التي تُولَّد بعد الحفظ فقط.\n'
+          + 'جلسات اليوم المولَّدة مسبقاً تبقى على نمطها. متابعة؟',
+        confirmLabel: 'بدّل النمط',
+      })
+      if (!ok) return
+    }
     setBusy(true); setSaved(false); setErr(null)
     try {
       await api.updateSetting(setting.key, value)
@@ -74,6 +83,8 @@ function SettingRow({ setting, onSaved, onDirty }) {
 }
 
 export default function Settings() {
+  const dlg = useDialogs()
+  const navigate = useNavigate()
   const [settings, setSettings] = useState(null)
   const [err, setErr] = useState(null)
 
@@ -95,10 +106,19 @@ export default function Settings() {
     if (!hasUnsaved) return undefined
     const msg = 'في الإعدادات تغييرات غير محفوظة — المغادرة تُضيعها. متابعة؟'
     const onBeforeUnload = (e) => { e.preventDefault(); e.returnValue = msg; return msg }
+    // ═══ الاعتراض متزامن، والنافذة غير متزامنة ═══
+    // لا يمكن انتظار الجواب داخل معالج الضغط: المتصفّح يمضي بالتنقّل قبل أن
+    // يعود الوعد. فنمنع التنقّل **أولاً** ثمّ نسأل ثمّ نُكمل إن وافق — وهو
+    // الترتيب الصحيح أصلاً، ويعمل على الهاتف حيث لا نافذةَ متصفّح أساساً.
     const onClick = (e) => {
       const a = e.target.closest?.('a[href]')
       if (!a || a.target === '_blank' || e.defaultPrevented) return
-      if (!confirm(msg)) { e.preventDefault(); e.stopPropagation() }
+      e.preventDefault(); e.stopPropagation()
+      const href = a.getAttribute('href')
+      dlg.confirm({
+        title: 'تغييرات غير محفوظة', body: msg,
+        confirmLabel: 'غادِر بلا حفظ', cancelLabel: 'ابقَ', danger: true,
+      }).then((ok) => { if (ok && href) navigate(href) })
     }
     window.addEventListener('beforeunload', onBeforeUnload)
     document.addEventListener('click', onClick, true)

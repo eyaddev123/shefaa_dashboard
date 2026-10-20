@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { SpecialtyPicker } from '../SpecialtyPicker.jsx'
 import { useParams, Link } from 'react-router-dom'
 import { api, WEEKDAYS, fmtMoney, fmtTime } from '../api.js'
 
@@ -8,7 +9,7 @@ function ProfileForm({ doctor, globalBuffer, onSaved }) {
   const [form, setForm] = useState({
     hourly_buffer_minutes: doctor.hourly_buffer_minutes ?? '',
     name: doctor.name,
-    specialty: doctor.specialty || '',
+    specialty_id: doctor.specialty_id ? String(doctor.specialty_id) : '',
     phone: doctor.phone || '',
     room: doctor.room || '',
     consultation_fee: doctor.consultation_fee,
@@ -54,7 +55,8 @@ function ProfileForm({ doctor, globalBuffer, onSaved }) {
     <form onSubmit={submit}>
       <div className="inline" style={{ flexWrap: 'wrap' }}>
         <div className="field"><label>اسم الدكتور</label><input value={form.name} onChange={set('name')} required /></div>
-        <div className="field"><label>الاختصاص</label><input value={form.specialty} onChange={set('specialty')} /></div>
+        <SpecialtyPicker value={form.specialty_id} canAdd
+          onChange={(v) => setForm((f) => ({ ...f, specialty_id: v }))} />
         <div className="field"><label>الجوال</label><input value={form.phone} onChange={set('phone')} dir="ltr" /></div>
         {/* رقم الغرفة يظهر ويُنطَق على شاشة الصالة، ويُشتقّ منه اسم المقطع الصوتي
             (room-3.mp3) — الخادم يطبّع الأرقام العربية والمسافات (AUDIO.md) */}

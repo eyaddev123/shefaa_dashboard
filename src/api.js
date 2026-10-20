@@ -138,6 +138,22 @@ export const api = {
       http(`/clinic/schedules/preview?from=${from}&weeks=${weeks}`),
     dayDoctors: (date) => http(`/clinic/day-doctors?date=${date}`),
     closeSession: (id) => http(`/clinic/sessions/${id}/close`, { method: 'POST' }),
+    // ═══ تسوية الإجراءات ═══
+    pendingProcedures: (date, scope, doctorId) => {
+      const q = new URLSearchParams({ date })
+      if (scope) q.set('scope', scope)
+      if (doctorId) q.set('doctor_id', String(doctorId))
+      return http(`/clinic/procedures/pending?${q}`)
+    },
+    settleProcedure: (lineId, body) =>
+      http(`/clinic/procedures/${lineId}/settle`, { method: 'PATCH', body: JSON.stringify(body) }),
+    setDoctorShare: (id, body) =>
+      http(`/clinic/doctors/${id}/share`, { method: 'PATCH', body: JSON.stringify(body) }),
+    doctorProcedureShares: (id) => http(`/clinic/doctors/${id}/procedure-shares`),
+    setDoctorProcedureShare: (id, procId, body) =>
+      http(`/clinic/doctors/${id}/procedure-shares/${procId}`, { method: 'PUT', body: JSON.stringify(body) }),
+    removeDoctorProcedureShare: (id, procId) =>
+      http(`/clinic/doctors/${id}/procedure-shares/${procId}`, { method: 'DELETE' }),
     reopenSession: (id) => http(`/clinic/sessions/${id}/reopen`, { method: 'POST' }),
     // ═══ التصدير: تنزيل ملفٍّ لا JSON ═══
     // رابطٌ عاديّ <a href> لا يحمل ترويسة Authorization، فالخادم يردّ 401.
@@ -200,10 +216,8 @@ export const api = {
       http(`/clinic/appointments/${appointmentId}`, { method: 'PATCH', body: JSON.stringify(body) }),
 
     // ═══ تعديل الحجز ═══
-    // تغيير الحالة: قائمة واحدة لكل الحالات، بملاحظة اختيارية
-    setAppointmentStatus: (appointmentId, status, note) =>
-      http(`/clinic/appointments/${appointmentId}/status`,
-        { method: 'PATCH', body: JSON.stringify({ status, note: note || undefined }) }),
+    // (الحالة تُغيَّر من لوحة «تفاصيل» ضمن حفظٍ واحد عبر saveAppointmentDetails
+    //  أدناه — ولا مُستدعٍ لمسار /status في الواجهة.)
     undoNoShow: (appointmentId, reason) =>
       http(`/clinic/appointments/${appointmentId}/undo-no-show`,
         { method: 'POST', body: JSON.stringify({ reason }) }),
@@ -242,7 +256,16 @@ export const api = {
       http(`/clinic/sessions/${sessionId}/flow-mode`, { method: 'PATCH', body: JSON.stringify({ flow_mode: flowMode }) }),
     // ── إجراءات العيادة ──
     // الكتالوج: الاستقبال يتسلّم المفعَّل وحده من الخادم نفسه
-    procedures: () => http('/clinic/procedures'),
+    // forDoctor: ترشيح الكتالوج باختصاص دكتورٍ بعينه (الاستقبال يمرّره من الحجز).
+    // والطبيب يُرشَّح باختصاصه هو في الخادم بلا معاملة.
+    procedures: (forDoctor) =>
+      http(`/clinic/procedures${forDoctor ? `?active=1&for_doctor=${forDoctor}` : ''}`),
+    // ── الاختصاصات ──
+    specialties: () => http('/clinic/specialties'),
+    addSpecialty: (name) =>
+      http('/clinic/specialties', { method: 'POST', body: JSON.stringify({ name }) }),
+    setProcedureSpecialties: (id, body) =>
+      http(`/clinic/procedures/${id}/specialties`, { method: 'PUT', body: JSON.stringify(body) }),
     addProcedure: (body) => http('/clinic/procedures', { method: 'POST', body: JSON.stringify(body) }),
     updateProcedure: (id, body) => http(`/clinic/procedures/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
     // على الحجز: لا سعر يُرسَل — الخادم ينسخه من الكتالوج

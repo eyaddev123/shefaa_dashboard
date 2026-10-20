@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useDialogs } from '../dialogs.jsx'
 import { Link, useParams } from 'react-router-dom'
 import { api, AID_TYPES, DECISION_TYPES, PAYMENT_METHODS, RELATIONS, SERVICE_UNITS, STATUSES, committedFromDecision, fmtDate, fmtMoney } from '../api.js'
 import { useRole } from '../RoleContext.jsx'
@@ -157,6 +158,7 @@ function DecisionForm({ request, onSaved }) {
 }
 
 export default function RequestDetail() {
+  const dlg = useDialogs()
   const { id } = useParams()
   const [r, setR] = useState(null)
   const [err, setErr] = useState(null)
@@ -187,18 +189,18 @@ export default function RequestDetail() {
         `.\nالرجاء الحضور إلى مقر الجمعية لاستلام الوصل.`
       window.open(`https://wa.me/${waNumber(r.mobile || r.family_mobile || '')}?text=${encodeURIComponent(msg)}`, '_blank')
       load()
-    } catch (e) { alert(e.message) }
+    } catch (e) { await dlg.alert({ title: 'تعذّر التنفيذ', body: e.message }) }
   }
 
   // المرفقات لم تعد روابط مباشرة: مجلد uploads مغلق، والملف يُجلب بالتوكن ثم يُفتح
   const openAttachment = async (attachmentId) => {
-    try { await api.openAttachment(attachmentId) } catch (ex) { alert(ex.message) }
+    try { await api.openAttachment(attachmentId) } catch (ex) { await dlg.alert({ title: 'تعذّر التنفيذ', body: ex.message }) }
   }
 
   const uploadFile = async (e) => {
     const file = e.target.files?.[0]
     if (!file) return
-    try { await api.uploadAttachment(r.id, file); load() } catch (ex) { alert(ex.message) }
+    try { await api.uploadAttachment(r.id, file); load() } catch (ex) { await dlg.alert({ title: 'تعذّر التنفيذ', body: ex.message }) }
     e.target.value = ''
   }
 

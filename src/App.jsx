@@ -3,7 +3,7 @@ import { Navigate, NavLink, Route, Routes, useLocation, useNavigate } from 'reac
 import { RoleProvider, useRole } from './RoleContext.jsx'
 import {
   canManageUsers, canReadAid, canSearchAid, canSeeClinicBoard, canSeeDoctorsPage,
-  canSeeDoctorScreen, canSeeSettings, canSeeProceduresPage, homePathFor,
+  canSeeDoctorScreen, canSeeSettings, canSeeProceduresPage, canSeePrinterSetup, homePathFor,
 } from './permissions.js'
 import { ROLE_LABELS } from './api.js'
 import ThemeToggle from './components/ThemeToggle.jsx'
@@ -25,6 +25,7 @@ import ClinicDoctors from './pages/ClinicDoctors.jsx'
 import DoctorProfile from './pages/DoctorProfile.jsx'
 import DataQuality from './pages/DataQuality.jsx'
 import Settings from './pages/Settings.jsx'
+import PrinterSetup from './pages/PrinterSetup.jsx'
 import Users from './pages/Users.jsx'
 import ClinicBoard from './pages/ClinicBoard.jsx'
 import ClinicProcedures from './pages/ClinicProcedures.jsx'
@@ -110,6 +111,7 @@ function Sidebar({ onNavigate }) {
         {canSeeClinicBoard(role) && <NavLink to="/clinic/board">{I.clinic} لوحة العيادات اليومية</NavLink>}
         {canSeeDoctorScreen(role) && <NavLink to="/clinic/doctor">{I.clinic} شاشتي</NavLink>}
         {canManageUsers(role) && <NavLink to="/users">{I.users} الموظفون والصلاحيات</NavLink>}
+        {canSeePrinterSetup(role) && <NavLink to="/clinic/printer">{I.settings} إعداد الطابعة</NavLink>}
         {canSeeSettings(role) && <NavLink to="/settings">{I.settings} الإعدادات</NavLink>}
       </nav>
 
@@ -208,6 +210,8 @@ function Shell() {
             <Guard allow={canManageUsers}><Users /></Guard>} />
           <Route path="/settings" element={
             <Guard allow={canSeeSettings}><Settings /></Guard>} />
+          <Route path="/clinic/printer" element={
+            <Guard allow={canSeePrinterSetup}><PrinterSetup /></Guard>} />
           <Route path="/search" element={<Guard allow={canSearchAid}><Search /></Guard>} />
           <Route path="*" element={<Navigate to={homePathFor(role)} replace />} />
         </Routes>

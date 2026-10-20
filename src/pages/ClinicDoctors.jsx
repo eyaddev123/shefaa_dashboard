@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
+import { SpecialtyPicker } from '../SpecialtyPicker.jsx'
+import { useDialogs } from '../dialogs.jsx'
 import { Link } from 'react-router-dom'
 import { api, WEEKDAYS, fmtMoney, fmtTime, todayLocal } from '../api.js'
 
 function NewDoctorForm({ onCreated }) {
-  const blank = { name: '', specialty: '', phone: '', consultation_fee: '', followup_fee: '',
+  const blank = { name: '', specialty_id: '', phone: '', consultation_fee: '', followup_fee: '',
                   followup_window_days: '7', expected_visit_minutes: '15', room: '',
                   accepts_urgent: true }
   const [form, setForm] = useState(blank)
@@ -27,7 +29,8 @@ function NewDoctorForm({ onCreated }) {
   return (
     <form className="inline" onSubmit={submit} style={{ marginTop: 14 }}>
       <div className="field"><label>اسم الدكتور</label><input value={form.name} onChange={set('name')} required /></div>
-      <div className="field"><label>الاختصاص</label><input value={form.specialty} onChange={set('specialty')} /></div>
+      <SpecialtyPicker value={form.specialty_id} canAdd
+        onChange={(v) => setForm((f) => ({ ...f, specialty_id: v }))} />
       <div className="field"><label>الجوال</label><input value={form.phone} onChange={set('phone')} /></div>
       {/* رقم الغرفة يُشتقّ منه اسم المقطع الصوتي (room-3.mp3) — الخادم يطبّع
           الأرقام العربية والمسافات، والتنويه هنا يمنع المشكلة من أصلها (AUDIO.md) */}
@@ -49,6 +52,131 @@ function NewDoctorForm({ onCreated }) {
       <button type="submit">إضافة دكتور</button>
       {err && <p className="error">{err}</p>}
     </form>
+  )
+}
+
+// ═══ قاعدة حصّة الدكتور من الإجراءات ═══
+//
+// عامّة لكل إجراءاته، وخاصّة لإجراءٍ بعينه تغلبها (دكتور العظمية: «تجبير»
+// مبلغٌ ثابت، وغيره نسبة). وبلا قاعدةٍ تكون حصّته صفراً — بتحذير لا بمنع،
+// فالمنع يُعلّق تسوية يومٍ كامل بسبب إعدادٍ ناقص.
+function DoctorShareRules({ doctor, onToast }) {
+  const [kind, setKind] = useState(doctor.share_kind || '')
+  const [value, setValue] = useState(doctor.share_value ?? '')
+  const [rules, setRules] = useState(null)
+  const [catalog, setCatalog] = useState(null)
+  const [adding, setAdding] = useState({ procedure_id: '', kind: 'percent', value: '' })
+  const [busy, setBusy] = useState(false)
+
+  const load = () => {
+    api.clinic.doctorProcedureShares(doctor.id).then(setRules).catch((e) => onToast(e.message))
+    if (!catalog) api.clinic.procedures().then((r) => setCatalog(r.filter((x) => x.is_active)))
+      .catch(() => {})
+  }
+  useEffect(() => { load() }, [doctor.id])
+
+  const saveGeneral = async () => {
+    setBusy(true)
+    try {
+      await api.clinic.setDoctorShare(doctor.id,
+        kind === '' ? { share_kind: null } : { share_kind: kind, share_value: value })
+      onToast('حُفظت القاعدة العامّة', 'success', 3000)
+    } catch (e) { onToast(e.message) }
+    finally { setBusy(false) }
+  }
+
+  const addSpecific = async () => {
+    if (!adding.procedure_id) { onToast('اختر الإجراء'); return }
+    setBusy(true)
+    try {
+      await api.clinic.setDoctorProcedureShare(doctor.id, adding.procedure_id,
+        { share_kind: adding.kind, share_value: adding.value })
+      setAdding({ procedure_id: '', kind: 'percent', value: '' })
+      onToast('حُفظت القاعدة الخاصّة', 'success', 3000); load()
+    } catch (e) { onToast(e.message) }
+    finally { setBusy(false) }
+  }
+
+  const removeSpecific = async (procId) => {
+    setBusy(true)
+    try { await api.clinic.removeDoctorProcedureShare(doctor.id, procId); load() }
+    catch (e) { onToast(e.message) }
+    finally { setBusy(false) }
+  }
+
+  return (
+    <div style={{ marginTop: 14 }}>
+      <h4 style={{ margin: '0 0 6px' }}>حصّة الدكتور من الإجراءات</h4>
+      <p className="subtitle" style={{ marginTop: 0 }}>
+        النسبة تُحسب <strong>بعد خصم المواد</strong>، والمبلغ الثابت لا تؤثّر فيه المواد.
+        والشفاء تأخذ الباقي دائماً.
+      </p>
+      <div className="inline" style={{ alignItems: 'flex-end', gap: 8 }}>
+        <div className="field">
+          <label>القاعدة العامّة</label>
+          <select value={kind} onChange={(e) => setKind(e.target.value)}>
+            <option value="">بلا قاعدة (حصّته صفر)</option>
+            <option value="percent">نسبة ٪</option>
+            <option value="fixed">مبلغ ثابت</option>
+          </select>
+        </div>
+        {kind !== '' && (
+          <div className="field">
+            <label>{kind === 'percent' ? 'النسبة' : 'المبلغ'}</label>
+            <input value={value} inputMode="decimal" style={{ width: 110 }}
+              onChange={(e) => setValue(e.target.value)} />
+          </div>
+        )}
+        <button type="button" disabled={busy} onClick={saveGeneral}
+          style={{ padding: '6px 14px', fontSize: 12.5 }}>حفظ</button>
+      </div>
+
+      <h4 style={{ margin: '14px 0 6px' }}>قواعد خاصّة بإجراءات بعينها</h4>
+      {!rules ? <p className="empty">جارٍ التحميل…</p>
+        : rules.length === 0 ? <p className="empty">لا قواعد خاصّة — تُطبَّق العامّة على كل إجراءاته.</p>
+        : (
+          <table>
+            <thead><tr><th>الإجراء</th><th>القاعدة</th><th></th></tr></thead>
+            <tbody>
+              {rules.map((r) => (
+                <tr key={r.id}>
+                  <td>{r.procedure_name}</td>
+                  <td>{r.share_kind === 'percent' ? `${r.share_value}%` : fmtMoney(r.share_value)}</td>
+                  <td>
+                    <button type="button" className="ghost" disabled={busy}
+                      style={{ padding: '2px 8px', fontSize: 11 }}
+                      onClick={() => removeSpecific(r.procedure_id)}>حذف</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      <div className="inline" style={{ alignItems: 'flex-end', gap: 8, marginTop: 8 }}>
+        <div className="field">
+          <label>إضافة قاعدة لإجراء</label>
+          <select value={adding.procedure_id}
+            onChange={(e) => setAdding({ ...adding, procedure_id: e.target.value })}>
+            <option value="">— اختر —</option>
+            {(catalog || []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </div>
+        <div className="field">
+          <label>النوع</label>
+          <select value={adding.kind} onChange={(e) => setAdding({ ...adding, kind: e.target.value })}>
+            <option value="percent">نسبة ٪</option>
+            <option value="fixed">مبلغ ثابت</option>
+          </select>
+        </div>
+        <div className="field">
+          <label>القيمة</label>
+          <input value={adding.value} inputMode="decimal" style={{ width: 110 }}
+            onChange={(e) => setAdding({ ...adding, value: e.target.value })} />
+        </div>
+        <button type="button" className="ghost" disabled={busy} onClick={addSpecific}
+          style={{ padding: '6px 14px', fontSize: 12.5 }}>إضافة</button>
+      </div>
+    </div>
   )
 }
 
@@ -124,8 +252,10 @@ function NewScheduleForm({ doctorId, onCreated }) {
 }
 
 function DoctorRow({ doctor, onChanged }) {
+  const dlg = useDialogs()
   const [expanded, setExpanded] = useState(false)
   const [schedules, setSchedules] = useState(null)
+  const [shareMsg, setShareMsg] = useState(null)
 
   const loadSchedules = () => api.clinic.schedules(doctor.id).then(setSchedules)
   const toggle = () => {
@@ -135,20 +265,32 @@ function DoctorRow({ doctor, onChanged }) {
 
   const toggleActive = async () => {
     try { await api.clinic.updateDoctor(doctor.id, { is_active: !doctor.is_active }); onChanged() }
-    catch (ex) { alert(ex.message) }
+    catch (ex) { await dlg.alert({ title: 'تعذّر التنفيذ', body: ex.message }) }
   }
 
   const removeSchedule = async (id) => {
-    if (!confirm('حذف موعد الدوام هذا؟')) return
+    const ok = await dlg.confirm({
+      title: 'حذف موعد الدوام',
+      body: 'حذف موعد الدوام هذا؟ لن تُولَّد منه جلساتٌ بعد اليوم.',
+      confirmLabel: 'حذف', danger: true,
+    })
+    if (!ok) return
     try { await api.clinic.deleteSchedule(id); loadSchedules() }
-    catch (ex) { alert(ex.message) }
+    catch (ex) { await dlg.alert({ title: 'تعذّر التنفيذ', body: ex.message }) }
   }
 
   return (
     <>
       <tr style={doctor.is_active ? undefined : { opacity: 0.5 }}>
         <td><Link to={`/clinic/doctors/${doctor.id}`}>{doctor.name}</Link></td>
-        <td>{doctor.specialty || '—'}</td>
+        <td>
+          {doctor.specialty_name || doctor.specialty || <span className="muted">—</span>}
+          {/* بلا اختصاص ⇒ يرى الإجراءات العامّة وحدها — تحذيرٌ ظاهر لا صمت */}
+          {!doctor.specialty_id && (
+            <span className="badge warn" style={{ marginInlineStart: 5 }}
+              title="سيرى الإجراءات العامّة وحدها حتى يُختار اختصاصه">بلا اختصاص</span>
+          )}
+        </td>
         <td>{doctor.phone || '—'}</td>
         <td className="num">{fmtMoney(doctor.consultation_fee)}</td>
         <td className="num">{fmtMoney(doctor.followup_fee)}</td>
@@ -200,6 +342,8 @@ function DoctorRow({ doctor, onChanged }) {
                     </table>
                   )}
                 <NewScheduleForm doctorId={doctor.id} onCreated={loadSchedules} />
+                <DoctorShareRules doctor={doctor} onToast={(m) => setShareMsg(m)} />
+                {shareMsg && <p className="subtitle" style={{ marginTop: 6 }}>{shareMsg}</p>}
               </>
             )}
           </td>
