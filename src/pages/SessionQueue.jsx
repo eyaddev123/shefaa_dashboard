@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { useDialogs } from '../dialogs.jsx'
 import { loadPrinter, printTicket, ticketFrom } from '../ticket-print.js'
+import { printViaHelper } from '../print-helper.js'
 import { useParams } from 'react-router-dom'
 import { api, APPOINTMENT_STATUSES, BOOKING_TYPES, VISIT_TYPES, PRIORITIES, DELAY_CAUSES, WEEKDAYS, addDays, todayLocal, fmtMoney, fmtTime, toLatinDigits } from '../api.js'
 import { AttendanceBadge, urgentRowClass, isAttendanceSession, usePolling, fmtClock, FlowModeTag, FLOW_MODE_LABELS } from '../attendance-ui.jsx'
@@ -998,8 +999,15 @@ function AppointmentDetails({ appt, session, onChanged, onToast, onArrived }) {
     }
     setReprinting(true)
     try {
-      const r = await printTicket(ticketFrom(appt, session), printer.width)
-      if (!r.ok) onToast(`تعذّرت الطباعة${r.reason ? ` (${r.reason})` : ''}`)
+      const r = await printViaHelper(ticketFrom(appt, session), printer.width)
+      if (r.ok) return
+      // ★ الاحتياط لإعادة الطباعة وحدها (طلبٌ صريح من الموظف): لو كان
+      // الوسيط متوقّفاً تبقى طباعة المتصفّح طريقاً — بنافذةٍ وورقٍ أطول،
+      // لكنّها أفضل من «لا شيء» حين يطلبها المريض.
+      const fb = await printTicket(ticketFrom(appt, session), printer.width)
+      onToast(fb.ok
+        ? 'الوسيط غير متصل — طُبعت من المتصفّح (قد يزيد الورق)'
+        : `تعذّرت الطباعة${fb.reason ? ` (${fb.reason})` : ''}`)
     } finally { setReprinting(false) }
   }
 
@@ -1483,9 +1491,12 @@ export default function SessionQueue() {
     if (!data?.auto_print_arrival_ticket) return
     const printer = loadPrinter()
     if (!printer.enabled) return
-    const r = await printTicket(
-      ticketFrom({ ...appt, ...res }, data), printer.width)
-    if (!r.ok) showToast(`حضر المريض، لكن تعذّرت طباعة البطاقة${r.reason ? ` (${r.reason})` : ''}`)
+    // ★ عبر الوسيط المحلّي لا طباعة المتصفّح: طولٌ بالمحتوى، وقطعٌ تلقائيّ،
+    // وبلا نافذة. والفشل لا يمسّ الحضور — تمّ على الخادم قبل أن نطبع.
+    const r = await printViaHelper(ticketFrom({ ...appt, ...res }, data), printer.width)
+    if (!r.ok) showToast(r.reason === 'الطابعة غير متصلة'
+      ? 'حضر المريض — الطابعة غير متصلة'
+      : `حضر المريض، لكن تعذّرت طباعة البطاقة${r.reason ? ` (${r.reason})` : ''}`)
   }
 
   const load = () => api.clinic.queue(id).then((d) => { setData(d); setLoadErr(null) })

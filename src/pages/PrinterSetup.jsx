@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { loadPrinter, savePrinter, printTicket, SAMPLE_TICKET } from '../ticket-print.js'
+import { helperHealth, printViaHelper, loadHelper } from '../print-helper.js'
 
 // ═══════════ إعداد الطابعة الحرارية ═══════════
 // الإعداد هنا **لهذا الجهاز وحده** (localStorage): الاستقبال جهازان وطابعةٌ
@@ -14,6 +15,15 @@ export default function PrinterSetup() {
   const [printer, setPrinter] = useState(loadPrinter)
   const [testing, setTesting] = useState(false)
   const [msg, setMsg] = useState(null)
+  // حالة الوسيط: null = نفحص، ثمّ كائن الصحّة أو { ok:false }
+  const [helper, setHelper] = useState(null)
+  const checkHelper = () => { setHelper(null); helperHealth().then(setHelper) }
+  useEffect(() => {
+    checkHelper()
+    // فحصٌ دوريّ خفيف: الموظف قد يُشغّل الوسيط والصفحة مفتوحة
+    const t = setInterval(() => helperHealth().then(setHelper), 10000)
+    return () => clearInterval(t)
+  }, [])
 
   const update = (patch) => {
     const next = { ...printer, ...patch }
@@ -22,10 +32,16 @@ export default function PrinterSetup() {
 
   const test = async () => {
     setTesting(true); setMsg(null)
-    const r = await printTicket(SAMPLE_TICKET, printer.width)
-    setMsg(r.ok
-      ? { kind: 'good', text: 'أُرسلت البطاقة التجريبية إلى الطابعة.' }
-      : { kind: 'bad', text: `تعذّرت الطباعة${r.reason ? ` — ${r.reason}` : ''}` })
+    const r = await printViaHelper(SAMPLE_TICKET, printer.width)
+    if (r.ok) setMsg({ kind: 'good', text: 'أُرسلت البطاقة التجريبية إلى الطابعة.' })
+    else {
+      // الوسيط متوقّف ⇒ جرّب المتصفّح، وقل للموظف الفرق
+      const fb = await printTicket(SAMPLE_TICKET, printer.width)
+      setMsg(fb.ok
+        ? { kind: 'warn', text: 'الوسيط غير متصل — طُبعت من المتصفّح (نافذة وورقٌ أطول).' }
+        : { kind: 'bad', text: `تعذّرت الطباعة${r.reason ? ` — ${r.reason}` : ''}` })
+    }
+    helperHealth().then(setHelper)
     setTesting(false)
   }
 
@@ -41,6 +57,35 @@ export default function PrinterSetup() {
       {/* ═══ إعداد هذا الجهاز ═══ */}
       <div className="card">
         <h3>هذا الجهاز</h3>
+        {/* ═══ حالة وسيط الطباعة ═══
+            خضراء = الوسيط يعمل والطابعة متّصلة ⇒ طباعةٌ صامتة بطول المحتوى.
+            حمراء = الوسيط متوقّف ⇒ الحضور يمرّ والبطاقة لا تُطبع تلقائياً. */}
+        <div className={`ps-status ${helper === null ? '' : helper.ok
+          ? (helper.printer_ready ? 'is-ok' : 'is-warn') : 'is-bad'}`}>
+          <span className="ps-dot" />
+          <div>
+            {helper === null ? <strong>جارٍ فحص وسيط الطباعة…</strong>
+              : helper.ok ? (
+                <>
+                  <strong>وسيط الطباعة يعمل</strong>
+                  <div className="ps-status-sub">
+                    {helper.printer_ready
+                      ? `الطابعة «${helper.printer}» متّصلة وجاهزة.`
+                      : `الوسيط يعمل لكنّ الطابعة «${helper.printer}» غير جاهزة — ${helper.printer_state || 'تحقّق من الكبل والورق'}.`}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <strong>وسيط الطباعة غير متصل</strong>
+                  <div className="ps-status-sub">
+                    البطاقات لن تُطبع تلقائياً ({helper.reason || 'لا يستجيب'}).
+                    الحضور يُسجَّل كالمعتاد. راجع «تثبيت وسيط الطباعة» أدناه.
+                  </div>
+                </>
+              )}
+          </div>
+          <button type="button" className="ghost ps-recheck" onClick={checkHelper}>إعادة الفحص</button>
+        </div>
         <div className="ps-device">
           <label className="ps-toggle">
             <input type="checkbox" checked={printer.enabled}
@@ -72,6 +117,46 @@ export default function PrinterSetup() {
               الطباعة التجريبية تعمل حتى لو كان المفتاح مطفأً — لتجرّب قبل أن تُفعّله.
             </p>
           )}
+        </div>
+      </div>
+
+      {/* ═══ تثبيت وسيط الطباعة ═══ */}
+      <div className="card">
+        <h3>تثبيت وسيط الطباعة (مرّة واحدة على جهاز الاستقبال)</h3>
+        <p className="setting-desc">
+          برنامجٌ صغير يعمل في خلفية الجهاز، يستقبل صورة البطاقة من النظام ويرسلها
+          للطابعة مباشرةً — فتُطبع <strong>بلا نافذة</strong>، و<strong>بطول المحتوى</strong>،
+          و<strong>تُقطع تلقائياً</strong>. بدونه يبقى الحضور يعمل، لكن لا تُطبع بطاقة.
+        </p>
+        <ol className="ps-steps">
+          <Step n="١">
+            انسخ مجلّد <code dir="ltr">print-helper</code> إلى الجهاز، مثلاً إلى
+            {' '}<code dir="ltr">~/shefaa-print</code>.
+          </Step>
+          <Step n="٢">
+            تأكّد من وجود Node (الإصدار ١٨ فأعلى): افتح <strong>Terminal</strong> ونفّذ
+            <pre dir="ltr" className="ps-cmd">node --version</pre>
+            إن لم يكن مثبّتاً فنزّله من <code dir="ltr">nodejs.org</code>.
+          </Step>
+          <Step n="٣">
+            اعرف اسم طابعتك كما يراها النظام:
+            <pre dir="ltr" className="ps-cmd">lpstat -p | awk '{'{'}print $2{'}'}'</pre>
+            ثمّ عدّل <code dir="ltr">config.json</code> وضع الاسم في <code dir="ltr">printer</code>.
+          </Step>
+          <Step n="٤">
+            ثبّته ليعمل تلقائياً عند الدخول:
+            <pre dir="ltr" className="ps-cmd">cd ~/shefaa-print && ./install-mac.sh</pre>
+            السكربت ينشئ LaunchAgent ويُشغّله فوراً.
+          </Step>
+          <Step n="٥">
+            تأكّد: يجب أن تصير اللافتة في أعلى هذه الصفحة <strong>خضراء</strong>.
+            وللفحص من الطرفية:
+            <pre dir="ltr" className="ps-cmd">curl http://127.0.0.1:17625/health</pre>
+          </Step>
+        </ol>
+        <div className="ps-note">
+          السجلّ عند الأعطال: <code dir="ltr">~/Library/Logs/shefaa-print.log</code>
+          <br />لإيقافه: <code dir="ltr">launchctl unload ~/Library/LaunchAgents/com.shefaa.print.plist</code>
         </div>
       </div>
 
