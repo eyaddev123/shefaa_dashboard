@@ -118,16 +118,16 @@ public class ShefaaRaw {
   [DllImport("winspool.Drv",EntryPoint="WritePrinter",SetLastError=true)]
   public static extern bool WritePrinter(IntPtr h,IntPtr buf,int n,out int written);
   public static void Send(string printer,byte[] bytes){
-    IntPtr h; if(!OpenPrinter(printer,out h,IntPtr.Zero)) throw new Exception("تعذّر فتح الطابعة: "+printer);
+    IntPtr h; if(!OpenPrinter(printer,out h,IntPtr.Zero)) throw new Exception("OpenPrinter failed: "+printer);
     try{
       DOCINFO di=new DOCINFO(); di.pDocName="shefaa-ticket"; di.pDataType="RAW";
-      if(!StartDocPrinter(h,1,ref di)) throw new Exception("StartDocPrinter فشل");
+      if(!StartDocPrinter(h,1,ref di)) throw new Exception("StartDocPrinter failed");
       try{
-        if(!StartPagePrinter(h)) throw new Exception("StartPagePrinter فشل");
+        if(!StartPagePrinter(h)) throw new Exception("StartPagePrinter failed");
         IntPtr p=Marshal.AllocHGlobal(bytes.Length);
         try{ Marshal.Copy(bytes,0,p,bytes.Length); int w;
-          if(!WritePrinter(h,p,bytes.Length,out w)) throw new Exception("WritePrinter فشل");
-          if(w!=bytes.Length) throw new Exception("كُتب "+w+" من "+bytes.Length);
+          if(!WritePrinter(h,p,bytes.Length,out w)) throw new Exception("WritePrinter failed");
+          if(w!=bytes.Length) throw new Exception("wrote "+w+" of "+bytes.Length);
         } finally { Marshal.FreeHGlobal(p); }
         EndPagePrinter(h);
       } finally { EndDocPrinter(h); }
@@ -145,7 +145,11 @@ async function sendRawWindows(bytes, printer) {
   try {
     writeFileSync(tmp, bytes)
     const ps1 = join(tmpdir(), `shefaa-raw-${process.pid}.ps1`)
-    if (!existsSync(ps1)) writeFileSync(ps1, WIN_RAW_PS1, 'utf8')
+    // ★ BOM إلزاميّ: PowerShell 5.1 (الافتراضيّ على ويندوز) يقرأ الملفّ
+    // بترميز ANSI ما لم يبدأ بـBOM، فيُفسد أيّ حرفٍ غير لاتينيّ ويكسر
+    // اقتران علامات الاقتباس — فتسقط الطباعة بخطأ نحويٍّ غامض.
+    // (محتوى هذا السكربت لاتينيّ بالكامل احتياطاً، والـBOM حارسٌ ثانٍ.)
+    if (!existsSync(ps1)) writeFileSync(ps1, '\ufeff' + WIN_RAW_PS1, 'utf8')
     const r = await run('powershell.exe',
       ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
        '-File', ps1, '-PrinterName', printer, '-DataFile', tmp])

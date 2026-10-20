@@ -6,8 +6,8 @@
 // عاد كما كان — ونقرأ رأس الأمر بايتاً بايتاً ونقارنه بالمواصفة.
 import { decodePng, encodeGrayPng } from '../src/png.js'
 import { rgbaToBits, buildJob, rasterCmd, feedDots, cutCmd, initCmd, bitAt } from '../src/escpos.js'
-import { writeFileSync, mkdirSync, readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { writeFileSync, mkdirSync, readFileSync, readdirSync } from 'node:fs'
+import { dirname, join, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const OUT = process.env.TICKET_SHOTS || join(dirname(fileURLToPath(import.meta.url)), '..', '.out')
@@ -191,6 +191,50 @@ console.log('\n── ٧) ماك وويندوز ──')
   // ★ البايتات نفسها لا تختلف بين النظامين — وهو ما يجعل الفحص هنا كافياً
   ok(!/platform[\s\S]{0,400}rasterCmd|rasterCmd[\s\S]{0,200}platform/.test(src),
     '★ ترميز ESC/POS واحدٌ للنظامين (لا تفرّع)')
+}
+
+// ═══ ٨) ترميز سكربتات PowerShell ═══
+// عطبٌ حقيقيّ على ويندوز: PowerShell 5.1 (الافتراضيّ) يقرأ الملفّ بترميز
+// ANSI ما لم يبدأ بـBOM، فيُفسد الحروف العربية ويكسر اقتران علامات
+// الاقتباس — ويسقط التثبيت بأخطاء نحوٍ غامضة («Unexpected token '}'»).
+// وفي المقابل: config.json يجب أن يبقى **بلا** BOM وإلا رفضه JSON.parse.
+console.log('\n── ٨) ترميز ملفّات ويندوز ──')
+{
+  const root = new URL('..', import.meta.url)
+  const BOM = Buffer.from([0xEF, 0xBB, 0xBF])
+
+  const ps1Files = readdirSync(root, { recursive: true })
+    .filter((f) => String(f).endsWith('.ps1'))
+  ok(ps1Files.length > 0, 'وُجد سكربت ويندوز واحدٌ على الأقلّ',
+    ps1Files.join(', '))
+  for (const f of ps1Files) {
+    const buf = readFileSync(new URL(String(f).split(sep).join('/'), root))
+    ok(buf.subarray(0, 3).equals(BOM), `★ ${f} يبدأ بـBOM (يلزم PowerShell 5.1)`,
+      [...buf.subarray(0, 3)].map((b) => b.toString(16)).join(' '))
+    // وأن يبقى UTF-8 صالحاً بعد الـBOM
+    let okUtf8 = true
+    try { new TextDecoder('utf-8', { fatal: true }).decode(buf.subarray(3)) }
+    catch { okUtf8 = false }
+    ok(okUtf8, `${f} محتواه UTF-8 صالح`)
+  }
+
+  // config.json بلا BOM — Node يرفض JSON يبدأ به
+  const cfg = readFileSync(new URL('config.json', root))
+  ok(!cfg.subarray(0, 3).equals(BOM), '★ config.json بلا BOM (وإلا رفضه JSON.parse)')
+  let parses = true
+  try { JSON.parse(cfg.toString('utf8')) } catch { parses = false }
+  ok(parses, 'config.json يُقرأ فعلاً')
+
+  // ★ والسكربت الذي يكتبه الخادم وقت التشغيل: يُكتب بـBOM ومحتواه لاتينيّ
+  const src = readFileSync(new URL('src/server.js', root), 'utf8')
+  const gen = /const WIN_RAW_PS1 = `([\s\S]*?)`\n/.exec(src)
+  ok(!!gen, 'وُجد سكربت الطباعة المولَّد')
+  if (gen) {
+    ok(!/[\u0600-\u06FF]/.test(gen[1]),
+      '★ السكربت المولَّد بلا عربية (لا يعتمد على الترميز أصلاً)')
+    ok(/writeFileSync\(ps1, '\\ufeff'/.test(src),
+      '★ ويُكتب بـBOM أيضاً — حارسٌ ثانٍ')
+  }
 }
 
 console.log(`\n═══ ${pass} تحقّقاً ناجحاً، ${fails.length} فشلاً ═══`)
