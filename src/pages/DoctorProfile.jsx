@@ -2,6 +2,11 @@ import { useEffect, useState } from 'react'
 import { SpecialtyPicker } from '../SpecialtyPicker.jsx'
 import { useParams, Link } from 'react-router-dom'
 import { api, WEEKDAYS, fmtMoney, fmtTime } from '../api.js'
+import { useRole } from '../RoleContext.jsx'
+import DoctorShareRules from '../components/DoctorShareRules.jsx'
+
+// من يرى حصص الإجراءات — يطابق SETTLEMENT_VIEWERS في الخادم، ومشرف العيادات وحده يكتب
+const SHARE_VIEWERS = ['clinic_admin', 'board', 'super_admin', 'manager']
 
 // بروفايل الدكتور: تعديل معلوماته وتسعيرتيه (معاينة/مراجعة) ومدة الكشف المتوقعة،
 // وهي التي يُقسَّم على أساسها دوامه إلى خانات زمنية.
@@ -159,6 +164,7 @@ function SlotPreview({ schedule, minutes }) {
 
 export default function DoctorProfile() {
   const { id } = useParams()
+  const { role } = useRole()
   const [doctor, setDoctor] = useState(null)
   const [globalBuffer, setGlobalBuffer] = useState(null)
   const [err, setErr] = useState(null)
@@ -215,6 +221,10 @@ export default function DoctorProfile() {
             </table>
           )}
       </div>
+
+      {SHARE_VIEWERS.includes(role) && (
+        <DoctorShareRules doctor={doctor} canEdit={role === 'clinic_admin'} onSaved={load} />
+      )}
     </>
   )
 }

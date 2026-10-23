@@ -37,6 +37,33 @@ async function http(path, options = {}) {
   return data
 }
 
+// ═══ التنزيل: ملفٌّ لا JSON ═══
+// رابطٌ عاديّ <a href> لا يحمل ترويسة Authorization، فالخادم يردّ 401.
+// فنجلبه بـ fetch ونصنع رابطاً مؤقّتاً من الـblob — والاسم العربي يُقرأ
+// من Content-Disposition الذي يرسله الخادم.
+async function downloadFile(url, fallbackName) {
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${getToken()}` } })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    const err = new Error(data.error || `تعذّر التصدير (${res.status})`)
+    err.status = res.status; err.data = data
+    throw err
+  }
+  const cd = res.headers.get('content-disposition') || ''
+  const star = /filename\*=UTF-8''([^;]+)/i.exec(cd)
+  const name = star ? decodeURIComponent(star[1]) : fallbackName
+  const objectUrl = URL.createObjectURL(await res.blob())
+  const a = document.createElement('a')
+  a.href = objectUrl
+  a.download = name
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  // الإفراج مؤجَّل: الإلغاء الفوري يقطع التنزيل في بعض المتصفّحات
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 10000)
+  return name
+}
+
 export const api = {
   login: (username, password) =>
     http('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
@@ -138,15 +165,28 @@ export const api = {
       http(`/clinic/schedules/preview?from=${from}&weeks=${weeks}`),
     dayDoctors: (date) => http(`/clinic/day-doctors?date=${date}`),
     closeSession: (id) => http(`/clinic/sessions/${id}/close`, { method: 'POST' }),
-    // ═══ تسوية الإجراءات ═══
-    pendingProcedures: (date, scope, doctorId) => {
-      const q = new URLSearchParams({ date })
-      if (scope) q.set('scope', scope)
+    // ═══ الإجراءات بالحساب الفوري: المراجعة والتقارير (مشرف العيادات ومن يطالع) ═══
+    procedureReview: ({ from, to, doctorId, flag }) => {
+      const q = new URLSearchParams({ from, to: to || from })
       if (doctorId) q.set('doctor_id', String(doctorId))
-      return http(`/clinic/procedures/pending?${q}`)
+      if (flag) q.set('flag', flag)
+      return http(`/clinic/procedures/review?${q}`)
     },
-    settleProcedure: (lineId, body) =>
-      http(`/clinic/procedures/${lineId}/settle`, { method: 'PATCH', body: JSON.stringify(body) }),
+    procedureHistory: (lineId) => http(`/clinic/procedures/${lineId}/history`),
+    exportProcedures: ({ from, to, doctorId }) => {
+      const q = new URLSearchParams({ from, to: to || from })
+      if (doctorId) q.set('doctor_id', String(doctorId))
+      return downloadFile(`/api/clinic/procedures/export?${q}`, `حصص الإجراءات-${from}.xlsx`)
+    },
+    materialsConsumption: ({ from, to }) =>
+      http(`/clinic/materials/consumption?${new URLSearchParams({ from, to: to || from })}`),
+    exportConsumption: ({ from, to }) =>
+      downloadFile(`/api/clinic/materials/consumption?${new URLSearchParams({ from, to: to || from, format: 'xlsx' })}`,
+        `استهلاك المواد-${from}.xlsx`),
+    // ── كتالوج المواد ── (الاستقبال يتسلّم المفعَّل بلا سعر — من الخادم نفسه)
+    materials: () => http('/clinic/materials'),
+    addMaterial: (body) => http('/clinic/materials', { method: 'POST', body: JSON.stringify(body) }),
+    updateMaterial: (id, body) => http(`/clinic/materials/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
     setDoctorShare: (id, body) =>
       http(`/clinic/doctors/${id}/share`, { method: 'PATCH', body: JSON.stringify(body) }),
     doctorProcedureShares: (id) => http(`/clinic/doctors/${id}/procedure-shares`),
@@ -155,36 +195,11 @@ export const api = {
     removeDoctorProcedureShare: (id, procId) =>
       http(`/clinic/doctors/${id}/procedure-shares/${procId}`, { method: 'DELETE' }),
     reopenSession: (id) => http(`/clinic/sessions/${id}/reopen`, { method: 'POST' }),
-    // ═══ التصدير: تنزيل ملفٍّ لا JSON ═══
-    // رابطٌ عاديّ <a href> لا يحمل ترويسة Authorization، فالخادم يردّ 401.
-    // فنجلبه بـ fetch ونصنع رابطاً مؤقّتاً من الـblob — والاسم العربي يُقرأ
-    // من Content-Disposition الذي يرسله الخادم.
-    exportExcel: async ({ from, to, doctorId }) => {
+    // تصدير بيانات العيادة (انظر downloadFile)
+    exportExcel: ({ from, to, doctorId }) => {
       const q = new URLSearchParams({ from, to: to || from })
       if (doctorId) q.set('doctor_id', String(doctorId))
-      const res = await fetch(`/api/clinic/export?${q}`, {
-        headers: { Authorization: `Bearer ${getToken()}` },
-      })
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        const err = new Error(data.error || `تعذّر التصدير (${res.status})`)
-        err.status = res.status; err.data = data
-        throw err
-      }
-      const cd = res.headers.get('content-disposition') || ''
-      const star = /filename\*=UTF-8''([^;]+)/i.exec(cd)
-      const name = star ? decodeURIComponent(star[1]) : `عيادات-${from}.xlsx`
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = name
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      // الإفراج مؤجَّل: الإلغاء الفوري يقطع التنزيل في بعض المتصفّحات
-      setTimeout(() => URL.revokeObjectURL(url), 10000)
-      return name
+      return downloadFile(`/api/clinic/export?${q}`, `عيادات-${from}.xlsx`)
     },
     apologize: (body) => http('/clinic/apologies', { method: 'POST', body: JSON.stringify(body) }),
     undoApology: (doctorId, date) =>
@@ -268,9 +283,15 @@ export const api = {
       http(`/clinic/procedures/${id}/specialties`, { method: 'PUT', body: JSON.stringify(body) }),
     addProcedure: (body) => http('/clinic/procedures', { method: 'POST', body: JSON.stringify(body) }),
     updateProcedure: (id, body) => http(`/clinic/procedures/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
-    // على الحجز: لا سعر يُرسَل — الخادم ينسخه من الكتالوج
-    addAppointmentProcedure: (appointmentId, procedureId) => http(`/clinic/appointments/${appointmentId}/procedures`,
-      { method: 'POST', body: JSON.stringify({ procedure_id: procedureId }) }),
+    // على الحجز: لا سعر يُرسَل — الخادم ينسخه من الكتالوج، ويحسب المواد والحصص لحظتها
+    // materials: [{material_id, qty}]
+    addAppointmentProcedure: (appointmentId, procedureId, materials = []) =>
+      http(`/clinic/appointments/${appointmentId}/procedures`,
+        { method: 'POST', body: JSON.stringify({ procedure_id: procedureId, materials }) }),
+    // القائمة كاملةً تحلّ محلّ السابقة؛ legacy_materials للمشرف وحده
+    setLineMaterials: (appointmentId, lineId, body) =>
+      http(`/clinic/appointments/${appointmentId}/procedures/${lineId}/materials`,
+        { method: 'PUT', body: JSON.stringify(body) }),
     removeAppointmentProcedure: (appointmentId, lineId, reason) =>
       http(`/clinic/appointments/${appointmentId}/procedures/${lineId}/remove`,
         { method: 'POST', body: JSON.stringify({ reason }) }),

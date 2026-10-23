@@ -8,6 +8,7 @@ import { AttendanceBadge, urgentRowClass, isAttendanceSession, usePolling, fmtCl
 import { useRole } from '../RoleContext.jsx'
 import { useToast, RecallButton } from '../action-feedback.jsx'
 import { canEditAppointmentProcedures, canEditBooking } from '../permissions.js'
+import MaterialsEditor, { qtyValid, toPayload, fmtQty, materialsSummary } from '../components/MaterialsEditor.jsx'
 
 // شارة الأولوية — تُبرز من يتقدّم الطابور وسببه
 function priorityBadge(priority) {
@@ -1207,17 +1208,25 @@ const whenAt = (ts, sessionDay) => {
   return day === sessionDay ? fmtClock(ts) : `${day} ${fmtClock(ts)}`
 }
 
-// ═══ إجراءات الحجز ═══
+// ═══ إجراءات الحجز وموادّها ═══
 // تُضاف بعد دخول المريض فقط (قيد الكشف أو انتهى). السعر من الكتالوج ولا يُعدَّل هنا.
 // الاستقبال في يوم الجلسة وحده، ومسؤول العيادات أي وقت — والخادم هو الحارس، والإخفاء هنا
 // يقول السبب بدل زرٍّ يُرفض. الإزالة بسبب إلزامي، والمُزال يبقى ظاهراً مشطوباً بأثره.
+//
+// ★ المواد: الممرّضة تُملي ما استُعمل، والاستقبال يختاره من الكتالوج كاملاً بكمّيته.
+//   إجراءٌ بلا مواد (إيكو) طبيعيّ تماماً. ولا سعر مادة ولا تقسيم هنا — الخادم يحسبهما
+//   لحظة الحفظ ولا يرسلهما للاستقبال أصلاً.
 function AppointmentProcedures({ appt, session, onChanged, onToast }) {
   const { role } = useRole()
   const [catalog, setCatalog] = useState(null)
+  const [matCatalog, setMatCatalog] = useState(null)
   const [pick, setPick] = useState('')
+  const [newMats, setNewMats] = useState([])
   const [busy, setBusy] = useState(false)
   const [removing, setRemoving] = useState(null)   // id السطر الجاري إزالته
   const [reason, setReason] = useState('')
+  const [editing, setEditing] = useState(null)     // id السطر الجاري تعديل موادّه
+  const [editMats, setEditMats] = useState([])
   const lines = appt.procedures || []
   const entered = ['in_service', 'done'].includes(appt.status)
   const dayOk = role === 'clinic_admin' || session.session_day === session.server_today
@@ -1232,6 +1241,9 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
     const forDoctor = role === 'clinic_admin' ? null : session.doctor_id
     api.clinic.procedures(forDoctor).then((r) => setCatalog(r.filter((p) => p.is_active)))
       .catch((e) => onToast(e.message))
+    // كتالوج المواد كاملاً، المفعَّل وحده (المعطَّلة تختفي من البحث)
+    api.clinic.materials().then((r) => setMatCatalog(r.filter((m) => m.is_active !== false)))
+      .catch((e) => onToast(e.message))
   }, [canEdit])
 
   const activeIds = new Set(lines.filter((l) => !l.removed_at).map((l) => String(l.procedure_id)))
@@ -1239,11 +1251,13 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
   const chosen = choices.find((p) => String(p.id) === pick)
 
   const add = async () => {
-    if (!chosen) return
+    if (!chosen || !qtyValid(newMats)) return
     setBusy(true)
     try {
-      await api.clinic.addAppointmentProcedure(appt.id, chosen.id)
-      onToast(`أُضيف «${chosen.name}» — ${fmtMoney(chosen.price)}`, 'success'); setPick(''); onChanged()
+      await api.clinic.addAppointmentProcedure(appt.id, chosen.id, toPayload(newMats))
+      const withMats = newMats.length ? ` + ${newMats.length} ${newMats.length === 1 ? 'مادة' : 'مواد'}` : ''
+      onToast(`أُضيف «${chosen.name}» — ${fmtMoney(chosen.price)}${withMats}`, 'success')
+      setPick(''); setNewMats([]); onChanged()
     } catch (ex) { onToast(ex.message) }
     finally { setBusy(false) }
   }
@@ -1256,6 +1270,20 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
     } catch (ex) { onToast(ex.message) }
     finally { setBusy(false) }
   }
+  const startEdit = (line) => {
+    setRemoving(null); setEditing(line.id)
+    setEditMats((line.materials || []).map((m) => ({ ...m, qty: fmtQty(m.qty) })))
+  }
+  const saveEdit = async (line) => {
+    if (!qtyValid(editMats)) return
+    setBusy(true)
+    try {
+      const r = await api.clinic.setLineMaterials(appt.id, line.id, { materials: toPayload(editMats) })
+      onToast(r.unchanged ? 'لا تغيير في المواد' : `حُدّثت مواد «${line.name}»`, 'success')
+      setEditing(null); onChanged()
+    } catch (ex) { onToast(ex.message) }
+    finally { setBusy(false) }
+  }
 
   return (
     <div className="appt-procs">
@@ -1263,42 +1291,68 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
         <table className="appt-procs-table">
           <tbody>
             {lines.map((l) => (
-              <tr key={l.id} className={l.removed_at ? 'proc-removed' : undefined}>
-                <td>
-                  {l.name}
-                  {/* أُضيف خارج اختصاص دكتوره بقرار المشرف — العلامة تُبقي الأثر */}
-                  {l.off_specialty && (
-                    <span className="badge warn" style={{ marginInlineStart: 5, fontSize: 10.5 }}
-                      title="أُضيف خارج اختصاص الدكتور بقرار مشرف العيادات">خارج الاختصاص</span>
-                  )}
-                </td>
-                <td className="num">{fmtMoney(l.price)}</td>
-                <td className="appt-procs-meta">
-                  أضافه {l.added_by_name || '—'} <span dir="ltr">{whenAt(l.added_at, session.session_day)}</span>
-                  {l.removed_at && (
-                    <span className="proc-removed-why">
-                      أزاله {l.removed_by_name || '—'} <span dir="ltr">{whenAt(l.removed_at, session.session_day)}</span> — {l.removed_reason}
-                    </span>
-                  )}
-                </td>
-                <td>
-                  {!l.removed_at && canEdit && removing !== l.id && (
-                    <button className="ghost" style={{ padding: '2px 10px', fontSize: 11.5 }}
-                      onClick={() => { setRemoving(l.id); setReason('') }}>إزالة</button>
-                  )}
-                  {removing === l.id && (
-                    <span className="proc-remove-form">
-                      <input value={reason} autoFocus placeholder="سبب الإزالة (إلزامي)" aria-label="سبب الإزالة"
-                        onChange={(e) => setReason(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') remove(l) }} />
-                      <button style={{ padding: '3px 10px', fontSize: 11.5 }} disabled={busy || !reason.trim()}
-                        onClick={() => remove(l)}>تأكيد الإزالة</button>
-                      <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }}
-                        onClick={() => setRemoving(null)}>إلغاء</button>
-                    </span>
-                  )}
-                </td>
-              </tr>
+              <Fragment key={l.id}>
+                <tr className={l.removed_at ? 'proc-removed' : undefined}>
+                  <td>
+                    {l.name}
+                    {/* أُضيف خارج اختصاص دكتوره بقرار المشرف — العلامة تُبقي الأثر */}
+                    {l.off_specialty && (
+                      <span className="badge warn" style={{ marginInlineStart: 5, fontSize: 10.5 }}
+                        title="أُضيف خارج اختصاص الدكتور بقرار مشرف العيادات">خارج الاختصاص</span>
+                    )}
+                  </td>
+                  <td className="num">{fmtMoney(l.price)}</td>
+                  <td className="appt-procs-meta">
+                    أضافه {l.added_by_name || '—'} <span dir="ltr">{whenAt(l.added_at, session.session_day)}</span>
+                    {l.removed_at && (
+                      <span className="proc-removed-why">
+                        أزاله {l.removed_by_name || '—'} <span dir="ltr">{whenAt(l.removed_at, session.session_day)}</span> — {l.removed_reason}
+                      </span>
+                    )}
+                  </td>
+                  <td>
+                    {!l.removed_at && canEdit && removing !== l.id && editing !== l.id && (
+                      <span className="proc-line-actions">
+                        <button className="ghost" style={{ padding: '2px 10px', fontSize: 11.5 }}
+                          onClick={() => startEdit(l)}>المواد</button>
+                        <button className="ghost" style={{ padding: '2px 10px', fontSize: 11.5 }}
+                          onClick={() => { setEditing(null); setRemoving(l.id); setReason('') }}>إزالة</button>
+                      </span>
+                    )}
+                    {removing === l.id && (
+                      <span className="proc-remove-form">
+                        <input value={reason} autoFocus placeholder="سبب الإزالة (إلزامي)" aria-label="سبب الإزالة"
+                          onChange={(e) => setReason(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') remove(l) }} />
+                        <button style={{ padding: '3px 10px', fontSize: 11.5 }} disabled={busy || !reason.trim()}
+                          onClick={() => remove(l)}>تأكيد الإزالة</button>
+                        <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }}
+                          onClick={() => setRemoving(null)}>إلغاء</button>
+                      </span>
+                    )}
+                  </td>
+                </tr>
+                {/* مواد السطر: بالاسم والكمّية — أو محرّرها إن فُتح */}
+                {!l.removed_at && (editing === l.id ? (
+                  <tr className="proc-mats-row">
+                    <td colSpan={4}>
+                      <MaterialsEditor catalog={matCatalog} value={editMats} onChange={setEditMats} disabled={busy} />
+                      <div className="mat-actions">
+                        <button disabled={busy || !qtyValid(editMats)} onClick={() => saveEdit(l)}>حفظ المواد</button>
+                        <button className="ghost" disabled={busy} onClick={() => setEditing(null)}>إلغاء</button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  <tr className="proc-mats-row">
+                    <td colSpan={4} className="proc-mats-text">
+                      {(l.materials || []).length
+                        ? <>المواد: {materialsSummary(l.materials)}</>
+                        : <span className="muted">بلا مواد</span>}
+                    </td>
+                  </tr>
+                ))}
+              </Fragment>
             ))}
           </tbody>
         </table>
@@ -1312,19 +1366,28 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
       )}
       {canEditAppointmentProcedures(role) && (
         canEdit ? (
-          <div className="proc-add">
-            <select value={pick} onChange={(e) => setPick(e.target.value)} aria-label="الإجراء">
-              <option value="">{catalog === null ? 'جارٍ التحميل…' : choices.length ? '— اختر إجراءً —' : 'لا إجراءات متاحة'}</option>
-              {choices.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-            {/* السعر للقراءة فقط — من الكتالوج، ولا يُرسَل للخادم أصلاً */}
-            <span className="proc-add-price">{chosen ? fmtMoney(chosen.price) : '—'}</span>
-            <button disabled={!chosen || busy} onClick={add}>+ إجراء</button>
+          <div className="proc-add-box">
+            <div className="proc-add">
+              <select value={pick} onChange={(e) => setPick(e.target.value)} aria-label="الإجراء">
+                <option value="">{catalog === null ? 'جارٍ التحميل…' : choices.length ? '— اختر إجراءً —' : 'لا إجراءات متاحة'}</option>
+                {choices.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+              {/* السعر للقراءة فقط — من الكتالوج، ولا يُرسَل للخادم أصلاً */}
+              <span className="proc-add-price">{chosen ? fmtMoney(chosen.price) : '—'}</span>
+              <button disabled={!chosen || busy || !qtyValid(newMats)} onClick={add}>+ إجراء</button>
+            </div>
+            {/* المواد بعد اختيار الإجراء: اختيارية — إجراءٌ بلا مواد يُضاف كما هو */}
+            {chosen && (
+              <div className="proc-add-mats">
+                <span className="proc-add-mats-label">المواد المستعملة (اختياري):</span>
+                <MaterialsEditor catalog={matCatalog} value={newMats} onChange={setNewMats} disabled={busy} />
+              </div>
+            )}
           </div>
         ) : (
           <p className="appt-procs-hint">
             {!entered ? 'تُضاف الإجراءات بعد دخول المريض على الطبيب.'
-              : 'انتهى يوم هذه الجلسة — الإضافة والإزالة الآن لمسؤول العيادات.'}
+              : 'انتهى يوم هذه الجلسة — الإضافة والإزالة وتعديل المواد الآن لمسؤول العيادات.'}
           </p>
         )
       )}
