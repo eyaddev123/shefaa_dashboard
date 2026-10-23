@@ -35,9 +35,9 @@ PY
 if [ -z "$PRINTER" ]; then PRINTER="Printer_POS_80"; fi
 
 if lpstat -p "$PRINTER" >/dev/null 2>&1; then
-  echo "✔ الطابعة «$PRINTER» معروفة للنظام"
+  echo "✔ الطابعة «${PRINTER}» معروفة للنظام"
 else
-  echo "⚠ الطابعة «$PRINTER» غير موجودة. الطابعات المتاحة:"
+  echo "⚠ الطابعة «${PRINTER}» غير موجودة. الطابعات المتاحة:"
   lpstat -p 2>/dev/null | awk '{print "     - " $2}' || echo "     (لا طابعات)"
   echo "   عدّل printer في config.json ثمّ أعد تشغيل هذا السكربت."
 fi
