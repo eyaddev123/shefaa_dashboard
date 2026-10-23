@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ProcedureSpecialties } from '../SpecialtyPicker.jsx'
+import { ProcedureSpecialties, specialtiesText } from '../SpecialtyPicker.jsx'
 import { useDialogs } from '../dialogs.jsx'
 import { api, fmtMoney, toLatinDigits } from '../api.js'
 import { useRole } from '../RoleContext.jsx'
@@ -51,8 +51,9 @@ function NewProcedureForm({ onCreated }) {
     } catch (ex) { setErr(ex.message) }
     finally { setBusy(false) }
   }
+  // سطرٌ واحد: الاسم · السعر · الاختصاصات · الزرّ — بارتفاعٍ واحد وعلى خطٍّ واحد
   return (
-    <form className="inline" onSubmit={submit} style={{ marginTop: 14 }}>
+    <form className="proc-form" onSubmit={submit}>
       <div className="field"><label htmlFor="new-proc-name">اسم الإجراء</label>
         <input id="new-proc-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} maxLength={150}
           placeholder="مثال: تخطيط قلب" required /></div>
@@ -60,26 +61,33 @@ function NewProcedureForm({ onCreated }) {
       <div className="field"><label htmlFor="new-proc-price">السعر (ل.س)</label>
         <input id="new-proc-price" value={form.price} inputMode="decimal" placeholder="0"
           onChange={(e) => setForm({ ...form, price: toLatinDigits(e.target.value) })} required /></div>
-      <ProcedureSpecialties isGeneral={spec.isGeneral} specialtyIds={spec.specialtyIds}
+      <ProcedureSpecialties id="new-proc-spec" isGeneral={spec.isGeneral} specialtyIds={spec.specialtyIds}
         canAdd onChange={setSpec} />
-      <button type="submit" disabled={busy}>{busy ? 'جارٍ الإضافة…' : 'إضافة إجراء'}</button>
-      {err && <p className="error">{err}</p>}
+      <button type="submit" className="proc-form-btn" disabled={busy}>{busy ? 'جارٍ الإضافة…' : 'إضافة'}</button>
+      {err && <p className="error proc-form-err">{err}</p>}
     </form>
   )
 }
 
-// تعديل الاسم والسعر في الصفّ نفسه
+// تعديل الاسم والسعر والاختصاصات في الصفّ نفسه — بنفس مكوّن الإضافة
+const specKey = (sp) => (sp.isGeneral ? 'general' : [...sp.specialtyIds].map(String).sort().join(','))
 function EditRow({ proc, onSaved, onCancel }) {
   const dlg = useDialogs()
   const [name, setName] = useState(proc.name)
   const [price, setPrice] = useState(String(Number(proc.price)))
+  const initialSpec = {
+    isGeneral: !!proc.is_general || !(proc.specialties || []).length,
+    specialtyIds: proc.is_general ? [] : (proc.specialties || []).map((x) => String(x.id)),
+  }
+  const [spec, setSpec] = useState(initialSpec)
+  const specChanged = specKey(spec) !== specKey(initialSpec)
   const [err, setErr] = useState(null)
   const [busy, setBusy] = useState(false)
   const save = async () => {
     const body = {}
     if (name.trim() !== proc.name) body.name = name
     if (Number(price) !== Number(proc.price) || price.trim() === '') body.price = price
-    if (Object.keys(body).length === 0) return onCancel()
+    if (Object.keys(body).length === 0 && !specChanged) return onCancel()
     if (body.price !== undefined) {
       const ok = await dlg.confirm({
         title: 'تغيير السعر',
@@ -90,8 +98,13 @@ function EditRow({ proc, onSaved, onCancel }) {
       if (!ok) return
     }
     setErr(null); setBusy(true)
-    try { await api.clinic.updateProcedure(proc.id, body); onSaved() }
-    catch (ex) { setErr(ex.message) }
+    try {
+      if (Object.keys(body).length) await api.clinic.updateProcedure(proc.id, body)
+      // الاختصاصات بمسارها الذرّيّ (مسحٌ ثمّ إدراج في معاملةٍ واحدة)
+      if (specChanged) await api.clinic.setProcedureSpecialties(proc.id,
+        { is_general: spec.isGeneral, specialty_ids: spec.isGeneral ? [] : spec.specialtyIds.map(Number) })
+      onSaved()
+    } catch (ex) { setErr(ex.message) }
     finally { setBusy(false) }
   }
   return (
@@ -99,6 +112,10 @@ function EditRow({ proc, onSaved, onCancel }) {
       <td><input value={name} maxLength={150} onChange={(e) => setName(e.target.value)} aria-label="اسم الإجراء" /></td>
       <td><input value={price} inputMode="decimal" style={{ width: 130 }} aria-label="السعر"
         onChange={(e) => setPrice(toLatinDigits(e.target.value))} /></td>
+      <td className="proc-edit-spec">
+        <ProcedureSpecialties id={`edit-spec-${proc.id}`} hideLabel isGeneral={spec.isGeneral}
+          specialtyIds={spec.specialtyIds} canAdd onChange={setSpec} />
+      </td>
       <td colSpan={4}>
         <div className="inline" style={{ gap: 6 }}>
           <button onClick={save} disabled={busy} style={{ padding: '4px 12px', fontSize: 12 }}>حفظ</button>
@@ -174,7 +191,7 @@ export default function ClinicProcedures() {
           : <p className="subtitle" style={{ marginTop: -6 }}>للاطّلاع فقط — يديره مسؤول العيادات.</p>}
         <table style={{ marginTop: 14 }}>
           <thead>
-            <tr><th>الإجراء</th><th>السعر الحالي</th><th>الحالة</th><th>استُعمل</th><th>آخر تعديل</th>{canEdit && <th></th>}</tr>
+            <tr><th>الإجراء</th><th>السعر الحالي</th><th>الاختصاصات</th><th>الحالة</th><th>استُعمل</th><th>آخر تعديل</th>{canEdit && <th></th>}</tr>
           </thead>
           <tbody>
             {list.map((p) => editing === p.id ? (
@@ -184,9 +201,12 @@ export default function ClinicProcedures() {
               <tr key={p.id} className={p.is_active ? undefined : 'proc-inactive'}>
                 <td>{p.name}</td>
                 <td className="num">{fmtMoney(p.price)}</td>
+                <td className="proc-spec-cell">
+                  {specialtiesText(p) === 'عام' ? <span className="badge">عام</span> : specialtiesText(p)}
+                </td>
                 <td>{p.is_active ? <span className="badge good">مفعَّل</span> : <span className="badge">معطَّل</span>}</td>
                 <td className="num">{p.times_used} حجز</td>
-                <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                <td className="proc-meta-cell" style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
                   {p.updated_by_name || p.created_by_name || '—'}
                   {(p.updated_at || p.created_at) && (
                     <span dir="ltr" style={{ marginInlineStart: 6 }}>
@@ -195,7 +215,7 @@ export default function ClinicProcedures() {
                   )}
                 </td>
                 {canEdit && (
-                  <td>
+                  <td className="proc-actions-cell">
                     <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }}
                       onClick={() => setEditing(p.id)}>تعديل</button>{' '}
                     <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }}
@@ -205,7 +225,7 @@ export default function ClinicProcedures() {
               </tr>
             ))}
             {list.length === 0 && (
-              <tr><td colSpan={canEdit ? 6 : 5} className="empty">لا إجراءات بعد{canEdit ? ' — أضف أولها أعلاه' : ''}</td></tr>
+              <tr><td colSpan={canEdit ? 7 : 6} className="empty">لا إجراءات بعد{canEdit ? ' — أضف أولها أعلاه' : ''}</td></tr>
             )}
           </tbody>
         </table>

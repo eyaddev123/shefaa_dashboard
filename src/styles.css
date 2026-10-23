@@ -2063,34 +2063,84 @@ button.danger:hover:not(:disabled) { filter: brightness(1.08); }
 .field:has(.spec-row) { flex: 1 1 100%; min-width: 280px; }
 .spec-add { flex: none; padding: 6px 12px; font-size: 12px; white-space: nowrap; }
 .spec-warn { color: var(--status-pending); font-weight: 700; }
-/* الكتلة تأخذ سطرها كاملاً داخل النموذج المرن: الحقل الضيّق كان يقصّ أسماء
-   الاختصاصات ويكسر سطر «عام» ثلاثة أسطر. */
-.field:has(.spec-list), .field:has(.spec-general) { flex: 1 1 100%; min-width: 260px; }
-.spec-general {
-  display: flex; align-items: center; gap: 8px;
-  font-weight: 700; margin-bottom: 6px; white-space: nowrap;
+/* ═══ اختصاصات الإجراء (ProcedureSpecialties) — قائمة منسدلة متعدّدة الاختيار ═══
+   الحقل بارتفاع الحقول العادية تماماً؛ المختار شاراتٌ داخله، واللوحة في body بموضعٍ
+   ثابت (البطاقة تقصّ ما يفيض منها). */
+:root { --field-h: 42px; }
+.spec-ms-field {
+  box-sizing: border-box; height: var(--field-h);
+  display: flex; align-items: center; gap: 5px; overflow: hidden;
+  padding: 0 12px 0 32px;     /* مكان السهم يساراً (فيزيائياً: inline-start في RTL هو اليمين) */
+  border: 1.5px solid var(--grid); border-radius: 10px;
+  background-color: var(--surface-1); color: var(--text-primary);
+  font-size: 13.5px; cursor: pointer; user-select: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5l5-5' fill='none' stroke='%237d938f' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: left 12px center; background-size: 11px;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
-/* صناديق الاختيار: قاعدة `.inline > .field input { width:100% }` أقوى تخصيصاً،
-   فكانت تمدّ المربّع ليملأ السطر ويبقى اسم الاختصاص بعرض صفر. نطابق تخصيصها. */
-.spec-general input[type='checkbox'],
-.spec-item input[type='checkbox'],
-.inline > .field .spec-general input[type='checkbox'],
-.inline > .field .spec-item input[type='checkbox'] {
-  width: 16px; height: 16px; flex: none; margin: 0; accent-color: var(--primary); cursor: pointer;
+.spec-ms-field:focus-visible, .spec-ms-field.is-open {
+  outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft);
 }
-.spec-search { width: 100%; }
-.spec-list {
-  margin-top: 6px; max-height: 190px; overflow-y: auto;
-  border: 1px solid var(--border); border-radius: 10px;
+.spec-ms-chips { display: flex; align-items: center; gap: 5px; flex: 1 1 auto; min-width: 0; overflow: hidden; }
+.spec-ms-general { color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.spec-chip {
+  display: inline-flex; align-items: center; gap: 2px; flex: 0 1 auto; min-width: 0; max-width: 130px;
+  padding: 2px 4px 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; line-height: 1.5;
+  color: var(--accent-text, var(--primary)); background: var(--primary-soft);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.spec-item {
-  display: flex; align-items: center; gap: 8px;
-  padding: 8px 12px; cursor: pointer; font-size: 13.5px;
+.spec-chip-more { padding: 2px 9px; }
+.spec-chip-x {
+  all: unset; cursor: pointer; font-size: 14px; font-weight: 800; line-height: 1;
+  padding: 0 4px; border-radius: 50%; color: inherit; opacity: 0.75;
 }
-/* الاسم يأخذ ما بقي ولا يُقصّ */
-.spec-item > span { flex: 1 1 auto; min-width: 0; }
-.spec-item + .spec-item { border-top: 1px solid var(--border); }
+.spec-chip-x:hover, .spec-chip-x:focus-visible { opacity: 1; background: var(--surface-1); }
 
+.spec-ms-panel {
+  position: fixed; z-index: 1100; display: flex; flex-direction: column;
+  background: var(--surface-1); color: var(--text-primary);
+  border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow-pop);
+  padding: 8px; box-sizing: border-box; font-size: 13.5px;
+}
+.spec-ms-search { width: 100%; flex: none; padding: 7px 10px; font-size: 13px; }
+.spec-ms-options { overflow-y: auto; margin-top: 6px; flex: 1 1 auto; min-height: 0; }
+.spec-ms-opt {
+  display: flex; align-items: center; gap: 9px; padding: 7px 8px; border-radius: 8px; cursor: pointer;
+}
+.spec-ms-opt:hover { background: var(--primary-soft); }
+.spec-ms-opt.is-on { font-weight: 700; }
+.spec-ms-opt.is-general { border-bottom: 1px solid var(--border); border-radius: 8px 8px 0 0; margin-bottom: 2px; }
+.spec-ms-opt input[type='checkbox'] { width: 16px; height: 16px; flex: none; margin: 0; accent-color: var(--primary); cursor: pointer; }
+.spec-ms-empty { margin: 6px 8px; font-size: 12.5px; color: var(--muted); }
+.spec-ms-foot { flex: none; border-top: 1px solid var(--border); margin-top: 6px; padding-top: 6px; }
+.spec-ms-addbtn { width: 100%; padding: 6px 10px; font-size: 12.5px; }
+.spec-ms-addrow { display: flex; gap: 6px; align-items: center; }
+.spec-ms-addrow input { flex: 1 1 auto; padding: 6px 10px; font-size: 13px; }
+.spec-ms-addrow button { flex: none; padding: 6px 12px; font-size: 12px; }
+.spec-ms-note { display: block; margin-top: 5px; font-size: 11.5px; color: var(--text-secondary); }
+
+/* ═══ نموذج إضافة إجراء: سطرٌ واحد على الشاشة العريضة ═══
+   الاسم · السعر · الاختصاصات · الزرّ — بارتفاعٍ واحد وعلى خطٍّ واحد. */
+.proc-form {
+  display: grid; gap: 10px 12px; align-items: end; margin-top: 14px;
+  grid-template-columns: minmax(180px, 2fr) minmax(110px, 1fr) minmax(220px, 2fr) auto;
+}
+.proc-form > .field { min-width: 0; }
+.proc-form input { box-sizing: border-box; height: var(--field-h); width: 100%; }
+.proc-form-btn { box-sizing: border-box; height: var(--field-h); padding: 0 22px; white-space: nowrap; }
+.proc-form-err { grid-column: 1 / -1; margin: 0; }
+/* الضيّق: الاسم والسعر، ثمّ الاختصاصات والزرّ */
+@media (max-width: 760px) {
+  .proc-form { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); }
+  .proc-form-btn { width: 100%; }
+}
+/* على الجوال الأزرار ٤٤px هدفَ لمس (قاعدة عامّة) — فالحقول معها، وإلا اختلف الارتفاع */
+@media (max-width: 639px) { :root { --field-h: 44px; } }
+.proc-spec-cell { font-size: 12.5px; color: var(--text-secondary); max-width: 220px; }
+.proc-edit-spec { min-width: 220px; }
+/* التاريخ والأزرار لا تنكسر سطرين حين يتّسع عمود الاختصاصات في صفّ التعديل */
+.proc-meta-cell, .proc-actions-cell { white-space: nowrap; }
+.proc-edit-spec .spec-ms { gap: 0; }
 
 /* ═══ إعداد الطابعة (PrinterSetup) ═══
    دليلٌ يُقرأ مرّةً عند التركيب — فالخطوات مرقّمة بارزة، والتحذير مميَّز. */
