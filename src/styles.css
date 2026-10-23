@@ -2007,7 +2007,6 @@ button.danger:hover:not(:disabled) { filter: brightness(1.08); }
   .action-row > .doc-actions > button.doc-btn {
     flex: 1 1 calc(50% - 4px); min-width: 0; width: auto;
   }
-  /* DoneProcedure يغلّف زرّه بـ Fragment فيصير ابناً مباشراً — نغطّي الحالتين */
   .action-row > .doc-actions > * { min-width: 0; }
   .doc-btn { width: 100%; padding: 11px 8px; font-size: 13.5px; }
   /* الفاصل يصير عمودياً: الصفّ الثاني منفصلٌ بصرياً عن الأول */
@@ -2016,7 +2015,7 @@ button.danger:hover:not(:disabled) { filter: brightness(1.08); }
   .action-row > .doc-actions > .doc-procs { flex: 1 1 100%; }
 }
 
-/* ── ما أضافه الطبيب على هذا المريض: أسماءٌ فقط ── */
+/* ── ما أُضيف على هذا المريض: أسماءٌ فقط، للاطّلاع ── */
 .doc-procs {
   display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
   margin-top: 10px;
@@ -2026,40 +2025,10 @@ button.danger:hover:not(:disabled) { filter: brightness(1.08); }
 .doc-procs-label { font-size: 12.5px; color: var(--text-secondary); font-weight: 700; }
 .doc-proc-chip {
   display: inline-flex; align-items: center; gap: 4px;
-  padding: 3px 6px 3px 10px; border-radius: 999px;
+  padding: 3px 10px; border-radius: 999px;
   font-size: 12.5px; font-weight: 700;
   color: var(--status-good); background: var(--status-good-bg);
 }
-.doc-proc-x {
-  all: unset; cursor: pointer; line-height: 1;
-  font-size: 15px; font-weight: 800; padding: 0 3px; border-radius: 50%;
-  color: var(--status-bad);
-}
-.doc-proc-x:hover { background: var(--status-bad-bg); }
-.doc-proc-x:disabled { opacity: 0.4; cursor: default; }
-
-/* ── نافذة الاختيار: بحثٌ ومربّعات اختيار ── */
-.doc-proc-search {
-  width: 100%; margin-top: 10px;
-}
-.doc-proc-list {
-  margin-top: 10px; max-height: 320px; overflow-y: auto;
-  border: 1px solid var(--border); border-radius: 12px;
-}
-.doc-proc-row {
-  display: flex; align-items: center; gap: 10px;
-  padding: 11px 14px; cursor: pointer; font-size: 14.5px; font-weight: 700;
-}
-.doc-proc-row + .doc-proc-row { border-top: 1px solid var(--border); }
-.doc-proc-row:hover:not(.is-added) { background: var(--surface-2, rgba(127,214,184,0.07)); }
-.doc-proc-row input { width: auto; margin: 0; flex: none; }
-/* المضاف سابقاً: مؤشَّرٌ ومعطَّل — لا يُضاف مرّتين (والخادم يحرسها أيضاً) */
-.doc-proc-row.is-added { opacity: 0.6; cursor: default; }
-.doc-proc-done {
-  margin-inline-start: auto; font-size: 11.5px; font-weight: 700;
-  color: var(--status-good);
-}
-
 /* ═══════════════════════════════════════════════════════════════════
    نوافذ التأكيد والإدخال (dialogs.jsx) — بديل window.confirm/alert/prompt
    تلك تكتب «localhost:5173 says» وأزرارها إنكليزية ولا تعرف الثيم.
@@ -2182,3 +2151,80 @@ button.danger:hover:not(:disabled) { filter: brightness(1.08); }
 .ps-status > div { flex: 1 1 auto; min-width: 0; }
 .ps-status-sub { font-size: 12.5px; color: var(--text-secondary); margin-top: 3px; line-height: 1.6; }
 .ps-recheck { flex: none; padding: 4px 10px; font-size: 12px; white-space: nowrap; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   مواد سطر الإجراء (MaterialsEditor) — بحثٌ في الكتالوج كاملاً وكمّية لكل مادة
+   ═══════════════════════════════════════════════════════════════════ */
+.proc-add-box { margin-top: 6px; }
+.proc-add-mats { margin-top: 8px; padding: 10px 12px; border: 1px dashed var(--border); border-radius: 10px; }
+.proc-add-mats-label { display: block; font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 6px; }
+.proc-line-actions { display: inline-flex; gap: 6px; }
+.proc-mats-row > td { padding-top: 0 !important; }
+.proc-mats-text { font-size: 12px; color: var(--text-secondary); }
+.mat-editor { display: flex; flex-direction: column; gap: 8px; }
+.mat-chosen { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.mat-chosen li { display: flex; align-items: center; gap: 8px; }
+.mat-name { flex: 0 1 220px; font-weight: 700; font-size: 13px; }
+.mat-qty { width: 72px !important; padding: 4px 8px !important; text-align: center; font-size: 13px; }
+.mat-qty.is-bad { border-color: var(--status-bad) !important; }
+.mat-unit { font-size: 12px; color: var(--text-secondary); }
+.mat-x {
+  all: unset; cursor: pointer; line-height: 1; font-size: 16px; font-weight: 800;
+  padding: 0 5px; border-radius: 50%; color: var(--status-bad);
+}
+.mat-x:hover { background: var(--status-bad-bg); }
+.mat-search { position: relative; max-width: 360px; }
+.mat-search input { width: 100%; font-size: 13px; padding: 6px 10px; }
+.mat-results {
+  list-style: none; margin: 4px 0 0; padding: 4px; position: absolute; inset-inline: 0; z-index: 20;
+  background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: var(--shadow-pop); max-height: 260px; overflow-y: auto;
+}
+.mat-results button {
+  all: unset; display: block; width: 100%; box-sizing: border-box; cursor: pointer;
+  padding: 7px 10px; border-radius: 8px; font-size: 13px; font-weight: 700;
+}
+.mat-results button:hover, .mat-results button:focus-visible { background: var(--primary-soft); }
+.mat-none { padding: 7px 10px; font-size: 12.5px; color: var(--muted); }
+.mat-actions { display: flex; gap: 8px; margin-top: 8px; }
+.mat-actions button { padding: 5px 14px; font-size: 12px; }
+@media (max-width: 640px) {
+  .mat-name { flex: 1 1 auto; }
+  .mat-search { max-width: none; }
+}
+.success-text { color: var(--status-good); font-size: 13px; margin-top: 8px; font-weight: 600; }
+.share-warn { margin: 0 0 10px; padding: 8px 12px; border-radius: 10px; font-size: 13px; font-weight: 600;
+  color: var(--status-pending); background: var(--status-pending-bg); }
+
+/* ═══════════════════════════════════════════════════════════════════
+   مراجعة الإجراءات — الأحمر: الشفاء سالبة · الأصفر: الدكتور بلا قاعدة
+   ═══════════════════════════════════════════════════════════════════ */
+.rev-filters { gap: 10px; margin-top: 12px; align-items: flex-end; flex-wrap: wrap; }
+.rev-flags { gap: 8px; margin: 12px 0 4px; flex-wrap: wrap; }
+.rev-flag {
+  padding: 5px 12px; font-size: 12.5px; border-radius: 999px;
+  background: transparent; color: var(--text-primary); border: 1px solid var(--border);
+}
+.rev-flag.is-on { border-color: var(--primary); background: var(--primary-soft); }
+.rev-flag.is-neg { color: var(--status-bad); }
+.rev-flag.is-neg.is-on { background: var(--status-bad-bg); border-color: var(--status-bad); }
+.rev-flag.is-norule { color: var(--status-pending); }
+.rev-flag.is-norule.is-on { background: var(--status-pending-bg); border-color: var(--status-pending); }
+.rev-flag-n { font-weight: 800; margin-inline-start: 4px; }
+.rev-totals { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 10px 0; font-size: 13px; color: var(--text-secondary); }
+.rev-totals strong { color: var(--text-primary); }
+.rev-table { margin-top: 8px; font-size: 13px; }
+.rev-table td { vertical-align: top; }
+.rev-neg > td { background: var(--status-bad-bg) !important; }
+.rev-norule > td { background: var(--status-pending-bg) !important; }
+.neg { color: var(--status-bad) !important; font-weight: 800; }
+.rev-mats strong { display: block; }
+.rev-mats-list { display: block; font-size: 11.5px; color: var(--text-secondary); max-width: 260px; }
+.rev-rule { font-size: 12px; max-width: 220px; }
+.rev-note { display: block; margin-top: 3px; font-size: 11.5px; font-weight: 700; color: var(--status-pending); }
+.rev-detail > td { background: var(--surface-1); }
+.rev-edit { padding: 6px 0; }
+.rev-legacy { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 12.5px; }
+.rev-history { margin: 4px 0; padding-inline-start: 18px; font-size: 12.5px; line-height: 1.8; }
+.rev-history-nums { display: block; font-size: 11.5px; color: var(--text-secondary); }
+.rev-total-row > td { font-weight: 800; border-top: 2px solid var(--border); }
