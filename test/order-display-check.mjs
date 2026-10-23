@@ -228,7 +228,8 @@ const run = async () => {
           const fsz = parseFloat(getComputedStyle(t).fontSize)
           return {
             text: t.textContent.trim(), fsz,
-            oneLine: tr.height <= fsz * 1.9,
+            // عدد صناديق السطر لا نسبة الارتفاع: صندوق Cairo ≈1.87em فالنسبة تخطئ بالتقريب
+            oneLine: t.getClientRects().length === 1,
             notClipped: t.scrollWidth <= t.clientWidth + 1,
             inView: tr.left >= 0 && tr.right <= window.innerWidth,
             inHead: tr.top >= hr.top - 1 && tr.bottom <= hr.bottom + 1,
