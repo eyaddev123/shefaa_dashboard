@@ -83,7 +83,9 @@ console.log('\n── ٢) محتوى البطاقة ──')
     visit_type: 'consultation', fee: 15000, procedures: [],
     doctor_name: 'د. سامر الحلبي', room: '3', now: '2026-10-19T14:30:00',
   }, 80))
-  ok(html.includes('جمعية الشفاء الخيرية'), 'اسم الجمعية')
+  ok(html.includes('<span>مجمع عيادات</span> <span>الشفاء الطبي</span>'), '★ الاسم «مجمع عيادات الشفاء الطبي» (نصفان لا ينكسران)')
+  ok(!html.includes('جمعية الشفاء الخيرية'), '★ والاسم القديم غائب')
+  ok(!html.includes('class="copy"'), 'بلا اسم نسخة ما لم يُطلب')
   ok(html.includes('>12<'), 'رقم الدور')
   ok(html.includes('عبد الرحمن محمد الخطيب'), 'الاسم الثلاثي')
   ok(html.includes('العمر: 34 سنة'), 'العمر محسوبٌ من سنة الميلاد')
@@ -264,6 +266,51 @@ console.log('\n── ٥ب) خطّ البطاقة ──')
     '★ المبلغ ثقيل (700)')
   ok(/font-weight: 400/.test(html), 'والباقي عاديّ (400)')
   ok(external.length === 0, 'لا طلب خطٍّ خارجيّ', external.join(' '))
+  await page.close()
+}
+
+// ═══ ٥د) الاسم الجديد بخطّ Cairo الحقيقيّ: يسع العرض، سطرٌ أو سطران متوازنان ═══
+console.log('\n── ٥د) اسم الجهة واسم النسخة بخطّ Cairo ──')
+for (const w of [80, 58]) {
+  const page = await browser.newPage({ viewport: { width: Math.round(w * MM), height: 900 } })
+  // ملفّات الخطّ من public/fonts — كما يخدمها التطبيق
+  await page.route('http://x/fonts/*', (r) => r.fulfill({ status: 200, contentType: 'font/woff2',
+    body: readFileSync(resolve(ROOT, 'public/fonts', r.request().url().split('/').pop())) }))
+  await page.addScriptTag({ content: src })
+  const html = await page.evaluate(([w]) => ticketHtml({
+    queue_number: 7, full_name: 'علي حسن خالد', birth_year: 1990, visit_type: 'consultation',
+    fee: 15000, procedures: [], doctor_name: 'د. هدى', room: '2' }, w, null, 'http://x', 'نسخة العيادة'), [w])
+  await page.setContent(html, { waitUntil: 'load' })
+  await page.evaluate(() => document.fonts.ready)
+  const r = await page.evaluate((mmPx) => {
+    const org = document.querySelector('.org')
+    const t = document.querySelector('.t')
+    const lh = parseFloat(getComputedStyle(org).lineHeight) || parseFloat(getComputedStyle(org).fontSize) * 1.45
+    const spans = [...org.querySelectorAll('span')]
+    const tr = t.getBoundingClientRect()
+    return {
+      cairo: document.fonts.check(`700 ${getComputedStyle(org).fontSize} Cairo`),
+      fontFamily: getComputedStyle(org).fontFamily,
+      fontSize: getComputedStyle(org).fontSize,
+      lines: Math.round(org.getBoundingClientRect().height / lh),
+      spansWhole: spans.every((sp) => sp.getClientRects().length === 1),
+      inside: spans.every((sp) => { const b = sp.getBoundingClientRect(); return b.left >= tr.left - 0.5 && b.right <= tr.right + 0.5 }),
+      widths: spans.map((sp) => Math.round(sp.getBoundingClientRect().width / mmPx)),
+      contentMm: Math.round(tr.width / mmPx),
+      copy: (document.querySelector('.copy') || {}).textContent || '',
+      copyBelowWhen: (() => { const c = document.querySelector('.copy'), wh = document.querySelector('.when')
+        return !!(c && wh && c.getBoundingClientRect().top >= wh.getBoundingClientRect().bottom - 1) })(),
+    }
+  }, MM)
+  const tag = `${w}mm`
+  ok(r.cairo, `${tag}: الاسم بخطّ Cairo فعلاً (${r.fontSize})`, r.fontFamily)
+  ok(r.lines === 1 || r.lines === 2, `${tag}: ★ الاسم سطرٌ واحد أو سطران (${r.lines})`)
+  ok(r.spansWhole, `${tag}: ★ «مجمع عيادات» و«الشفاء الطبي» لا ينكسر أيٌّ منهما`)
+  ok(r.inside, `${tag}: ★ لا شيء من الاسم خارج ${r.contentMm}مم`, JSON.stringify(r.widths))
+  if (r.lines === 2) ok(Math.abs(r.widths[0] - r.widths[1]) <= 6, `${tag}: السطران متوازنان (${r.widths.join(' / ')}مم)`)
+  ok(r.copy === 'نسخة العيادة' && r.copyBelowWhen, `${tag}: ★ «نسخة العيادة» صغيرةً في الأسفل`)
+  console.log(`     ${tag}: الاسم ${r.lines === 1 ? 'سطرٌ واحد' : 'سطران'} — ${r.widths.join(' + ')}مم من ${r.contentMm}مم`)
+  await page.screenshot({ path: `${SHOTS}/ticket-name-${w}mm.png`, fullPage: true })
   await page.close()
 }
 

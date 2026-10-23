@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { useDialogs } from '../dialogs.jsx'
-import { loadPrinter, printTicket, ticketFrom } from '../ticket-print.js'
+import { loadPrinter, printTicket, ticketFrom, MAX_COPIES } from '../ticket-print.js'
 import { printViaHelper } from '../print-helper.js'
 import { useParams } from 'react-router-dom'
 import { api, APPOINTMENT_STATUSES, BOOKING_TYPES, VISIT_TYPES, PRIORITIES, DELAY_CAUSES, WEEKDAYS, addDays, todayLocal, fmtMoney, fmtTime, toLatinDigits } from '../api.js'
@@ -1019,14 +1019,27 @@ function AppointmentDetails({ appt, session, onChanged, onToast, onArrived }) {
       onToast('هذا الجهاز غير معلَّمٍ للطباعة — فعّله من «إعداد الطابعة»')
       return
     }
+    // كم نسخة؟ واحدة افتراضاً — الإعادة غالباً بطاقةٌ ضاعت من المريض
+    const answer = await dlg.prompt({
+      title: 'طباعة البطاقة',
+      body: `كم نسخة؟ (من ١ إلى ${MAX_COPIES.toLocaleString('ar-SY')})`,
+      defaultValue: '1', confirmLabel: 'طباعة', required: true,
+    })
+    if (answer == null) return
+    const copies = Math.round(Number(toLatinDigits(answer)))
+    if (!Number.isInteger(copies) || copies < 1 || copies > MAX_COPIES) {
+      onToast(`عدد النسخ بين ١ و${MAX_COPIES.toLocaleString('ar-SY')}`)
+      return
+    }
     setReprinting(true)
     try {
-      const r = await printViaHelper(ticketFrom(appt, session), printer.width)
+      const r = await printViaHelper(ticketFrom(appt, session), printer.width,
+        undefined, undefined, { copies })
       if (r.ok) return
       // ★ الاحتياط لإعادة الطباعة وحدها (طلبٌ صريح من الموظف): لو كان
       // الوسيط متوقّفاً تبقى طباعة المتصفّح طريقاً — بنافذةٍ وورقٍ أطول،
       // لكنّها أفضل من «لا شيء» حين يطلبها المريض.
-      const fb = await printTicket(ticketFrom(appt, session), printer.width)
+      const fb = await printTicket(ticketFrom(appt, session), printer.width, undefined, { copies })
       onToast(fb.ok
         ? 'الوسيط غير متصل — طُبعت من المتصفّح (قد يزيد الورق)'
         : `تعذّرت الطباعة${fb.reason ? ` (${fb.reason})` : ''}`)
@@ -1588,7 +1601,9 @@ export default function SessionQueue() {
     if (!printer.enabled) return
     // ★ عبر الوسيط المحلّي لا طباعة المتصفّح: طولٌ بالمحتوى، وقطعٌ تلقائيّ،
     // وبلا نافذة. والفشل لا يمسّ الحضور — تمّ على الخادم قبل أن نطبع.
-    const r = await printViaHelper(ticketFrom({ ...appt, ...res }, data), printer.width)
+    // نسختان افتراضاً (نسخة المريض ونسخة العيادة) — من «إعداد الطابعة»
+    const r = await printViaHelper(ticketFrom({ ...appt, ...res }, data), printer.width,
+      undefined, undefined, { copies: printer.copies })
     if (!r.ok) showToast(r.reason === 'الطابعة غير متصلة'
       ? 'حضر المريض — الطابعة غير متصلة'
       : `حضر المريض، لكن تعذّرت طباعة البطاقة${r.reason ? ` (${r.reason})` : ''}`)

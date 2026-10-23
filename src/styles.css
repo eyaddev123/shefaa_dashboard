@@ -969,7 +969,7 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
 .pd-head { display: flex; align-items: center; gap: 1.5vw; }
 .pd-brand { display: flex; align-items: center; gap: 0.8vw; }
 .pd-logo { font-size: clamp(24px, 3vw, 52px); }
-.pd-title { font-size: clamp(16px, 1.8vw, 34px); font-weight: 800; }
+.pd-title { font-size: clamp(16px, 1.8vw, 34px); font-weight: 800; white-space: nowrap; }  /* سطرٌ واحد — والفحص يقيس أنّه لا يلامس الساعة */
 .pd-clock { margin-inline-start: auto; text-align: center; line-height: 1.1; }
 .pd-time { font-size: clamp(22px, 2.6vw, 48px); font-weight: 800; color: #7fd6b8; }
 .pd-date { font-size: clamp(11px, 1vw, 19px); color: #b3c6c2; }
@@ -2281,3 +2281,7 @@ button.danger:hover:not(:disabled) { filter: brightness(1.08); }
 .rev-history { margin: 4px 0; padding-inline-start: 18px; font-size: 12.5px; line-height: 1.8; }
 .rev-history-nums { display: block; font-size: 11.5px; color: var(--text-secondary); }
 .rev-total-row > td { font-weight: 800; border-top: 2px solid var(--border); }
+
+/* عدد النسخ: القائمة بعرض حقل الورق، والشرح تحتها بعرضٍ مريح */
+.ps-copies { max-width: 460px; }
+.ps-copies select { max-width: 220px; }

@@ -238,7 +238,7 @@ export default function OrderDisplay() {
       <header className="pd-head">
         <div className="pd-brand">
           <span className="pd-logo">🏥</span>
-          <span className="pd-title">الدور — جمعية الشفاء الخيرية</span>
+          <span className="pd-title">الدور — مجمع عيادات الشفاء الطبي</span>
         </div>
         <div className="pd-clock">
           <div className="pd-time">{clock}</div>

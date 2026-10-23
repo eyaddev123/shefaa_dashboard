@@ -6,9 +6,11 @@
 // عاد كما كان — ونقرأ رأس الأمر بايتاً بايتاً ونقارنه بالمواصفة.
 import { decodePng, encodeGrayPng } from '../src/png.js'
 import { rgbaToBits, buildJob, rasterCmd, feedDots, cutCmd, initCmd, bitAt } from '../src/escpos.js'
-import { writeFileSync, mkdirSync, readFileSync, readdirSync } from 'node:fs'
+import { writeFileSync, mkdirSync, readFileSync, readdirSync, rmSync, mkdtempSync } from 'node:fs'
 import { dirname, join, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { spawn } from 'node:child_process'
+import { tmpdir } from 'node:os'
 
 const OUT = process.env.TICKET_SHOTS || join(dirname(fileURLToPath(import.meta.url)), '..', '.out')
 mkdirSync(OUT, { recursive: true })
@@ -234,6 +236,109 @@ console.log('\n── ٨) ترميز ملفّات ويندوز ──')
       '★ السكربت المولَّد بلا عربية (لا يعتمد على الترميز أصلاً)')
     ok(/writeFileSync\(ps1, '\\ufeff'/.test(src),
       '★ ويُكتب بـBOM أيضاً — حارسٌ ثانٍ')
+  }
+}
+
+// ═══ مفكّك التدفّق: ما تقرؤه الطابعة، أمراً أمراً، والصور شرائحَ مجمّعة ═══
+function parseStream(job) {
+  const ops = [], images = []
+  let cur = null, i = 0
+  while (i < job.length) {
+    if (job[i] === 0x1b && job[i + 1] === 0x40) { ops.push('init'); i += 2; continue }
+    if (job[i] === 0x1b && job[i + 1] === 0x4a) { ops.push(`feed:${job[i + 2]}`); cur = null; i += 3; continue }
+    if (job[i] === 0x1d && job[i + 1] === 0x56) { ops.push(`cut:${job[i + 2]}`); cur = null; i += 4; continue }
+    if (job[i] === 0x1d && job[i + 1] === 0x76 && job[i + 2] === 0x30) {
+      const bpl = job[i + 4] + job[i + 5] * 256
+      const rows = job[i + 6] + job[i + 7] * 256
+      const data = job.subarray(i + 8, i + 8 + bpl * rows)
+      if (!cur) { cur = { width: bpl * 8, height: 0, chunks: [] }; images.push(cur); ops.push('raster') }
+      cur.chunks.push(Buffer.from(data)); cur.height += rows
+      i += 8 + bpl * rows
+      continue
+    }
+    ops.push(`?0x${job[i].toString(16)}`); i++
+  }
+  return { ops, images: images.map((m) => ({ width: m.width, height: m.height, bits: Buffer.concat(m.chunks) })) }
+}
+const sameBits = (img, want) => {
+  let diff = 0
+  for (let y = 0; y < img.height; y++)
+    for (let x = 0; x < img.width; x++) if (bitAt(img, x, y) !== want(x, y)) diff++
+  return diff
+}
+
+// ═══ ٩) نسختان في مهمّةٍ واحدة: اطبع، اقطع، اطبع، اقطع ═══
+console.log('\n── ٩) نسختان في مهمّةٍ واحدة ──')
+{
+  const W = 576
+  const A = (x, y) => y < 3 || (x > 100 && x < 200 && y > 20 && y < 80)     // «نسخة ١»
+  const B = (x, y) => y < 3 || (x > 380 && x < 480 && y > 20 && y < 80)     // «نسخة ٢»
+  const mk = (H, f) => { const d = decodePng(encodeGrayPng(W, H, f)); return rgbaToBits(d.width, d.height, d.rgba) }
+  const job = buildJob([mk(100, A), mk(120, B)], { feedMm: 5 })
+  const { ops, images } = parseStream(job)
+  const seq = ops.map((o) => o.split(':')[0]).join(',')
+  ok(seq === 'init,raster,feed,cut,raster,feed,cut', '★ الترتيب: تهيئة، صورة، تغذية، قطع، صورة، تغذية، قطع', seq)
+  ok(ops.filter((o) => o.startsWith('cut:')).length === 2, '★ قطعان بالضبط')
+  ok(ops.filter((o) => o === 'init').length === 1, 'تهيئةٌ واحدة — مهمّةٌ واحدة لا مهمّتان')
+  ok(images.length === 2 && images[0].height === 100 && images[1].height === 120, 'صورتان بارتفاعيهما', images.map((m) => m.height).join(','))
+  ok(sameBits(images[0], A) === 0 && sameBits(images[1], B) === 0, '★★ كلّ نسخةٍ تعود بكسلاً بكسلاً كما رُسمت')
+  ok(!ops.some((o) => o.startsWith('?')), 'لا بايتاتٍ مجهولة')
+  const single = parseStream(buildJob(mk(50, A)))
+  ok(single.ops.filter((o) => o.startsWith('cut')).length === 1, 'صورةٌ واحدة (غير مصفوفة) ⇒ قطعٌ واحد كما كان')
+  let threw = null
+  try { buildJob([]) } catch (e) { threw = e.message }
+  ok(!!threw, 'مصفوفةٌ فارغة ⇒ خطأ صريح', threw || 'لم يرمِ')
+}
+
+// ═══ ١٠) الخادم نفسه بتشغيلٍ جافّ: images[] ⇒ مهمّةٌ واحدة بقطعين ═══
+// لا شيء يُرسل للطابعة: SHEFAA_PRINT_DRY_RUN يكتب المهمّة ملفّاً، واسم
+// الطابعة غير موجود أصلاً — حارسان.
+console.log('\n── ١٠) الخادم: نسخٌ في طلبٍ واحد ──')
+{
+  const dir = mkdtempSync(join(tmpdir(), 'shefaa-dry-'))
+  const cfgFile = join(dir, 'cfg.json')
+  const PORT = 17000 + Math.floor(Math.random() * 900)
+  writeFileSync(cfgFile, JSON.stringify({ port: PORT, printer: 'DRY-RUN-NO-SUCH-PRINTER', token: 'tk',
+    origins: ['http://test.local'], log: join(dir, 'log.txt') }))
+  const out = join(dir, 'jobs')
+  const srv = spawn(process.execPath, [fileURLToPath(new URL('../src/server.js', import.meta.url))],
+    { env: { ...process.env, SHEFAA_PRINT_CONFIG: cfgFile, SHEFAA_PRINT_DRY_RUN: out }, stdio: ['ignore', 'pipe', 'pipe'] })
+  let boot = ''
+  srv.stdout.on('data', (d) => { boot += d })
+  for (let t = 0; t < 40 && !/يعمل على/.test(boot); t++) await new Promise((r) => setTimeout(r, 100))
+  ok(/تشغيلٌ جافّ/.test(boot), 'الخادم يعلن التشغيل الجافّ في سجلّه', boot.slice(0, 160))
+  const B = `http://127.0.0.1:${PORT}`
+  const H = { 'Content-Type': 'application/json', Origin: 'http://test.local', 'X-Print-Token': 'tk' }
+  const url = (f) => 'data:image/png;base64,' + encodeGrayPng(576, 90, f).toString('base64')
+  const A = (x, y) => y < 2 || (x < 60 && y > 30)
+  const Bp = (x, y) => y < 2 || (x > 500 && y > 30)
+  try {
+    const h = await (await fetch(`${B}/health`, { headers: { Origin: 'http://test.local' } })).json()
+    ok(h.version === 2 && h.max_copies === 5, '★ /health: الإصدار ٢ ويقبل حتى ٥ نسخ', JSON.stringify(h))
+    const r = await fetch(`${B}/print`, { method: 'POST', headers: H, body: JSON.stringify({ images: [url(A), url(Bp)] }) })
+    const body = await r.json()
+    ok(r.status === 200 && body.copies === 2, '★ images[2] ⇒ 200 ونسختان', JSON.stringify(body))
+    const files = readdirSync(out)
+    ok(files.length === 1, '★ مهمّةٌ واحدة لا مهمّتان', files.join(','))
+    const { ops, images } = parseStream(readFileSync(join(out, files[0])))
+    ok(ops.filter((o) => o.startsWith('cut')).length === 2, '★ والمهمّة فيها قطعان', ops.join(' → '))
+    ok(images.length === 2 && sameBits(images[0], A) === 0 && sameBits(images[1], Bp) === 0,
+      '★★ النسختان في المهمّة مطابقتان لما أُرسل، بالترتيب')
+    rmSync(out, { recursive: true, force: true })
+    const legacy = await fetch(`${B}/print`, { method: 'POST', headers: H, body: JSON.stringify({ image: url(A) }) })
+    const lf = readdirSync(out)
+    ok(legacy.status === 200 && lf.length === 1
+      && parseStream(readFileSync(join(out, lf[0]))).ops.filter((o) => o.startsWith('cut')).length === 1,
+      '★ الطلب القديم (image واحدة) ما زال يعمل ⇒ قطعٌ واحد')
+    const six = await fetch(`${B}/print`, { method: 'POST', headers: H,
+      body: JSON.stringify({ images: Array(6).fill(url(A)) }) })
+    ok(six.status === 400, 'ستّ نسخ ⇒ 400 (الحدّ ٥)', String(six.status))
+    const noTok = await fetch(`${B}/print`, { method: 'POST', headers: { ...H, 'X-Print-Token': 'x' },
+      body: JSON.stringify({ images: [url(A)] }) })
+    ok(noTok.status === 401, 'الرمز ما زال مطلوباً ⇒ 401')
+  } finally {
+    srv.kill()
+    rmSync(dir, { recursive: true, force: true })
   }
 }
 

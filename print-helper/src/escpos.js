@@ -94,8 +94,17 @@ export const bitAt = (img, x, y) => {
   return (img.bits[y * bpl + (x >> 3)] & (0x80 >> (x & 7))) !== 0
 }
 
-/** مهمّة طباعةٍ كاملة: تهيئة + صورة + تغذية + قطع */
-export function buildJob(img, { feedMm = 5, dpi = 203 } = {}) {
+/**
+ * مهمّة طباعةٍ كاملة: تهيئة، ثمّ لكلّ نسخة: صورة + تغذية + قطع.
+ * نسختان ⇒ «اطبع، اقطع، اطبع، اقطع» في مهمّةٍ واحدة — فلا تتداخل مع مهمّةٍ
+ * أخرى بينهما، ولكلّ نسخةٍ قطعها فتُمسك كلٌّ منهما منفصلة.
+ * @param {object|object[]} imgs صورةٌ واحدة أو مصفوفة صور (نسخ)
+ */
+export function buildJob(imgs, { feedMm = 5, dpi = 203 } = {}) {
+  const list = Array.isArray(imgs) ? imgs : [imgs]
+  if (list.length === 0) throw new Error('لا صورة للطباعة')
   const dots = Math.round((feedMm / 25.4) * dpi)
-  return Buffer.concat([initCmd(), rasterCmd(img), feedDots(dots), cutCmd(0)])
+  const parts = [initCmd()]
+  for (const img of list) parts.push(rasterCmd(img), feedDots(dots), cutCmd(0))
+  return Buffer.concat(parts)
 }

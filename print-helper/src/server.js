@@ -50,6 +50,15 @@ function loadConfig() {
 
 const CFG = loadConfig()
 
+// أقصى عدد نسخٍ في الطلب الواحد — حارسٌ من طلبٍ خاطئ يُفرغ بكرة الورق
+const MAX_COPIES = 5
+
+// ═══ تشغيلٌ جافّ للفحص وحده ═══
+// SHEFAA_PRINT_DRY_RUN=<مجلّد> يكتب المهمّة (بايتات ESC/POS) ملفّاً بدل
+// إرسالها للطابعة — فيُفكّ ما كان سيُطبع ويُفحص بلا ورق. مطفأٌ ما لم يُضبط
+// المتغيّر صراحةً؛ والتثبيت لا يضبطه.
+const DRY_RUN = process.env.SHEFAA_PRINT_DRY_RUN || ''
+
 function log(level, msg) {
   const line = `${new Date().toISOString()} [${level}] ${msg}\n`
   process.stdout.write(line)
@@ -167,6 +176,12 @@ async function sendRawWindows(bytes, printer) {
 
 /** يرسل بايتاتٍ خاماً — CUPS على ماك/لينكس، والسبولر على ويندوز */
 async function sendRaw(bytes, printer) {
+  if (DRY_RUN) {
+    mkdirSync(DRY_RUN, { recursive: true })
+    const f = join(DRY_RUN, `job-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.bin`)
+    writeFileSync(f, bytes)
+    return { ok: true, job: `dry-run:${f}` }
+  }
   if (IS_WIN) return sendRawWindows(bytes, printer)
   const r = await run('lp', ['-d', printer, '-o', 'raw', '-t', 'shefaa-ticket'], bytes)
   if (r.code === 0) return { ok: true, job: r.out }
@@ -224,7 +239,8 @@ const server = http.createServer(async (req, res) => {
   if (url.pathname === '/health' && req.method === 'GET') {
     const st = await printerState(CFG.printer)
     json(res, 200, {
-      ok: true, service: 'shefaa-print', version: 1,
+      // version 2: يقبل images[] (نسخٌ في مهمّةٍ واحدة) — الواجهة تقرأ ذلك من ردّ /print
+      ok: true, service: 'shefaa-print', version: 2, max_copies: MAX_COPIES,
       printer: CFG.printer,
       printer_ready: !!(st.known && !st.disabled && !st.offline),
       printer_state: st.text || 'غير معروفة',
@@ -241,31 +257,40 @@ const server = http.createServer(async (req, res) => {
     }
     try {
       const body = await readBody(req)
-      let png = body
-      // نقبل JSON فيه data URL، أو بايتات PNG مباشرةً
+      // نقبل JSON فيه images[] (نسخٌ، كلٌّ تُقطع وحدها) أو image واحدة،
+      // أو بايتات PNG مباشرةً
+      let pngs = [body]
       const ctype = String(req.headers['content-type'] || '')
       if (ctype.includes('application/json')) {
         const obj = JSON.parse(body.toString('utf8'))
-        const m = /^data:image\/png;base64,(.+)$/s.exec(obj.image || '')
-        if (!m) throw new Error('image يجب أن تكون data:image/png;base64,…')
-        png = Buffer.from(m[1], 'base64')
+        const list = Array.isArray(obj.images) ? obj.images : [obj.image]
+        if (list.length < 1 || list.length > MAX_COPIES)
+          throw new Error(`عدد النسخ بين ١ و${MAX_COPIES}`)
+        pngs = list.map((u) => {
+          const m = /^data:image\/png;base64,(.+)$/s.exec(u || '')
+          if (!m) throw new Error('image يجب أن تكون data:image/png;base64,…')
+          return Buffer.from(m[1], 'base64')
+        })
       }
 
-      const img = decodePng(png)
-      if (img.width > CFG.width_dots)
-        throw new Error(`عرض الصورة ${img.width} أكبر من ${CFG.width_dots} نقطة`)
-
-      const mono = rgbaToBits(img.width, img.height, img.rgba, CFG.threshold)
-      const job = buildJob(mono, { feedMm: CFG.feed_mm })
+      const monos = pngs.map((png) => {
+        const img = decodePng(png)
+        if (img.width > CFG.width_dots)
+          throw new Error(`عرض الصورة ${img.width} أكبر من ${CFG.width_dots} نقطة`)
+        return rgbaToBits(img.width, img.height, img.rgba, CFG.threshold)
+      })
+      const img = monos[0]
+      // ★ مهمّةٌ واحدة: اطبع، اقطع، اطبع، اقطع
+      const job = buildJob(monos, { feedMm: CFG.feed_mm })
       const sent = await sendRaw(job, CFG.printer)
 
       if (!sent.ok) {
         log('ERROR', `فشل الإرسال: ${sent.error}`)
         json(res, 502, { error: sent.error, printer: CFG.printer }); return
       }
-      log('INFO', `طُبعت بطاقة ${img.width}×${img.height} (${job.length} بايت) — ${sent.job}`)
+      log('INFO', `طُبعت بطاقة ${img.width}×${img.height} × ${monos.length} نسخة (${job.length} بايت) — ${sent.job}`)
       json(res, 200, { ok: true, job: sent.job, width: img.width, height: img.height,
-                       bytes: job.length })
+                       copies: monos.length, bytes: job.length })
     } catch (e) {
       log('ERROR', `خطأ: ${e.message}`)
       json(res, 400, { error: e.message })
@@ -278,6 +303,7 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(CFG.port, '127.0.0.1', () => {
   log('INFO', `خادم الطباعة يعمل على 127.0.0.1:${CFG.port} — الطابعة ${CFG.printer}`
-    + ` — الإعداد من ${CFG._from}${CFG.token ? ' — برمز' : ' — ★ بلا رمز'}`)
+    + ` — الإعداد من ${CFG._from}${CFG.token ? ' — برمز' : ' — ★ بلا رمز'}`
+    + (DRY_RUN ? ` — ★ تشغيلٌ جافّ: لا شيء يُرسل للطابعة (${DRY_RUN})` : ''))
 })
 server.on('error', (e) => { log('ERROR', `تعذّر الإقلاع: ${e.message}`); process.exit(1) })

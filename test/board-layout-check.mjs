@@ -251,6 +251,65 @@ const run = async () => {
     await ctx.close()
   }
 
+
+  // ═══ الترويسة: «مجمع عيادات الشفاء الطبي» سطرٌ واحد، لا يُقصّ ولا يلامس الساعة ═══
+  // بكلّ المقاسات المفحوصة، ملء الشاشة ومع شريط المتصفّح، بمحاكاة Chrome 66.
+  {
+    const HEAD_SIZES = [[1920, 1080], [1366, 768], [960, 540]]
+    const line = []
+    for (const [w, h0] of HEAD_SIZES) {
+      for (const bar of [false, true]) {
+        const h = bar ? h0 - BAR : h0
+        const ctx = await browser.newContext({ viewport: { width: w, height: h } })
+        await ctx.addInitScript((snap) => {
+          const orig = CSS.supports.bind(CSS)
+          CSS.supports = (...a) => /container-type|aspect-ratio/.test(a.join(' ')) ? false : orig(...a)
+          class FakeES {
+            constructor() { this.l = {}
+              setTimeout(() => { if (this.onopen) this.onopen({})
+                ;(this.l.snapshot || []).forEach((f) => f({ data: JSON.stringify(snap) })) }, 30) }
+            addEventListener(t, f) { (this.l[t] = this.l[t] || []).push(f) }
+            removeEventListener() {} close() {}
+          }
+          window.EventSource = FakeES
+        }, mkBoard(4, 5))
+        const page = await ctx.newPage()
+        const errors = []
+        page.on('pageerror', (e) => errors.push(e.message))
+        await page.goto(`${BASE}/display?key=test`, { waitUntil: 'load' })
+        await page.waitForTimeout(600)
+        const hd = await page.evaluate(() => {
+          const t = document.querySelector('.pd-title')
+          const c = document.querySelector('.pd-clock')
+          const head = document.querySelector('.pd-head')
+          const tr = t.getBoundingClientRect(), cr = c.getBoundingClientRect(), hr = head.getBoundingClientRect()
+          const fsz = parseFloat(getComputedStyle(t).fontSize)
+          return {
+            text: t.textContent.trim(), fsz,
+            oneLine: tr.height <= fsz * 1.9,
+            notClipped: t.scrollWidth <= t.clientWidth + 1,
+            inView: tr.left >= 0 && tr.right <= window.innerWidth,
+            inHead: tr.top >= hr.top - 1 && tr.bottom <= hr.bottom + 1,
+            // RTL: الهوية يميناً والساعة بعدها يساراً — المسافة بينهما
+            gap: Math.round(tr.left - cr.right),
+            scrollX: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+          }
+        })
+        const tag = `ترويسة ${w}×${h0}${bar ? '+شريط' : ''}`
+        ok(/مجمع عيادات الشفاء الطبي/.test(hd.text) && !/جمعية/.test(hd.text), `${tag}: الاسم «${hd.text}»`)
+        ok(hd.oneLine, `${tag}: الاسم انكسر سطرين`)
+        ok(hd.notClipped, `${tag}: الاسم مقصوص`)
+        ok(hd.inView && hd.inHead, `${tag}: الاسم خارج الشاشة أو الترويسة`)
+        ok(hd.gap >= 8, `${tag}: الاسم يلامس الساعة (المسافة ${hd.gap}px)`)
+        ok(hd.scrollX <= 0, `${tag}: تمرير أفقي ${hd.scrollX}px`)
+        ok(errors.length === 0, `${tag}: أخطاء صفحة: ${errors.join(' | ')}`)
+        line.push(`${w}×${h}:${hd.fsz}px/${hd.gap}px`)
+        await ctx.close()
+      }
+    }
+    console.log(`  الترويسة │ ${line.join('  ')}`)
+  }
+
   await browser.close()
   stop()
 
