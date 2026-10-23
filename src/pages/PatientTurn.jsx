@@ -48,7 +48,10 @@ export default function PatientTurn() {
         {result && (
           <div className="patient-turn-result">
             <div className="ptr-doctor">{result.doctor_name} — {result.specialty || '—'}</div>
-            <div className="ptr-number">{result.queue_number}</div>
+            {/* نمط الحضور: رقم الدور يُعطى عند الحضور — قبله لا رقم */}
+            {result.queue_number != null
+              ? <div className="ptr-number">{result.queue_number}</div>
+              : <div className="ptr-status">يُعطى رقم دورك عند حضورك إلى الاستقبال</div>}
             <div className="ptr-status">{APPOINTMENT_STATUSES[result.status] || result.status}</div>
             {/* من تجاوز الدوام: نعرض عدد من أمامه بلا وقت متوقّع — لا وقت له أصلاً،
                 وعرض تقديرٍ محسوب من مواعيد انتهت وعدٌ لا يُوفى. */}

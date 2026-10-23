@@ -4,7 +4,8 @@ import { loadPrinter, printTicket, ticketFrom } from '../ticket-print.js'
 import { printViaHelper } from '../print-helper.js'
 import { useParams } from 'react-router-dom'
 import { api, APPOINTMENT_STATUSES, BOOKING_TYPES, VISIT_TYPES, PRIORITIES, DELAY_CAUSES, WEEKDAYS, addDays, todayLocal, fmtMoney, fmtTime, toLatinDigits } from '../api.js'
-import { AttendanceBadge, urgentRowClass, isAttendanceSession, usePolling, fmtClock, FlowModeTag, FLOW_MODE_LABELS } from '../attendance-ui.jsx'
+import { AttendanceBadge, urgentRowClass, isAttendanceSession, usePolling, fmtClock, FlowModeTag, FLOW_MODE_LABELS,
+  AttendanceNumber, turnLabel, fmtTimeOfDay } from '../attendance-ui.jsx'
 import { useRole } from '../RoleContext.jsx'
 import { useToast, RecallButton } from '../action-feedback.jsx'
 import { canEditAppointmentProcedures, canEditBooking } from '../permissions.js'
@@ -52,7 +53,7 @@ function appointmentBadge(status) {
   return <span className={`badge ${cls}`}>{APPOINTMENT_STATUSES[status] || status}</span>
 }
 
-function TicketPrint({ appt, doctorName, onDone }) {
+function TicketPrint({ appt, doctorName, attendance = false, onDone }) {
   const printed = useRef(false)
   useEffect(() => {
     if (printed.current) return
@@ -62,9 +63,18 @@ function TicketPrint({ appt, doctorName, onDone }) {
   return (
     <div className="ticket-print">
       <div className="ticket-card">
-        <h2>بطاقة الدور</h2>
+        <h2>{attendance ? 'بطاقة الحجز' : 'بطاقة الدور'}</h2>
         <p className="ticket-doctor">{doctorName}</p>
-        <p className="ticket-number">{appt.queue_number}</p>
+        {attendance ? (
+          // نمط الحضور: لا رقم دور عند الحجز — يُعطى عند الحضور. رقم الحجز مرجعٌ
+          // للاستقبال. (الوقت التقريبي للاستقبال وحده: لا يُطبع على أي بطاقة.)
+          <>
+            <p className="ticket-number">{appt.queue_number}</p>
+            <p className="ticket-hint">رقم الحجز — رقم الدور يُعطى عند الحضور، والنداء بترتيب الحضور.</p>
+          </>
+        ) : (
+          <p className="ticket-number">{appt.queue_number}</p>
+        )}
         {/* رمز الوصول هو مفتاح صفحة «دوري» العامة — يُطبع بارزاً لأن المريض
             سيكتبه على موبايله. رمز البطاقة الداخلي لم يعد يفتح شيئاً علناً. */}
         <p className="ticket-access-code">رمز الوصول: <strong>{appt.access_code}</strong></p>
@@ -330,7 +340,7 @@ function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel, urgent = f
 // ═══ نموذج استكمال معلومات المريض عند الحضور ═══
 // يُفتح تلقائياً حين يرفض الخادم الحضور لنقص المعلومات. يعرض الحقول الناقصة
 // وحدها ويُرسلها مع تعليم الحضور في طلب واحد — فلا حضورٌ بمعلومات نصف مكتملة.
-function CompletePatientForm({ appt, missing, patient, onCancel, onSubmit }) {
+function CompletePatientForm({ appt, missing, patient, attendance = false, onCancel, onSubmit }) {
   const [form, setForm] = useState({
     mobile: patient.mobile || '', gender: patient.gender || '',
     birth_year: patient.birth_year || '',
@@ -358,7 +368,7 @@ function CompletePatientForm({ appt, missing, patient, onCancel, onSubmit }) {
     <div className="card highlight">
       <h3>معلومات المريض (اختيارية) — {appt?.full_name}</h3>
       <p className="subtitle" style={{ marginTop: -6 }}>
-        الدور {appt?.queue_number} · أكملها إن تيسّر، أو علّم الحضور بدونها —
+        {appt && turnLabel(appt, attendance)} · أكملها إن تيسّر، أو علّم الحضور بدونها —
         لا شيء منها يمنع الحضور.
       </p>
       {/* بنية نموذج الحجز نفسها (booking-form + bf-row): صفٌّ محاذى من الأعلى، وكل حقل
@@ -410,7 +420,7 @@ function CompletePatientForm({ appt, missing, patient, onCancel, onSubmit }) {
 // بنفس قواعد الحجز — فرفضُه (جلسة ممتلئة أو ليوم مضى) يظهر كما هو بلا تفسير محلي.
 // showTicket: إعداد «عرض بطاقة الحجز بعد الحجز». معطّلاً تُغلق النافذة فور النجاح برسالة
 // قصيرة بدل بطاقة الرمز الجديد — والرمز يبقى ظاهراً في تفاصيل الحجز الجديد.
-function PostponeDialog({ appt, currentSessionId, showTicket, onClose, onDone, onSuccessToast }) {
+function PostponeDialog({ appt, currentSessionId, showTicket, attendance = false, onClose, onDone, onSuccessToast }) {
   // الغد افتراضاً: التأجيل يعني «ليس اليوم» في أغلب الحالات.
   // ⚠️ من أجزاء التاريخ المحلية لا toISOString(): تلك بتوقيت UTC، فبين منتصف الليل
   // والثالثة فجراً بتوقيت دمشق كانت تعطي تاريخ اليوم بدل الغد.
@@ -455,7 +465,13 @@ function PostponeDialog({ appt, currentSessionId, showTicket, onClose, onDone, o
     setErr(null); setBusy(true)
     try {
       const r = await api.clinic.postpone(appt.id, { target_session_id: targetId, reason: reason.trim() })
-      if (!showTicket) { onSuccessToast(`تم التأجيل — الدور ${r.queue_number}`); onDone(); return }
+      // الجلسة الهدف بنمط الحضور ⇒ الحجز الجديد يحمل وقتاً تقريبياً ولا رقم دور بعد
+      if (!showTicket) {
+        onSuccessToast(r.estimated_time
+          ? `تم التأجيل — رقم الحجز ${r.queue_number} · الوقت التقريبي: ${fmtTimeOfDay(r.estimated_time)}`
+          : `تم التأجيل — الدور ${r.queue_number}`)
+        onDone(); return
+      }
       setDone(r)   // نعرض رمز الوصول الجديد ليُعطى للمريض قبل إغلاق النافذة
     } catch (ex) { setErr(ex.message) }
     finally { setBusy(false) }
@@ -465,7 +481,12 @@ function PostponeDialog({ appt, currentSessionId, showTicket, onClose, onDone, o
     <div className="card highlight">
       <h3>✔ تم التأجيل</h3>
       <p>
-        {appt.full_name} — الدور الجديد <strong>{done.queue_number}</strong>
+        {done.estimated_time ? (
+          <>{appt.full_name} — رقم الحجز الجديد <strong>{done.queue_number}</strong>
+            {' '}· الوقت التقريبي <strong dir="ltr">{fmtTimeOfDay(done.estimated_time)}</strong></>
+        ) : (
+          <>{appt.full_name} — الدور الجديد <strong>{done.queue_number}</strong></>
+        )}
         {done.slot_time && <> الساعة <strong dir="ltr">{fmtTime(done.slot_time)}</strong></>}
       </p>
       {/* رمز الوصول الجديد: بلا إعطائه للمريض لا يستطيع متابعة دوره في «دوري» */}
@@ -479,7 +500,7 @@ function PostponeDialog({ appt, currentSessionId, showTicket, onClose, onDone, o
 
   return (
     <div className="card highlight">
-      <h3>تأجيل موعد — {appt.full_name} (الدور {appt.queue_number})</h3>
+      <h3>تأجيل موعد — {appt.full_name} ({turnLabel(appt, attendance)})</h3>
       <form onSubmit={submit}>
         <div className="inline" style={{ flexWrap: 'wrap' }}>
           <div className="field">
@@ -694,7 +715,7 @@ function PriorityPicker({ appt, attendance, onClose, onDone, onArrived }) {
   return (
     <div className="modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose() }}>
       <div className="modal-card" role="dialog" aria-modal="true" aria-labelledby="prio-title">
-        <h3 id="prio-title">تقديم الدور {appt.queue_number} — {appt.full_name}</h3>
+        <h3 id="prio-title">تقديم {turnLabel(appt, attendance)} — {appt.full_name}</h3>
         {result ? (
           <>
             <p className="bf-note bf-note-ok" style={{ marginTop: 10 }}>{result}</p>
@@ -816,7 +837,7 @@ function AttendanceCurrentCard({ current, recalled, onRecalled, onError }) {
       {current ? (
         <div className="attn-current">
           <div className="attn-current-who">
-            <div className="attn-current-num">الدور {current.queue_number}<AttendanceBadge priority={current.priority} /></div>
+            <div className="attn-current-num">{turnLabel(current, true)}<AttendanceBadge priority={current.priority} /></div>
             <div className="attn-current-name">{current.full_name}</div>
           </div>
           <div className="attn-current-recall">
@@ -968,7 +989,7 @@ function AppointmentDetails({ appt, session, onChanged, onToast, onArrived }) {
     if (Object.keys(d).length === 0) return
     // التأكيد باسم المريض: الإلغاء و«لم يحضر» يُخرجانه من الطابور
     if (['cancelled', 'no_show'].includes(d.status)) {
-      const who = `الدور ${appt.queue_number}${appt.full_name ? ` (${appt.full_name})` : ''}`
+      const who = `${turnLabel(appt, isAttendanceSession(session))}${appt.full_name ? ` (${appt.full_name})` : ''}`
       const what = d.status === 'cancelled' ? 'إلغاء حجز' : 'تعليم «لم يحضر» لـ'
       const ok = await dlg.confirm({
         title: d.status === 'cancelled' ? 'إلغاء الحجز' : 'تعليم «لم يحضر»',
@@ -1014,6 +1035,11 @@ function AppointmentDetails({ appt, session, onChanged, onToast, onArrived }) {
 
   const missing = missingOf(appt)
   const info = [
+    // نمط الحضور: رقم الحجز والوقت التقريبي المُعطى عنده (رقم الدور في عمود القائمة)
+    ...(isAttendanceSession(session) ? [
+      ['رقم الحجز', String(appt.queue_number), null],
+      ['الوقت التقريبي', fmtTimeOfDay(appt.estimated_time), 'ltr'],
+    ] : []),
     ['رمز الوصول', appt.access_code, 'ltr'],
     // رمز البطاقة يظهر حين تكون البطاقة مفعَّلة فقط — وإلّا فهو سطرٌ بلا معنى
     ...(session.show_booking_ticket && appt.ticket_code ? [['رمز البطاقة', appt.ticket_code, 'ltr']] : []),
@@ -1411,8 +1437,8 @@ function AttendanceQueueTable({ data, actions }) {
     <div className="card">
       <h3>الطابور ({data.appointments.length})</h3>
       <p className="subtitle" style={{ marginTop: -6 }}>
-        الدور بترتيب <strong>الحضور</strong>: الإسعافي الحاضر أولاً، ثم الأقدم حضوراً.
-        رقم الدور على البطاقة للتعريف فقط ولا يتغيّر.
+        رقم الدور يُعطى عند <strong>الحضور</strong> (١، ٢، ٣…) ولا يتغيّر، والنداء بترتيبه —
+        الإسعافي الحاضر أولاً. تحته صغيراً: رقم الحجز والوقت التقريبي.
       </p>
       <table style={{ marginTop: 14 }}>
         <thead>
@@ -1425,7 +1451,7 @@ function AttendanceQueueTable({ data, actions }) {
           {data.appointments.map((a) => (
             <Fragment key={a.id}>
             <tr className={urgentRowClass(a)}>
-              <td className="num">{a.queue_number}<AttendanceBadge priority={a.priority} /></td>
+              <td className="num"><AttendanceNumber appt={a} /><AttendanceBadge priority={a.priority} /></td>
               <td>{a.full_name} <MissingBadge appt={a} /></td>
               <td dir="ltr">{a.mobile || '—'}</td>
               <td>
@@ -1483,7 +1509,7 @@ function PendingArrivalList({ data, onChanged, onError }) {
   const noShow = async (a) => {
     const ok = await dlg.confirm({
       title: 'تعليم «ما حضر»',
-      body: `تعليم الدور ${a.queue_number} (${a.full_name}) «ما حضر»؟`,
+      body: `تعليم ${turnLabel(a, true)} (${a.full_name}) «ما حضر»؟`,
       confirmLabel: 'ما حضر', cancelLabel: 'تراجع', danger: true,
     })
     if (!ok) return
@@ -1501,7 +1527,7 @@ function PendingArrivalList({ data, onChanged, onError }) {
           <tbody>
             {pending.map((a) => (
               <tr key={a.id}>
-                <td className="num">{a.queue_number}<AttendanceBadge priority={a.priority} /></td>
+                <td className="num"><AttendanceNumber appt={a} /><AttendanceBadge priority={a.priority} /></td>
                 <td>{a.full_name}</td>
                 <td dir="ltr">{a.mobile || '—'}</td>
                 <td>{BOOKING_TYPES[a.booking_type] || a.booking_type}</td>
@@ -1538,7 +1564,13 @@ export default function SessionQueue() {
     // الموظف) — فهو مسار حضورٍ أيضاً، وبطاقته تُطبع كبقيّة الحضور.
     if (appt?.status === 'arrived') autoPrint(appt, { was_first_arrival: true })
     if (data?.show_booking_ticket) { setTicket(appt); return }
-    showToast(`تم الحجز — الدور ${appt.queue_number}`, 'success', 4000)
+    // نمط الحضور: لا رقم دور عند الحجز — رقم الحجز والوقت التقريبي (ورقم الدور إن حضر
+    // فوراً: الإسعافي الحضوري). أطول بقاءً: الموظف ينقل الوقت للمريض على الهاتف.
+    if (attendance) {
+      const t = fmtTimeOfDay(appt.estimated_time)
+      showToast(`تم الحجز — رقم الحجز ${appt.queue_number}${t ? ` · الوقت التقريبي: ${t}` : ''}`
+        + `${appt.arrival_number != null ? ` · الدور ${appt.arrival_number}` : ''}`, 'success', 9000)
+    } else showToast(`تم الحجز — الدور ${appt.queue_number}`, 'success', 4000)
     load()
   }
 
@@ -1637,7 +1669,7 @@ export default function SessionQueue() {
     </div>
   ) : <p className="empty">جارٍ التحميل…</p>
 
-  if (ticket) return <TicketPrint appt={ticket} doctorName={data.doctor_name} onDone={() => { setTicket(null); load() }} />
+  if (ticket) return <TicketPrint appt={ticket} doctorName={data.doctor_name} attendance={attendance} onDone={() => { setTicket(null); load() }} />
 
   return (
     <>
@@ -1761,6 +1793,7 @@ export default function SessionQueue() {
           appt={completing.appt}
           missing={completing.missing}
           patient={completing.patient}
+          attendance={attendance}
           onCancel={() => setCompleting(null)}
           onSubmit={(patch) => arrive(completing.appt.id, patch)}
         />
@@ -1781,6 +1814,7 @@ export default function SessionQueue() {
           appt={postponing}
           currentSessionId={id}
           showTicket={!!data.show_booking_ticket}
+          attendance={attendance}
           onSuccessToast={(msg) => showToast(msg, 'success', 4000)}
           onClose={() => setPostponing(null)}
           onDone={() => { setPostponing(null); load() }}

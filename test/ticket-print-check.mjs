@@ -59,6 +59,21 @@ console.log('\n── ١) العمر من سنة الميلاد ──')
 }
 
 // ═══ ٢) المحتوى: ما يجب أن يظهر وما يجب ألّا يظهر ═══
+// ═══ ١ب) الرقم المطبوع: رقم الدور عند الحضور في نمط الحضور ═══
+console.log('\n── ١ب) الرقم المطبوع ──')
+{
+  const page = await browser.newPage()
+  await page.addScriptTag({ content: src })
+  const r = await page.evaluate(() => ({
+    attn: ticketFrom({ queue_number: 17, arrival_number: 1, estimated_time: '11:20:00' }, { flow_mode: 'attendance' }),
+    slots: ticketFrom({ queue_number: 17, arrival_number: null }, { flow_mode: 'slots' }),
+  }))
+  ok(r.attn.queue_number === 1, '★ نمط الحضور: البطاقة تطبع رقم الدور (١) لا رقم الحجز (١٧)', JSON.stringify(r.attn))
+  ok(!('estimated_time' in r.attn), '★ ولا وقت تقريبي على البطاقة')
+  ok(r.slots.queue_number === 17, 'نمط الخانات: رقم الدور كما كان')
+  await page.close()
+}
+
 console.log('\n── ٢) محتوى البطاقة ──')
 {
   const page = await browser.newPage()

@@ -22,6 +22,33 @@ export function AttendanceBadge({ priority }) {
   return <span className={`badge ${b[1]}`} style={{ marginInlineStart: 6 }}>{b[0]}</span>
 }
 
+// ═══ الرقمان في نمط الحضور ═══
+// رقم الدور (arrival_number) يُعطى عند **أوّل حضور** وهو ما تراه الصالة وتنطقه وتطبعه
+// البطاقة. queue_number في جلسة الحضور **رقم الحجز** — مرجعٌ داخليّ للاستقبال وحده.
+// نمط الخانات: رقمٌ واحد (queue_number) كما كان.
+// عمود TIME يصل 'HH:MM:SS' ⇒ 'HH:MM'
+export const fmtTimeOfDay = (t) => (t ? String(t).slice(0, 5) : null)
+
+// نصّ التعريف في الرسائل والعناوين: «الدور ٧» لمن حضر، «رقم الحجز ١٢» لمن لم يحضر بعد
+export const turnLabel = (a, attendance) => (!attendance ? `الدور ${a.queue_number}`
+  : a.arrival_number != null ? `الدور ${a.arrival_number}` : `رقم الحجز ${a.queue_number}`)
+
+// خليّة الرقم في قوائم الاستقبال: رقم الدور كبيراً (أو «—» قبل الحضور)، وتحته صغيراً
+// رقم الحجز والوقت التقريبي المُعطى عند الحجز.
+export function AttendanceNumber({ appt }) {
+  const t = fmtTimeOfDay(appt.estimated_time)
+  return (
+    <span className="attn-num">
+      <span className="attn-num-main" title={appt.arrival_number != null ? 'رقم الدور (عند الحضور)' : 'لم يحضر بعد — لا رقم دور'}>
+        {appt.arrival_number ?? '—'}
+      </span>
+      <span className="attn-num-ref">
+        حجز {appt.queue_number}{t && <> · <span dir="ltr">{t}</span></>}
+      </span>
+    </span>
+  )
+}
+
 // صف الإسعافي الحاضر أحمر — في قائمة الطبيب وقائمة الاستقبال معاً
 export const urgentRowClass = (a) =>
   a.priority === 'urgent' && ['arrived', 'in_service'].includes(a.status) ? 'attn-row-urgent' : undefined

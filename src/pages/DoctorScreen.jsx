@@ -50,6 +50,8 @@ export default function DoctorScreen() {
   // ★ نمط الحضور: الاستقبال يعلّم الحضور فيتغيّر الطابور من خارج هذه الشاشة — تحديث دوري.
   // نمط الخانات يبقى كما كان (بلا تحديث دوري).
   const attendance = isAttendanceSession(queue)
+  // نمط الحضور: رقم الدور المُعطى عند الحضور (ما تنطقه الصالة) — رقم الحجز داخليّ للاستقبال
+  const shownNumber = (a) => (attendance ? (a.arrival_number ?? '—') : a.queue_number)
   usePolling(loadQueue, attendance && !!sessionId)
 
   const act = async (fn, apptId) => {
@@ -108,7 +110,7 @@ export default function DoctorScreen() {
               <div className="action-row">
                 <div>
                   <div style={{ fontSize: 32, fontWeight: 800, color: 'var(--primary)' }}>
-                    الدور {current.queue_number}
+                    الدور {shownNumber(current)}
                     {attendance && <AttendanceBadge priority={current.priority} />}
                   </div>
                   <div style={{ color: 'var(--text-secondary)' }}>{current.full_name}</div>
@@ -156,7 +158,7 @@ export default function DoctorScreen() {
               <div className="action-row">
                 <div>
                   <div style={{ fontSize: 22, fontWeight: 700 }}>
-                    الدور {nextUp.queue_number} — {nextUp.full_name}
+                    الدور {shownNumber(nextUp)} — {nextUp.full_name}
                     {attendance && <AttendanceBadge priority={nextUp.priority} />}
                   </div>
                   {nextUp.reason && <div style={{ color: 'var(--muted)', fontSize: 13 }}>{nextUp.reason}</div>}
@@ -201,7 +203,7 @@ export default function DoctorScreen() {
                   {arrivedWaiting.map((a) => (
                     <tr key={a.id} className={[a.id === nextUp?.id ? 'doc-row-next' : '',
                       attendance ? urgentRowClass(a) : ''].filter(Boolean).join(' ') || undefined}>
-                      <td className="num">{a.queue_number}</td>
+                      <td className="num">{shownNumber(a)}</td>
                       <td>{a.full_name}{attendance && <AttendanceBadge priority={a.priority} />}</td>
                       <td>
                         <span className="badge good">وصل</span>
@@ -211,7 +213,7 @@ export default function DoctorScreen() {
                   ))}
                   {stillWaiting.map((a) => (
                     <tr key={a.id} className="doc-row-away">
-                      <td className="num">{a.queue_number}</td>
+                      <td className="num">{shownNumber(a)}</td>
                       <td>{a.full_name}</td>
                       <td><span className="badge">لم يصل بعد</span></td>
                     </tr>

@@ -451,6 +451,9 @@ td.num { font-variant-numeric: tabular-nums; }
 .attn-compact-empty { margin: auto 0; font-size: 13px; color: var(--muted); }
 /* قيد الكشف: الرقم كبير يُقرأ بلمحة، والاسم وزرّ النداء بجانبه */
 .attn-current { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.attn-num { display: inline-flex; flex-direction: column; align-items: center; line-height: 1.1; vertical-align: middle; }
+.attn-num-main { font-size: 17px; font-weight: 800; color: var(--primary); }
+.attn-num-ref { font-size: 10.5px; color: var(--muted); font-weight: 400; white-space: nowrap; margin-top: 2px; }
 .attn-current-num { font-size: 28px; font-weight: 800; color: var(--primary); line-height: 1.15; display: flex; align-items: center; }
 .attn-current-name { font-size: 13px; color: var(--text-secondary); }
 .attn-current-recall { text-align: center; }

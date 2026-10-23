@@ -237,8 +237,12 @@ export function printTicket(data, width = 80, doc = document) {
 // ═══ بطاقة من صفّ الطابور ═══
 // كل ما تحتاجه البطاقة موجودٌ أصلاً في ردّ الطابور — لا طلب شبكةٍ إضافي
 // يؤخّر الطباعة (ولا يفشل بها) لحظة وقوف المريض أمام الموظف.
+// ★ نمط الحضور: البطاقة تُطبع عند الحضور وتحمل **رقم الدور** (arrival_number) لا رقم
+// الحجز — الرقم الذي تعرضه الصالة وتنطقه. (منطقٌ مُضمَّن لا استيراد: فحص البطاقة يحقن
+// هذا الملف في صفحة بلا وحدات.)
 export const ticketFrom = (appt, session) => ({
-  queue_number: appt.queue_number,
+  queue_number: session?.flow_mode === 'attendance'
+    ? (appt.arrival_number ?? appt.queue_number) : appt.queue_number,
   full_name: appt.full_name,
   birth_year: appt.birth_year,
   visit_type: appt.visit_type,
