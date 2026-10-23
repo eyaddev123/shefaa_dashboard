@@ -64,6 +64,10 @@ $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries `
   -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) `
   -ExecutionTimeLimit (New-TimeSpan -Seconds 0)
 
+# ★ أوقف النسخة العاملة أوّلاً: إلغاء التسجيل لا يُنهي العملية الجارية، فتبقى
+#   النسخة القديمة ممسكةً بالمنفذ وتسقط الجديدة بـ«المنفذ مشغول» — تحديثٌ صامتٌ لا يحدث.
+Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+Start-Sleep -Seconds 1
 Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
 Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger `
   -Settings $settings -Description 'وسيط طباعة بطاقات جمعية الشفاء' | Out-Null

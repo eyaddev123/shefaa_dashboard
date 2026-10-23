@@ -358,7 +358,7 @@ export default function PublicDisplay() {
       <header className="pd-head">
         <div className="pd-brand">
           <span className="pd-logo">🏥</span>
-          <span className="pd-title">جمعية الشفاء الخيرية</span>
+          <span className="pd-title">مجمع عيادات الشفاء الطبي</span>
         </div>
         <div className="pd-clock">
           <div className="pd-time">{clock}</div>

@@ -9,7 +9,7 @@
 // عربية في الطابعة، تختلف بين الموديلات وتكسر وصل الحروف. والصورة بتّاتٌ
 // لا تعرف لغة — ما رسمه المتصفّح هو ما يُطبع حرفياً.
 
-import { ticketHtml } from './ticket-print.js'
+import { ticketHtml, ORG_NAME, ORG_NAME_PARTS, copyLabel } from './ticket-print.js'
 
 const SETTINGS_KEY = 'shefaa.printer'
 export const DEFAULT_HELPER = { port: 17625, token: '' }
@@ -70,7 +70,7 @@ export function ageFromYear(birthYear, now = new Date()) {
  * يمرّ مرّتين: الأولى تقيس الارتفاع، والثانية ترسم على لوحةٍ بذلك الارتفاع —
  * فلا ورق أبيض زائد ولا قصّ للمحتوى.
  */
-export async function renderTicketPng(data, width = 80, doc = document) {
+export async function renderTicketPng(data, width = 80, doc = document, { copy = null } = {}) {
   const W = DOTS[width] || DOTS[80]
   const scale = W / 576                  // أحجامٌ مضبوطة على ٥٧٦ نقطة
   const win = doc.defaultView || window
@@ -121,7 +121,16 @@ export async function renderTicketPng(data, width = 80, doc = document) {
       y += Math.round(9 * scale)
     }
 
-    line('جمعية الشفاء الخيرية', { size: 30, weight: 700, gap: 4 })
+    // ═══ الاسم: سطرٌ واحد إن وسع، وإلّا سطران متوازنان ═══
+    // نقيس بالخطّ نفسه والحجم نفسه — لا نصغّر الخطّ ولا نقصّ: «مجمع عيادات» ثمّ
+    // «الشفاء الطبي» (نصفان متقاربان) إن ضاق العرض (ورق ٥٨مم).
+    {
+      const px = Math.round(30 * scale)
+      ctx.font = `700 ${px}px Cairo, Tahoma, sans-serif`
+      const fits = ctx.measureText(ORG_NAME).width <= right - left
+      if (fits) line(ORG_NAME, { size: 30, weight: 700, gap: 4 })
+      else ORG_NAME_PARTS.forEach((part, i) => line(part, { size: 30, weight: 700, gap: i === 0 ? 2 : 4 }))
+    }
     rule()
     line('رقم الدور', { size: 22, gap: 2 })
     line(data.queue_number, { size: 86, weight: 700, gap: 12 })
@@ -150,6 +159,8 @@ export async function renderTicketPng(data, width = 80, doc = document) {
 
     y += Math.round(10 * scale)
     line(stamp(data.now ? new Date(data.now) : new Date()), { size: 19, gap: 4 })
+    // ★ اسم النسخة صغيراً في الأسفل — «نسخة المريض» / «نسخة العيادة»
+    if (copy) line(copy, { size: 18, gap: 4 })
     return y + Math.round(16 * scale)      // فراغٌ بسيط قبل القطع
   }
 
@@ -170,21 +181,43 @@ export async function renderTicketPng(data, width = 80, doc = document) {
   return { png: c.toDataURL('image/png'), width: W, height: H }
 }
 
+// وسيطٌ قديم (الإصدار ١) لا يعرف images[] فيرفضها بهذه الرسالة نفسها
+const OLD_HELPER_ERROR = /^image يجب أن تكون/
+
 /**
- * الطباعة عبر الوسيط. لا ترمي أبداً — { ok, reason }.
+ * الطباعة عبر الوسيط. لا ترمي أبداً — { ok, reason, copies, mode }.
  * الحضور نجح على الخادم قبل أن نصل هنا، فالفشل رسالةٌ لا تراجع.
+ *
+ * copies: عدد النسخ. كلّ نسخةٍ تُرسم باسمها في الأسفل، وتُرسل كلّها في
+ * **مهمّةٍ واحدة** (اطبع، اقطع، اطبع، اقطع). وإن كان الوسيط على الجهاز قديماً
+ * (قبل النسخ) تُرسل نسخةً نسخة — الورق نفسه، فلا تنقطع الطباعة قبل تحديثه.
  */
-export async function printViaHelper(data, width = 80, cfg = loadHelper(), doc = document) {
+export async function printViaHelper(data, width = 80, cfg = loadHelper(), doc = document, { copies = 1 } = {}) {
   try {
-    const { png, height } = await renderTicketPng(data, width, doc)
+    const n = Math.max(1, Math.min(5, Math.round(Number(copies) || 1)))
+    const rendered = []
+    for (let i = 0; i < n; i++) rendered.push(await renderTicketPng(data, width, doc, { copy: copyLabel(i) }))
     const headers = { 'Content-Type': 'application/json' }
     if (cfg.token) headers['X-Print-Token'] = cfg.token
-    const r = await fetch(`${helperUrl(cfg.port)}/print`, {
-      method: 'POST', headers, body: JSON.stringify({ image: png }),
-    })
-    const body = await r.json().catch(() => ({}))
-    if (!r.ok) return { ok: false, reason: body.error || `الوسيط ردّ ${r.status}` }
-    return { ok: true, height, job: body.job }
+    const post = async (payload) => {
+      const r = await fetch(`${helperUrl(cfg.port)}/print`, {
+        method: 'POST', headers, body: JSON.stringify(payload),
+      })
+      return { r, body: await r.json().catch(() => ({})) }
+    }
+
+    const first = await post({ images: rendered.map((x) => x.png) })
+    if (first.r.ok)
+      return { ok: true, height: rendered[0].height, job: first.body.job, copies: n, mode: 'one-job' }
+    if (!(first.r.status === 400 && OLD_HELPER_ERROR.test(first.body.error || '')))
+      return { ok: false, reason: first.body.error || `الوسيط ردّ ${first.r.status}` }
+
+    // ── وسيطٌ قديم: نسخةً نسخة ──
+    for (let i = 0; i < n; i++) {
+      const one = await post({ image: rendered[i].png })
+      if (!one.r.ok) return { ok: false, reason: one.body.error || `الوسيط ردّ ${one.r.status}`, printed: i }
+    }
+    return { ok: true, height: rendered[0].height, copies: n, mode: 'per-copy' }
   } catch (e) {
     const net = e && (e.name === 'TypeError' || /fetch/i.test(e.message || ''))
     return { ok: false, reason: net ? 'الطابعة غير متصلة' : (e.message || 'فشل غير متوقّع') }

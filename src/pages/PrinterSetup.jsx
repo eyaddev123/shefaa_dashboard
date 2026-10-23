@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { loadPrinter, savePrinter, printTicket, SAMPLE_TICKET } from '../ticket-print.js'
+import { loadPrinter, savePrinter, printTicket, SAMPLE_TICKET, MAX_COPIES, copyLabel } from '../ticket-print.js'
 import { helperHealth, printViaHelper, loadHelper } from '../print-helper.js'
 
 // ═══════════ إعداد الطابعة الحرارية ═══════════
@@ -32,11 +32,14 @@ export default function PrinterSetup() {
 
   const test = async () => {
     setTesting(true); setMsg(null)
-    const r = await printViaHelper(SAMPLE_TICKET, printer.width)
-    if (r.ok) setMsg({ kind: 'good', text: 'أُرسلت البطاقة التجريبية إلى الطابعة.' })
+    // بعدد النسخ المضبوط — فيرى الموظف ما سيخرج عند الحضور بالضبط
+    const r = await printViaHelper(SAMPLE_TICKET, printer.width, undefined, undefined, { copies: printer.copies })
+    if (r.ok) setMsg({ kind: 'good', text: printer.copies > 1
+      ? `أُرسلت ${printer.copies} نسخ تجريبية إلى الطابعة، كلٌّ منها مقطوعة وحدها.`
+      : 'أُرسلت البطاقة التجريبية إلى الطابعة.' })
     else {
       // الوسيط متوقّف ⇒ جرّب المتصفّح، وقل للموظف الفرق
-      const fb = await printTicket(SAMPLE_TICKET, printer.width)
+      const fb = await printTicket(SAMPLE_TICKET, printer.width, undefined, { copies: printer.copies })
       setMsg(fb.ok
         ? { kind: 'warn', text: 'الوسيط غير متصل — طُبعت من المتصفّح (نافذة وورقٌ أطول).' }
         : { kind: 'bad', text: `تعذّرت الطباعة${r.reason ? ` — ${r.reason}` : ''}` })
@@ -73,6 +76,15 @@ export default function PrinterSetup() {
                       ? `الطابعة «${helper.printer}» متّصلة وجاهزة.`
                       : `الوسيط يعمل لكنّ الطابعة «${helper.printer}» غير جاهزة — ${helper.printer_state || 'تحقّق من الكبل والورق'}.`}
                   </div>
+                  {/* الإصدار ١ لا يعرف النسخ في مهمّةٍ واحدة: يطبعها النظام نسخةً نسخة
+                      (الورق نفسه)، والتحديث يجعلها مهمّةً واحدة — انظر «التحديث» في الدليل */}
+                  {!(helper.version >= 2) && (
+                    <div className="ps-status-sub">
+                      ⚠ الوسيط على هذا الجهاز إصدارٌ أقدم — النسخ تُطبع واحدةً واحدة. حدّثه: انسخ مجلّد
+                      {' '}<code dir="ltr">print-helper</code> الجديد فوق القديم (أبقِ <code dir="ltr">config.json</code>)
+                      ثمّ أعد تشغيل سكربت التثبيت.
+                    </div>
+                  )}
                 </>
               ) : (
                 <>
@@ -104,6 +116,23 @@ export default function PrinterSetup() {
               <option value={80}>٨٠ مم (الافتراضي)</option>
               <option value={58}>٥٨ مم</option>
             </select>
+          </div>
+
+          {/* عدد النسخ عند الحضور: الأولى «نسخة المريض» والثانية «نسخة العيادة» */}
+          <div className="field ps-copies">
+            <label htmlFor="ps-copies">عدد النسخ عند الحضور</label>
+            <select id="ps-copies" value={printer.copies}
+              onChange={(e) => update({ copies: Number(e.target.value) })}>
+              {Array.from({ length: MAX_COPIES }, (_, i) => i + 1).map((n) => (
+                <option key={n} value={n}>
+                  {n === 1 ? 'نسخة واحدة' : n === 2 ? 'نسختان (الافتراضي)' : `${n} نسخ`}
+                </option>
+              ))}
+            </select>
+            <span className="hint">
+              {Array.from({ length: printer.copies }, (_, i) => copyLabel(i)).join(' · ')}
+              {' '}— كلّ نسخةٍ تُقطع وحدها. وإعادة الطباعة اليدوية تسأل عن العدد كلّ مرّة.
+            </span>
           </div>
 
           <div className="ps-test">

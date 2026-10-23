@@ -11,7 +11,25 @@
 
 const SETTINGS_KEY = 'shefaa.printer'
 
-export const DEFAULT_PRINTER = { enabled: false, width: 80 }
+// ═══ اسم الجهة على البطاقة ═══
+// نصفان متقاربان: سطرٌ واحد إن وسعه الورق، وإلّا سطران متوازنان — لا قصّ ولا
+// تصغير خطّ. (اسم النظام نفسه في الشريط الجانبيّ وصفحة الدخول لم يتغيّر.)
+export const ORG_NAME_PARTS = ['مجمع عيادات', 'الشفاء الطبي']
+export const ORG_NAME = ORG_NAME_PARTS.join(' ')
+
+// ═══ النسخ ═══
+// الأولى للمريض والثانية للعيادة، وما زاد «نسخة إضافية». والمحتوى متطابق.
+export const COPY_LABELS = ['نسخة المريض', 'نسخة العيادة']
+export const copyLabel = (i) => COPY_LABELS[i] || 'نسخة إضافية'
+export const MAX_COPIES = 5
+const clampCopies = (n, dflt) => {
+  const v = Math.round(Number(n))
+  return Number.isFinite(v) && v >= 1 && v <= MAX_COPIES ? v : dflt
+}
+
+// copies: عدد النسخ في الطباعة **التلقائية عند الحضور** (٢ افتراضاً: المريض والعيادة).
+// إعادة الطباعة اليدوية تسأل عن العدد كلّ مرّة (١ افتراضاً).
+export const DEFAULT_PRINTER = { enabled: false, width: 80, copies: 2 }
 
 // ★ الافتراض «مطفأ»: الاستقبال جهازان وطابعةٌ واحدة. لو كان الافتراض
 // «يطبع» لحاول الجهاز الذي لا طابعة له أن يطبع عند كل حضور.
@@ -21,12 +39,19 @@ export const loadPrinter = () => {
     return {
       enabled: raw.enabled === true,
       width: raw.width === 58 ? 58 : DEFAULT_PRINTER.width,
+      copies: clampCopies(raw.copies, DEFAULT_PRINTER.copies),
     }
   } catch { return { ...DEFAULT_PRINTER } }
 }
 
+// ★ دمجٌ لا استبدال: المفتاح نفسه يحمل منفذ الوسيط ورمزه (loadHelper) —
+// والكتابة فوقه كاملاً كانت تمحوهما بصمت عند أيّ تغييرٍ في هذه الصفحة.
 export const savePrinter = (s) => {
-  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)) } catch { /* وضع التصفّح الخاص */ }
+  try {
+    let prev = {}
+    try { prev = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') || {} } catch { prev = {} }
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...prev, ...s }))
+  } catch { /* وضع التصفّح الخاص */ }
 }
 
 // ═══ العمر من سنة الميلاد ═══
@@ -55,7 +80,7 @@ const stamp = (d = new Date()) =>
 // الطابعة الحرارية لا تطبع حتى الحافّة، وبلا هامشٍ يُقصّ أوّل الحرف وآخره.
 // heightMm: طولُ الصفحة بالمليمتر حين نعرفه (بعد قياس المحتوى) — وإلّا «auto».
 // origin: جذر الموقع لتحميل ملفات الخطّ منه (الإطار بلا عنوانٍ يُحَلّ منه مسار).
-export function ticketHtml(data, width = 80, heightMm = null, origin = '') {
+export function ticketHtml(data, width = 80, heightMm = null, origin = '', copy = null) {
   const w = width === 58 ? 58 : 80
   const content = w === 58 ? 48 : 72          // عرض المحتوى الفعلي (مم)
   const big = w === 58 ? 26 : 34              // حجم رقم الدور (مم ⇒ pt تقريبي)
@@ -121,6 +146,9 @@ export function ticketHtml(data, width = 80, heightMm = null, origin = '') {
   }
   .t { width: ${content}mm; margin: 0 auto; padding: 3mm 0 0; text-align: center; }
   .org { font-size: ${base + 2}pt; font-weight: 700; }
+  /* نصفا الاسم لا ينكسران: سطرٌ واحد إن وسع، وإلّا سطران متوازنان */
+  .org span { display: inline-block; white-space: nowrap; }
+  .copy { font-size: ${base - 2}pt; margin-top: 1mm; }
   .rule { border-top: 1px dashed #000; margin: 2mm 0; }
   .num-label { font-size: ${base - 1}pt; }
   .num { font-size: ${big}pt; font-weight: 700; line-height: 1.05; margin: 1mm 0 2mm; }
@@ -144,7 +172,7 @@ export function ticketHtml(data, width = 80, heightMm = null, origin = '') {
   .cut { height: 8mm; }
 </style></head>
 <body><div class="t">
-  <div class="org">جمعية الشفاء الخيرية</div>
+  <div class="org">${ORG_NAME_PARTS.map((p) => `<span>${esc(p)}</span>`).join(' ')}</div>
   <div class="rule"></div>
 
   <div class="num-label">رقم الدور</div>
@@ -161,13 +189,25 @@ export function ticketHtml(data, width = 80, heightMm = null, origin = '') {
   ${amountBlock}
 
   <div class="when">${esc(stamp(data.now ? new Date(data.now) : new Date()))}</div>
+  ${copy ? `<div class="copy">${esc(copy)}</div>` : ''}
   <div class="cut"></div>
 </div></body></html>`
 }
 
 // ═══ الطباعة ═══
 // تُرجع وعداً يُحلّ دائماً — الطباعة لا تُفشل الحضور أبداً. { ok, reason }
-export function printTicket(data, width = 80, doc = document) {
+// copies: نسخةً بعد نسخة (احتياط المتصفّح وحده — الوسيط يطبعها مهمّةً واحدة)
+export async function printTicket(data, width = 80, doc = document, { copies = 1 } = {}) {
+  const n = clampCopies(copies, 1)
+  let last = { ok: true, reason: null }
+  for (let i = 0; i < n; i++) {
+    last = await printOneTicket(data, width, doc, copyLabel(i))
+    if (!last.ok) return last
+  }
+  return last
+}
+
+function printOneTicket(data, width = 80, doc = document, copy = null) {
   return new Promise((resolve) => {
     let frame = null
     let settled = false
@@ -198,7 +238,7 @@ export function printTicket(data, width = 80, doc = document) {
       // إلى حدّ المقاس المختار (٢١٠مم عندنا) ويُخرج ورقاً أبيض طويلاً بعد
       // النصّ. نرسم أوّلاً لنقيس ارتفاع المحتوى الحقيقي، ثمّ نُعيد الرسم
       // بـ@page بذلك الارتفاع — فيقطع السائق بعد المحتوى مباشرةً.
-      d.open(); d.write(ticketHtml(data, width, null, origin)); d.close()
+      d.open(); d.write(ticketHtml(data, width, null, origin, copy)); d.close()
 
       const guard = setTimeout(() => done(true, null), 9000)
       w.onafterprint = () => { clearTimeout(guard); done(true, null) }
@@ -215,7 +255,7 @@ export function printTicket(data, width = 80, doc = document) {
           const el = d.querySelector('.t') || d.body
           const measured = Math.ceil((el.getBoundingClientRect().height) / MM)
           if (measured > 20 && measured < 2000) {
-            d.open(); d.write(ticketHtml(data, width, measured, origin)); d.close()
+            d.open(); d.write(ticketHtml(data, width, measured, origin, copy)); d.close()
             if (d.fonts && d.fonts.ready) {
               await Promise.race([d.fonts.ready, new Promise((r) => setTimeout(r, 1500))])
             }
