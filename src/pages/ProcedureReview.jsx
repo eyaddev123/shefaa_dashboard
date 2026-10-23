@@ -172,7 +172,10 @@ export default function ProcedureReview({ canEdit, showToast }) {
                 <Fragment key={l.id}>
                   <tr className={l.negative_shifa ? 'rev-neg' : l.no_rule ? 'rev-norule' : undefined}>
                     <td dir="ltr" style={{ whiteSpace: 'nowrap' }}>{l.session_date}</td>
-                    <td>{l.patient_name} <span className="muted">#{l.queue_number}</span></td>
+                    <td>{l.patient_name} <span className="muted">{l.flow_mode === 'attendance'
+                      // نمط الحضور: رقم الدور (عند الحضور) ثم رقم الحجز
+                      ? `${l.arrival_number != null ? `#${l.arrival_number} · ` : ''}حجز ${l.queue_number}`
+                      : `#${l.queue_number}`}</span></td>
                     <td>{l.doctor_name}</td>
                     <td>{l.name_snapshot}</td>
                     <td className="num">{fmtMoney(l.price_snapshot)}</td>
