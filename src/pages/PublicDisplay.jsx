@@ -4,7 +4,7 @@ import { withTitle } from '../announce.js'
 import { callAudio, loadSettings } from '../call-audio.js'
 import { roomClip, CLIP_TEXT } from '../audio-clips.js'
 // التخطيط مشتركٌ مع شاشة الدور (/order) — مصدرٌ واحد فلا تنحرف الشاشتان
-import { pickGrid, lastRowOffset, cardFonts } from '../display-layout.js'
+import { pickGrid, lastRowOffset, cardFonts, planChips, tierOf, chipMinPx, TIERS } from '../display-layout.js'
 
 // شبكة أمان فقط: البثّ المباشر (SSE) هو مصدر التحديث الفعلي، وهذه السحبة تُصلح
 // أي فرق لو انقطع الاتصال دون أن يلاحظ المتصفح
@@ -26,12 +26,79 @@ export const waitingOf = (b) => (b.queue || []).filter((q) => q.arrived)
 
 // ═══ «بانتظار العودة» ═══
 // خرجوا مؤقتاً (قطرة، صورة…) وسيُنادَون ليُكملوا: ليسوا في «التالي» ولا «يُخدَم الآن».
-// سطرٌ هادئ أسفل البطاقة بأرقامهم فقط — بلا وميض ولا لون لافت. والحقل يغيب عن خادمٍ
-// أقدم، فالغياب = لا أحد.
+// حبّاتٌ زرقاء هادئة بأرقامهم فقط — بلا وميض. والحقل يغيب عن خادمٍ أقدم، فالغياب = لا أحد.
 export const returningOf = (b) => b.returning || []
 
-// يُعاد القياس حين يظهر السطر أو يختفي (يتغيّر توزيع البطاقة)
-const anyReturningKey = (d) => ((d && d.board) || []).some((b) => !b.closed && returningOf(b).length > 0)
+// يُعاد القياس حين يظهر صفّ حبّاتٍ أو يختفي (يتغيّر توزيع البطاقة)
+const rowsKey = (d) => {
+  const open = ((d && d.board) || []).filter((b) => !b.closed)
+  return `${open.some((b) => waitingOf(b).length > 0)}|${open.some((b) => returningOf(b).length > 0)}`
+}
+
+// أيقونة «عودة» (↩) مرسومةً لا محرفاً: خطوط تلفاز أندرويد القديم قد ترسم ↩ رمزاً ملوّناً
+// أو مربّعاً فارغاً. SVG مضمَّن يعمل في Chrome 66 ويأخذ لونه من النصّ.
+const ReturnIcon = () => (
+  <svg className="pd-return-icon" viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11" fill="none" stroke="currentColor"
+      strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+)
+
+// ═══ حبّات «التالي» و«بانتظار العودة» ═══
+// العدد محسوب من العرض (planChips) والمقاس من cardFonts — لا قياس بعد الرسم.
+// RTL: أوّل حبّة (التالي مباشرةً) في أقصى اليمين، وهي نفسها التي تُنادى بعدُ.
+// ★ أرقامٌ فقط: لا اسم، ولا تمييز للإسعافي بلونٍ أو شارة — تمييزه على شاشةٍ عامة
+// يكشف واقعةً طبية عن شخصٍ بعينه. التمييز الوحيد للأولى: «هي التالية».
+function UpcomingChips({ next, ret, fonts }) {
+  const plan = planChips(next, ret, fonts)
+  const tier = TIERS[fonts.tier]
+  const showNext = plan.next.length > 0
+  const showRet = plan.ret.length > 0 || plan.retMore > 0
+  // لا منتظرين ولا عائدين: لا صفّ إطلاقاً (ولا مكان محجوز داخل البطاقة)
+  if (!showNext && !showRet) return null
+  const nextChips = showNext && (
+    <>
+      {plan.next.map((n, i) => (
+        <span key={n} className={`pd-chip${i === 0 ? ' pd-chip-first' : ''}`}>{n}</span>
+      ))}
+      {/* dir=ltr: في سياق RTL تُرسم «+2» مقلوبةً «2+» */}
+      {plan.nextMore > 0 && <span className="pd-chip pd-chip-more" dir="ltr">+{plan.nextMore}</span>}
+    </>
+  )
+  const retChips = showRet && (
+    <>
+      {plan.ret.map((n) => <span key={n} className="pd-chip pd-chip-return">{n}</span>)}
+      {plan.retMore > 0 && <span className="pd-chip pd-chip-return pd-chip-more" dir="ltr">+{plan.retMore}</span>}
+    </>
+  )
+  if (tier.merged) {
+    // المكبوس: صفٌّ واحد بلا أيّ عنوان — اللون يفرّق العائدين عن التالين
+    return (
+      <div className="pd-chips">
+        <div className="pd-chip-row">
+          {nextChips}
+          {showNext && showRet && <span className="pd-chip-sep" />}
+          {retChips}
+        </div>
+      </div>
+    )
+  }
+  return (
+    <div className="pd-chips">
+      {showNext && tier.nextTitle && <div className="pd-chip-title">التالي</div>}
+      {showNext && <div className="pd-chip-row">{nextChips}</div>}
+      {showRet && (
+        <div className={`pd-chip-row${showNext ? ' pd-chip-row-gap' : ''}`}>
+          <span className={`pd-return-mark${tier.returnTitle ? '' : ' pd-return-mark-icon'}`}>
+            <ReturnIcon />
+            {tier.returnTitle && <span className="pd-return-word">بانتظار العودة</span>}
+          </span>
+          {retChips}
+        </div>
+      )}
+    </div>
+  )
+}
 
 const two = (n) => String(n).padStart(2, '0')
 const AR_DAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
@@ -57,6 +124,8 @@ export default function PublicDisplay() {
   // الصالة. innerHeight هو المرئي فعلاً في كل متصفح، فنثبّت الارتفاع عليه ونحدّثه مع
   // كل تغيّر (مقاس، ملء شاشة، ظهور الشريط). وCSS يبقى احتياطاً (100dvh ثم 100vh).
   const [viewH, setViewH] = useState(() => (typeof window !== 'undefined' ? window.innerHeight : 0))
+  // العرض يحدّد الحدّ الأدنى لرقم الحبّة (chipMinPx) — انظر display-layout.js
+  const [viewW, setViewW] = useState(() => (typeof window !== 'undefined' ? window.innerWidth : 0))
   // البطاقات التي تغيّر رقمها حديثاً — تُومض ليلفت التغيّر النظر حتى لو الصوت مقفول
   const [flashing, setFlashing] = useState({})
 
@@ -91,6 +160,7 @@ export default function PublicDisplay() {
       const w = window.innerWidth || document.documentElement.clientWidth || 0
       setWide(h > 0 && w / h > 2)
       if (h > 0) setViewH(h)
+      if (w > 0) setViewW(w)
     }
     window.addEventListener('resize', onResize)
     // شريط المتصفح يظهر ويختفي دون resize في بعض المتصفحات؛ وملء الشاشة كذلك.
@@ -165,7 +235,7 @@ export default function PublicDisplay() {
       ro.observe(gridRef.current)
     }
     return () => { if (ro) ro.disconnect() }
-  }, [viewH, data?.board?.length, !!data?.urgent_delays, audioReady, showSettings, err, anyReturningKey(data)])
+  }, [viewH, data?.board?.length, !!data?.urgent_delays, audioReady, showSettings, err, rowsKey(data)])
 
   // ── وميض البطاقة عند تغيّر رقمها ──
   const flashDoctor = useCallback((key) => {
@@ -318,37 +388,32 @@ export default function PublicDisplay() {
   const GAP = 10
   const cardW = grid.cols ? (gridBox.w - GAP * (grid.cols - 1)) / grid.cols : 0
   const cardH = grid.rows ? (gridBox.h - GAP * (grid.rows - 1)) / grid.rows : 0
-  // سطر «بانتظار العودة» يُحجز ارتفاعه في كل البطاقات معاً متى وُجد في إحداها:
-  // المقاسات واحدة للشبكة كلّها، فلا تختلف بطاقةٌ عن جارتها في حجم رقمها.
-  const anyReturning = (data?.board || []).some((b) => !b.closed && returningOf(b).length > 0)
-  const fonts = cardFonts(cardW, cardH, { extraRow: anyReturning })
+  // ═══ المستوى بعدد العيادات (١–٢ · ٣–٤ · ٥+) ═══
+  // صفّا «التالي» و«بانتظار العودة» يُحجز ارتفاعهما في كل البطاقات معاً متى وُجدا في
+  // إحداها: المقاسات واحدة للشبكة كلّها، فلا تختلف بطاقةٌ عن جارتها في حجم رقمها.
+  const openBoard = (data?.board || []).filter((b) => !b.closed)
+  const tier = tierOf(docCount)
+  // أطول رقمٍ قد يُعرض في حبّة: ثلاث خانات تحتاج حبّةً أعرض فيتّسع عددٌ أقل
+  const digits = openBoard.reduce((m, b) => Math.max(m, ...waitingOf(b).concat(returningOf(b))
+    .map((q) => String(q.queue_number).length)), 2)
+  const fonts = cardFonts(cardW, cardH, {
+    tier,
+    chipMin: chipMinPx(viewW),
+    nextRow: openBoard.some((b) => waitingOf(b).length > 0),
+    returnRow: openBoard.some((b) => returningOf(b).length > 0),
+    digits,
+  })
   // متغيّرات CSS: قيمٌ بالبكسل محسوبة هنا، فتعمل على Chrome 66 بلا container queries
-  // ═══ كم رقماً يتّسع في البطاقة؟ ═══
-  // يُحسب من التخطيط لا يُقاس بعد الرسم: القياس يأتي متأخّراً دورةً فتُعرض
-  // أرقامٌ تُقصّ بصمت. وعرض الرقم ≈ 0.62 من حجم خطّه لكل خانة، مع فجوة.
-  // والسطور المتاحة من ارتفاع المنطقة المحجوزة لصفّ «التالي».
-  const waitFit = (() => {
-    if (!fonts || !cardW) return 2
-    const digitW = fonts.upNum * 0.62
-    const chipW = digitW * 2.2 + fonts.upNum * 0.5   // رقمان + حشو + فجوة
-    const usable = cardW - 16 - fonts.upLabel * 4    // الحشو وكلمة «التالي:»
-    const perLine = Math.max(1, Math.floor(usable / chipW))
-    // سطران كحدٍّ أقصى: أكثر من ذلك يزاحم الرقم الضخم أو يدفع الغرفة خارج البطاقة
-    const lines = cardH > 420 ? 2 : 1
-    // «بانتظار العودة» داخل الصفّ نفسه (البطاقة الأضيق): نترك له مكان كلمته وأرقامه
-    const inlineReturn = fonts.returningInline
-      ? Math.max(0, ...(data?.board || []).map((b) => returningOf(b).length)) + 2 : 0
-    return Math.max(1, perLine * lines - inlineReturn)
-  })()
-
   const fontVars = fonts ? {
     '--pd-number': `${fonts.number}px`,
     '--pd-room': `${fonts.room}px`,
     '--pd-doctor': `${fonts.doctor}px`,
     '--pd-label': `${fonts.label}px`,
-    '--pd-up-num': `${fonts.upNum}px`,
-    '--pd-up-label': `${fonts.upLabel}px`,
     '--pd-specialty': `${fonts.specialty}px`,
+    '--pd-chip': `${fonts.chip}px`,
+    '--pd-chip-title': `${fonts.chipTitle}px`,
+    '--pd-pad-x': `${fonts.padX}px`,
+    '--pd-pad-y': `${fonts.padY}px`,
   } : {}
 
   const offlineLong = offlineSince && Date.now() - offlineSince > OFFLINE_ALERT_MS
@@ -430,6 +495,7 @@ export default function PublicDisplay() {
           {data.board.map((b, i) => (
             <div
               key={b.doctor_name}
+              data-tier={fonts ? fonts.tier : tier}
               className={`pd-card ${flashing[b.doctor_name] ? 'pd-flash' : ''} ${
                 banner && banner.doctor_name === b.doctor_name ? 'pd-card-active' : ''} ${
                 b.closed ? 'pd-card-closed' : ''}`}
@@ -440,7 +506,8 @@ export default function PublicDisplay() {
               <div className="pd-card-head">
                 {/* اسم الدكتور يظهر ولا يُنطق أبداً — ولا اسم مريض هنا إطلاقاً */}
                 <div className="pd-doctor">{b.doctor_name}</div>
-                <div className="pd-specialty">{b.specialty || '—'}</div>
+                {/* المكبوس: الاسم وحده سطراً واحداً — الاختصاص يزاحم الرقم والحبّات */}
+                {fonts?.showSpecialty !== false && <div className="pd-specialty">{b.specialty || '—'}</div>}
               </div>
 
               {/* عند ضيق الارتفاع تُقلَّل الأسطر لا تُصغَّر الخطوط: يسقط «يُخدَم الآن»
@@ -469,52 +536,14 @@ export default function PublicDisplay() {
                 )}
               </div>
 
-              {/* ═══ المنتظرون كاملين بترتيب خدمتهم ═══
-                  «التالي/بعده» كانا يُظهران اثنين فقط، فمن رقمه الخامس لا يعرف
-                  أين هو ويسأل الاستقبال. والقائمة تُظهر الجميع بالترتيب الفعلي
-                  (الإسعافي أولاً ثمّ ترتيب الحضور — يأتي مرتَّباً من الخادم).
-
-                  ★ أرقامٌ فقط: لا اسم، ولا تمييز للإسعافي بلونٍ أو شارة —
-                  تمييزه على شاشةٍ عامة يكشف واقعةً طبية عن شخصٍ بعينه.
-                  والحاضرون وحدهم: من حجز ولم يحضر ليس في الطابور بعد. */}
-              {!b.closed && (
-                <div className={`pd-waiting${fonts?.returningInline && returningOf(b).length > 0 ? ' pd-waiting-oneline' : ''}`}>
-                  {waitingOf(b).length === 0 ? (
-                    <span className="pd-up-label pd-dim">لا أحد بانتظار الدور</span>
-                  ) : (
-                    <>
-                      <span className="pd-up-label">التالي:</span>
-                      <span className="pd-wait-nums">
-                        {waitingOf(b).slice(0, waitFit).map((q, i) => (
-                          <span key={q.queue_number}
-                            className={`pd-wait-num${i === 0 ? ' pd-wait-first' : ''}`}>
-                            {q.queue_number}
-                          </span>
-                        ))}
-                        {waitingOf(b).length > waitFit && (
-                          <span className="pd-wait-more">+{waitingOf(b).length - waitFit}</span>
-                        )}
-                      </span>
-                    </>
-                  )}
-                  {fonts?.returningInline && returningOf(b).length > 0 && (
-                    <span className="pd-returning-inline">
-                      <span className="pd-returning-label">عودة:</span>
-                      {returningOf(b).map((q) => (
-                        <span key={q.queue_number} className="pd-returning-num">{q.queue_number}</span>
-                      ))}
-                    </span>
-                  )}
-                </div>
-              )}
-
-              {!b.closed && !fonts?.returningInline && returningOf(b).length > 0 && (
-                <div className="pd-returning">
-                  <span className="pd-returning-label">بانتظار العودة:</span>
-                  {returningOf(b).map((q) => (
-                    <span key={q.queue_number} className="pd-returning-num">{q.queue_number}</span>
-                  ))}
-                </div>
+              {/* ═══ المنتظرون بترتيب خدمتهم (حبّات) ═══
+                  الترتيب يأتي من الخادم (الإسعافي أولاً ثمّ ترتيب الحضور)، والحاضرون
+                  وحدهم: من حجز ولم يحضر ليس في الطابور بعد. */}
+              {!b.closed && fonts && (
+                <UpcomingChips
+                  next={waitingOf(b).map((q) => q.queue_number)}
+                  ret={returningOf(b).map((q) => q.queue_number)}
+                  fonts={fonts} />
               )}
             </div>
           ))}

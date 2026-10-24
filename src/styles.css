@@ -1011,7 +1011,7 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
 .pd-card {
   display: grid;
   grid-template-rows: auto 1fr auto;
-  gap: 0.3vh;
+  gap: 4px;                      /* ثابتٌ بالبكسل: داخلٌ في ميزانية cardFonts (SECTION_GAP) */
   /* تملأ خانتها طولاً وعرضاً — min-*:0 يمنع المحتوى من تمديدها خارج الخانة */
   width: 100%;
   height: 100%;
@@ -1022,7 +1022,8 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
   background: #10201e;
   border: 2px solid rgba(127, 214, 184, 0.18);
   border-radius: 1.4vh;
-  padding: 0.8vh 0.8vw;
+  /* الحشو يُحسب في JS (cardFonts) لأنه داخلٌ في ميزانية الارتفاع */
+  padding: var(--pd-pad-y, 0.8vh) var(--pd-pad-x, 0.8vw);
 }
 /* ترويسة البطاقة: كتلة مرنة عمودية بأسطر لا تتراكب. الاعتماد على ارتفاع
    السطر وحده جعل «يُخدَم الآن» يركب على الاختصاص عند أربع بطاقات. */
@@ -1031,7 +1032,7 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
   display: flex; flex-direction: column;
   min-height: min-content; flex: none;
 }
-.pd-card-head > * + * { margin-top: 0.2vh; }
+.pd-card-head > * + * { margin-top: 3px; }
 .pd-doctor {
   font-size: var(--pd-doctor, 20px); font-weight: 800; line-height: 1.15;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -1091,52 +1092,56 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
-/* ═══ صفّ المنتظرين: الأرقام كاملةً بترتيب الخدمة ═══
-   بدل «التالي/بعده» (اثنان فقط) — من رقمه الخامس يعرف أين هو بلا سؤال.
-   ولا flex gap: متصفّح التلفاز (Chrome 66) يتجاهلها بصمت، فالهوامش بديلٌ يعمل.
-   والمقاسات تصل متغيّراتِ CSS محسوبةً من JS — لا container queries. */
-.pd-waiting {
-  display: flex; align-items: baseline; justify-content: center;
+/* ═══ حبّات «التالي» و«بانتظار العودة» ═══
+   سطر النصّ الصغير «التالي: ٧ ٨ ٩» لم يكن يلفت أحداً في الصالة. الحبّة صندوقٌ بخلفيةٍ
+   أفتح من البطاقة ورقمٍ عريض يُقرأ من بعيد. المقاس (--pd-chip) والعدد يُحسبان في JS
+   (cardFonts/planChips) بحدٍّ أدنى لا يُنزل عنه — يقلّ العدد («+N») لا الخطّ.
+   ★ Chrome 66: لا flex gap — الحبّات inline-block بهوامش متناظرة (لا margin-inline،
+   وهي أحدث منه)، وكلّ أبعادها بـ em من خطّها فتطابق حساب chipWidth في JS. */
+.pd-chips {
   flex: none; min-width: 0;
-  padding-top: 0.6vh; border-top: 1px solid rgba(127, 214, 184, 0.18);
+  padding-top: calc(var(--pd-chip, 34px) * 0.25);
+  border-top: 1px solid rgba(127, 214, 184, 0.18);
+  text-align: center;
   overflow: hidden;
 }
-.pd-wait-nums { display: inline-block; margin-inline-start: 0.45em; min-width: 0; }
-.pd-wait-num {
-  display: inline-block;
-  font-size: var(--pd-up-num, 24px); font-weight: 800; line-height: 1.3;
-  color: #eef7f5;
-  margin-inline-end: 0.5em;
+.pd-chip-title {
+  font-size: var(--pd-chip-title, 15px); color: #9fb4b0; font-weight: 700;
+  line-height: 1.25; margin-bottom: calc(4px + var(--pd-chip, 34px) * 0.08);
 }
-/* الأول هو «التالي» — يتميّز بلونه لا بشارةٍ تكشف شيئاً عن صاحبه */
-.pd-wait-first { color: #14b8a6; }
-/* ما لم يتّسع يُعلن عن نفسه: قصٌّ صامت أسوأ من رقمٍ ناقص */
-.pd-wait-more {
-  display: inline-block;
-  font-size: var(--pd-up-num, 24px); font-weight: 800; line-height: 1.3;
-  color: #7fd6b8;
-}
-
-/* ═══ «بانتظار العودة» (خروج مؤقت): سطرٌ هادئ أسفل البطاقة ═══
-   أصغر من صفّ «التالي» وأخفت لوناً، بلا وميض ولا إطار: هؤلاء ليسوا التالين، وتمييزهم
-   بلونٍ لافت يُربك من ينتظر دوره. ارتفاعه محجوزٌ في cardFonts (extraRow) فلا يقصّ الغرفة.
-   ولا flex gap (Chrome 66): الهوامش بديل. */
-.pd-returning {
-  display: flex; align-items: baseline; justify-content: center;
-  flex: none; min-width: 0;
-  padding-top: 0.4vh; border-top: 1px dashed rgba(127, 214, 184, 0.14);
+.pd-chip-row {
+  font-size: var(--pd-chip, 34px); line-height: 1;
   white-space: nowrap; overflow: hidden;
 }
-.pd-returning-inline { display: inline-block; margin-inline-start: 0.9em; white-space: nowrap; flex: none; }
-/* الصفّ يحمل «التالي» و«عودة» معاً في البطاقة الأضيق: سطرٌ واحد لا يلتفّ — الالتفاف
-   يُطيله فيسحق الوسط ويقصّ الرقم. وما لا يتّسع من المنتظرين يُعلنه «+N» كالعادة. */
-.pd-waiting-oneline, .pd-waiting-oneline .pd-wait-nums { white-space: nowrap; flex-wrap: nowrap; }
-.pd-returning-label { font-size: var(--pd-up-label, 13px); color: #8aa29d; font-weight: 700; line-height: 1.3; }
-.pd-returning-num {
-  font-size: calc(var(--pd-up-label, 13px) * 1.15); font-weight: 800; line-height: 1.2;
-  color: #b3c6c2;
-  margin-inline-start: 0.6em;
+.pd-chip-row-gap { margin-top: calc(var(--pd-chip, 34px) * 0.2); }
+.pd-chip {
+  display: inline-block; vertical-align: middle;
+  font-size: var(--pd-chip, 34px); font-weight: 800; line-height: 1.2;
+  padding: 0.12em 0.4em; margin: 0 0.15em;
+  border: 1px solid transparent; border-radius: 0.28em;
+  color: #eef7f5; background: rgba(238, 247, 245, 0.1);
+  /* الانتقال الوحيد: حين تصير الحبّة الثانية أولى بعد نداء — تلوّنٌ هادئ لا حركة */
+  transition: background-color 0.4s ease, color 0.4s ease;
 }
+/* الأولى = التالي مباشرةً: بلون «يُخدَم الآن» نفسه ونصٍّ داكن (تباين ≈٨:١، والأبيض ≈٢٫٥:١) */
+.pd-chip-first { background: #14b8a6; color: #0b1615; }
+/* ما لم يتّسع يُعلن عن نفسه — قصٌّ صامت أسوأ من رقمٍ ناقص */
+.pd-chip-more { color: #7fd6b8; background: transparent; border-color: rgba(127, 214, 184, 0.3); }
+/* «بانتظار العودة» (خروج مؤقت): أزرق هادئ من عائلة شارة الاستقبال (--status-review
+   الداكنة) — ليسوا التالين، فلا لون لافت ولا وميض */
+.pd-chip-return { color: #58b6e8; background: rgba(88, 182, 232, 0.14); border-color: rgba(88, 182, 232, 0.35); }
+.pd-chip-return.pd-chip-more { background: transparent; }
+/* فاصلٌ بين المجموعتين في الصفّ المدموج (٠٫٤em — محسوبٌ في planChips) */
+.pd-chip-sep { display: inline-block; width: 0.4em; }
+/* علامة العودة قبل حبّاتها: أيقونة + كلمة (كبير) أو أيقونة وحدها بحجم الحبّة (متوسّط) */
+.pd-return-mark {
+  display: inline-block; vertical-align: middle;
+  font-size: var(--pd-chip-title, 15px); font-weight: 700; line-height: 1.2;
+  color: #58b6e8; margin: 0 0.15em;
+}
+.pd-return-mark-icon { font-size: calc(var(--pd-chip, 34px) * 0.75); }
+.pd-return-icon { display: inline-block; vertical-align: -0.15em; width: 1.1em; height: 1.1em; }
+.pd-return-word { margin-right: 0.3em; }
 
 /* الرقمان الجايان */
 .pd-upcoming {
@@ -1227,6 +1232,7 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
 /* من يعاني حساسية الحركة: نُبقي كل شيء ثابتاً بلا نبض ولا وميض */
 @media (prefers-reduced-motion: reduce) {
   .pd-banner, .pd-banner-inner, .pd-card.pd-flash, .pd-dot-off { animation: none; }
+  .pd-chip { transition: none; }
 }
 
 /* ═══ موقع المريض العام — بحث عن الدور ═══ */
