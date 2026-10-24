@@ -222,6 +222,10 @@ export const api = {
       http(`/clinic/sessions/${sessionId}/followup-check?mobile=${encodeURIComponent(mobile)}`),
     prioritize: (appointmentId, priority) =>
       http(`/clinic/appointments/${appointmentId}/prioritize`, { method: 'POST', body: JSON.stringify({ priority }) }),
+    // قراءةٌ فقط: الوقت الذي سيأخذه الحجز التالي لو حُفظ الآن (نمط الحضور). الحقيقيّ يُعطى عند الحفظ.
+    estimatePreview: (sessionId, { priority, booking_type }) =>
+      http(`/clinic/sessions/${sessionId}/estimate-preview?priority=${encodeURIComponent(priority)}`
+        + `&booking_type=${encodeURIComponent(booking_type)}`),
     book: (sessionId, body) =>
       http(`/clinic/sessions/${sessionId}/appointments`, { method: 'POST', body: JSON.stringify(body) }),
     // patient اختياري: استكمال المعلومات المؤجَّلة مع تعليم الحضور في طلب واحد

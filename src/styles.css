@@ -1345,6 +1345,10 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
 /* ألوان الحالة من متغيّرات السمة (--status-*) لا قيَماً ثابتة: الأحمر الداكن
    يصير غير مقروء على الخلفية الداكنة، والمتغيّرات مضبوطة للسمتين أصلاً. */
 .bf-note { margin: 0; font-size: 12.5px; line-height: 1.6; }
+/* الوقت التقريبي أعلى نموذج الحجز (نمط الحضور): يُقرأ للمتّصل بلمحة */
+.bf-estimate { margin: 0; padding: 8px 12px; border-radius: 8px; background: var(--primary-soft);
+  color: var(--accent-text); font-size: 15px; }
+.bf-estimate strong { font-size: 18px; margin-inline-start: 4px; }
 .bf-note-urgent { color: var(--status-bad); font-weight: 700; }
 .bf-note-warn { color: var(--status-pending); }
 .bf-note-ok { color: var(--status-good); }
