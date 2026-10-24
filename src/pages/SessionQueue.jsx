@@ -311,7 +311,7 @@ function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel, urgent = f
           </select>
         </div>
         <div className="field bf-reason">
-          <label>سبب الزيارة <span className="opt">(اختياري)</span></label>
+          <label>ملاحظة الحجز <span className="opt">(اختيارية)</span></label>
           <input value={form.reason} onChange={set('reason')} />
         </div>
       </div>
@@ -970,6 +970,12 @@ function MissingBadge({ appt }) {
   return <span className="badge warn sm" title={`ينقص: ${m.map((f) => f.label).join('، ')}`}>بيانات ناقصة</span>
 }
 
+// ملاحظة الحجز تحت الاسم في صفّ الطابور: سطرٌ صغير يُقصّ إن طال، وكاملها في tooltip
+function QueueNote({ appt }) {
+  if (!appt.reason) return null
+  return <div className="queue-note" title={appt.reason}>{appt.reason}</div>
+}
+
 // ═══ تفاصيل الحجز — لوحةٌ واحدة مُحكمة ═══
 // كانت القيم تظهر مرّتين (سطر قراءة فوق حقولٍ تحمل القيم نفسها)، وبزرَّي حفظ
 // وعناوين أقسام تملأ الشاشة. الآن: سطر معلوماتٍ صغير، ثمّ صفُّ حقولٍ واحد كلّ
@@ -978,7 +984,6 @@ function AppointmentDetails({ appt, session, onChanged, onToast, onArrived }) {
   const dlg = useDialogs()
   const { role } = useRole()
   const [busy, setBusy] = useState(false)
-  const [note, setNote] = useState('')
   const [showHistory, setShowHistory] = useState(false)
   const [swap, setSwap] = useState(false)
 
@@ -987,10 +992,12 @@ function AppointmentDetails({ appt, session, onChanged, onToast, onArrived }) {
     gender: appt.gender || '', birth_year: appt.birth_year || '',
     visit_type: appt.visit_type, priority: appt.priority || 'normal',
     status: appt.status,
+    // ملاحظة الحجز نفسها (عمود reason) — حقلٌ كغيره: يبدأ بقيمته ويدخل فحص التغيير
+    reason: appt.reason || '',
   })
   const [form, setForm] = useState(base)
-  useEffect(() => { setForm(base()); setNote('') }, [appt.id, appt.full_name, appt.mobile,
-    appt.gender, appt.birth_year, appt.visit_type, appt.priority, appt.status]) // eslint-disable-line
+  useEffect(() => { setForm(base()) }, [appt.id, appt.full_name, appt.mobile,
+    appt.gender, appt.birth_year, appt.visit_type, appt.priority, appt.status, appt.reason]) // eslint-disable-line
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
 
   const dayOk = role === 'clinic_admin' || session.session_day === session.server_today
@@ -1022,11 +1029,11 @@ function AppointmentDetails({ appt, session, onChanged, onToast, onArrived }) {
       })
       if (!ok) return
     }
-    if (note.trim()) d.note = note.trim()
+    if (d.reason !== undefined) d.reason = d.reason.trim()
     setBusy(true)
     try {
       const r = await api.clinic.saveAppointmentDetails(appt.id, d)
-      onToast(r?.message || 'حُفظت التعديلات', 'success'); setNote(''); onChanged()
+      onToast(r?.message || 'حُفظت التعديلات', 'success'); onChanged()
       // «بانتظار الحضور» ⇒ «حاضر» من هذه اللوحة مسارُ حضورٍ كغيره.
       // was_first_arrival من الخادم يمنع الطباعة الثانية عند التبديل ذهاباً وإياباً.
       if (r?.was_first_arrival && onArrived) onArrived({ ...appt, ...(r || {}) }, r)
@@ -1118,8 +1125,8 @@ function AppointmentDetails({ appt, session, onChanged, onToast, onArrived }) {
               <select value={form.status} onChange={set('status')}>
                 {Object.entries(APPOINTMENT_STATUSES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </select></label>
-            <label className="ad-note">ملاحظة (اختيارية)
-              <input value={note} onChange={(e) => setNote(e.target.value)} /></label>
+            <label className="ad-note">ملاحظة الحجز (اختيارية)
+              <input value={form.reason} onChange={set('reason')} disabled={fieldsFrozen} /></label>
           </div>
           <div className="ad-actions">
             <button disabled={busy || !hasChanges} onClick={save}>حفظ التعديلات</button>
@@ -1129,7 +1136,7 @@ function AppointmentDetails({ appt, session, onChanged, onToast, onArrived }) {
             <button className="ghost" disabled={reprinting} onClick={reprint}>
               {reprinting ? 'جارٍ الطباعة…' : '🖨 طباعة البطاقة'}
             </button>
-            {hasChanges && <button className="ghost" onClick={() => { setForm(base()); setNote('') }}>تراجع</button>}
+            {hasChanges && <button className="ghost" onClick={() => setForm(base())}>تراجع</button>}
             {missing.length > 0 && <span className="ad-missing">ينقص: {missing.map((f) => f.label).join('، ')}</span>}
           </div>
         </>
@@ -1225,6 +1232,7 @@ const EDIT_FIELD_LABELS = {
   priority: 'الأولوية', slot_time: 'الخانة الزمنية',
   'patient.full_name': 'اسم المريض', 'patient.mobile': 'الموبايل',
   'patient.gender': 'الجنس', 'patient.birth_year': 'سنة الميلاد',
+  reason: 'ملاحظة الحجز',
 }
 const EDIT_VALUE_LABELS = {
   ...APPOINTMENT_STATUSES, ...VISIT_TYPES,
@@ -1488,7 +1496,7 @@ function AttendanceQueueTable({ data, actions }) {
             <Fragment key={a.id}>
             <tr className={urgentRowClass(a)}>
               <td className="num"><AttendanceNumber appt={a} /><AttendanceBadge priority={a.priority} /></td>
-              <td>{a.full_name} <MissingBadge appt={a} /></td>
+              <td>{a.full_name} <MissingBadge appt={a} /><QueueNote appt={a} /></td>
               <td dir="ltr">{a.mobile || '—'}</td>
               <td>
                 {VISIT_TYPES[a.visit_type] || a.visit_type}
@@ -1884,7 +1892,7 @@ export default function SessionQueue() {
               <Fragment key={a.id}>
               <tr>
                 <td className="num">{a.queue_number}{priorityBadge(a.priority)}</td>
-                <td>{a.full_name}</td>
+                <td>{a.full_name}<QueueNote appt={a} /></td>
                 <td dir="ltr">{a.mobile}</td>
                 <td>
                   {VISIT_TYPES[a.visit_type] || a.visit_type}
