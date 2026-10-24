@@ -24,7 +24,8 @@ const SHOTS = process.env.TICKET_SHOTS || resolve(ROOT, '.ticket-shots')
 mkdirSync(SHOTS, { recursive: true })
 const PORT = Number(process.env.COPIES_TEST_PORT || 5234)
 const BASE = `http://127.0.0.1:${PORT}`
-const HELPER_PORT = 17000 + Math.floor(Math.random() * 900)
+// ★ خارج 17625 (منفذ الوسيط الحقيقيّ على جهازٍ مثبَّتٍ عليه): تصادمٌ كان سيطبع فعلاً
+const HELPER_PORT = 18100 + Math.floor(Math.random() * 800)
 const OLD_PORT = HELPER_PORT + 1
 
 let pass = 0
@@ -103,6 +104,10 @@ const run = async () => {
   }
   if (!up) { console.error('✖ لم يُقلع خادم Vite'); stop(); process.exit(1) }
   ok(/تشغيلٌ جافّ/.test(helperLog), 'الوسيط بتشغيلٍ جافّ — لا شيء يصل طابعة', helperLog.slice(0, 120))
+  // ★ حارس: المجيب على المنفذ هو وسيطنا الجافّ — وإلّا لا طباعة إطلاقاً
+  const hh = await fetch(`http://127.0.0.1:${HELPER_PORT}/health`, { headers: { Origin: BASE } }).then((r) => r.json()).catch(() => ({}))
+  if (hh.dry_run !== true) { console.error('✖ الوسيط على المنفذ ليس جافّاً — توقّف الفحص قبل أيّ طباعة'); stop(); process.exit(1) }
+  ok(hh.dry_run === true, '★ /health يقول dry_run قبل أيّ طلب طباعة')
 
   const browser = await chromium.launch()
   const page = await browser.newPage()

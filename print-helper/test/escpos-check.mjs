@@ -297,7 +297,8 @@ console.log('\n── ١٠) الخادم: نسخٌ في طلبٍ واحد ──
 {
   const dir = mkdtempSync(join(tmpdir(), 'shefaa-dry-'))
   const cfgFile = join(dir, 'cfg.json')
-  const PORT = 17000 + Math.floor(Math.random() * 900)
+  // ★ خارج 17625 (منفذ الوسيط الحقيقيّ): تصادمٌ كان سيرسل الفحص إلى الطابعة
+  const PORT = 18100 + Math.floor(Math.random() * 800)
   writeFileSync(cfgFile, JSON.stringify({ port: PORT, printer: 'DRY-RUN-NO-SUCH-PRINTER', token: 'tk',
     origins: ['http://test.local'], log: join(dir, 'log.txt') }))
   const out = join(dir, 'jobs')
@@ -315,6 +316,9 @@ console.log('\n── ١٠) الخادم: نسخٌ في طلبٍ واحد ──
   try {
     const h = await (await fetch(`${B}/health`, { headers: { Origin: 'http://test.local' } })).json()
     ok(h.version === 2 && h.max_copies === 5, '★ /health: الإصدار ٢ ويقبل حتى ٥ نسخ', JSON.stringify(h))
+    // ★ حارس: لا طلب طباعة إلا لوسيطٍ جافٍّ — وإلّا فالمجيب ليس وسيطنا
+    if (h.dry_run !== true) { console.error('✖ الوسيط على المنفذ ليس جافّاً — توقّف الفحص قبل أيّ طباعة'); srv.kill(); process.exit(1) }
+    ok(h.dry_run === true, '★ /health يقول dry_run قبل أيّ طلب طباعة')
     const r = await fetch(`${B}/print`, { method: 'POST', headers: H, body: JSON.stringify({ images: [url(A), url(Bp)] }) })
     const body = await r.json()
     ok(r.status === 200 && body.copies === 2, '★ images[2] ⇒ 200 ونسختان', JSON.stringify(body))

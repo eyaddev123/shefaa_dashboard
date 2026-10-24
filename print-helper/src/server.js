@@ -241,6 +241,8 @@ const server = http.createServer(async (req, res) => {
     json(res, 200, {
       // version 2: يقبل images[] (نسخٌ في مهمّةٍ واحدة) — الواجهة تقرأ ذلك من ردّ /print
       ok: true, service: 'shefaa-print', version: 2, max_copies: MAX_COPIES,
+      // الفحوص تتحقّق من هذا قبل أيّ طباعة: لا ترسل إلا لوسيطٍ جافٍّ شغّلته هي
+      dry_run: !!DRY_RUN,
       printer: CFG.printer,
       printer_ready: !!(st.known && !st.disabled && !st.offline),
       printer_state: st.text || 'غير معروفة',
