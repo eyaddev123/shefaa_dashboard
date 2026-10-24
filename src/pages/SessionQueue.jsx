@@ -6,6 +6,7 @@ import { useParams } from 'react-router-dom'
 import { api, APPOINTMENT_STATUSES, BOOKING_TYPES, VISIT_TYPES, PRIORITIES, DELAY_CAUSES, WEEKDAYS, addDays, todayLocal, fmtMoney, fmtTime, toLatinDigits } from '../api.js'
 import { AttendanceBadge, urgentRowClass, isAttendanceSession, usePolling, fmtClock, FlowModeTag, FLOW_MODE_LABELS,
   AttendanceNumber, turnLabel, fmtTimeOfDay } from '../attendance-ui.jsx'
+import { attendanceBookedMessage } from '../booking-message.js'
 import { useRole } from '../RoleContext.jsx'
 import { useToast, RecallButton } from '../action-feedback.jsx'
 import { canEditAppointmentProcedures, canEditBooking } from '../permissions.js'
@@ -102,6 +103,21 @@ function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel, urgent = f
   const [busy, setBusy] = useState(false)
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
 
+  // ═══ الوقت التقريبي — معاينةٌ حيّة (نمط الحضور) ═══
+  // ما سيأخذه الحجز لو حُفظ الآن، من الخادم بقواعده نفسها (قراءةٌ بلا قفل). يُحدَّث عند
+  // الفتح، وكل ١٠ ث، وعند تغيّر الأولوية أو الطريقة (الإسعافي الحضوري بلا وقت)، وقبل الإرسال.
+  // الحقيقيّ يُعطى عند الحفظ تحت قفل الجلسة — إن حجز غيرُك بينهما تقول رسالة النجاح «تغيّر من».
+  const [preview, setPreview] = useState(null)   // 'HH:MM' | null
+  const fetchPreview = async () => {
+    if (!attendance) return
+    try {
+      const r = await api.clinic.estimatePreview(sessionId, { priority: form.priority, booking_type: form.booking_type })
+      setPreview(fmtTimeOfDay(r?.estimated_time))
+    } catch { /* المعاينة إرشاد — فشلها لا يمنع الحجز */ }
+  }
+  useEffect(() => { fetchPreview() }, [attendance, sessionId, form.priority, form.booking_type]) // eslint-disable-line react-hooks/exhaustive-deps
+  usePolling(fetchPreview, attendance, 10000)
+
   // ═══ البحث بالاسم هو المدخل الأساسي ═══
   // الموبايل صار اختيارياً عند الحجز، فالبحث به وحده يترك من لا موبايل له بلا
   // طريق للتعرّف عليه — صفٌّ جديد في كل زيارة وتاريخٌ مقطوع. والاسم متاح دائماً.
@@ -161,6 +177,10 @@ function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel, urgent = f
   const submit = async (e) => {
     e.preventDefault()
     setErr(null); setBusy(true)
+    // ما رآه الموظف (وربما قاله للمتّصل) لحظة الضغط — هو ما تُقارَن به رسالة النجاح.
+    // والتحديث قبل الإرسال يُري الوقت الأحدث إن فشل الحجز وبقي النموذج مفتوحاً.
+    const shownAtClick = preview
+    await fetchPreview()
     try {
       const appt = await api.clinic.book(sessionId, {
         ...form,
@@ -168,7 +188,7 @@ function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel, urgent = f
         slot_time: slotTime || undefined,
         followup_override_reason: needsOverride ? (override || null) : undefined,
       })
-      onBooked(appt)
+      onBooked(attendance ? { ...appt, preview_estimated_time: shownAtClick } : appt)
     } catch (ex) {
       setErr(ex.message)
       // السيرفر يعيد تفاصيل عدم الأهلية — نعرضها ونفتح خانة سبب التجاوز
@@ -184,6 +204,9 @@ function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel, urgent = f
 
   return (
     <form className="booking-form" onSubmit={submit}>
+      {attendance && preview && (
+        <p className="bf-estimate" aria-live="polite">الوقت التقريبي: <strong dir="ltr">{preview}</strong></p>
+      )}
       {/* ═══ صفّ الهوية: الاسم هو المدخل الأساسي فيأخذ عرضاً أكبر ═══ */}
       <div className="bf-row bf-row-identity">
         <div className="field bf-name">
@@ -1579,11 +1602,8 @@ export default function SessionQueue() {
     if (data?.show_booking_ticket) { setTicket(appt); return }
     // نمط الحضور: لا رقم دور عند الحجز — رقم الحجز والوقت التقريبي (ورقم الدور إن حضر
     // فوراً: الإسعافي الحضوري). أطول بقاءً: الموظف ينقل الوقت للمريض على الهاتف.
-    if (attendance) {
-      const t = fmtTimeOfDay(appt.estimated_time)
-      showToast(`تم الحجز — رقم الحجز ${appt.queue_number}${t ? ` · الوقت التقريبي: ${t}` : ''}`
-        + `${appt.arrival_number != null ? ` · الدور ${appt.arrival_number}` : ''}`, 'success', 9000)
-    } else showToast(`تم الحجز — الدور ${appt.queue_number}`, 'success', 4000)
+    if (attendance) showToast(attendanceBookedMessage(appt), 'success', 9000)
+    else showToast(`تم الحجز — الدور ${appt.queue_number}`, 'success', 4000)
     load()
   }
 
