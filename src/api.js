@@ -210,11 +210,13 @@ export const api = {
     updateReferralSource: (id, body) =>
       http(`/clinic/referral-sources/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
     deleteReferralSource: (id) => http(`/clinic/referral-sources/${id}`, { method: 'DELETE' }),
-    // الورقة كاملةً تحلّ محلّ السابقة؛ والخادم يُعيد الحساب
-    setReferral: (appointmentId, body) =>
-      http(`/clinic/appointments/${appointmentId}/referral`, { method: 'PUT', body: JSON.stringify(body) }),
-    removeReferral: (appointmentId, reason) =>
-      http(`/clinic/appointments/${appointmentId}/referral`, { method: 'DELETE', body: JSON.stringify({ reason }) }),
+    // حتى إحالتين للزيارة بلا تداخل؛ كل كتابة يُعيد الخادم بها الحساب (والتداخل 409)
+    addReferral: (appointmentId, body) =>
+      http(`/clinic/appointments/${appointmentId}/referrals`, { method: 'POST', body: JSON.stringify(body) }),
+    updateReferral: (appointmentId, refId, body) =>
+      http(`/clinic/appointments/${appointmentId}/referrals/${refId}`, { method: 'PUT', body: JSON.stringify(body) }),
+    removeReferral: (appointmentId, refId, reason) =>
+      http(`/clinic/appointments/${appointmentId}/referrals/${refId}`, { method: 'DELETE', body: JSON.stringify({ reason }) }),
     referralReport: ({ from, to, sourceId }) => {
       const q = new URLSearchParams({ from, to: to || from })
       if (sourceId) q.set('source_id', String(sourceId))

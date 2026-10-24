@@ -2347,3 +2347,15 @@ table.ref-totals { max-width: 560px; margin-bottom: 16px; }
 .ref-doc-pct { font-size: 11px; margin-inline-start: 4px; }
 /* التاريخ والمبالغ لا تنكسر على سطرين — الاسم والجهة يلتفّان بدلاً منها */
 table.ref-dues td.num, table.ref-totals td.num { white-space: nowrap; }
+
+/* ═══ حتى إحالتين: سطرٌ لكل إحالة ═══ */
+.ref-item { display: flex; flex-direction: column; gap: 6px; }
+.ref-item + .ref-item { padding-top: 10px; border-top: 1px dashed var(--border); }
+.ref-item-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; font-size: 12.5px; color: var(--text-secondary); }
+.ref-item-foot strong { color: var(--text-primary); }
+.ref-waiting { font-size: 12px; color: var(--status-pending); }
+.ref-add { align-self: flex-start; font-size: 12.5px; }
+.ad-referral { flex-direction: column; align-items: stretch; }
+.ad-ref-head { display: flex; gap: 10px; align-items: baseline; }
+.ad-ref-line { display: flex; flex-wrap: wrap; justify-content: flex-start; align-items: center; gap: 4px 14px; }
+.ad-ref-edit { padding: 10px 12px; border-radius: 10px; background: var(--primary-soft); }
