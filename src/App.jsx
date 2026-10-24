@@ -3,7 +3,7 @@ import { Navigate, NavLink, Route, Routes, useLocation, useNavigate } from 'reac
 import { RoleProvider, useRole } from './RoleContext.jsx'
 import {
   canManageUsers, canReadAid, canSearchAid, canSeeClinicBoard, canSeeDoctorsPage,
-  canSeeDoctorScreen, canSeeSettings, canSeeProceduresPage, canSeePrinterSetup, homePathFor,
+  canSeeDoctorScreen, canSeeSettings, canSeeProceduresPage, canSeePrinterSetup, canSeeReferralsPage, homePathFor,
 } from './permissions.js'
 import { ROLE_LABELS } from './api.js'
 import ThemeToggle from './components/ThemeToggle.jsx'
@@ -28,6 +28,7 @@ import Settings from './pages/Settings.jsx'
 import PrinterSetup from './pages/PrinterSetup.jsx'
 import Users from './pages/Users.jsx'
 import ClinicBoard from './pages/ClinicBoard.jsx'
+import ClinicReferrals from './pages/ClinicReferrals.jsx'
 import ClinicProcedures from './pages/ClinicProcedures.jsx'
 import SessionQueue from './pages/SessionQueue.jsx'
 import DoctorScreen from './pages/DoctorScreen.jsx'
@@ -108,6 +109,7 @@ function Sidebar({ onNavigate }) {
         {(role === 'officer' || role === 'accountant') && <NavLink to="/reconciliation">{I.sync} مطابقة الأمين</NavLink>}
         {canSeeDoctorsPage(role) && <NavLink to="/clinic/doctors">{I.clinic} العيادات — الدكاترة والدوام</NavLink>}
         {canSeeProceduresPage(role) && <NavLink to="/clinic/procedures">{I.clinic} العيادات — الإجراءات</NavLink>}
+        {canSeeReferralsPage(role) && <NavLink to="/clinic/referrals">{I.clinic} العيادات — الإحالات</NavLink>}
         {canSeeClinicBoard(role) && <NavLink to="/clinic/board">{I.clinic} لوحة العيادات اليومية</NavLink>}
         {canSeeDoctorScreen(role) && <NavLink to="/clinic/doctor">{I.clinic} شاشتي</NavLink>}
         {canManageUsers(role) && <NavLink to="/users">{I.users} الموظفون والصلاحيات</NavLink>}
@@ -200,6 +202,8 @@ function Shell() {
             <Guard allow={canSeeDoctorsPage}><DoctorProfile /></Guard>} />
           <Route path="/clinic/procedures" element={
             <Guard allow={canSeeProceduresPage}><ClinicProcedures /></Guard>} />
+          <Route path="/clinic/referrals" element={
+            <Guard allow={canSeeReferralsPage}><ClinicReferrals /></Guard>} />
           <Route path="/clinic/board" element={
             <Guard allow={canSeeClinicBoard}><ClinicBoard /></Guard>} />
           <Route path="/clinic/session/:id" element={

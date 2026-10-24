@@ -9,7 +9,9 @@ import { AttendanceBadge, urgentRowClass, isAttendanceSession, usePolling, fmtCl
 import { attendanceBookedMessage } from '../booking-message.js'
 import { useRole } from '../RoleContext.jsx'
 import { useToast, RecallButton } from '../action-feedback.jsx'
-import { canEditAppointmentProcedures, canEditBooking } from '../permissions.js'
+import { canEditAppointmentProcedures, canEditBooking, canEditReferral } from '../permissions.js'
+import ReferralFields from '../components/ReferralFields.jsx'
+import { blankReferral, referralFromAppt, referralPayload, referralReady, referralSummary } from '../referral.js'
 import MaterialsEditor, { qtyValid, toPayload, fmtQty, materialsSummary } from '../components/MaterialsEditor.jsx'
 
 // شارة الأولوية — تُبرز من يتقدّم الطابور وسببه
@@ -99,6 +101,7 @@ function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel, urgent = f
   const [lookupState, setLookupState] = useState(null) // null | 'checking' | 'found' | 'new'
   const [followup, setFollowup] = useState(null)       // أهليّة المراجعة للمريض الحالي
   const [override, setOverride] = useState(null)       // سبب تجاوز شرط المراجعة (يملؤه المشرف)
+  const [referral, setReferral] = useState(blankReferral)   // ورقة الإحالة (مطويّة افتراضاً)
   const [err, setErr] = useState(null)
   const [busy, setBusy] = useState(false)
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
@@ -187,6 +190,7 @@ function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel, urgent = f
         birth_year: form.birth_year ? Number(form.birth_year) : null,
         slot_time: slotTime || undefined,
         followup_override_reason: needsOverride ? (override || null) : undefined,
+        referral: referralPayload(referral) || undefined,
       })
       onBooked(attendance ? { ...appt, preview_estimated_time: shownAtClick } : appt)
     } catch (ex) {
@@ -351,8 +355,11 @@ function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel, urgent = f
         </div>
       )}
 
+      {/* الإحالة: خانةٌ واحدة في الحالة العادية — تنفتح لمن معه ورقة */}
+      <ReferralFields value={referral} onChange={setReferral} amounts={{ fee, lines: [] }} disabled={busy} />
+
       <div className="bf-actions">
-        <button type="submit" disabled={busy}>{busy ? 'جارٍ الحجز…' : 'حجز دور'}</button>
+        <button type="submit" disabled={busy || !referralReady(referral)}>{busy ? 'جارٍ الحجز…' : 'حجز دور'}</button>
         {onCancel && <button type="button" className="ghost" onClick={onCancel}>إلغاء</button>}
       </div>
       {err && <p className="error">{err}</p>}
@@ -929,8 +936,25 @@ function DoctorArrivalCard({ data, onChanged, onError }) {
 // بلا إجراءات: سعر الزيارة كما كان. ومعها ثلاثة أسطر: المعاينة، الإجراءات، الإجمالي.
 // كلماتٌ لا «+» و«=»: الرمز المحايد في أول سطرٍ عربي ينقلب موضعه بخوارزمية الاتجاه.
 // للعرض وحده — لا شيء يُكتب في الخزينة.
+// الإحالة: الأصل مشطوباً ← المطلوب بعد الخصم، وشارة «إحالة» باسم الجهة — فالموظف يستوفي
+// ما بعد الخصم لا السعر الأصلي. (الطبيب لا يتسلّم حقل الإحالة أصلاً فلا يرى شيئاً منها.)
+function ReferralBadge({ appt }) {
+  const r = appt.referral
+  if (!r) return null
+  return <span className="badge sm ref-badge" title={`${r.source_name} · ${referralSummary(r)}`}>إحالة</span>
+}
 function FeeCell({ appt }) {
-  if (!appt.procedures_total) return <>{fmtMoney(appt.fee)}</>
+  const r = appt.referral
+  if (!appt.procedures_total) {
+    if (!r) return <>{fmtMoney(appt.fee)}</>
+    return (
+      <span className="fee-breakdown">
+        <span>{appt.referral_discount > 0 && <><s className="muted">{fmtMoney(appt.fee)}</s> ← </>}
+          <strong>{fmtMoney(appt.patient_total)}</strong></span>
+        <ReferralBadge appt={appt} />
+      </span>
+    )
+  }
   // ═══ سطر العمل للاستقبال ═══
   // المبالغ وحدها تقول «كم»، ولا تقول «افعل». والموظف يحتاج جملةً صريحة:
   // أيّ إجراءٍ أُضيف وكم يُستوفى زيادةً — وإلا مرّ المريض بلا دفع الفرق.
@@ -940,10 +964,18 @@ function FeeCell({ appt }) {
     <span className="fee-breakdown">
       <span>{VISIT_TYPES[appt.visit_type] || 'زيارة'} {fmtMoney(appt.fee)}</span>
       <span>إجراءات {fmtMoney(appt.procedures_total)}</span>
-      <strong>الإجمالي {fmtMoney(appt.total)}</strong>
+      {/* سطران لا سطرٌ واحد: الأصل مشطوباً ثمّ المطلوب — فلا يتّسع العمود فيضيق الاسم */}
+      {r && appt.referral_discount > 0 ? (
+        <>
+          <span><s>الإجمالي {fmtMoney(appt.total)}</s></span>
+          <strong>المطلوب {fmtMoney(appt.patient_total)}</strong>
+        </>
+      ) : <strong>الإجمالي {fmtMoney(appt.total)}</strong>}
+      {r && <ReferralBadge appt={appt} />}
       {names && (
         <span className="fee-action">
-          إجراء: {names} — خذي {fmtMoney(appt.procedures_total)} زيادة
+          {/* بعد خصم الإحالة على الإجراءات (إن شملها النطاق) — ما يُستوفى فعلاً */}
+          إجراء: {names} — خذي {fmtMoney(r ? appt.patient_total - appt.patient_fee : appt.procedures_total)} زيادة
         </span>
       )}
     </span>
@@ -1141,6 +1173,8 @@ function AppointmentDetails({ appt, session, onChanged, onToast, onArrived }) {
         </p>
       )}
 
+      <ReferralSection appt={appt} session={session} onChanged={onChanged} onToast={onToast} />
+
       <AppointmentProcedures appt={appt} session={session} onChanged={onChanged} onToast={onToast} />
 
       <div className="ad-links">
@@ -1155,6 +1189,79 @@ function AppointmentDetails({ appt, session, onChanged, onToast, onArrived }) {
       {swap && <SwapPatient appt={appt} onToast={onToast}
         onDone={() => { setSwap(false); onChanged() }} onCancel={() => setSwap(false)} />}
       {showHistory && <BookingHistory appt={appt} session={session} onToast={onToast} />}
+    </div>
+  )
+}
+
+// ═══ الإحالة على الزيارة — عند الحجز أو الحضور، وتُعدَّل قبل نهاية يوم الجلسة ═══
+// الاستقبال في يوم الجلسة، والمشرف أي وقت (الخادم هو الحارس). كل حفظٍ يُعيد الخادمُ به
+// حساب الخصم على الكشف وكل إجراء — والطابور يُحدَّث من ردّه لا من حساب الواجهة.
+function ReferralSection({ appt, session, onChanged, onToast }) {
+  const { role } = useRole()
+  const dlg = useDialogs()
+  const r = appt.referral
+  const [editing, setEditing] = useState(false)
+  const [form, setForm] = useState(() => referralFromAppt(r))
+  const [busy, setBusy] = useState(false)
+  useEffect(() => { if (!editing) setForm(referralFromAppt(appt.referral)) }, [appt.referral, editing]) // eslint-disable-line
+
+  const dayOk = role === 'clinic_admin' || session.session_day === session.server_today
+  const canEdit = canEditReferral(role) && dayOk && !['cancelled', 'postponed'].includes(appt.status)
+  const amounts = {
+    fee: appt.fee,
+    lines: (appt.procedures || []).filter((l) => !l.removed_at).map((l) => ({ id: l.id, price: l.price })),
+  }
+  // البطاقة طُبعت قبل الإحالة؟ فمبلغها قديم — نقولها صراحةً بدل أن يدفع المريض الأصل
+  const printedNote = appt.first_arrived_at ? ' — البطاقة طُبعت قبلها: أعِد طباعتها بالمبلغ الجديد' : ''
+
+  const save = async () => {
+    setBusy(true)
+    try {
+      await api.clinic.setReferral(appt.id, referralPayload({ ...form, enabled: true }))
+      onToast(`${r ? 'عُدّلت الإحالة' : 'سُجّلت الإحالة'}${printedNote}`, 'success')
+      setEditing(false); onChanged()
+    } catch (ex) { onToast(ex.message) } finally { setBusy(false) }
+  }
+  const remove = async () => {
+    const ok = await dlg.confirm({ title: 'إزالة الإحالة',
+      body: `إزالة إحالة «${r.source_name}» عن ${appt.full_name || 'هذا الحجز'}؟ يعود المطلوب إلى السعر الكامل.`,
+      confirmLabel: 'إزالة', cancelLabel: 'تراجع', danger: true })
+    if (!ok) return
+    setBusy(true)
+    try { await api.clinic.removeReferral(appt.id); onToast(`أُزيلت الإحالة${printedNote}`, 'success'); onChanged() }
+    catch (ex) { onToast(ex.message) } finally { setBusy(false) }
+  }
+
+  if (editing) return (
+    <div className="ad-referral editing">
+      <ReferralFields value={{ ...form, enabled: true }} onChange={setForm} amounts={amounts} current={r}
+        collapsible={false} disabled={busy} />
+      <div className="ad-actions">
+        <button disabled={busy || !referralReady({ ...form, enabled: true })} onClick={save}>
+          {busy ? 'جارٍ الحفظ…' : 'حفظ الإحالة'}</button>
+        <button className="ghost" disabled={busy} onClick={() => setEditing(false)}>إلغاء</button>
+      </div>
+    </div>
+  )
+  if (!r) return canEdit ? (
+    <div className="ad-referral empty-ref">
+      <button className="link-btn" onClick={() => setEditing(true)}>+ معه إحالة؟</button>
+    </div>
+  ) : null
+  return (
+    <div className="ad-referral">
+      <span className="ad-ref-line">
+        <b>إحالة</b> {r.source_name} · {referralSummary(r)}
+        {r.referral_doc_number && <> · الورقة <span dir="auto">{r.referral_doc_number}</span></>}
+        {' · '}خصم {fmtMoney(appt.referral_discount)} · المطلوب <strong>{fmtMoney(appt.patient_total)}</strong>
+        {r.referral_note && <span className="muted"> — {r.referral_note}</span>}
+      </span>
+      {canEdit && (
+        <span className="ad-ref-actions">
+          <button className="link-btn" disabled={busy} onClick={() => setEditing(true)}>تعديل</button>
+          <button className="link-btn" disabled={busy} onClick={remove}>إزالة</button>
+        </span>
+      )}
     </div>
   )
 }
@@ -1221,7 +1328,7 @@ function SwapPatient({ appt, onToast, onDone, onCancel }) {
 
 // ═══ سجلّ تعديلات الحجز — يُفتح بالضغط لا تلقائياً ═══
 const EDIT_FIELD_LABELS = {
-  status: 'الحالة', patient_id: 'المريض', visit_type: 'نوع الزيارة', fee: 'الأجر',
+  status: 'الحالة', patient_id: 'المريض', visit_type: 'نوع الزيارة', fee: 'الأجر', referral: 'الإحالة',
   priority: 'الأولوية', slot_time: 'الخانة الزمنية',
   'patient.full_name': 'اسم المريض', 'patient.mobile': 'الموبايل',
   'patient.gender': 'الجنس', 'patient.birth_year': 'سنة الميلاد',
@@ -1424,6 +1531,9 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
         <p className="appt-procs-total">
           {VISIT_TYPES[appt.visit_type] || 'زيارة'} {fmtMoney(appt.fee)} + إجراءات {fmtMoney(appt.procedures_total || 0)}
           {' '}= <strong>{fmtMoney(appt.total ?? appt.fee)}</strong>
+          {appt.referral && appt.referral_discount > 0 && (
+            <> · بعد الإحالة <strong>{fmtMoney(appt.patient_total)}</strong></>
+          )}
         </p>
       )}
       {canEditAppointmentProcedures(role) && (

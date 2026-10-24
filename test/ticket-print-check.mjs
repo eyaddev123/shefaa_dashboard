@@ -74,6 +74,32 @@ console.log('\n── ١ب) الرقم المطبوع ──')
   await page.close()
 }
 
+// ═══ ١ج) الإحالة: البطاقة تحمل ما يدفعه المريض بعد الخصم — بلا كلمة «خصم» ═══
+console.log('\n── ١ج) بطاقة مريضٍ بإحالة ──')
+{
+  const page = await browser.newPage()
+  await page.addScriptTag({ content: src })
+  const r = await page.evaluate(() => {
+    // صفّ طابورٍ كما يرسله الخادم للاستقبال: الأصل + المطلوب بعد خصم الإحالة
+    const row = { queue_number: 4, full_name: 'أحمد محمود الخطيب', visit_type: 'consultation',
+      fee: '20000.00', patient_fee: 10000,
+      referral: { source_name: 'جمعية الشفاء - المساعدات' },
+      procedures: [
+        { id: 1, name: 'قلع', price: '50000.00', patient_price: 25000 },
+        { id: 2, name: 'حشوة', price: '30000.00', patient_price: 30000, removed_at: null },
+      ] }
+    const t = ticketFrom(row, { flow_mode: 'slots', doctor_name: 'د. كمال', room: '2' })
+    const plain = ticketFrom({ queue_number: 5, fee: '20000.00', procedures: [] }, { flow_mode: 'slots' })
+    return { t, plain, html: ticketHtml(t, 80), plainHtml: ticketHtml(plain, 80) }
+  })
+  ok(r.t.fee === 10000 && r.t.procedures[0].price === 25000, '★ البطاقة تأخذ المطلوب بعد الخصم', JSON.stringify(r.t))
+  ok(r.html.includes('65,000 ل.س'), '★ «المجموع للدفع» = 10,000 + 25,000 + 30,000 = 65,000')
+  ok(!r.html.includes('20,000') && !r.html.includes('50,000') && !r.html.includes('105,000'), '★ ولا مبلغٌ أصلي على البطاقة')
+  ok(!r.html.includes('خصم') && !r.html.includes('إحالة') && !r.html.includes('جمعية'), '★ ولا كلمة «خصم» ولا اسم الجهة')
+  ok(r.plain.fee === '20000.00' && r.plainHtml.includes('20,000 ل.س'), 'بلا إحالة (ردٌّ بلا patient_fee): الأصل كما كان')
+  await page.close()
+}
+
 console.log('\n── ٢) محتوى البطاقة ──')
 {
   const page = await browser.newPage()

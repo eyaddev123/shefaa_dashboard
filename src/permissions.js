@@ -44,6 +44,11 @@ export const canSeePrinterSetup = (role) => role === 'clinic_admin' || role === 
 // والخادم هو الحارس — هذا لإخفاء ما لا يُفيد الضغط عليه.
 export const canEditBooking = (role) => role === 'clinic_admin' || role === 'clinic_reception'
 
+// الإحالات: إدارة الجهات وتقرير المستحقات — مشرف العيادات وحده (الخادم يردّ غيره 403).
+// وتسجيل الإحالة على زيارة للاستقبال والمشرف (نفس canEditBooking). الطبيب لا يرى شيئاً.
+export const canSeeReferralsPage = (role) => role === 'clinic_admin'
+export const canEditReferral = (role) => role === 'clinic_admin' || role === 'clinic_reception'
+
 // شاشة الطبيب الخاصة — مربوطة بسجلّ دكتور، فلا معنى لها لغير الطبيب
 export const canSeeDoctorScreen = (role) => role === 'doctor'
 
@@ -71,6 +76,7 @@ export const ROUTE_ACCESS = {
   '/search': canSearchAid,
   '/clinic/doctors': canSeeDoctorsPage,
   '/clinic/procedures': canSeeProceduresPage,
+  '/clinic/referrals': canSeeReferralsPage,
   '/clinic/board': canSeeClinicBoard,
   '/clinic/session': canSeeClinicBoard,
   '/clinic/doctor': canSeeDoctorScreen,

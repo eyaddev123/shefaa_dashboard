@@ -2289,3 +2289,61 @@ button.danger:hover:not(:disabled) { filter: brightness(1.08); }
 /* عدد النسخ: القائمة بعرض حقل الورق، والشرح تحتها بعرضٍ مريح */
 .ps-copies { max-width: 460px; }
 .ps-copies select { max-width: 220px; }
+
+/* ═══ الإحالة — قسمٌ مطويّ في نموذج الحجز وفي تفاصيل الحجز ═══
+   مطويّاً: خانةٌ واحدة «معه إحالة؟» بلا إطار، فلا يطول النموذج على الحالة العادية.
+   مفتوحاً: إطارٌ هادئ بلون السمة، وصفّ حقولٍ بشبكة النموذج نفسها، ثمّ المطلوب من المريض. */
+.ref-box { display: flex; flex-direction: column; gap: 10px; }
+.ref-box.open { padding: 12px 14px; border-radius: 12px; background: var(--primary-soft);
+  border: 1px solid var(--border); }
+.ref-toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600;
+  color: var(--text-secondary); cursor: pointer; width: fit-content; }
+.ref-toggle input { width: 16px; height: 16px; margin: 0; accent-color: var(--primary); }
+.ref-row {
+  grid-template-columns:
+    minmax(170px, 1.6fr)   /* الجهة — أطول القيم */
+    minmax(110px, 0.9fr)   /* نوع الخصم */
+    minmax(100px, 0.8fr)   /* القيمة */
+    minmax(130px, 1fr)     /* النطاق */
+    minmax(100px, 0.8fr)   /* رقم الورقة */
+    minmax(140px, 1.3fr);  /* ملاحظة */
+}
+.ref-box .field { display: flex; flex-direction: column; gap: 5px; min-width: 0; margin: 0; }
+.ref-box .field label { font-size: 11.5px; color: var(--muted); }
+.ref-box .field input, .ref-box .field select { width: 100%; box-sizing: border-box; }
+.ref-box .field .hint { margin: 0; }
+.ref-due { margin: 0; font-size: 13.5px; color: var(--text-secondary); }
+.ref-due strong { font-size: 16px; color: var(--accent-text); }
+.ref-due s { margin-inline-start: 2px; }
+.ref-due-note { font-size: 12px; }
+@media (max-width: 1100px) { .ref-row { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 720px)  { .ref-row { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 480px)  { .ref-row { grid-template-columns: 1fr; } }
+
+/* شارة «إحالة» على عمود السعر — بلون السمة لا بلون تحذير: ليست مشكلة */
+.badge.ref-badge { color: var(--accent-text); background: var(--primary-soft); align-self: flex-start; }
+.badge.ref-badge::before { background: var(--accent-text); }
+
+/* سطر الإحالة في تفاصيل الحجز */
+.ad-referral { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 14px;
+  margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--grid); font-size: 12.5px;
+  color: var(--text-secondary); }
+.ad-referral b { font-weight: 600; color: var(--muted); font-size: 11.5px; margin-inline-end: 4px; }
+.ad-referral strong { color: var(--text-primary); }
+.ad-referral.editing { display: block; }
+.ad-referral.empty-ref { justify-content: flex-start; }
+.ad-ref-actions { display: inline-flex; gap: 10px; }
+
+/* صفحة الإحالات */
+.ref-source-form { display: grid; grid-template-columns: minmax(0, 420px) auto; gap: 10px; align-items: end; }
+.ref-source-form .field { min-width: 0; margin: 0; }
+.ref-source-form input { box-sizing: border-box; height: var(--field-h); width: 100%; }
+@media (max-width: 560px) { .ref-source-form { grid-template-columns: 1fr; } }
+.ref-due-total { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; margin: 14px 0;
+  padding: 12px 16px; border-radius: 12px; background: var(--primary-soft); color: var(--text-secondary); }
+.ref-due-total strong { font-size: 22px; color: var(--accent-text); }
+.ref-due-total .muted { font-size: 12px; }
+table.ref-totals { max-width: 560px; margin-bottom: 16px; }
+.ref-doc-pct { font-size: 11px; margin-inline-start: 4px; }
+/* التاريخ والمبالغ لا تنكسر على سطرين — الاسم والجهة يلتفّان بدلاً منها */
+table.ref-dues td.num, table.ref-totals td.num { white-space: nowrap; }

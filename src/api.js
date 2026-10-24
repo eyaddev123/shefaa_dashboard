@@ -202,6 +202,29 @@ export const api = {
       if (clinicId) q.set('clinic_id', clinicId)
       return downloadFile(`/api/reception/cash-report?${q}`, `jard-${date}.xlsx`)
     },
+    // ═══ الإحالات ═══
+    // قائمة الاختيار (الفعّالة) للاستقبال والمشرفة؛ والإدارة والتقرير للمشرفة وحدها
+    referralOptions: () => http('/clinic/referral-sources/options'),
+    referralSources: () => http('/clinic/referral-sources'),
+    addReferralSource: (body) => http('/clinic/referral-sources', { method: 'POST', body: JSON.stringify(body) }),
+    updateReferralSource: (id, body) =>
+      http(`/clinic/referral-sources/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+    deleteReferralSource: (id) => http(`/clinic/referral-sources/${id}`, { method: 'DELETE' }),
+    // الورقة كاملةً تحلّ محلّ السابقة؛ والخادم يُعيد الحساب
+    setReferral: (appointmentId, body) =>
+      http(`/clinic/appointments/${appointmentId}/referral`, { method: 'PUT', body: JSON.stringify(body) }),
+    removeReferral: (appointmentId, reason) =>
+      http(`/clinic/appointments/${appointmentId}/referral`, { method: 'DELETE', body: JSON.stringify({ reason }) }),
+    referralReport: ({ from, to, sourceId }) => {
+      const q = new URLSearchParams({ from, to: to || from })
+      if (sourceId) q.set('source_id', String(sourceId))
+      return http(`/clinic/referrals/report?${q}`)
+    },
+    exportReferralReport: ({ from, to, sourceId }) => {
+      const q = new URLSearchParams({ from, to: to || from })
+      if (sourceId) q.set('source_id', String(sourceId))
+      return downloadFile(`/api/clinic/referrals/report/export?${q}`, `مستحقات-الإحالات-${from}.xlsx`)
+    },
     // تصدير بيانات العيادة (انظر downloadFile)
     exportExcel: ({ from, to, doctorId }) => {
       const q = new URLSearchParams({ from, to: to || from })

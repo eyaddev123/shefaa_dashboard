@@ -280,14 +280,18 @@ function printOneTicket(data, width = 80, doc = document, copy = null) {
 // ★ نمط الحضور: البطاقة تُطبع عند الحضور وتحمل **رقم الدور** (arrival_number) لا رقم
 // الحجز — الرقم الذي تعرضه الصالة وتنطقه. (منطقٌ مُضمَّن لا استيراد: فحص البطاقة يحقن
 // هذا الملف في صفحة بلا وحدات.)
+// ★ الإحالة: البطاقة تحمل ما يدفعه المريض فعلاً — بعد الخصم، بلا كلمة «خصم» ولا اسم الجهة.
+// patient_fee و patient_price يرسلهما الخادم مع صفّ الطابور (للاستقبال وحده)؛ وبلا إحالة
+// يساويان الأصل، وفي غيابهما (ردٌّ قديم) يُطبع الأصل كما كان.
 export const ticketFrom = (appt, session) => ({
   queue_number: session?.flow_mode === 'attendance'
     ? (appt.arrival_number ?? appt.queue_number) : appt.queue_number,
   full_name: appt.full_name,
   birth_year: appt.birth_year,
   visit_type: appt.visit_type,
-  fee: appt.fee,
-  procedures: appt.procedures,
+  fee: appt.patient_fee ?? appt.fee,
+  procedures: (appt.procedures || []).map((p) =>
+    (p.patient_price != null ? { ...p, price: p.patient_price } : p)),
   doctor_name: session?.doctor_name,
   room: session?.room,
 })
