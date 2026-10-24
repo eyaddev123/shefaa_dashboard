@@ -44,6 +44,11 @@ export const canSeePrinterSetup = (role) => role === 'clinic_admin' || role === 
 // والخادم هو الحارس — هذا لإخفاء ما لا يُفيد الضغط عليه.
 export const canEditBooking = (role) => role === 'clinic_admin' || role === 'clinic_reception'
 
+// «خروج مؤقت» ونداء العودة من شاشة الاستقبال: مشرف العيادات وحده، صلاحيةَ طوارئ
+// (طبيبٌ غادر ومريضه «خارج»، أو جهازه تعطّل). الطبيب يفعلها من شاشته، والاستقبال لا:
+// قرارٌ طبّي داخل الغرفة. والخادم هو الحارس — هذا لإظهار الزرّ وحده.
+export const canStepOutAsSupervisor = (role) => role === 'clinic_admin'
+
 // شاشة الطبيب الخاصة — مربوطة بسجلّ دكتور، فلا معنى لها لغير الطبيب
 export const canSeeDoctorScreen = (role) => role === 'doctor'
 

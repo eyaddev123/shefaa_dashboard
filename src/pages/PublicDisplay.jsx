@@ -24,6 +24,15 @@ const RETRY_MS = [1000, 2000, 5000, 10000, 30000]
 // أولاً ثمّ ترتيب الحضور) — فلا نُعيد ترتيبه هنا ولا نكشف سببه.
 export const waitingOf = (b) => (b.queue || []).filter((q) => q.arrived)
 
+// ═══ «بانتظار العودة» ═══
+// خرجوا مؤقتاً (قطرة، صورة…) وسيُنادَون ليُكملوا: ليسوا في «التالي» ولا «يُخدَم الآن».
+// سطرٌ هادئ أسفل البطاقة بأرقامهم فقط — بلا وميض ولا لون لافت. والحقل يغيب عن خادمٍ
+// أقدم، فالغياب = لا أحد.
+export const returningOf = (b) => b.returning || []
+
+// يُعاد القياس حين يظهر السطر أو يختفي (يتغيّر توزيع البطاقة)
+const anyReturningKey = (d) => ((d && d.board) || []).some((b) => !b.closed && returningOf(b).length > 0)
+
 const two = (n) => String(n).padStart(2, '0')
 const AR_DAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
 const AR_MONTHS = ['كانون الثاني', 'شباط', 'آذار', 'نيسان', 'أيار', 'حزيران',
@@ -156,7 +165,7 @@ export default function PublicDisplay() {
       ro.observe(gridRef.current)
     }
     return () => { if (ro) ro.disconnect() }
-  }, [viewH, data?.board?.length, !!data?.urgent_delays, audioReady, showSettings, err])
+  }, [viewH, data?.board?.length, !!data?.urgent_delays, audioReady, showSettings, err, anyReturningKey(data)])
 
   // ── وميض البطاقة عند تغيّر رقمها ──
   const flashDoctor = useCallback((key) => {
@@ -309,7 +318,10 @@ export default function PublicDisplay() {
   const GAP = 10
   const cardW = grid.cols ? (gridBox.w - GAP * (grid.cols - 1)) / grid.cols : 0
   const cardH = grid.rows ? (gridBox.h - GAP * (grid.rows - 1)) / grid.rows : 0
-  const fonts = cardFonts(cardW, cardH)
+  // سطر «بانتظار العودة» يُحجز ارتفاعه في كل البطاقات معاً متى وُجد في إحداها:
+  // المقاسات واحدة للشبكة كلّها، فلا تختلف بطاقةٌ عن جارتها في حجم رقمها.
+  const anyReturning = (data?.board || []).some((b) => !b.closed && returningOf(b).length > 0)
+  const fonts = cardFonts(cardW, cardH, { extraRow: anyReturning })
   // متغيّرات CSS: قيمٌ بالبكسل محسوبة هنا، فتعمل على Chrome 66 بلا container queries
   // ═══ كم رقماً يتّسع في البطاقة؟ ═══
   // يُحسب من التخطيط لا يُقاس بعد الرسم: القياس يأتي متأخّراً دورةً فتُعرض
@@ -323,7 +335,10 @@ export default function PublicDisplay() {
     const perLine = Math.max(1, Math.floor(usable / chipW))
     // سطران كحدٍّ أقصى: أكثر من ذلك يزاحم الرقم الضخم أو يدفع الغرفة خارج البطاقة
     const lines = cardH > 420 ? 2 : 1
-    return Math.max(1, perLine * lines)
+    // «بانتظار العودة» داخل الصفّ نفسه (البطاقة الأضيق): نترك له مكان كلمته وأرقامه
+    const inlineReturn = fonts.returningInline
+      ? Math.max(0, ...(data?.board || []).map((b) => returningOf(b).length)) + 2 : 0
+    return Math.max(1, perLine * lines - inlineReturn)
   })()
 
   const fontVars = fonts ? {
@@ -463,7 +478,7 @@ export default function PublicDisplay() {
                   تمييزه على شاشةٍ عامة يكشف واقعةً طبية عن شخصٍ بعينه.
                   والحاضرون وحدهم: من حجز ولم يحضر ليس في الطابور بعد. */}
               {!b.closed && (
-                <div className="pd-waiting">
+                <div className={`pd-waiting${fonts?.returningInline && returningOf(b).length > 0 ? ' pd-waiting-oneline' : ''}`}>
                   {waitingOf(b).length === 0 ? (
                     <span className="pd-up-label pd-dim">لا أحد بانتظار الدور</span>
                   ) : (
@@ -482,6 +497,23 @@ export default function PublicDisplay() {
                       </span>
                     </>
                   )}
+                  {fonts?.returningInline && returningOf(b).length > 0 && (
+                    <span className="pd-returning-inline">
+                      <span className="pd-returning-label">عودة:</span>
+                      {returningOf(b).map((q) => (
+                        <span key={q.queue_number} className="pd-returning-num">{q.queue_number}</span>
+                      ))}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {!b.closed && !fonts?.returningInline && returningOf(b).length > 0 && (
+                <div className="pd-returning">
+                  <span className="pd-returning-label">بانتظار العودة:</span>
+                  {returningOf(b).map((q) => (
+                    <span key={q.queue_number} className="pd-returning-num">{q.queue_number}</span>
+                  ))}
                 </div>
               )}
             </div>

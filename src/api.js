@@ -270,6 +270,11 @@ export const api = {
     done: (appointmentId) => http(`/clinic/appointments/${appointmentId}/done`, { method: 'POST' }),
     noShow: (appointmentId) => http(`/clinic/appointments/${appointmentId}/no-show`, { method: 'POST' }),
     recall: (appointmentId) => http(`/clinic/appointments/${appointmentId}/recall`, { method: 'POST' }),
+    // ── «خروج مؤقت»: المريض يخرج (قطرة، صورة) ويعود بلا أن يخسر دوره ──
+    // للطبيب صاحب الحجز ولمشرف العيادات (طوارئ). العودة نداءٌ على شاشة الصالة،
+    // ويرفضها الخادم (409 DOCTOR_BUSY) والطبيب في منتصف كشف مريضٍ آخر.
+    stepOut: (appointmentId) => http(`/clinic/appointments/${appointmentId}/step-out`, { method: 'POST' }),
+    returnCall: (appointmentId) => http(`/clinic/appointments/${appointmentId}/return`, { method: 'POST' }),
     // ── نمط الحضور ──
     // بدء الكشف: منفصل عن النداء — يسجّل started_at وحده
     start: (appointmentId) => http(`/clinic/appointments/${appointmentId}/start`, { method: 'POST' }),
@@ -497,6 +502,7 @@ export const SESSION_STATUSES = {
 
 export const APPOINTMENT_STATUSES = {
   waiting: 'بانتظار الحضور', arrived: 'حاضر — بانتظار الدور', in_service: 'قيد الكشف',
+  waiting_return: 'بانتظار العودة',
   done: 'انتهى', no_show: 'لم يحضر', cancelled: 'ملغى',
 }
 
@@ -545,3 +551,48 @@ export const fmtDate = (d) =>
 // تاريخ ووقت — لسجل التعديلات (متى غُيّر الحقل بالضبط)
 export const fmtDateTime = (d) =>
   d ? new Date(d).toLocaleString('ar-SY', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'
+
+// ═══ بثّ الموظفين: «تغيّر شيءٌ في جلسة كذا» ═══
+// يفتح /api/clinic/events ويستدعي onEvent(name, data) لكل حدث. بـ fetch لا EventSource:
+// المسار مصادَق بتوكن الموظف في الترويسة، وEventSource لا يرسل ترويسات (والتوكن في
+// العنوان يُسجَّل في سجلّات الوسطاء). يُعيد الاتصال وحده بتباعدٍ متزايد، ويُعيد دالّةً
+// تُغلقه. والتحديث الدوري في الشاشة يبقى شبكة أمان لو انقطع البثّ صامتاً.
+const STAFF_RETRY_MS = [2000, 5000, 15000, 30000]
+export function openStaffStream(onEvent) {
+  let closed = false, ctrl = null, timer = null, step = 0
+  const parse = (frame) => {
+    const ev = /^event: (.+)$/m.exec(frame)
+    const data = /^data: (.+)$/m.exec(frame)
+    if (!ev || !data) return
+    try { onEvent(ev[1], JSON.parse(data[1])) } catch { /* إطارٌ تالف — التحديث الدوري يُصلح */ }
+  }
+  const connect = async () => {
+    if (closed) return
+    const token = getToken()
+    if (!token || typeof ReadableStream === 'undefined' || typeof AbortController === 'undefined') return
+    ctrl = new AbortController()
+    try {
+      const res = await fetch('/api/clinic/events', {
+        headers: { Authorization: `Bearer ${token}` }, signal: ctrl.signal })
+      // 401/403: لا معنى لإعادة المحاولة — التوكن انتهى أو الدور لا يملك القسم
+      if (res.status === 401 || res.status === 403) return
+      if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`)
+      step = 0
+      const reader = res.body.getReader()
+      const dec = new TextDecoder()
+      let buf = ''
+      for (;;) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buf += dec.decode(value, { stream: true })
+        const frames = buf.split('\n\n')
+        buf = frames.pop()
+        frames.forEach(parse)
+      }
+    } catch { /* انقطاع — نعيد الاتصال أدناه */ }
+    if (closed) return
+    timer = setTimeout(connect, STAFF_RETRY_MS[Math.min(step++, STAFF_RETRY_MS.length - 1)])
+  }
+  connect()
+  return () => { closed = true; clearTimeout(timer); if (ctrl) ctrl.abort() }
+}

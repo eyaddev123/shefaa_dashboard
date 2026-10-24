@@ -28,12 +28,14 @@ const SIZES = [[1920, 1080], [1366, 768], [960, 540]]
 const DOCS = [1, 4, 7]
 // أعداد المنتظرين: فارغ · واحد · متوسّط · طويلٌ يتجاوز البطاقة («+N»)
 const WAITING = [0, 1, 5, 20]
+// «بانتظار العودة» (خروج مؤقت): بلا · ثلاثة — سطرٌ رابع في البطاقة يجب ألّا يقصّ الغرفة
+const RETURNING = [0, 3]
 const BAR = 90   // شريط متصفّح التلفاز
 
 // أسماء مرضى في البيانات عمداً: إن ظهر أحدها على الشاشة فهو تسريب
 const PATIENT_NAMES = ['سمير خالد الحسن', 'ليلى أحمد النجار']
 
-const mkBoard = (n, waiting = 2) => ({
+const mkBoard = (n, waiting = 2, returning = 0) => ({
   urgent_delays: 0, seq: 1,
   board: Array.from({ length: n }, (_, i) => ({
     doctor_name: `د. ضياء الدين المنقل ${i + 1}`,
@@ -49,6 +51,7 @@ const mkBoard = (n, waiting = 2) => ({
       { queue_number: 901, arrived: false, full_name: PATIENT_NAMES[0] },
       { queue_number: 902, arrived: false, full_name: PATIENT_NAMES[1] },
     ],
+    returning: Array.from({ length: returning }, (_, k) => ({ queue_number: 60 + k })),
   })),
 })
 
@@ -74,6 +77,7 @@ const run = async () => {
       const line = []
       for (const n of DOCS) {
        for (const waiting of WAITING) {
+       for (const returning of RETURNING) {
         const ctx = await browser.newContext({ viewport: { width: w, height: h } })
         // ═══ محاكاة التلفاز: بلا container queries ولا aspect-ratio ═══
         await ctx.addInitScript((snap) => {
@@ -87,7 +91,7 @@ const run = async () => {
             removeEventListener() {} close() {}
           }
           window.EventSource = FakeES
-        }, mkBoard(n, waiting))
+        }, mkBoard(n, waiting, returning))
 
         const page = await ctx.newPage()
         const errors = []
@@ -130,6 +134,19 @@ const run = async () => {
           const nums = first ? [...first.querySelectorAll('.pd-wait-num')] : []
           const moreEl = first ? first.querySelector('.pd-wait-more') : null
           const waitRow = first ? first.querySelector('.pd-waiting') : null
+          // سطر «بانتظار العودة»: داخل البطاقة، وأرقامه داخله
+          const retRow = first ? first.querySelector('.pd-returning') : null
+          if (retRow && first) {
+            const cr = first.getBoundingClientRect()
+            const rr = retRow.getBoundingClientRect()
+            if (rr.bottom > cr.bottom + 1 || rr.height < 8) clipped.push('card0:returning-row')
+          }
+          // والبطاقة الأضيق تضعها في صفّ «التالي» نفسه: داخل البطاقة أيضاً
+          if (first) first.querySelectorAll('.pd-returning-num').forEach((el, k) => {
+            const r = el.getBoundingClientRect(), cr = first.getBoundingClientRect()
+            if (r.bottom > cr.bottom + 1 || r.right > cr.right + 1 || r.left < cr.left - 1 || r.width < 2)
+              clipped.push(`card0:return${k}`)
+          })
           if (waitRow && first) {
             const cr = first.getBoundingClientRect()
             const wr = waitRow.getBoundingClientRect()
@@ -149,12 +166,14 @@ const run = async () => {
             shownNums: nums.map((e) => e.textContent.trim()),
             moreText: moreEl ? moreEl.textContent.trim() : '',
             hasWaitRow: !!waitRow,
+            returningNums: first ? [...first.querySelectorAll('.pd-returning-num')].map((e) => e.textContent.trim()) : [],
+            returningFlash: !!document.querySelector('.pd-flash'),
             text: document.body.innerText,
             scrollY: document.documentElement.scrollHeight - document.documentElement.clientHeight,
           }
         })
 
-        const tag = `${w}×${h0}${bar ? '+شريط' : ''} ${n}د/${waiting}منتظر`
+        const tag = `${w}×${h0}${bar ? '+شريط' : ''} ${n}د/${waiting}منتظر/${returning}عودة`
         ok(m.cards === n, `${tag}: ظهرت ${m.cards} بطاقة من ${n}`)
 
         // ═══ لا بطاقة يتيمة ═══
@@ -205,10 +224,18 @@ const run = async () => {
         // أصلاً — المهمّ ألّا تظهر «الغرفة» إطلاقاً.
         ok(!/الغرفة/.test(m.text), `${tag}: ★ ظهرت «الغرفة» — التسمية يجب أن تكون «العيادة»`)
 
+        // ═══ «بانتظار العودة»: أرقامها كلّها، ولا تختلط بالمنتظرين، وبلا وميض ═══
+        ok(m.returningNums.join() === Array.from({ length: returning }, (_, k) => 60 + k).join(),
+          `${tag}: أرقام «بانتظار العودة» ${JSON.stringify(m.returningNums)}`)
+        ok(!m.shownNums.some((x) => Number(x) >= 60 && Number(x) < 70),
+          `${tag}: ★ رقمٌ «بانتظار العودة» ظهر بين المنتظرين`)
+        ok(!m.returningFlash, `${tag}: ★ وميضٌ على اللقطة الأولى`)
+
         ok(errors.length === 0, `${tag}: أخطاء صفحة: ${errors.join(' | ')}`)
 
-        line.push(`${n}د/${waiting}:${m.shownNums.length}${m.moreText ? '+' : ''}`)
+        if (returning === 0) line.push(`${n}د/${waiting}:${m.shownNums.length}${m.moreText ? '+' : ''}`)
         await ctx.close()
+       }
        }
       }
       console.log(`  ${String(w).padStart(4)}×${String(h0).padEnd(4)}${bar ? ' +شريط' : '  ملء  '} │ ${line.join('  ')}`)

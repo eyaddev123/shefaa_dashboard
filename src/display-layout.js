@@ -69,7 +69,9 @@ export function lastRowOffset(n, cols) {
 // الترتيب البصري مقصود: الرقم ← الغرفة ← الاسم ← التالي/بعده ← الاختصاص.
 const MIN = { number: 56, room: 28, doctor: 20, label: 15, upNum: 24, upLabel: 13, specialty: 13 }
 
-export function cardFonts(cardW, cardH) {
+// opts.extraRow: سطر «بانتظار العودة» أسفل البطاقة (خروج مؤقت) — يُقتطع ارتفاعه من
+// الوسط **قبل** توزيعه، وإلا فاض الوسط فقصّ overflow الغرفةَ بصمت (انظر أدناه).
+export function cardFonts(cardW, cardH, opts = {}) {
   if (!cardW || !cardH) return null
   // الأضيق يحكم: نصٌّ مربوط بالعرض وحده يفيض طولاً في بطاقة عريضة قصيرة، والعكس.
   const base = Math.min(cardW, cardH * 1.35)
@@ -89,7 +91,15 @@ export function cardFonts(cardW, cardH) {
   // إلا في الصالة)، والناقص يصغّر الخطّ قليلاً فقط (خطأٌ مرئي وقابل للضبط).
   // بطاقةٌ قليلة العدد تملك فائض ارتفاع (الترويسة وصفّ التالي لا ينموان بنفس
   // النسبة)، فنعطيها نصيباً أكبر من الوسط. والصغيرة تبقى على ٤٦٪ المقيسة.
-  const midH = cardH * (cardH >= 600 ? 0.56 : cardH >= 380 ? 0.50 : 0.46)
+  // السطر الإضافي: خطّ «التالي:» الصغير × ارتفاع السطر + حشوه وحدّه ≈ ٩٪ من البطاقة،
+  // وحدٌّ أدنى ١٨px للبطاقات الصغيرة (الخطّ لا ينزل عن ١٣px).
+  // ★ وفي البطاقة الأضيق لا يتّسع السطر حتى للرقم بحدّه الأدنى (٧ أطباء على ٩٦٠×٤٥٠):
+  // فلا سطر — تنتقل الأرقام إلى صفّ «التالي» نفسه (returningInline) بدل قصّ الرقم.
+  const midShare = cardH * (cardH >= 600 ? 0.56 : cardH >= 380 ? 0.50 : 0.46)
+  let extraH = opts.extraRow ? Math.max(18, Math.round(cardH * 0.09)) : 0
+  const returningInline = extraH > 0 && MIN.number * 1.02 > (midShare - extraH) * 0.95
+  if (returningInline) extraH = 0
+  const midH = midShare - extraH
   // الخطّ = نصيب الصندوق ÷ ارتفاع السطر (number 1.02، room 1.25 + حشو 0.16em)
   const numberByH = (midH * 0.54) / 1.02
   const roomByH = (midH * 0.22) / 1.41
@@ -128,6 +138,7 @@ export function cardFonts(cardW, cardH) {
     room,
     roomCompact,
     showLabel,
+    returningInline,
     doctor,
     upNum,
     label: Math.min(px(0.062, MIN.label), Math.round(doctor * 0.8)),

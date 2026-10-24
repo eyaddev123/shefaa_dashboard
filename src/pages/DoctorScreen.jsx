@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api, fmtTime, todayLocal } from '../api.js'
 import { AttendanceBadge, urgentRowClass, isAttendanceSession, usePolling, fmtClock } from '../attendance-ui.jsx'
 import { useToast, RecallButton } from '../action-feedback.jsx'
+import { waitingReturnOf, serverOffsetOf, Elapsed, useStaffEvents } from '../waiting-return.jsx'
 
 // ═══ ما أُضيف على هذا المريض ═══
 // للاطّلاع وحده: الاستقبال يُدخل الإجراءات وموادّها بما تُمليه الممرّضة، والطبيب
@@ -53,6 +54,8 @@ export default function DoctorScreen() {
   // نمط الحضور: رقم الدور المُعطى عند الحضور (ما تنطقه الصالة) — رقم الحجز داخليّ للاستقبال
   const shownNumber = (a) => (attendance ? (a.arrival_number ?? '—') : a.queue_number)
   usePolling(loadQueue, attendance && !!sessionId)
+  // فوريّ: الاستقبال يعلّم الحضور، والمشرف قد ينادي للعودة — بلا انتظار التحديث الدوري
+  useStaffEvents(sessionId, loadQueue, !!sessionId)
 
   const act = async (fn, apptId) => {
     setBusy(true)
@@ -78,6 +81,9 @@ export default function DoctorScreen() {
   const stillWaiting = attendance ? []
     : queue?.appointments.filter((a) => a.status === 'waiting') || []
   const nextUp = arrivedWaiting[0]
+  // خرجوا مؤقتاً (قطرة، صورة…) وسيُنادَون ليُكملوا — ليسوا في الطابور ولا «قيد الكشف»
+  const returning = waitingReturnOf(queue?.appointments)
+  const offset = serverOffsetOf(queue)
 
   return (
     <>
@@ -138,6 +144,14 @@ export default function DoctorScreen() {
                   {/* معطَّل طوال مدّة خنق الخادم مع عدٍّ ظاهر — فلا تصل ضغطةٌ ثانية لتُرفض */}
                   <RecallButton apptId={current.id} onError={showToast} className="ghost doc-btn" />
 
+                  {/* ★ خروج مؤقت: ثانويّ عمداً (ghost) — المريض يخرج ويعود بدوره، والطبيب
+                      ينادي التالي. لا يُنهي شيئاً، فلا يحتاج فاصل «إنهاء الكشف». */}
+                  <button className="ghost doc-btn" disabled={busy}
+                    title="المريض يخرج (قطرة، صورة…) ويعود بدوره — وتنادي التالي"
+                    onClick={() => act(api.clinic.stepOut, current.id)}>
+                    <span aria-hidden="true">⏸</span> خروج مؤقت
+                  </button>
+
                   <button className="doc-btn doc-btn-done" disabled={busy}
                     onClick={() => act(api.clinic.done, current.id)}>
                     إنهاء الكشف
@@ -151,6 +165,32 @@ export default function DoctorScreen() {
               <p className="empty">لا أحد قيد الكشف حالياً.</p>
             )}
           </div>
+
+          {/* ═══ بانتظار العودة ═══
+              صغيرٌ تحت «قيد الكشف» لا يزاحمه، ويظهر حين يوجد خارجٌ فقط. العدّاد من
+              لحظة الخروج في القاعدة — يضبط بعد التحديث. والنداء معطَّل ما دام أحدٌ قيد
+              الكشف: مريضان قيد الكشف عند طبيبٍ واحد يُربكان الشاشة (والخادم يرفض أيضاً). */}
+          {returning.length > 0 && (
+            <div className="card wr-card">
+              <h3>بانتظار العودة <span className="wr-count">{returning.length}</span></h3>
+              <ul className="wr-list">
+                {returning.map((a) => (
+                  <li key={a.id} className="wr-item">
+                    <span className="wr-num">الدور {shownNumber(a)}</span>
+                    <span className="wr-name">{a.full_name}</span>
+                    <Elapsed since={a.stepped_out_at} offset={offset} />
+                    <button className="ghost wr-call" disabled={busy || !!current}
+                      onClick={() => act(api.clinic.returnCall, a.id)}>
+                      نداء
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              {current && (
+                <p className="wr-hint">أنهِ الكشف الحالي أو اجعله «خروجاً مؤقتاً» قبل نداء العودة.</p>
+              )}
+            </div>
+          )}
 
           <div className="card">
             <h3>التالي في الطابور</h3>

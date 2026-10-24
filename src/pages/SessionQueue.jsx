@@ -9,7 +9,8 @@ import { AttendanceBadge, urgentRowClass, isAttendanceSession, usePolling, fmtCl
 import { attendanceBookedMessage } from '../booking-message.js'
 import { useRole } from '../RoleContext.jsx'
 import { useToast, RecallButton } from '../action-feedback.jsx'
-import { canEditAppointmentProcedures, canEditBooking } from '../permissions.js'
+import { canEditAppointmentProcedures, canEditBooking, canStepOutAsSupervisor } from '../permissions.js'
+import { WAITING_RETURN, waitingReturnOf, serverOffsetOf, Elapsed, useStaffEvents } from '../waiting-return.jsx'
 import MaterialsEditor, { qtyValid, toPayload, fmtQty, materialsSummary } from '../components/MaterialsEditor.jsx'
 
 // شارة الأولوية — تُبرز من يتقدّم الطابور وسببه
@@ -50,8 +51,44 @@ function SlotCell({ appt }) {
 
 function appointmentBadge(status) {
   const cls = status === 'in_service' ? 'good' : status === 'no_show' || status === 'cancelled' ? 'bad'
-    : status === 'arrived' ? 'warn' : ''
+    : status === 'arrived' ? 'warn' : status === WAITING_RETURN ? 'blue' : ''
   return <span className={`badge ${cls}`}>{APPOINTMENT_STATUSES[status] || status}</span>
+}
+
+// ═══ خانة الحالة في الطابور ═══
+// «بانتظار العودة» (خروج مؤقت) شارةٌ زرقاء هادئة ومعها كم صار له خارجاً — لا «غائب»:
+// المريض في الصالة ينتظر أن يناديه الطبيب ليُكمل، ورقم دوره كما هو.
+function StatusCell({ appt, offset }) {
+  if (appt.status !== WAITING_RETURN) return appointmentBadge(appt.status)
+  return (
+    <span className="wr-status">
+      {appointmentBadge(appt.status)}
+      <Elapsed since={appt.stepped_out_at} offset={offset} />
+    </span>
+  )
+}
+
+// ═══ أزرار الطوارئ لمشرف العيادات ═══
+// الطبيب يفعلها من شاشته؛ وهنا للمشرف وحده (طبيبٌ غادر ومريضه «خارج»). والعودة
+// يرفضها الخادم والطبيب في منتصف كشف مريضٍ آخر — والرسالة تقول ماذا يُفعل.
+function SupervisorReturnActions({ appt, onDone, onError }) {
+  const { role } = useRole()
+  const [busy, setBusy] = useState(false)
+  if (!canStepOutAsSupervisor(role)) return null
+  const run = async (fn, okMsg) => {
+    setBusy(true)
+    try { await fn(appt.id); onDone(okMsg) } catch (ex) { onError(ex.message) } finally { setBusy(false) }
+  }
+  const btn = { padding: '3px 10px', fontSize: 11.5 }
+  if (appt.status === 'in_service') return (
+    <button className="ghost" style={btn} disabled={busy}
+      onClick={() => run(api.clinic.stepOut, 'خرج مؤقتاً — ويبقى دوره')}>خروج مؤقت</button>
+  )
+  if (appt.status === WAITING_RETURN) return (
+    <button className="ghost" style={btn} disabled={busy}
+      onClick={() => run(api.clinic.returnCall, 'نودي للعودة على شاشة الصالة')}>نداء العودة</button>
+  )
+  return null
 }
 
 function TicketPrint({ appt, doctorName, attendance = false, onDone }) {
@@ -853,7 +890,7 @@ function AttendanceBookingForm({ sessionId, fees, open, onClose, onBooked }) {
 }
 
 // قيد الكشف الآن — مضغوط، ورقم الدور كبير يُقرأ بلمحة. فارغٌ بنفس الارتفاع (الشبكة تمدّ الثلاث).
-function AttendanceCurrentCard({ current, recalled, onRecalled, onError }) {
+function AttendanceCurrentCard({ current, returning = [], recalled, onRecalled, onError }) {
   return (
     <div className={`card attn-compact ${current ? 'highlight' : ''}`}>
       <h3>قيد الكشف الآن</h3>
@@ -873,6 +910,15 @@ function AttendanceCurrentCard({ current, recalled, onRecalled, onError }) {
           </div>
         </div>
       ) : <p className="attn-compact-empty">لا أحد قيد الكشف</p>}
+      {/* خرجوا مؤقتاً وسيُنادَون ليُكملوا — سطرٌ صغير لا يزاحم «قيد الكشف» */}
+      {returning.length > 0 && (
+        <div className="wr-inline">
+          بانتظار العودة:
+          {returning.map((a) => (
+            <span key={a.id} className="wr-inline-num">{turnLabel(a, true)}</span>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -1123,7 +1169,11 @@ function AppointmentDetails({ appt, session, onChanged, onToast, onArrived }) {
               </select></label>
             <label>الحالة
               <select value={form.status} onChange={set('status')}>
-                {Object.entries(APPOINTMENT_STATUSES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                {/* «بانتظار العودة» لا يُختار من هنا (الطبيب وحده يُخرج مريضه) — يظهر خياراً
+                    فقط حين يكون هو الحالة الحالية، فتُقرأ القائمة صحيحة ويُخرَج منها */}
+                {Object.entries(APPOINTMENT_STATUSES)
+                  .filter(([k]) => k !== WAITING_RETURN || appt.status === WAITING_RETURN)
+                  .map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </select></label>
             <label className="ad-note">ملاحظة الحجز (اختيارية)
               <input value={form.reason} onChange={set('reason')} disabled={fieldsFrozen} /></label>
@@ -1298,7 +1348,8 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
   const [editing, setEditing] = useState(null)     // id السطر الجاري تعديل موادّه
   const [editMats, setEditMats] = useState([])
   const lines = appt.procedures || []
-  const entered = ['in_service', 'done'].includes(appt.status)
+  // «بانتظار العودة» دخل على الطبيب ثمّ خرج مؤقتاً — والقطرة نفسها إجراءٌ يُضاف وهو في الصالة
+  const entered = ['in_service', WAITING_RETURN, 'done'].includes(appt.status)
   const dayOk = role === 'clinic_admin' || session.session_day === session.server_today
   const canEdit = canEditAppointmentProcedures(role) && entered && dayOk
 
@@ -1477,6 +1528,7 @@ function DetailsToggle({ open, onToggle }) {
 // حضوراً — ثم من لم يحضر). لا عمود موعد ولا انتظار متوقَّع: لا خانات ولا تقدير هنا.
 function AttendanceQueueTable({ data, actions }) {
   const { arrive, cancel, prioritize, setPostponing, openDetails, toggleDetails, reload, toast, autoPrint } = actions
+  const offset = serverOffsetOf(data)
   return (
     <div className="card">
       <h3>الطابور ({data.appointments.length})</h3>
@@ -1507,7 +1559,7 @@ function AttendanceQueueTable({ data, actions }) {
               </td>
               <td className="num" style={{ whiteSpace: 'nowrap' }}><FeeCell appt={a} /></td>
               <td dir="ltr">{a.arrived_at ? fmtClock(a.arrived_at) : '—'}</td>
-              <td>{appointmentBadge(a.status)}</td>
+              <td><StatusCell appt={a} offset={offset} /></td>
               <td className="num">{a.ahead_count ?? '—'}</td>
               {/* فجوةٌ حقيقية بين الأزرار: «حضر» و«إلغاء» كانا متلاصقَين
                   فيُضغط الخطأ منهما بسهولة، وأثرهما متناقض */}
@@ -1527,6 +1579,8 @@ function AttendanceQueueTable({ data, actions }) {
                   <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }}
                     onClick={() => setPostponing(a)}>تأجيل</button>
                 )}{' '}
+                <SupervisorReturnActions appt={a}
+                  onDone={(msg) => { toast(msg, 'success'); reload() }} onError={(msg) => { toast(msg); reload() }} />{' '}
                 <DetailsToggle open={openDetails === a.id} onToggle={() => toggleDetails(a.id)} />
               </td>
             </tr>
@@ -1648,6 +1702,8 @@ export default function SessionQueue() {
   // نمط الخانات يبقى كما كان (بلا تحديث دوري).
   const attendance = isAttendanceSession(data)
   usePolling(load, attendance)
+  // فوريّ: خروجٌ مؤقت أو نداء عودة أو حضور من جهازٍ آخر يظهر هنا بلا انتظار التحديث الدوري
+  useStaffEvents(id, load)
 
   // ★ الحضور لا يُحجب أبداً (قرارٌ مقصود).
   // كان الخادم يرفضه لنقص المعلومات فيقف المريض والموظف يسأله والدور ينتظر.
@@ -1738,6 +1794,7 @@ export default function SessionQueue() {
             <AttendanceBookingCard acceptsUrgent={data.accepts_urgent !== false}
               open={bookingOpen} onOpen={setBookingOpen} />
             <AttendanceCurrentCard current={data.appointments.find((a) => a.status === 'in_service')}
+              returning={waitingReturnOf(data.appointments)}
               recalled={recalled} onRecalled={() => setRecalled(Date.now())} onError={showToast} />
             <DoctorArrivalCard data={data} onChanged={load} onError={showToast} />
           </div>
@@ -1903,7 +1960,7 @@ export default function SessionQueue() {
                 </td>
                 <td className="num"><FeeCell appt={a} /></td>
                 <td><SlotCell appt={a} /></td>
-                <td>{appointmentBadge(a.status)}</td>
+                <td><StatusCell appt={a} offset={serverOffsetOf(data)} /></td>
                 <td className="num">
                   {['waiting', 'arrived', 'in_service'].includes(a.status) ? `~${a.wait_minutes} د` : '—'}
                 </td>
@@ -1925,6 +1982,8 @@ export default function SessionQueue() {
                     <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }}
                       onClick={() => setPostponing(a)}>تأجيل</button>
                   )}{' '}
+                  <SupervisorReturnActions appt={a}
+                    onDone={(msg) => { showToast(msg, 'success', 3500); load() }} onError={(msg) => { showToast(msg); load() }} />{' '}
                   <DetailsToggle open={openDetails === a.id} onToggle={() => toggleDetails(a.id)} />
                 </td>
               </tr>
