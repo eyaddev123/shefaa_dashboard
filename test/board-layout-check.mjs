@@ -11,6 +11,7 @@
 import { chromium } from 'playwright'
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { chipMinPx, tierOf } from '../src/display-layout.js'
 
@@ -100,6 +101,9 @@ const run = async () => {
         const errors = []
         page.on('pageerror', (e) => errors.push(e.message))
         await page.goto(`${BASE}/display?key=test`, { waitUntil: 'load' })
+        // الخطّ أولاً: عدد الحبّات محسوب بعرض أرقام Cairo، والقياس قبل تحميله (جهازٌ مشغول)
+        // يرى خطّاً احتياطياً أعرض فيُبلغ عن قصٍّ لا وجود له — فشلٌ متنقّل بين الجولات
+        await page.evaluate(() => (document.fonts ? document.fonts.ready.then(() => 0) : 0))
         await page.waitForTimeout(600)
 
         const m = await page.evaluate(() => {
@@ -318,6 +322,9 @@ const run = async () => {
     }, mkBoard(2, 3))
     const page = await ctx.newPage()
     await page.goto(`${BASE}/display?key=test`, { waitUntil: 'load' })
+        // الخطّ أولاً: عدد الحبّات محسوب بعرض أرقام Cairo، والقياس قبل تحميله (جهازٌ مشغول)
+        // يرى خطّاً احتياطياً أعرض فيُبلغ عن قصٍّ لا وجود له — فشلٌ متنقّل بين الجولات
+        await page.evaluate(() => (document.fonts ? document.fonts.ready.then(() => 0) : 0))
     await page.waitForTimeout(900)
     await page.evaluate(() => window.__sse.emit('call', {
       queue_number: 7, room: '1', doctor_name: 'د. ضياء الدين المنقل 1',
@@ -360,6 +367,9 @@ const run = async () => {
         const errors = []
         page.on('pageerror', (e) => errors.push(e.message))
         await page.goto(`${BASE}/display?key=test`, { waitUntil: 'load' })
+        // الخطّ أولاً: عدد الحبّات محسوب بعرض أرقام Cairo، والقياس قبل تحميله (جهازٌ مشغول)
+        // يرى خطّاً احتياطياً أعرض فيُبلغ عن قصٍّ لا وجود له — فشلٌ متنقّل بين الجولات
+        await page.evaluate(() => (document.fonts ? document.fonts.ready.then(() => 0) : 0))
         await page.waitForTimeout(600)
         const hd = await page.evaluate(() => {
           const t = document.querySelector('.pd-title')
@@ -385,6 +395,9 @@ const run = async () => {
         ok(hd.notClipped, `${tag}: الاسم مقصوص`)
         ok(hd.inView && hd.inHead, `${tag}: الاسم خارج الشاشة أو الترويسة`)
         ok(hd.gap >= 8, `${tag}: الاسم يلامس الساعة (المسافة ${hd.gap}px)`)
+        // الحجم = ما كانت clamp(16px, 1.8vw, 34px) ستعطيه — بلا clamp
+        const want = Math.min(34, Math.max(16, w * 0.018))
+        ok(Math.abs(hd.fsz - want) < 0.6, `${tag}: خطّ الاسم ${hd.fsz}px ≠ ${want.toFixed(1)}`)
         ok(hd.scrollX <= 0, `${tag}: تمرير أفقي ${hd.scrollX}px`)
         ok(errors.length === 0, `${tag}: أخطاء صفحة: ${errors.join(' | ')}`)
         line.push(`${w}×${h}:${hd.fsz}px/${hd.gap}px`)
@@ -392,6 +405,21 @@ const run = async () => {
       }
     }
     console.log(`  الترويسة │ ${line.join('  ')}`)
+  }
+
+  // ═══ الترويسة بلا clamp()/min()/max() ولا flex gap ولا margin-inline ═══
+  // Chrome 66 (تلفاز الصالة) لا يملكها فيُسقط التصريح كلّه إلى ١٦px، والمتصفّح الحديث
+  // في هذا الفحص يملكها فلا يرى العطب — فنفحص المصدر نفسه.
+  {
+    const css = readFileSync(resolve(ROOT, 'src/styles.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+    const HEAD = /\.pd-(head|brand|logo|title|clock|time|date|tools|dot|icon-btn)\b/
+    const bad = []
+    for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      // وgap (في flex) وmargin-inline-*/padding-inline-*: كلّها أحدث من Chrome 66
+      if (HEAD.test(m[1]) && /\b(clamp|min|max)\(|(^|[;\s])gap\s*:|(margin|padding)-inline/.test(m[2])) bad.push(m[1].trim())
+    }
+    ok(bad.length === 0, `الترويسة: خصائص غير مدعومة في Chrome 66 (clamp/min/max/gap/inline) — ${bad.join(' | ')}`)
+    console.log(`  الترويسة (CSS) │ ${bad.length ? '✖ ' + bad.join(' | ') : 'بلا clamp/min/max/gap/margin-inline'}`)
   }
 
   await browser.close()

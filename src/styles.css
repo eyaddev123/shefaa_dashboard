@@ -966,25 +966,50 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
 }
 
 /* ── الترويسة: الهوية، الساعة، ومؤشّرات صغيرة ── */
-.pd-head { display: flex; align-items: center; gap: 1.5vw; }
-.pd-brand { display: flex; align-items: center; gap: 0.8vw; }
-.pd-logo { font-size: clamp(24px, 3vw, 52px); }
-.pd-title { font-size: clamp(16px, 1.8vw, 34px); font-weight: 800; white-space: nowrap; }  /* سطرٌ واحد — والفحص يقيس أنّه لا يلامس الساعة */
-.pd-clock { margin-inline-start: auto; text-align: center; line-height: 1.1; }
-.pd-time { font-size: clamp(22px, 2.6vw, 48px); font-weight: 800; color: #7fd6b8; }
-.pd-date { font-size: clamp(11px, 1vw, 19px); color: #b3c6c2; }
-.pd-tools { display: flex; align-items: center; gap: 0.6vw; }
+/* ★ Chrome 66: لا gap في flex ولا margin-inline-* — فكانت الساعة تلتصق باسم المجمع بدل
+   أن تُدفع يساراً، والشعار يلامس الاسم. البديل هوامش فيزيائية: الصفحة RTL دائماً، فالتالي
+   من الإخوة يقع يسار سابقه والفاصل هامشه الأيمن، و«البداية» = اليمين. */
+.pd-head { display: flex; align-items: center; }
+.pd-head > * + * { margin-right: 1.5vw; }
+.pd-brand { display: flex; align-items: center; }
+.pd-brand > * + * { margin-right: 0.8vw; }
+.pd-logo { font-size: 3vw; }
+.pd-title { font-size: 1.8vw; font-weight: 800; white-space: nowrap; }  /* سطرٌ واحد — والفحص يقيس أنّه لا يلامس الساعة */
+.pd-head > .pd-clock { margin-right: auto; }   /* يدفع الساعة والأدوات إلى اليسار */
+.pd-clock { text-align: center; line-height: 1.1; }
+.pd-time { font-size: 2.6vw; font-weight: 800; color: #7fd6b8; }
+.pd-date { font-size: 1vw; color: #b3c6c2; }
+.pd-tools { display: flex; align-items: center; }
+.pd-tools > * + * { margin-right: 0.6vw; }
 /* height صريح لا aspect-ratio: الأخيرة غائبة في Chrome 66 فيبقى الارتفاع صفراً */
-.pd-dot { width: clamp(8px, 0.8vw, 14px); height: clamp(8px, 0.8vw, 14px); border-radius: 50%; }
+.pd-dot { width: 0.8vw; height: 0.8vw; border-radius: 50%; }
 .pd-dot-on { background: #14b8a6; }
 .pd-dot-off { background: #f0b37e; animation: pd-blink 1.2s ease-in-out infinite; }
 .pd-icon-btn {
   font-family: inherit; cursor: pointer; line-height: 1;
-  font-size: clamp(13px, 1.1vw, 20px);
+  font-size: 1.1vw;
   color: #7fd6b8; background: rgba(127, 214, 184, 0.12);
   border: 1px solid rgba(127, 214, 184, 0.3);
   padding: 0.5vh 0.7vw; border-radius: 10px;
 }
+/* ═══ حدود الترويسة: media queries بدل clamp() ═══
+   clamp() (Chrome 79) غائبة في Chrome 66 — متصفّح تلفاز الصالة — فكان التصريح كلّه
+   يسقط إلى حجم المتصفّح الافتراضي ١٦px: اسم المجمع والساعة صغيران على الشاشة الفعلية.
+   القيمة الأساسية أعلاه بـ vw، وكلّ حدٍّ عند العرض الذي يبلغه فيه vw بالضبط
+   (الحدّ ÷ النسبة × ١٠٠)، فالنتيجة مطابقةٌ لـ clamp في كلّ عرض. وCSS لا JS: الترويسة
+   مشتركة مع شاشة الدور (/order). والفحص يمنع عودة clamp/min()/max() هنا. */
+@media (max-width: 800px)   { .pd-logo { font-size: 24px; } }        /* 24 ÷ 3%   */
+@media (min-width: 1734px)  { .pd-logo { font-size: 52px; } }        /* 52 ÷ 3%   */
+@media (max-width: 888px)   { .pd-title { font-size: 16px; } }       /* 16 ÷ 1.8% */
+@media (min-width: 1889px)  { .pd-title { font-size: 34px; } }       /* 34 ÷ 1.8% */
+@media (max-width: 846px)   { .pd-time { font-size: 22px; } }        /* 22 ÷ 2.6% */
+@media (min-width: 1847px)  { .pd-time { font-size: 48px; } }        /* 48 ÷ 2.6% */
+@media (max-width: 1100px)  { .pd-date { font-size: 11px; } }        /* 11 ÷ 1%   */
+@media (min-width: 1900px)  { .pd-date { font-size: 19px; } }        /* 19 ÷ 1%   */
+@media (max-width: 1000px)  { .pd-dot { width: 8px; height: 8px; } }    /* 8 ÷ 0.8%  */
+@media (min-width: 1750px)  { .pd-dot { width: 14px; height: 14px; } }  /* 14 ÷ 0.8% */
+@media (max-width: 1181px)  { .pd-icon-btn { font-size: 13px; } }    /* 13 ÷ 1.1% */
+@media (min-width: 1819px)  { .pd-icon-btn { font-size: 20px; } }    /* 20 ÷ 1.1% */
 
 /* ── لافتة التأخير: عامة بلا ذكر عيادة (ذكرها يكشف واقعة طبية عن مريض بعينه) ── */
 .pd-urgent-banner {
