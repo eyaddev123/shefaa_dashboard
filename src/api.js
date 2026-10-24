@@ -195,6 +195,13 @@ export const api = {
     removeDoctorProcedureShare: (id, procId) =>
       http(`/clinic/doctors/${id}/procedure-shares/${procId}`, { method: 'DELETE' }),
     reopenSession: (id) => http(`/clinic/sessions/${id}/reopen`, { method: 'POST' }),
+    // جرد الصندوق: ملفّ إكسل ليومٍ وعيادة (غرفة) أو للكلّ — الحساب كلّه في الخادم
+    cashReportClinics: (date) => http(`/reception/cash-report/clinics?${new URLSearchParams({ date })}`),
+    cashReport: ({ date, clinicId }) => {
+      const q = new URLSearchParams({ date })
+      if (clinicId) q.set('clinic_id', clinicId)
+      return downloadFile(`/api/reception/cash-report?${q}`, `jard-${date}.xlsx`)
+    },
     // تصدير بيانات العيادة (انظر downloadFile)
     exportExcel: ({ from, to, doctorId }) => {
       const q = new URLSearchParams({ from, to: to || from })

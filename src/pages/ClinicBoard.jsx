@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { addDays, api, dayLabel, SESSION_STATUSES, fmtTime, todayLocal } from '../api.js'
 import { useRole } from '../RoleContext.jsx'
 import { FlowModeTag } from '../attendance-ui.jsx'
+import CashReportDialog from '../components/CashReportDialog.jsx'
 
 // من يرى قسم «دكاترة اليوم» والاعتذارات — يطابق APOLOGY_VIEWERS في الخادم.
 // الاستقبال غائبٌ عمداً: المعتذر لا وجود له عنده ذلك اليوم.
@@ -299,6 +300,9 @@ export default function ClinicBoard() {
   const [busyId, setBusyId] = useState(null)
   // من يرى الصالة هو من يعرف أنّ الدكتور غادر — الاستقبال والمشرف معاً
   const canCloseSession = role === 'clinic_admin' || role === 'clinic_reception'
+  // جرد الصندوق: الاستقبال والمشرف — يطابق CASH_REPORT_ROLES في الخادم
+  const canCashReport = role === 'clinic_admin' || role === 'clinic_reception'
+  const [showCash, setShowCash] = useState(false)
 
   const toggleClose = async (s) => {
     setBusyId(s.id); setErr(null)
@@ -329,6 +333,10 @@ export default function ClinicBoard() {
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }}>
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          {canCashReport && (
+            <button type="button" className="ghost" style={{ whiteSpace: 'nowrap' }}
+              onClick={() => setShowCash(true)}>جرد الصندوق</button>
+          )}
           {role === 'clinic_admin' && (
             <button onClick={generate} disabled={busy}>{busy ? 'جارٍ التوليد…' : 'توليد جلسات هذا اليوم'}</button>
           )}
@@ -361,6 +369,7 @@ export default function ClinicBoard() {
       </div>
 
       {err && <p className="error">{err}</p>}
+      {showCash && <CashReportDialog onClose={() => setShowCash(false)} />}
 
       {/* الاستقبال لا يرى هذا القسم إطلاقاً — ولا الخادم يُجيبه عليه */}
       {APOLOGY_VIEWERS.includes(role) && (
