@@ -300,8 +300,8 @@ export default function ClinicBoard() {
   const [busyId, setBusyId] = useState(null)
   // من يرى الصالة هو من يعرف أنّ الدكتور غادر — الاستقبال والمشرف معاً
   const canCloseSession = role === 'clinic_admin' || role === 'clinic_reception'
-  // جرد الصندوق: الاستقبال والمشرف — يطابق CASH_REPORT_ROLES في الخادم
-  const canCashReport = role === 'clinic_admin' || role === 'clinic_reception'
+  // جرد الصندوق: الاستقبال والمشرف والمدير — يطابق CASH_REPORT_ROLES في الخادم
+  const canCashReport = role === 'clinic_admin' || role === 'clinic_reception' || role === 'manager'
   const [showCash, setShowCash] = useState(false)
 
   const toggleClose = async (s) => {
