@@ -1117,6 +1117,27 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
   color: #7fd6b8;
 }
 
+/* ═══ «بانتظار العودة» (خروج مؤقت): سطرٌ هادئ أسفل البطاقة ═══
+   أصغر من صفّ «التالي» وأخفت لوناً، بلا وميض ولا إطار: هؤلاء ليسوا التالين، وتمييزهم
+   بلونٍ لافت يُربك من ينتظر دوره. ارتفاعه محجوزٌ في cardFonts (extraRow) فلا يقصّ الغرفة.
+   ولا flex gap (Chrome 66): الهوامش بديل. */
+.pd-returning {
+  display: flex; align-items: baseline; justify-content: center;
+  flex: none; min-width: 0;
+  padding-top: 0.4vh; border-top: 1px dashed rgba(127, 214, 184, 0.14);
+  white-space: nowrap; overflow: hidden;
+}
+.pd-returning-inline { display: inline-block; margin-inline-start: 0.9em; white-space: nowrap; flex: none; }
+/* الصفّ يحمل «التالي» و«عودة» معاً في البطاقة الأضيق: سطرٌ واحد لا يلتفّ — الالتفاف
+   يُطيله فيسحق الوسط ويقصّ الرقم. وما لا يتّسع من المنتظرين يُعلنه «+N» كالعادة. */
+.pd-waiting-oneline, .pd-waiting-oneline .pd-wait-nums { white-space: nowrap; flex-wrap: nowrap; }
+.pd-returning-label { font-size: var(--pd-up-label, 13px); color: #8aa29d; font-weight: 700; line-height: 1.3; }
+.pd-returning-num {
+  font-size: calc(var(--pd-up-label, 13px) * 1.15); font-weight: 800; line-height: 1.2;
+  color: #b3c6c2;
+  margin-inline-start: 0.6em;
+}
+
 /* الرقمان الجايان */
 .pd-upcoming {
   display: flex; justify-content: center;
@@ -2021,6 +2042,38 @@ button.danger:hover:not(:disabled) { filter: brightness(1.08); }
   /* الشارات تأخذ السطر كاملاً تحت الأزرار */
   .action-row > .doc-actions > .doc-procs { flex: 1 1 100%; }
 }
+
+/* ═══ «بانتظار العودة» — خرجوا مؤقتاً وسيُنادَون ليُكملوا ═══
+   صغيرٌ هادئ تحت «قيد الكشف»: حشوٌ أقلّ وخطٌّ أصغر، فلا يزاحم المريض الحالي.
+   ألوان الثيم وحدها (متغيّرات) — يعمل في الفاتح والداكن بلا قواعد إضافية. */
+.wr-card { padding-top: 14px; padding-bottom: 14px; }
+.wr-card h3 { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 15px; }
+.wr-count {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px;
+  font-size: 12px; font-weight: 700;
+  color: var(--status-review); background: var(--status-review-bg);
+}
+.wr-list { list-style: none; margin: 0; padding: 0; }
+.wr-item {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 7px 0; border-top: 1px solid var(--grid);
+}
+.wr-item:first-child { border-top: none; }
+.wr-num { font-weight: 800; color: var(--accent-text); min-width: 64px; }
+.wr-name { flex: 1 1 140px; min-width: 0; color: var(--text-secondary); }
+/* العدّاد: أرقامٌ لاتينية بعرضٍ ثابت فلا يرتجّ السطر كل ثانية */
+.wr-elapsed {
+  font-variant-numeric: tabular-nums; font-weight: 700; font-size: 13.5px;
+  color: var(--status-review);
+}
+.wr-call { padding: 6px 16px; font-size: 13px; }
+.wr-hint { font-size: 12px; color: var(--muted); margin: 8px 0 0; }
+
+/* الاستقبال: سطر «بانتظار العودة» داخل بطاقة «قيد الكشف الآن» */
+.wr-inline { margin-top: 8px; font-size: 12.5px; color: var(--muted); }
+.wr-inline .wr-inline-num { font-weight: 800; color: var(--status-review); margin-inline-start: 6px; }
+.wr-status { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 
 /* ── ما أُضيف على هذا المريض: أسماءٌ فقط، للاطّلاع ── */
 .doc-procs {
