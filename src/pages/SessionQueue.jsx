@@ -311,7 +311,7 @@ function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel, urgent = f
           </select>
         </div>
         <div className="field bf-reason">
-          <label>سبب الزيارة <span className="opt">(اختياري)</span></label>
+          <label>ملاحظة الحجز <span className="opt">(اختيارية)</span></label>
           <input value={form.reason} onChange={set('reason')} />
         </div>
       </div>
@@ -1125,7 +1125,7 @@ function AppointmentDetails({ appt, session, onChanged, onToast, onArrived }) {
               <select value={form.status} onChange={set('status')}>
                 {Object.entries(APPOINTMENT_STATUSES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </select></label>
-            <label className="ad-note">ملاحظة (اختيارية)
+            <label className="ad-note">ملاحظة الحجز (اختيارية)
               <input value={form.reason} onChange={set('reason')} disabled={fieldsFrozen} /></label>
           </div>
           <div className="ad-actions">
@@ -1232,7 +1232,7 @@ const EDIT_FIELD_LABELS = {
   priority: 'الأولوية', slot_time: 'الخانة الزمنية',
   'patient.full_name': 'اسم المريض', 'patient.mobile': 'الموبايل',
   'patient.gender': 'الجنس', 'patient.birth_year': 'سنة الميلاد',
-  reason: 'الملاحظة',
+  reason: 'ملاحظة الحجز',
 }
 const EDIT_VALUE_LABELS = {
   ...APPOINTMENT_STATUSES, ...VISIT_TYPES,
