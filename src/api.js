@@ -64,6 +64,26 @@ async function downloadFile(url, fallbackName) {
   return name
 }
 
+// رفع ملفّ (FormData) — بلا Content-Type: المتصفّح يضعه بحدوده. والخطأ يحمل جسمه
+// كاملاً (err.data) كـhttp(): معاينة الاستيراد الجديدة تصل مع 409 PREVIEW_STALE.
+async function postForm(path, form) {
+  let res
+  try {
+    res = await fetch(`/api${path}`, { method: 'POST', headers: { Authorization: `Bearer ${getToken()}` }, body: form })
+  } catch {
+    const err = new Error('تعذّر الاتصال بالخادم — تحقّق من الشبكة وأعد المحاولة')
+    err.status = 0; err.data = { code: 'NETWORK_ERROR' }
+    throw err
+  }
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    const err = new Error(data.error || `HTTP ${res.status}`)
+    err.status = res.status; err.data = data
+    throw err
+  }
+  return data
+}
+
 export const api = {
   login: (username, password) =>
     http('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
@@ -350,6 +370,40 @@ export const api = {
     const data = await res.json().catch(() => ({}))
     if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
     return data
+  },
+
+  // ═══ مخزون المواد — مشرفة العيادات وحدها (الخادم يردّ 403 لغيرها) ═══
+  inventory: {
+    materials: () => http('/inventory/materials'),
+    material: (id) => http(`/inventory/materials/${id}`),
+    units: () => http('/inventory/units'),
+    addMaterial: (body) => http('/inventory/materials', { method: 'POST', body: JSON.stringify(body) }),
+    updateMaterial: (id, body) => http(`/inventory/materials/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+    setPrice: (id, body) => http(`/inventory/materials/${id}/price`, { method: 'POST', body: JSON.stringify(body) }),
+    prices: (id) => http(`/inventory/materials/${id}/prices`),
+    movements: (id, page = 1, per = 20) => http(`/inventory/materials/${id}/movements?page=${page}&per=${per}`),
+    purchase: (body) => http('/inventory/purchases', { method: 'POST', body: JSON.stringify(body) }),
+    stocktakePreview: (items) => http('/inventory/stocktake/preview', { method: 'POST', body: JSON.stringify({ items }) }),
+    stocktake: (items) => http('/inventory/stocktake', { method: 'POST', body: JSON.stringify({ items }) }),
+    consumption: ({ from, to, group }) => http(`/inventory/reports/consumption?${new URLSearchParams({ from, to, group })}`),
+    exportConsumption: ({ from, to, group }) => downloadFile(
+      `/api/inventory/reports/consumption?${new URLSearchParams({ from, to, group, format: 'xlsx' })}`, `استهلاك المواد-${from}.xlsx`),
+    purchases: ({ from, to }) => http(`/inventory/reports/purchases?${new URLSearchParams({ from, to })}`),
+    exportPurchases: ({ from, to }) => downloadFile(
+      `/api/inventory/reports/purchases?${new URLSearchParams({ from, to, format: 'xlsx' })}`, `المشتريات-${from}.xlsx`),
+    template: () => downloadFile('/api/inventory/import/template', 'قالب استيراد المواد.xlsx'),
+    importPreview: (file) => { const f = new FormData(); f.append('file', file); return postForm('/inventory/import/preview', f) },
+    importCommit: (file, fingerprint) => {
+      const f = new FormData(); f.append('fingerprint', fingerprint); f.append('file', file)
+      return postForm('/inventory/import/commit', f)
+    },
+  },
+
+  // ═══ الإشعارات داخل النظام — لكلّ مستخدمٍ ما وُجّه إليه ═══
+  notifications: {
+    list: () => http('/notifications'),
+    read: (id) => http(`/notifications/${id}/read`, { method: 'POST' }),
+    readAll: () => http('/notifications/read-all', { method: 'POST' }),
   },
 }
 
