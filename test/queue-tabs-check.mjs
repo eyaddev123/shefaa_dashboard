@@ -96,10 +96,10 @@ const run = async () => {
   console.log('\n── ١) التوزيع والترتيب والعدّادات ──')
   {
     const { ctx, page, errors } = await open(browser, `/clinic/session/${ATT}`)
-    ok(await selected(page) === 'pending', '«بانتظار الحضور» افتراضاً')
+    ok(await selected(page) === 'present', '«الحضور» افتراضاً')
     ok(!(await page.$('.attn-pending-card')), 'بطاقة «لسا بانتظار» صارت تبويباً')
     const order = await page.locator('.queue-tab').evaluateAll((els) => els.map((e) => e.dataset.tab))
-    ok(order.join() === 'pending,all,present,done,absent', `ترتيب التبويبات (${order})`)
+    ok(order.join() === 'present,pending,done,absent,procedures,referrals,all', `ترتيب التبويبات (${order})`)
     // «الكل»: القائمة كاملة بترتيب الخادم، وعدّادها = كل الحجوزات
     await page.locator('.queue-tab[data-tab="all"]').click()
     ok(JSON.stringify(await rowNames(page)) === JSON.stringify(APPTS.map((a) => a.full_name)), 'الكل: كل الحجوزات بترتيب الخادم')
@@ -111,7 +111,7 @@ const run = async () => {
       const got = await rowNames(page)
       ok(JSON.stringify(got) === JSON.stringify(want), `${tab}: الصفوف والترتيب\n     got  ${got.join('، ')}\n     want ${want.join('، ')}`)
       ok((await tabText(page, tab)).includes(`(${want.length})`), `${tab}: العدّاد (${await tabText(page, tab)})`)
-      ok(new URL(page.url()).searchParams.get('tab') === (tab === 'pending' ? null : tab), `${tab}: في العنوان`)
+      ok(new URL(page.url()).searchParams.get('tab') === (tab === 'present' ? null : tab), `${tab}: في العنوان`)
     }
     // الحالات الخاصّة
     await page.locator('.queue-tab[data-tab="present"]').click()
@@ -247,6 +247,99 @@ const run = async () => {
     ok(await selected(page) === 'done' && await page.locator('.queue-search input').inputValue() === 'ا', 'رجوع ⇐ الواجهة كما كانت')
     const y1 = await page.evaluate(() => window.scrollY)
     ok(Math.abs(y1 - y0) <= 4, `رجوع ⇐ الموضع نفسه (${y0} ⇐ ${y1})`)
+    await ctx.close()
+  }
+
+  // ═══ ٦) «الإجراءات» و«الإحالات» ═══
+  console.log('\n── ٦) الإجراءات والإحالات ──')
+  const digits = (t) => Number(String(t).replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^\d]/g, ''))
+  const live = (a) => (a.procedures || []).filter((l) => !l.removed_at)
+  const PAYING = (a) => !['cancelled', 'no_show', 'postponed'].includes(a.status)
+  // مريضٌ ملغى عليه إجراء: يُصنع من نسخة الـ fixture (الحالة وحدها تتغيّر)
+  const withCancelled = clone(FX.queues[ATT])
+  const cx = withCancelled.appointments.find((a) => a.status === 'cancelled')
+  cx.procedures = [{ id: 7701, procedure_id: 1, name: 'تضميد', price: 15000, removed_at: null, materials: [] }]
+  cx.procedures_total = 15000
+  const LIST = withCancelled.appointments
+  const turn = (a) => (a.arrival_number != null ? [0, a.arrival_number] : [1, a.queue_number])
+  const byTurn = (x, y) => turn(x)[0] - turn(y)[0] || turn(x)[1] - turn(y)[1]
+  {
+    const { ctx, page } = await open(browser, `/clinic/session/${ATT}?tab=procedures`, { queueFor: (sid) => (sid === ATT ? withCancelled : FX.queues[sid]) })
+    const want = LIST.filter((a) => live(a).length).sort(byTurn)
+    ok(JSON.stringify(await rowNames(page)) === JSON.stringify(want.map((a) => a.full_name)), 'الإجراءات: من عليه إجراءٌ قائم، برقم الدور')
+    ok((await tabText(page, 'procedures')).includes(`(${want.length})`), `الإجراءات: العدّاد = عدد المرضى (${await tabText(page, 'procedures')})`)
+    const two = want.find((a) => live(a).length >= 2)
+    const row = page.locator('.queue-tabs-card tbody tr', { hasText: two.full_name })
+    ok(await row.count() === 1, 'مريضٌ بإجراءين: صفٌّ واحد')
+    const cells = await row.locator('td').allInnerTexts()
+    ok(cells[3] === live(two).map((l) => l.name).join('، '), `مريضٌ بإجراءين: الأسماء بـ«،» (${cells[3]})`)
+    ok(digits(cells[4]) === Number(two.procedures_total), `مريضٌ بإجراءين: المجموع (${cells[4]})`)
+    ok(cells[2] === withCancelled.doctor_name, 'الدكتور في الصفّ')
+    const crow = await page.locator('.queue-tabs-card tbody tr', { hasText: cx.full_name }).innerText()
+    ok(crow.includes('ملغى'), 'ملغى بإجراء: في «الإجراءات» بشارته')
+    const total = want.filter(PAYING).reduce((t, a) => t + Number(a.procedures_total), 0)
+    const foot = await page.locator('.queue-extra-total').innerText()
+    ok(digits(foot.split('(')[0]) === total && foot.includes('بلا 1'), `المجموع بلا الملغى (${foot} ≠ ${total})`)
+    ok(!/مواد|حصّة|حصة|شراء/.test(await page.locator('.queue-tabs-card').innerText()), 'لا مواد ولا حصص ولا أسعار شراء')
+    await page.locator('.queue-tab[data-tab="absent"]').click()
+    ok((await rowNames(page)).includes(cx.full_name), 'ملغى بإجراء: في «ما حضر» أيضاً')
+    // الصفّ كلّه يفتح الزيارة، والرجوع بالتبويب
+    await page.locator('.queue-tab[data-tab="procedures"]').click()
+    await row.locator('td').nth(3).click()
+    await page.waitForSelector('.visit-page')
+    await page.locator('.visit-back').click(); await page.waitForSelector('.queue-tabs-card')
+    ok(await selected(page) === 'procedures', 'الصفّ يفتح الزيارة، والرجوع إلى «الإجراءات»')
+    await ctx.close()
+  }
+  {
+    const { ctx, page } = await open(browser, `/clinic/session/${ATT}?tab=referrals`)
+    const want = APPTS.filter((a) => (a.referrals || []).length).sort(byTurn)
+    ok(JSON.stringify(await rowNames(page)) === JSON.stringify(want.map((a) => a.full_name)), 'الإحالات: من عليه إحالة، برقم الدور')
+    ok((await tabText(page, 'referrals')).includes(`(${want.length})`), 'الإحالات: العدّاد')
+    const two = want.find((a) => a.referrals.length >= 2)
+    const row = page.locator('.queue-tabs-card tbody tr', { hasText: two.full_name })
+    ok(await row.count() === 1, 'مريضٌ بإحالتين: صفٌّ واحد')
+    const cells = await row.locator('td').allInnerTexts()
+    ok(cells[2] === two.referrals.map((r) => r.source_name).join('، '), `مريضٌ بإحالتين: الجهتان بـ«،» (${cells[2]})`)
+    ok(digits(cells[3]) === Number(two.referral_discount) && digits(cells[4]) === Number(two.patient_total), `الخصم والمطلوب (${cells[3]} · ${cells[4]})`)
+    const total = want.filter(PAYING).reduce((t, a) => t + Number(a.referral_discount), 0)
+    ok(digits((await page.locator('.queue-extra-total').innerText()).split('(')[0]) === total, 'إجمالي الخصومات')
+    // البحث و«موجود في»
+    await page.locator('.queue-search input').fill(two.full_name.split(' ')[0])
+    ok((await tabText(page, 'referrals')).includes(`(1 من ${want.length})`), `البحث: الإحالات (1 من N) — ${await tabText(page, 'referrals')}`)
+    const none = APPTS.find((a) => !(a.referrals || []).length && !live(a).length && a.status === 'arrived')
+    await page.locator('.queue-search input').fill(none.full_name.split(' ')[0])
+    ok(await page.locator('.queue-tab-empty').count() === 1 && (await page.locator('.queue-tab-empty').innerText()).includes('موجود في'), 'لا نتيجة في الإحالات ⇐ «موجود في»')
+    await page.locator('.queue-tab[data-tab="procedures"]').click()
+    await page.locator('.queue-search input').fill(two.full_name.split(' ')[0])
+    ok((await rowNames(page)).includes(two.full_name), 'البحث في «الإجراءات»')
+    await ctx.close()
+  }
+  {
+    // SSE: إجراءٌ وإحالةٌ تُضافان لمريضٍ بلا شيء ⇐ العدّادان والمجموعان يتحدّثان
+    const after = clone(FX.queues[ATT])
+    const target = after.appointments.find((a) => !(a.referrals || []).length && !live(a).length && a.status === 'arrived')
+    target.procedures = [{ id: 7702, procedure_id: 1, name: 'إيكو قلب', price: 35000, removed_at: null, materials: [] }]
+    target.procedures_total = 35000
+    target.referrals = [{ id: 7703, source_name: 'جهة البثّ', actual_discount: 10000 }]
+    target.referral_discount = 10000
+    let changed = false, release, delivered = false
+    const fire = new Promise((r) => { release = r })
+    const { ctx, page } = await open(browser, `/clinic/session/${ATT}`, {
+      queueFor: (sid) => (sid === ATT && changed ? after : FX.queues[sid]),
+      events: async () => { if (delivered) return null; await fire; setTimeout(() => { delivered = true }, 100)
+        return `event: visit\ndata: ${JSON.stringify({ session_id: Number(ATT) })}\n\n` },
+    })
+    const p0 = APPTS.filter((a) => live(a).length).length, r0 = APPTS.filter((a) => (a.referrals || []).length).length
+    changed = true; release()
+    const ok1 = await page.waitForFunction(([p, r]) => {
+      const t = (k) => document.querySelector(`.queue-tab[data-tab="${k}"]`)?.innerText || ''
+      return t('procedures').includes(`(${p + 1})`) && t('referrals').includes(`(${r + 1})`)
+    }, [p0, r0], { timeout: 5000 }).then(() => true).catch(() => false)
+    ok(ok1, 'حدث البثّ ⇐ عدّادا الإجراءات والإحالات +١ بلا تحديث')
+    await page.locator('.queue-tab[data-tab="procedures"]').click()
+    const tot = after.appointments.filter((a) => live(a).length && PAYING(a)).reduce((t, a) => t + Number(a.procedures_total), 0)
+    ok(digits((await page.locator('.queue-extra-total').innerText()).split('(')[0]) === tot, 'وحدث المجموع')
     await ctx.close()
   }
 

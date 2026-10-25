@@ -2772,3 +2772,6 @@ button.queue-search-clear:hover { color: var(--text-primary); filter: none; }
 .queue-tab-empty { padding: 26px 12px; text-align: center; color: var(--muted); font-size: 13.5px; }
 .queue-tab-empty p + p, .queue-tab-empty p + button { margin-top: 8px; }
 button.queue-tab-jump { padding: 3px 12px; font-size: 12.5px; margin-inline-start: 6px; }
+/* سطر المجموع تحت تبويبي «الإجراءات» و«الإحالات» */
+.queue-extra-total { margin-top: 10px; padding-top: 10px; border-top: 2px solid var(--grid); font-size: 13.5px; text-align: start; }
+.queue-extra-total strong { color: var(--primary); font-size: 15px; }
