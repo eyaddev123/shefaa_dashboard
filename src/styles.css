@@ -2601,3 +2601,93 @@ table.ref-dues td.num, table.ref-totals td.num { white-space: nowrap; }
 .ad-ref-head { display: flex; gap: 10px; align-items: baseline; }
 .ad-ref-line { display: flex; flex-wrap: wrap; justify-content: flex-start; align-items: center; gap: 4px 14px; }
 .ad-ref-edit { padding: 10px 12px; border-radius: 10px; background: var(--primary-soft); }
+
+/* ═══ رقم العيادة بجانب اسم الدكتور (مطابقٌ لفرع ui-queue-naming) ═══ */
+.room-badge {
+  display: inline-block; margin-inline-start: 8px; padding: 2px 10px; border-radius: 999px;
+  font-size: 12.5px; font-weight: 800; line-height: 1.5; vertical-align: middle; white-space: nowrap;
+  color: #fff; background: var(--status-good);
+}
+:root[data-theme='dark'] .room-badge { color: #06301b; }
+.room-badge.lg { margin-inline-start: 12px; padding: 3px 16px; font-size: 18px; }
+.room-badge.none,
+:root[data-theme='dark'] .room-badge.none {
+  color: var(--status-pending); background: var(--status-pending-bg);
+  box-shadow: inset 0 0 0 1px var(--status-pending);
+}
+
+/* ═══ صفحة الزيارة ═══
+   بطاقات التطبيق نفسها (.card) بعناوينها — لا نمط جديد. عمودان على الشاشة العريضة:
+   «المطلوب» و«بيانات المريض» يميناً (أوّل عمود في RTL)، «الإجراءات» و«الإحالات» يساراً
+   وهو الأعرض (جدول ومواد). عمودٌ واحد دون ذلك، بالترتيب نفسه. */
+a.visit-link { color: inherit; font-weight: 600; text-decoration: none; }
+a.visit-link:hover { color: var(--accent-text); text-decoration: underline; }
+
+.visit-page .card { margin-bottom: 16px; }
+.visit-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0 16px; align-items: start; }
+@media (min-width: 1200px) {
+  .visit-grid { grid-template-columns: minmax(300px, 360px) minmax(0, 1fr); }
+}
+.visit-col { min-width: 0; }
+
+/* الرأس: يبقى ظاهراً مع التمرير على ≥1024px — تحتها الشريط العلوي هو الثابت فلا يتراكبان */
+.card.visit-head {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 10px 18px;
+  padding: 12px 18px; overflow: visible;
+}
+@media (min-width: 1024px) {
+  .card.visit-head { position: sticky; top: 0; z-index: 20; box-shadow: var(--shadow-pop); }
+}
+.visit-back { padding: 6px 14px; font-size: 13px; }
+.visit-num { display: flex; flex-direction: column; align-items: center; line-height: 1; min-width: 64px; }
+.visit-num-label { font-size: 11px; color: var(--muted); font-weight: 700; margin-bottom: 3px; }
+.visit-num-main { font-size: 34px; font-weight: 800; color: var(--primary); font-variant-numeric: tabular-nums; }
+.visit-num-ref { font-size: 11px; color: var(--muted); margin-top: 4px; white-space: nowrap; }
+.visit-who { flex: 1 1 260px; min-width: 0; }
+.visit-who h2 { font-size: 19px; font-weight: 800; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.visit-where { margin-top: 4px; font-size: 13px; color: var(--text-secondary); }
+.visit-head-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px 0; white-space: normal; }
+.visit-head-actions:empty { display: none; }
+
+/* عنوان بطاقةٍ بزرٍّ في طرفه */
+.card h3.visit-card-head { justify-content: flex-start; flex-wrap: wrap; }
+.visit-card-btn { margin-inline-start: auto; padding: 4px 14px; font-size: 12.5px; }
+.visit-empty { font-size: 12.5px; color: var(--muted); margin: 2px 0 8px; }
+
+/* المطلوب من المريض — الرقم النهائي هو الأبرز في الصفحة */
+.card.visit-pay { border-inline-start: 4px solid var(--primary); }
+.visit-pay table td { padding: 7px 4px; font-size: 13px; }
+.visit-pay table td.num { text-align: end; white-space: nowrap; font-weight: 700; }
+.visit-pay-disc td { color: var(--status-good); }
+.visit-pay-sub { display: block; font-size: 11.5px; color: var(--muted); }
+.visit-pay-final {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+  margin-top: 8px; padding-top: 12px; border-top: 2px solid var(--grid);
+}
+.visit-pay-final span { font-size: 13.5px; font-weight: 700; color: var(--text-secondary); }
+.visit-pay-final strong { font-size: 30px; font-weight: 800; color: var(--primary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.visit-pay-was { font-size: 12px; color: var(--muted); margin-top: 2px; text-align: end; }
+.visit-reprint { margin-top: 12px; padding: 6px 16px; font-size: 12.5px; }
+
+/* بيانات المريض: شبكة قراءة من .appt-details-grid، والملاحظة سطرٌ كامل */
+.visit-facts { margin-bottom: 12px; }
+.visit-facts > div { flex: 1 1 130px; }
+.visit-facts > .visit-facts-wide { flex-basis: 100%; }
+.visit-facts dd { font-weight: 600; }
+.visit-info { border-bottom: none; border-top: 1px solid var(--grid); padding: 10px 0 0; margin: 10px 0 0; }
+
+/* الأقسام القديمة داخل بطاقاتها: الفاصل العلوي كان يفصلها عن لوحةٍ واحدة — البطاقة تكفي الآن */
+.visit-procs .appt-procs { margin-top: 0; padding-top: 0; border-top: none; }
+.visit-procs .appt-procs-table { width: 100%; min-width: 0; }
+.visit-procs .proc-add select { flex: 1 1 200px; }
+.visit-refs .ad-referral { margin: 0; padding: 0; border: none; background: none; }
+.visit-refs .ref-add { padding: 5px 14px; font-size: 12.5px; }
+
+/* السجل: عنوانٌ يُطوى ويُفتح */
+.visit-history h3 { margin-bottom: 8px; }
+button.visit-fold {
+  background: none; border: none; color: inherit; font: inherit; padding: 0; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 8px;
+}
+button.visit-fold:hover { filter: none; color: var(--accent-text); }
+.visit-fold-icon { font-size: 12px; color: var(--muted); width: 12px; }

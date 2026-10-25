@@ -33,6 +33,7 @@ import ClinicReferrals from './pages/ClinicReferrals.jsx'
 import ClinicProcedures from './pages/ClinicProcedures.jsx'
 import Inventory from './pages/Inventory.jsx'
 import SessionQueue from './pages/SessionQueue.jsx'
+import VisitPage from './pages/VisitPage.jsx'
 import DoctorScreen from './pages/DoctorScreen.jsx'
 import PublicDisplay from './pages/PublicDisplay.jsx'
 import OrderDisplay from './pages/OrderDisplay.jsx'
@@ -216,6 +217,9 @@ function Shell() {
             <Guard allow={canSeeClinicBoard}><ClinicBoard /></Guard>} />
           <Route path="/clinic/session/:id" element={
             <Guard allow={canSeeClinicBoard}><SessionQueue /></Guard>} />
+          {/* صفحة الزيارة: بحارس الطابور نفسه — من لا يرى الطابور (الطبيب) لا يرى تفاصيل زيارته */}
+          <Route path="/clinic/session/:sessionId/visit/:id" element={
+            <Guard allow={canSeeClinicBoard}><VisitPage /></Guard>} />
           <Route path="/clinic/doctor" element={
             <Guard allow={canSeeDoctorScreen}><DoctorScreen /></Guard>} />
           <Route path="/users" element={
