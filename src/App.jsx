@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Navigate, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { RoleProvider, useRole } from './RoleContext.jsx'
 import {
-  canManageUsers, canReadAid, canSearchAid, canSeeClinicBoard, canSeeDoctorsPage,
+  canManageUsers, canReadAid, canSearchAid, canSeeClinicBoard, canSeeCashReport, canSeeDoctorsPage,
   canSeeDoctorScreen, canSeeSettings, canSeeProceduresPage, canSeePrinterSetup, canSeeInventory, canSeeReferralsPage, homePathFor,
 } from './permissions.js'
 import { ROLE_LABELS } from './api.js'
@@ -29,6 +29,7 @@ import Settings from './pages/Settings.jsx'
 import PrinterSetup from './pages/PrinterSetup.jsx'
 import Users from './pages/Users.jsx'
 import ClinicBoard from './pages/ClinicBoard.jsx'
+import CashReport from './pages/CashReport.jsx'
 import ClinicReferrals from './pages/ClinicReferrals.jsx'
 import ClinicProcedures from './pages/ClinicProcedures.jsx'
 import Inventory from './pages/Inventory.jsx'
@@ -215,6 +216,8 @@ function Shell() {
             <Guard allow={canSeeReferralsPage}><ClinicReferrals /></Guard>} />
           <Route path="/clinic/board" element={
             <Guard allow={canSeeClinicBoard}><ClinicBoard /></Guard>} />
+          <Route path="/clinic/cash-report" element={
+            <Guard allow={canSeeCashReport}><CashReport /></Guard>} />
           <Route path="/clinic/session/:id" element={
             <Guard allow={canSeeClinicBoard}><SessionQueue /></Guard>} />
           {/* صفحة الزيارة: بحارس الطابور نفسه — من لا يرى الطابور (الطبيب) لا يرى تفاصيل زيارته */}

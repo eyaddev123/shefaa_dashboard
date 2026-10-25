@@ -1,0 +1,602 @@
+{
+ "me": {
+  "rec": {
+   "id": "1",
+   "username": "rec",
+   "display_name": "ولاء السقا",
+   "role": "clinic_reception",
+   "board_member_id": null,
+   "is_chairman": false,
+   "member_title": null
+  },
+  "adm": {
+   "id": "2",
+   "username": "adm",
+   "display_name": "اسماء السقا",
+   "role": "clinic_admin",
+   "board_member_id": null,
+   "is_chairman": false,
+   "member_title": null
+  },
+  "mgr": {
+   "id": "7",
+   "username": "mgr",
+   "display_name": "مدير",
+   "role": "manager",
+   "board_member_id": null,
+   "is_chairman": false,
+   "member_title": null
+  },
+  "doc1": {
+   "id": "3",
+   "username": "doc1",
+   "display_name": "كمال",
+   "role": "doctor",
+   "board_member_id": null,
+   "is_chairman": false,
+   "member_title": null
+  }
+ },
+ "today": "2026-10-25",
+ "four": {
+  "date": "2026-10-25",
+  "clinic": null,
+  "clinicText": "كل العيادات",
+  "totals": {
+   "patients": 8,
+   "procCount": 4,
+   "fee": 165000,
+   "procTotal": 110000,
+   "discount": 15000,
+   "total": 260000
+  },
+  "doctors": [
+   {
+    "key": "2",
+    "doctorId": "2",
+    "doctor": "د. ديمة متولي",
+    "specialty": "أسنان",
+    "room": "2",
+    "clinic": "العيادة 2",
+    "sessionStart": "09:00",
+    "rows": [
+     {
+      "id": "7",
+      "queue": 1,
+      "name": "غسان إسعافي الطارئ",
+      "room": "2",
+      "clinic": "العيادة 2",
+      "doctorId": "2",
+      "doctor": "د. ديمة متولي",
+      "specialty": "أسنان",
+      "sessionStart": "09:00",
+      "visit": "معاينة",
+      "fee": 20000,
+      "procItems": [],
+      "procs": "",
+      "procCount": 0,
+      "procTotal": 0,
+      "referral": "",
+      "discount": 0,
+      "total": 20000,
+      "arrived": "21:49",
+      "remarks": [
+       "إسعافي"
+      ],
+      "flags": [],
+      "notes": "إسعافي",
+      "flagged": false
+     },
+     {
+      "id": "8",
+      "queue": 2,
+      "name": "هالة سعر صفر",
+      "room": "2",
+      "clinic": "العيادة 2",
+      "doctorId": "2",
+      "doctor": "د. ديمة متولي",
+      "specialty": "أسنان",
+      "sessionStart": "09:00",
+      "visit": "معاينة",
+      "fee": 20000,
+      "procItems": [
+       {
+        "name": "تنظيف",
+        "price": 0
+       }
+      ],
+      "procs": "تنظيف (0)",
+      "procCount": 1,
+      "procTotal": 0,
+      "referral": "",
+      "discount": 0,
+      "total": 20000,
+      "arrived": "21:49",
+      "remarks": [],
+      "flags": [
+       "سعر ناقص"
+      ],
+      "notes": "سعر ناقص",
+      "flagged": true
+     }
+    ],
+    "totals": {
+     "patients": 2,
+     "procCount": 1,
+     "fee": 40000,
+     "procTotal": 0,
+     "discount": 0,
+     "total": 40000
+    },
+    "flagged": 1
+   },
+   {
+    "key": "1",
+    "doctorId": "1",
+    "doctor": "د. كمال العزب",
+    "specialty": "أسنان",
+    "room": "2",
+    "clinic": "العيادة 2",
+    "sessionStart": "09:00",
+    "rows": [
+     {
+      "id": "1",
+      "queue": 1,
+      "name": "أحمد محمود الخطيب",
+      "room": "2",
+      "clinic": "العيادة 2",
+      "doctorId": "1",
+      "doctor": "د. كمال العزب",
+      "specialty": "أسنان",
+      "sessionStart": "09:00",
+      "visit": "معاينة",
+      "fee": 25000,
+      "procItems": [],
+      "procs": "",
+      "procCount": 0,
+      "procTotal": 0,
+      "referral": "",
+      "discount": 0,
+      "total": 25000,
+      "arrived": "21:49",
+      "remarks": [
+       "ألم ضرس"
+      ],
+      "flags": [],
+      "notes": "ألم ضرس",
+      "flagged": false
+     },
+     {
+      "id": "2",
+      "queue": 2,
+      "name": "بشرى علي النجار",
+      "room": "2",
+      "clinic": "العيادة 2",
+      "doctorId": "1",
+      "doctor": "د. كمال العزب",
+      "specialty": "أسنان",
+      "sessionStart": "09:00",
+      "visit": "معاينة",
+      "fee": 25000,
+      "procItems": [
+       {
+        "name": "قلع",
+        "price": 50000
+       },
+       {
+        "name": "حشوة",
+        "price": 30000
+       }
+      ],
+      "procs": "قلع (50,000)، حشوة (30,000)",
+      "procCount": 2,
+      "procTotal": 80000,
+      "referral": "",
+      "discount": 0,
+      "total": 105000,
+      "arrived": "21:49",
+      "remarks": [],
+      "flags": [],
+      "notes": "",
+      "flagged": false
+     },
+     {
+      "id": "3",
+      "queue": 3,
+      "name": "جميلة حسن الأحمد",
+      "room": "2",
+      "clinic": "العيادة 2",
+      "doctorId": "1",
+      "doctor": "د. كمال العزب",
+      "specialty": "أسنان",
+      "sessionStart": "09:00",
+      "visit": "مراجعة",
+      "fee": 0,
+      "procItems": [],
+      "procs": "",
+      "procCount": 0,
+      "procTotal": 0,
+      "referral": "",
+      "discount": 0,
+      "total": 0,
+      "arrived": "21:49",
+      "remarks": [
+       "بلا رسم كشف",
+       "مراجعة بتجاوز الشرط: مراجعة مجانية بطلب الإدارة"
+      ],
+      "flags": [],
+      "notes": "بلا رسم كشف | مراجعة بتجاوز الشرط: مراجعة مجانية بطلب الإدارة",
+      "flagged": false
+     }
+    ],
+    "totals": {
+     "patients": 3,
+     "procCount": 2,
+     "fee": 50000,
+     "procTotal": 80000,
+     "discount": 0,
+     "total": 130000
+    },
+    "flagged": 0
+   },
+   {
+    "key": "3",
+    "doctorId": "3",
+    "doctor": "د. سامر الخطيب",
+    "specialty": "قلبية",
+    "room": "5",
+    "clinic": "العيادة 5",
+    "sessionStart": "09:00",
+    "rows": [
+     {
+      "id": "9",
+      "queue": 1,
+      "name": "إياد سامر العلي",
+      "room": "5",
+      "clinic": "العيادة 5",
+      "doctorId": "3",
+      "doctor": "د. سامر الخطيب",
+      "specialty": "قلبية",
+      "sessionStart": "09:00",
+      "visit": "معاينة",
+      "fee": 30000,
+      "procItems": [
+       {
+        "name": "حشوة",
+        "price": 30000
+       }
+      ],
+      "procs": "حشوة (30,000)",
+      "procCount": 1,
+      "procTotal": 30000,
+      "referral": "",
+      "discount": 0,
+      "total": 60000,
+      "arrived": "21:49",
+      "remarks": [],
+      "flags": [],
+      "notes": "",
+      "flagged": false
+     },
+     {
+      "id": "11",
+      "queue": 2,
+      "name": "كريم إحالة الجمعية",
+      "room": "5",
+      "clinic": "العيادة 5",
+      "doctorId": "3",
+      "doctor": "د. سامر الخطيب",
+      "specialty": "قلبية",
+      "sessionStart": "09:00",
+      "visit": "معاينة",
+      "fee": 30000,
+      "procItems": [],
+      "procs": "",
+      "procCount": 0,
+      "procTotal": 0,
+      "referral": "جمعية النور",
+      "discount": 15000,
+      "total": 15000,
+      "arrived": "21:49",
+      "remarks": [],
+      "flags": [],
+      "notes": "",
+      "flagged": false
+     }
+    ],
+    "totals": {
+     "patients": 2,
+     "procCount": 1,
+     "fee": 60000,
+     "procTotal": 30000,
+     "discount": 15000,
+     "total": 75000
+    },
+    "flagged": 0
+   },
+   {
+    "key": "5",
+    "doctorId": "5",
+    "doctor": "د. سوسن النجرس",
+    "specialty": "",
+    "room": null,
+    "clinic": "بلا عيادة",
+    "sessionStart": "09:00",
+    "rows": [
+     {
+      "id": "10",
+      "queue": 1,
+      "name": "جنى بلا عيادة",
+      "room": null,
+      "clinic": "بلا عيادة",
+      "doctorId": "5",
+      "doctor": "د. سوسن النجرس",
+      "specialty": "",
+      "sessionStart": "09:00",
+      "visit": "معاينة",
+      "fee": 15000,
+      "procItems": [],
+      "procs": "",
+      "procCount": 0,
+      "procTotal": 0,
+      "referral": "",
+      "discount": 0,
+      "total": 15000,
+      "arrived": "21:49",
+      "remarks": [],
+      "flags": [],
+      "notes": "",
+      "flagged": false
+     }
+    ],
+    "totals": {
+     "patients": 1,
+     "procCount": 0,
+     "fee": 15000,
+     "procTotal": 0,
+     "discount": 0,
+     "total": 15000
+    },
+    "flagged": 0
+   }
+  ],
+  "flagged": 1,
+  "check": {
+   "independentTotal": 260000,
+   "independentPatients": 8,
+   "diff": 0,
+   "ok": true
+  }
+ },
+ "two": {
+  "date": "2026-10-25",
+  "clinic": "2",
+  "clinicText": "العيادة 2",
+  "totals": {
+   "patients": 5,
+   "procCount": 3,
+   "fee": 90000,
+   "procTotal": 80000,
+   "discount": 0,
+   "total": 170000
+  },
+  "doctors": [
+   {
+    "key": "2",
+    "doctorId": "2",
+    "doctor": "د. ديمة متولي",
+    "specialty": "أسنان",
+    "room": "2",
+    "clinic": "العيادة 2",
+    "sessionStart": "09:00",
+    "rows": [
+     {
+      "id": "7",
+      "queue": 1,
+      "name": "غسان إسعافي الطارئ",
+      "room": "2",
+      "clinic": "العيادة 2",
+      "doctorId": "2",
+      "doctor": "د. ديمة متولي",
+      "specialty": "أسنان",
+      "sessionStart": "09:00",
+      "visit": "معاينة",
+      "fee": 20000,
+      "procItems": [],
+      "procs": "",
+      "procCount": 0,
+      "procTotal": 0,
+      "referral": "",
+      "discount": 0,
+      "total": 20000,
+      "arrived": "21:49",
+      "remarks": [
+       "إسعافي"
+      ],
+      "flags": [],
+      "notes": "إسعافي",
+      "flagged": false
+     },
+     {
+      "id": "8",
+      "queue": 2,
+      "name": "هالة سعر صفر",
+      "room": "2",
+      "clinic": "العيادة 2",
+      "doctorId": "2",
+      "doctor": "د. ديمة متولي",
+      "specialty": "أسنان",
+      "sessionStart": "09:00",
+      "visit": "معاينة",
+      "fee": 20000,
+      "procItems": [
+       {
+        "name": "تنظيف",
+        "price": 0
+       }
+      ],
+      "procs": "تنظيف (0)",
+      "procCount": 1,
+      "procTotal": 0,
+      "referral": "",
+      "discount": 0,
+      "total": 20000,
+      "arrived": "21:49",
+      "remarks": [],
+      "flags": [
+       "سعر ناقص"
+      ],
+      "notes": "سعر ناقص",
+      "flagged": true
+     }
+    ],
+    "totals": {
+     "patients": 2,
+     "procCount": 1,
+     "fee": 40000,
+     "procTotal": 0,
+     "discount": 0,
+     "total": 40000
+    },
+    "flagged": 1
+   },
+   {
+    "key": "1",
+    "doctorId": "1",
+    "doctor": "د. كمال العزب",
+    "specialty": "أسنان",
+    "room": "2",
+    "clinic": "العيادة 2",
+    "sessionStart": "09:00",
+    "rows": [
+     {
+      "id": "1",
+      "queue": 1,
+      "name": "أحمد محمود الخطيب",
+      "room": "2",
+      "clinic": "العيادة 2",
+      "doctorId": "1",
+      "doctor": "د. كمال العزب",
+      "specialty": "أسنان",
+      "sessionStart": "09:00",
+      "visit": "معاينة",
+      "fee": 25000,
+      "procItems": [],
+      "procs": "",
+      "procCount": 0,
+      "procTotal": 0,
+      "referral": "",
+      "discount": 0,
+      "total": 25000,
+      "arrived": "21:49",
+      "remarks": [
+       "ألم ضرس"
+      ],
+      "flags": [],
+      "notes": "ألم ضرس",
+      "flagged": false
+     },
+     {
+      "id": "2",
+      "queue": 2,
+      "name": "بشرى علي النجار",
+      "room": "2",
+      "clinic": "العيادة 2",
+      "doctorId": "1",
+      "doctor": "د. كمال العزب",
+      "specialty": "أسنان",
+      "sessionStart": "09:00",
+      "visit": "معاينة",
+      "fee": 25000,
+      "procItems": [
+       {
+        "name": "قلع",
+        "price": 50000
+       },
+       {
+        "name": "حشوة",
+        "price": 30000
+       }
+      ],
+      "procs": "قلع (50,000)، حشوة (30,000)",
+      "procCount": 2,
+      "procTotal": 80000,
+      "referral": "",
+      "discount": 0,
+      "total": 105000,
+      "arrived": "21:49",
+      "remarks": [],
+      "flags": [],
+      "notes": "",
+      "flagged": false
+     },
+     {
+      "id": "3",
+      "queue": 3,
+      "name": "جميلة حسن الأحمد",
+      "room": "2",
+      "clinic": "العيادة 2",
+      "doctorId": "1",
+      "doctor": "د. كمال العزب",
+      "specialty": "أسنان",
+      "sessionStart": "09:00",
+      "visit": "مراجعة",
+      "fee": 0,
+      "procItems": [],
+      "procs": "",
+      "procCount": 0,
+      "procTotal": 0,
+      "referral": "",
+      "discount": 0,
+      "total": 0,
+      "arrived": "21:49",
+      "remarks": [
+       "بلا رسم كشف",
+       "مراجعة بتجاوز الشرط: مراجعة مجانية بطلب الإدارة"
+      ],
+      "flags": [],
+      "notes": "بلا رسم كشف | مراجعة بتجاوز الشرط: مراجعة مجانية بطلب الإدارة",
+      "flagged": false
+     }
+    ],
+    "totals": {
+     "patients": 3,
+     "procCount": 2,
+     "fee": 50000,
+     "procTotal": 80000,
+     "discount": 0,
+     "total": 130000
+    },
+    "flagged": 0
+   }
+  ],
+  "flagged": 1,
+  "check": {
+   "independentTotal": 170000,
+   "independentPatients": 5,
+   "diff": 0,
+   "ok": true
+  }
+ },
+ "empty": {
+  "date": "2026-03-03",
+  "clinic": null,
+  "clinicText": "كل العيادات",
+  "totals": {
+   "patients": 0,
+   "procCount": 0,
+   "fee": 0,
+   "procTotal": 0,
+   "discount": 0,
+   "total": 0
+  },
+  "doctors": [],
+  "flagged": 0,
+  "check": {
+   "independentTotal": 0,
+   "independentPatients": 0,
+   "diff": 0,
+   "ok": true
+  }
+ }
+}
