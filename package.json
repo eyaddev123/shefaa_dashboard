@@ -11,7 +11,8 @@
     "test:board": "node test/board-layout-check.mjs",
     "test:order": "node test/order-display-check.mjs",
     "test:ticket": "node test/ticket-print-check.mjs",
-    "test:copies": "node test/ticket-copies-check.mjs"
+    "test:copies": "node test/ticket-copies-check.mjs",
+    "test:naming": "node test/ui-naming-check.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

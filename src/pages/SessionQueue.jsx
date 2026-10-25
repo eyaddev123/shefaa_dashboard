@@ -11,6 +11,7 @@ import { useRole } from '../RoleContext.jsx'
 import { useToast, RecallButton } from '../action-feedback.jsx'
 import { canEditAppointmentProcedures, canEditBooking, canStepOutAsSupervisor } from '../permissions.js'
 import { WAITING_RETURN, waitingReturnOf, serverOffsetOf, Elapsed, useStaffEvents } from '../waiting-return.jsx'
+import RoomBadge from '../components/RoomBadge.jsx'
 import MaterialsEditor, { qtyValid, toPayload, fmtQty, materialsSummary } from '../components/MaterialsEditor.jsx'
 
 // شارة الأولوية — تُبرز من يتقدّم الطابور وسببه
@@ -29,7 +30,7 @@ function SlotCell({ appt }) {
   // ولا يفهم شيئاً. نكتبها صراحةً: الموعد لم يُلغَ، بل صار بعد انتهاء الدوام.
   if (!appt.slot_time && (appt.delays || []).some((d) => d.cause === 'session_overflow')) {
     return (
-      <span title="انزاح موعده إلى ما بعد نهاية الدوام — ما زال في الطابور">
+      <span title="انزاح موعده إلى ما بعد نهاية الدوام — ما زال في قائمة الدور">
         <s style={{ opacity: 0.55 }} dir="ltr">{orig}</s>{' → '}
         <strong className="after-hours">بعد انتهاء الدوام</strong>
       </span>
@@ -364,7 +365,7 @@ function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel, urgent = f
                 : '⚠ يُسجَّل حاضراً ويتصدّر الحاضرين — يُنادى بعد المريض الحالي')
               : 'شارة تنبيه فقط — مكانه بترتيب حضوره كغيره')
             : form.priority === 'urgent'
-              ? '⚠ يتصدّر الطابور — يُنادى بعد المريض الحالي مباشرة، ومواعيد المنتظرين تتأجل'
+              ? '⚠ يتصدّر قائمة الدور — يُنادى بعد المريض الحالي مباشرة، ومواعيد المنتظرين تتأجل'
               : '⚠ يتقدّم كل المنتظرين، ومواعيدهم تتأجل'}
         </p>
       )}
@@ -573,7 +574,7 @@ function PostponeDialog({ appt, currentSessionId, showTicket, attendance = false
               <option value="">— اختر —</option>
               {(sessions || []).map((sn) => (
                 <option key={sn.id} value={sn.id}>
-                  {sn.doctor_name} · {fmtTime(sn.start_time)}–{fmtTime(sn.end_time)} ({sn.active_count} بالطابور)
+                  {sn.doctor_name} · {fmtTime(sn.start_time)}–{fmtTime(sn.end_time)} ({sn.active_count} على الدور)
                 </option>
               ))}
             </select>
@@ -751,7 +752,7 @@ function PriorityPicker({ appt, attendance, onClose, onDone, onArrived }) {
   const choices = [
     ['urgent', 'إسعافي', 'bad', attendance
       ? 'يُسجَّل حاضراً ويتصدّر الحاضرين — يُنادى بعد المريض الحالي'
-      : 'يتصدّر الطابور، ومواعيد المنتظرين بعده تتأجل'],
+      : 'يتصدّر قائمة الدور، ومواعيد المنتظرين بعده تتأجل'],
     ['elderly', 'كبير السن', 'warn', attendance
       ? 'شارة تنبيه فقط — مكانه بترتيب حضوره'
       : 'يتقدّم المنتظرين، ومواعيدهم تتأجل'],
@@ -1531,7 +1532,7 @@ function AttendanceQueueTable({ data, actions }) {
   const offset = serverOffsetOf(data)
   return (
     <div className="card">
-      <h3>الطابور ({data.appointments.length})</h3>
+      <h3>قائمة الدور ({data.appointments.length})</h3>
       <p className="subtitle" style={{ marginTop: -6 }}>
         رقم الدور يُعطى عند <strong>الحضور</strong> (١، ٢، ٣…) ولا يتغيّر، والنداء بترتيبه —
         الإسعافي الحاضر أولاً. تحته صغيراً: رقم الحجز والوقت التقريبي.
@@ -1693,7 +1694,7 @@ export default function SessionQueue() {
 
   const load = () => api.clinic.queue(id).then((d) => { setData(d); setLoadErr(null) })
     .catch((e) => {
-      if (data) showToast(`تعذّر تحديث الطابور — يُعاد المحاولة تلقائياً (${e.message})`)
+      if (data) showToast(`تعذّر تحديث قائمة الدور — يُعاد المحاولة تلقائياً (${e.message})`)
       else setLoadErr(e.message)
     })
   useEffect(() => { load() }, [id])
@@ -1772,7 +1773,7 @@ export default function SessionQueue() {
 
   return (
     <>
-      <h2>طابور {data.doctor_name}<FlowModeTag mode={data.flow_mode} /></h2>
+      <h2 className="queue-head">دور {data.doctor_name}<RoomBadge room={data.room} size="lg" /><FlowModeTag mode={data.flow_mode} /></h2>
       <p className="subtitle">
         {data.specialty || '—'} · {fmtTime(data.start_time)} – {fmtTime(data.end_time)} ·
         مدة الكشف المتوقعة {data.expected_visit_minutes} دقيقة ·
@@ -1864,7 +1865,7 @@ export default function SessionQueue() {
             <h3>⏰ تجاوزوا وقت الدوام ({overflowed.length})</h3>
             <p className="subtitle" style={{ marginTop: -6 }}>
               انزاحت مواعيدهم إلى ما بعد نهاية الدوام ففقدوا خانتهم الزمنية.
-              <strong> ما زالوا في الطابور</strong> ويُنادى عليهم إن فرغ الدكتور —
+              <strong> ما زالوا في قائمة الدور</strong> ويُنادى عليهم إن فرغ الدكتور —
               أو أجّل موعدهم إلى جلسة أخرى.
             </p>
             <table>
@@ -1932,7 +1933,7 @@ export default function SessionQueue() {
 
       {!attendance && (
       <div className="card">
-        <h3>الطابور ({data.appointments.length})</h3>
+        <h3>قائمة الدور ({data.appointments.length})</h3>
         <p className="subtitle" style={{ marginTop: -6 }}>
           مرتَّب بترتيب الخدمة الفعلي: أصحاب الأولوية أولاً ثم بقية الأدوار.
           <strong> رقم الدور لا يتغير</strong> عند دخول حالة فورية — يتغيّر الوقت فقط، ويظهر أدناه أصله ومقدار انزياحه.
