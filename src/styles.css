@@ -1219,7 +1219,8 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
 
 /* ═══ بطاقة النداء: تغطي الشاشة لحظة النداء ثم تنسحب ═══ */
 .pd-banner {
-  position: fixed; inset: 0; z-index: 50;
+  /* top/right/bottom/left لا inset (Chrome 87): التلفاز على Chrome 66 */
+  position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 50;
   display: flex; align-items: center; justify-content: center;
   background: rgba(6, 15, 14, 0.94);
   animation: pd-banner-in 0.35s ease-out;
@@ -1231,14 +1232,24 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
   animation: pd-pulse 1.4s ease-in-out infinite;
 }
 .pd-banner-label {
-  font-size: clamp(14px, 1.5vw, 28px); font-weight: 700; color: #7fd6b8;
+  font-size: 1.5vw; font-weight: 700; color: #7fd6b8;
   letter-spacing: 0.4em; margin-bottom: 1vh;
 }
 .pd-banner-number {
-  font-size: clamp(90px, 16vw, 300px); font-weight: 800; color: #14b8a6; line-height: 0.9;
+  font-size: 16vw; font-weight: 800; color: #14b8a6; line-height: 0.9;
 }
-.pd-banner-dest { font-size: clamp(18px, 2.4vw, 46px); font-weight: 600; color: #b3c6c2; margin-top: 2vh; }
+.pd-banner-dest { font-size: 2.4vw; font-weight: 600; color: #b3c6c2; margin-top: 2vh; }
 .pd-banner-dest b { color: #7fd6b8; font-weight: 800; }
+/* ═══ حدود بطاقة النداء: media queries بدل clamp() — كالترويسة ═══
+   clamp() غائبة في Chrome 66 فكان الرقم المنادى نفسه ينزل إلى ١٦px على التلفاز.
+   كلّ حدٍّ عند العرض الذي يبلغه فيه vw بالضبط (الحدّ ÷ النسبة × ١٠٠). وما تحت 1024
+   تحكمه كتلة الجوال أدناه (رقمٌ بـ 34vw وتسميةٌ 16px) بحدودها هي. */
+@media (max-width: 933px)   { .pd-banner-label { font-size: 14px; } }    /* 14 ÷ 1.5%  */
+@media (min-width: 1867px)  { .pd-banner-label { font-size: 28px; } }    /* 28 ÷ 1.5%  */
+@media (max-width: 562px)   { .pd-banner-number { font-size: 90px; } }   /* 90 ÷ 16%   */
+@media (min-width: 1875px)  { .pd-banner-number { font-size: 300px; } }  /* 300 ÷ 16%  */
+@media (max-width: 750px)   { .pd-banner-dest { font-size: 18px; } }     /* 18 ÷ 2.4%  */
+@media (min-width: 1917px)  { .pd-banner-dest { font-size: 46px; } }     /* 46 ÷ 2.4%  */
 
 @keyframes pd-banner-in {
   from { opacity: 0; transform: scale(0.92); }
@@ -1720,13 +1731,18 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
      54px على أي تلفاز يُبلغ المتصفح بعرضٍ أقل من 1024 مهما كبر ارتفاعه. المقاسات الآن
      تتبع البطاقة، وتُحسب في JS — انظر cardFonts في PublicDisplay.jsx.) */
 
-  /* رقم النداء 190px يفيض عرض الجوال — clamp يُبقيه أكبر ما تحتمله الشاشة */
-  .pd-banner-inner { padding: 32px 24px; border-radius: 24px; width: min(92vw, 560px); }
-  .pd-banner-number { font-size: clamp(88px, 34vw, 190px); }
+  /* رقم النداء 190px يفيض عرض الجوال — 34vw بحدَّين (أدناه) يُبقيه أكبر ما تحتمله الشاشة.
+     width + max-width = min(92vw, 560px) بلا min() — غائبة في Chrome 66 */
+  .pd-banner-inner { padding: 32px 24px; border-radius: 24px; width: 92vw; max-width: 560px; }
+  .pd-banner-number { font-size: 34vw; }
   .pd-banner-label { font-size: 16px; letter-spacing: 4px; }
   .pd-banner-doctor { font-size: 22px; margin-top: 14px; }
   .pd-banner-room { font-size: 20px; }
 }
+
+/* حدّا رقم النداء على الجوال (كانا clamp(88px, 34vw, 190px)) — بعد كتلة 1023 لتغلبها */
+@media (max-width: 258px)                        { .pd-banner-number { font-size: 88px; } }   /* 88 ÷ 34%  */
+@media (min-width: 559px) and (max-width: 1023px) { .pd-banner-number { font-size: 190px; } }  /* 190 ÷ 34% */
 
 @media (max-width: 639px) {
   .public-display-grid { grid-template-columns: 1fr; }

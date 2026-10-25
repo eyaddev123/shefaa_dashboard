@@ -120,7 +120,7 @@ export default function DoctorScreen() {
                     {attendance && <AttendanceBadge priority={current.priority} />}
                   </div>
                   <div style={{ color: 'var(--text-secondary)' }}>{current.full_name}</div>
-                  {current.reason && <div style={{ color: 'var(--muted)', fontSize: 13, marginTop: 4 }}>سبب الزيارة: {current.reason}</div>}
+                  {current.reason && <div style={{ color: 'var(--muted)', fontSize: 13, marginTop: 4 }}>ملاحظة الحجز: {current.reason}</div>}
                   {attendance && current.started_at && (
                     <div style={{ color: 'var(--muted)', fontSize: 13, marginTop: 4 }}>بدأ الكشف {fmtClock(current.started_at)}</div>
                   )}

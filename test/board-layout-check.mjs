@@ -302,43 +302,74 @@ const run = async () => {
     }
   }
 
-  // ═══ بطاقة النداء: التسمية «العيادة» ═══
+  // ═══ بطاقة النداء: التسمية «العيادة»، وأحجامٌ تعمل على Chrome 66 ═══
   // فحصُ البطاقات وحدها لا يكفي: بطاقة النداء تظهر عند حدث call فقط، وقد بقيت
-  // تقول «الغرفة» بعد تغيير التسمية — لا يراها إلا من ينادي.
+  // تقول «الغرفة» بعد تغيير التسمية — لا يراها إلا من ينادي. وكانت أحجامها clamp()
+  // فنزل الرقم المنادى إلى ١٦px على التلفاز؛ الآن media queries، والحجم المتوقَّع
+  // هنا = ما كانت clamp ستعطيه في كلّ عرض (والجوال تحت 1024 بحدوده هو).
   {
-    const ctx = await browser.newContext({ viewport: { width: 1920, height: 1080 } })
-    await ctx.addInitScript((snap) => {
-      const orig = CSS.supports.bind(CSS)
-      CSS.supports = (...a) => /container-type|aspect-ratio/.test(a.join(' ')) ? false : orig(...a)
-      class FakeES {
-        constructor() { this.l = {}; window.__sse = this
-          setTimeout(() => { if (this.onopen) this.onopen({})
-            ;(this.l.snapshot || []).forEach((f) => f({ data: JSON.stringify(snap) })) }, 30) }
-        addEventListener(t, f) { (this.l[t] = this.l[t] || []).push(f) }
-        removeEventListener() {} close() {}
-        emit(t, d) { (this.l[t] || []).forEach((f) => f({ data: JSON.stringify(d) })) }
+    const CALL_SIZES = [[1920, 1080], [1366, 768], [960, 540], [375, 667]]
+    const between = (lo, v, hi) => Math.min(hi, Math.max(lo, v))
+    const line = []
+    for (const [w, h] of CALL_SIZES) {
+      const ctx = await browser.newContext({ viewport: { width: w, height: h } })
+      await ctx.addInitScript((snap) => {
+        const orig = CSS.supports.bind(CSS)
+        CSS.supports = (...a) => /container-type|aspect-ratio/.test(a.join(' ')) ? false : orig(...a)
+        class FakeES {
+          constructor() { this.l = {}; window.__sse = this
+            setTimeout(() => { if (this.onopen) this.onopen({})
+              ;(this.l.snapshot || []).forEach((f) => f({ data: JSON.stringify(snap) })) }, 30) }
+          addEventListener(t, f) { (this.l[t] = this.l[t] || []).push(f) }
+          removeEventListener() {} close() {}
+          emit(t, d) { (this.l[t] || []).forEach((f) => f({ data: JSON.stringify(d) })) }
+        }
+        window.EventSource = FakeES
+      }, mkBoard(2, 3))
+      const page = await ctx.newPage()
+      await page.goto(`${BASE}/display?key=test`, { waitUntil: 'load' })
+      // الخطّ أولاً: عدد الحبّات محسوب بعرض أرقام Cairo، والقياس قبل تحميله (جهازٌ مشغول)
+      // يرى خطّاً احتياطياً أعرض فيُبلغ عن قصٍّ لا وجود له — فشلٌ متنقّل بين الجولات
+      await page.evaluate(() => (document.fonts ? document.fonts.ready.then(() => 0) : 0))
+      await page.waitForTimeout(900)
+      await page.evaluate(() => window.__sse.emit('call', {
+        queue_number: 17, room: '1', doctor_name: 'د. ضياء الدين المنقل 1',
+        specialty: 'باطنية', seq: 99, repeat: false }))
+      await page.waitForTimeout(900)
+      const ban = await page.evaluate(() => {
+        const el = document.querySelector('.pd-banner')
+        if (!el) return { shown: false, text: '' }
+        const fs = (sel) => parseFloat(getComputedStyle(document.querySelector(sel)).fontSize)
+        const r = el.getBoundingClientRect()
+        const ir = document.querySelector('.pd-banner-inner').getBoundingClientRect()
+        const n = document.querySelector('.pd-banner-number')
+        return { shown: true, text: el.innerText,
+          number: fs('.pd-banner-number'), label: fs('.pd-banner-label'), dest: fs('.pd-banner-dest'),
+          covers: r.left <= 0 && r.top <= 0 && r.right >= innerWidth && r.bottom >= innerHeight,
+          innerIn: ir.left >= 0 && ir.right <= innerWidth && ir.top >= 0 && ir.bottom <= innerHeight,
+          numberWhole: n.scrollWidth <= n.clientWidth + 1 }
+      })
+      const tag = `بطاقة النداء ${w}×${h}`
+      if (!ok(ban.shown, `${tag}: لم تظهر عند حدث call`)) { await ctx.close(); continue }
+      ok(/العيادة/.test(ban.text), `${tag}: ★ التسمية يجب أن تكون «العيادة» — ${ban.text}`)
+      ok(!/الغرفة/.test(ban.text), `${tag}: ★ ظهرت «الغرفة» — ${ban.text}`)
+      const mobile = w <= 1023
+      const want = {
+        number: mobile ? between(88, w * 0.34, 190) : between(90, w * 0.16, 300),
+        label: mobile ? 16 : between(14, w * 0.015, 28),
+        dest: between(18, w * 0.024, 46),
       }
-      window.EventSource = FakeES
-    }, mkBoard(2, 3))
-    const page = await ctx.newPage()
-    await page.goto(`${BASE}/display?key=test`, { waitUntil: 'load' })
-        // الخطّ أولاً: عدد الحبّات محسوب بعرض أرقام Cairo، والقياس قبل تحميله (جهازٌ مشغول)
-        // يرى خطّاً احتياطياً أعرض فيُبلغ عن قصٍّ لا وجود له — فشلٌ متنقّل بين الجولات
-        await page.evaluate(() => (document.fonts ? document.fonts.ready.then(() => 0) : 0))
-    await page.waitForTimeout(900)
-    await page.evaluate(() => window.__sse.emit('call', {
-      queue_number: 7, room: '1', doctor_name: 'د. ضياء الدين المنقل 1',
-      specialty: 'باطنية', seq: 99, repeat: false }))
-    await page.waitForTimeout(900)
-    const ban = await page.evaluate(() => {
-      const el = document.querySelector('.pd-banner')
-      return { shown: !!el, text: el ? el.innerText : '' }
-    })
-    ok(ban.shown, 'بطاقة النداء: لم تظهر عند حدث call')
-    ok(/العيادة/.test(ban.text), `بطاقة النداء: ★ التسمية يجب أن تكون «العيادة» — ${ban.text}`)
-    ok(!/الغرفة/.test(ban.text), `بطاقة النداء: ★ ظهرت «الغرفة» — ${ban.text}`)
-    console.log(`  بطاقة النداء │ ${ban.text.replace(/\n/g, ' · ')}`)
-    await ctx.close()
+      for (const k of ['number', 'label', 'dest']) {
+        ok(Math.abs(ban[k] - want[k]) < 0.6, `${tag}: ★ خطّ ${k} ${ban[k]}px ≠ ${want[k].toFixed(1)} (ما كانت clamp ستعطيه)`)
+      }
+      ok(ban.number >= 88, `${tag}: ★ الرقم المنادى صغير ${ban.number}px`)
+      ok(ban.covers, `${tag}: الطبقة لا تغطّي الشاشة كلّها`)
+      ok(ban.innerIn, `${tag}: البطاقة تخرج من الشاشة`)
+      ok(ban.numberWhole, `${tag}: الرقم مقصوص`)
+      line.push(`${w}:${ban.number}/${ban.label}/${ban.dest}px`)
+      await ctx.close()
+    }
+    console.log(`  بطاقة النداء │ رقم/تسمية/وجهة ${line.join('  ')}`)
   }
 
 
@@ -407,19 +438,24 @@ const run = async () => {
     console.log(`  الترويسة │ ${line.join('  ')}`)
   }
 
-  // ═══ الترويسة بلا clamp()/min()/max() ولا flex gap ولا margin-inline ═══
-  // Chrome 66 (تلفاز الصالة) لا يملكها فيُسقط التصريح كلّه إلى ١٦px، والمتصفّح الحديث
-  // في هذا الفحص يملكها فلا يرى العطب — فنفحص المصدر نفسه.
+  // ═══ الترويسة وبطاقة النداء بلا clamp()/min()/max() ولا flex gap ولا margin-inline ولا inset ═══
+  // Chrome 66 (تلفاز الصالة) لا يملكها فيُسقط التصريح كلّه (الخطّ إلى ١٦px)، والمتصفّح
+  // الحديث في هذا الفحص يملكها فلا يرى العطب — فنفحص المصدر نفسه.
   {
     const css = readFileSync(resolve(ROOT, 'src/styles.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
-    const HEAD = /\.pd-(head|brand|logo|title|clock|time|date|tools|dot|icon-btn)\b/
-    const bad = []
-    for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
-      // وgap (في flex) وmargin-inline-*/padding-inline-*: كلّها أحدث من Chrome 66
-      if (HEAD.test(m[1]) && /\b(clamp|min|max)\(|(^|[;\s])gap\s*:|(margin|padding)-inline/.test(m[2])) bad.push(m[1].trim())
+    const AREAS = [
+      ['الترويسة', /\.pd-(head|brand|logo|title|clock|time|date|tools|dot|icon-btn)\b/],
+      ['بطاقة النداء', /\.pd-banner\b|\.pd-banner-/],
+    ]
+    for (const [name, SEL] of AREAS) {
+      const bad = []
+      for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+        // وgap (في flex) وmargin-inline-*/padding-inline-* وinset: كلّها أحدث من Chrome 66
+        if (SEL.test(m[1]) && /\b(clamp|min|max)\(|(^|[;\s])gap\s*:|(margin|padding)-inline|(^|[;\s])inset(-[a-z]+)?\s*:/.test(m[2])) bad.push(m[1].trim())
+      }
+      ok(bad.length === 0, `${name}: خصائص غير مدعومة في Chrome 66 (clamp/min/max/gap/inline/inset) — ${bad.join(' | ')}`)
+      console.log(`  ${name} (CSS) │ ${bad.length ? '✖ ' + bad.join(' | ') : 'بلا clamp/min/max/gap/margin-inline/inset'}`)
     }
-    ok(bad.length === 0, `الترويسة: خصائص غير مدعومة في Chrome 66 (clamp/min/max/gap/inline) — ${bad.join(' | ')}`)
-    console.log(`  الترويسة (CSS) │ ${bad.length ? '✖ ' + bad.join(' | ') : 'بلا clamp/min/max/gap/margin-inline'}`)
   }
 
   await browser.close()
