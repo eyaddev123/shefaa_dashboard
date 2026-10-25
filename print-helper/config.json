@@ -1,6 +1,7 @@
 {
   "port": 17625,
   "printer": "Printer_POS_80",
+  "printable_width": 80,
   "token": "",
   "feed_mm": 5,
   "threshold": 160
