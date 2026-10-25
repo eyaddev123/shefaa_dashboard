@@ -142,15 +142,24 @@ function DoctorRow({ doctor, onChanged }) {
     catch (ex) { await dlg.alert({ title: 'تعذّر التنفيذ', body: ex.message }) }
   }
 
-  const removeSchedule = async (id) => {
+  // التأكيد يسمّي السطر بتكراره: سطران بنفس اليوم والساعة (أسبوعي وكل أسبوعين)
+  // لا يُميَّزان إلا به، والحذف نفسه بالـ id وحده.
+  const removeSchedule = async (s) => {
     const ok = await dlg.confirm({
       title: 'حذف موعد الدوام',
-      body: 'حذف موعد الدوام هذا؟ لن تُولَّد منه جلساتٌ بعد اليوم.',
+      body: `حذف دوام ${WEEKDAYS[s.weekday]} ${fmtTime(s.start_time)}–${fmtTime(s.end_time)} (${
+        s.repeat_weeks === 2 ? 'كل أسبوعين' : 'كل أسبوع'})؟ لن تُولَّد منه جلساتٌ بعد اليوم، والجلسات السابقة تبقى.`,
       confirmLabel: 'حذف', danger: true,
     })
     if (!ok) return
-    try { await api.clinic.deleteSchedule(id); loadSchedules() }
-    catch (ex) { await dlg.alert({ title: 'تعذّر التنفيذ', body: ex.message }) }
+    try { await api.clinic.deleteSchedule(s.id) }
+    catch (ex) {
+      // الرفض لحجوزاتٍ قادمة يحمل أصحابها: المشرف يرى من سيتأثر لا رقماً فقط
+      const list = (ex.data?.appointments || [])
+        .map((a) => `${a.session_date}${a.slot_time ? ` ${a.slot_time}` : ''} — ${a.full_name}`)
+      await dlg.alert({ title: 'تعذّر حذف الدوام', body: [ex.message, ...list].join('\n') })
+    }
+    loadSchedules()
   }
 
   return (
@@ -208,7 +217,7 @@ function DoctorRow({ doctor, onChanged }) {
                             <td>{fmtTime(s.end_time)}</td>
                             <td className="num">{s.capacity || '—'}</td>
                             <td>
-                              <button className="ghost" style={{ padding: '2px 8px', fontSize: 11 }} onClick={() => removeSchedule(s.id)}>حذف</button>
+                              <button className="ghost" style={{ padding: '2px 8px', fontSize: 11 }} onClick={() => removeSchedule(s)}>حذف</button>
                             </td>
                           </tr>
                         ))}
