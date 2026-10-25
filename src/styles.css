@@ -1014,10 +1014,13 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
 /* ── لافتة التأخير: عامة بلا ذكر عيادة (ذكرها يكشف واقعة طبية عن مريض بعينه) ── */
 .pd-urgent-banner {
   text-align: center; font-weight: 800;
-  font-size: clamp(13px, 1.4vw, 26px);
+  font-size: 1.4vw;
   color: #0b1615; background: #f0b37e;
   padding: 0.8vh 1vw; border-radius: 12px;
 }
+/* clamp(13px, 1.4vw, 26px) بلا clamp — Chrome 66 (انظر حدود الترويسة أعلاه) */
+@media (max-width: 928px)   { .pd-urgent-banner { font-size: 13px; } }   /* 13 ÷ 1.4% */
+@media (min-width: 1858px)  { .pd-urgent-banner { font-size: 26px; } }   /* 26 ÷ 1.4% */
 
 /* ── الشبكة: عمود لكل عيادة، والصفوف تتوزّع الارتفاع المتاح ── */
 .pd-grid {
@@ -1190,32 +1193,46 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
    والساعة تماماً. تبقى بارزة بلونها وحجمها، وتختفي فور تفعيل الصوت. */
 .pd-audio-gate {
   font-family: inherit; cursor: pointer; border: none;
-  font-size: clamp(15px, 1.8vw, 34px); font-weight: 800;
+  font-size: 1.8vw; font-weight: 800;
   color: #3a1d02; background: #f0b37e;
   padding: 1.2vh 1vw; border-radius: 12px;
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
 }
 .pd-offline-alert {
-  position: fixed; inset-inline: 0; bottom: 0; z-index: 55;
+  /* left/right لا inset-inline (Chrome 87) */
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 55;
   text-align: center; font-weight: 800;
-  font-size: clamp(14px, 1.5vw, 28px);
+  font-size: 1.5vw;
   color: #2a0a0a; background: #f08a8a;
   padding: 1vh 1vw;
 }
 
-.pd-msg { text-align: center; font-size: clamp(16px, 2vw, 34px); color: #b3c6c2; align-self: center; }
-.pd-err { text-align: center; font-size: clamp(12px, 1.2vw, 22px); color: #f08a8a; }
+.pd-msg { text-align: center; font-size: 2vw; color: #b3c6c2; align-self: center; }
+.pd-err { text-align: center; font-size: 1.2vw; color: #f08a8a; }
 
 /* لوحة إعدادات الصوت — للاستقبال وقت الضبط، لا للعرض الدائم */
 .pd-settings {
   display: flex; flex-wrap: wrap; gap: 1.5vw; align-items: center;
   background: #10201e; border: 1px solid rgba(127, 214, 184, 0.25);
   border-radius: 12px; padding: 1vh 1vw;
-  font-size: clamp(11px, 1vw, 18px);
+  font-size: 1vw;
 }
 .pd-settings label { display: flex; align-items: center; gap: 0.5vw; }
 .pd-settings input[type='number'] { width: 4.5em; }
 .pd-missing { color: #f0b37e; font-weight: 700; }
+/* ═══ حدود لافتة الصوت والانقطاع والرسائل والإعدادات: media queries بدل clamp() ═══
+   كالترويسة وبطاقة النداء: Chrome 66 يُسقط clamp فينزل الخطّ إلى ١٦px. كلّ حدٍّ عند العرض
+   الذي يبلغه فيه vw بالضبط (الحدّ ÷ النسبة × ١٠٠)، فالنتيجة مطابقةٌ لـ clamp في كلّ عرض. */
+@media (max-width: 833px)   { .pd-audio-gate { font-size: 15px; } }     /* 15 ÷ 1.8% */
+@media (min-width: 1889px)  { .pd-audio-gate { font-size: 34px; } }     /* 34 ÷ 1.8% */
+@media (max-width: 933px)   { .pd-offline-alert { font-size: 14px; } }  /* 14 ÷ 1.5% */
+@media (min-width: 1867px)  { .pd-offline-alert { font-size: 28px; } }  /* 28 ÷ 1.5% */
+@media (max-width: 800px)   { .pd-msg { font-size: 16px; } }            /* 16 ÷ 2%   */
+@media (min-width: 1700px)  { .pd-msg { font-size: 34px; } }            /* 34 ÷ 2%   */
+@media (max-width: 1000px)  { .pd-err { font-size: 12px; } }            /* 12 ÷ 1.2% */
+@media (min-width: 1834px)  { .pd-err { font-size: 22px; } }            /* 22 ÷ 1.2% */
+@media (max-width: 1100px)  { .pd-settings { font-size: 11px; } }       /* 11 ÷ 1%   */
+@media (min-width: 1800px)  { .pd-settings { font-size: 18px; } }       /* 18 ÷ 1%   */
 
 /* ═══ بطاقة النداء: تغطي الشاشة لحظة النداء ثم تنسحب ═══ */
 .pd-banner {

@@ -438,23 +438,45 @@ const run = async () => {
     console.log(`  الترويسة │ ${line.join('  ')}`)
   }
 
-  // ═══ الترويسة وبطاقة النداء بلا clamp()/min()/max() ولا flex gap ولا margin-inline ولا inset ═══
-  // Chrome 66 (تلفاز الصالة) لا يملكها فيُسقط التصريح كلّه (الخطّ إلى ١٦px)، والمتصفّح
-  // الحديث في هذا الفحص يملكها فلا يرى العطب — فنفحص المصدر نفسه.
+  // ═══ CSS الشاشة بلا ما يغيب عن Chrome 66 ═══
+  // Chrome 66 (تلفاز الصالة) لا يملك clamp()/min()/max() (79) ولا inset/inset-inline (87)
+  // فيُسقط التصريح كلّه — الخطّ إلى ١٦px، والطبقة بلا حواف. والمتصفّح الحديث في هذا الفحص
+  // يملكها فلا يرى العطب — فنفحص المصدر نفسه.
   {
     const css = readFileSync(resolve(ROOT, 'src/styles.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+    const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((m) => ({ sel: m[1].trim(), body: m[2] }))
+    const offending = (SEL, BAN) => rules.filter((r) => SEL(r.sel) && BAN.test(r.body)).map((r) => r.sel)
+
+    // ١) كلّ قاعدةٍ تمسّ صنفاً تستعمله الشاشة (/display و/order): الأصناف تُجمع من شيفرتها
+    //    نفسها، فصنفٌ جديد يدخل الفحص وحده بلا قائمة تُنسى. styles.css مشترك مع بقيّة النظام،
+    //    فالقاعدة التي لا تمسّ أصناف الشاشة خارج الفحص.
+    const SCREEN_SRC = ['src/pages/PublicDisplay.jsx', 'src/pages/OrderDisplay.jsx', 'src/display-layout.js', 'src/waiting-return.jsx']
+    const cls = new Set()
+    for (const f of SCREEN_SRC) {
+      const src = readFileSync(resolve(ROOT, f), 'utf8')
+      for (const m of src.matchAll(/className=(?:"([^"]+)"|\{`([^`]+)`\}|\{'([^']+)'\})/g)) {
+        (m[1] || m[2] || m[3]).replace(/\$\{[^}]*\}/g, ' ').split(/\s+/).filter((c) => /^[a-z][-a-z0-9]*$/.test(c)).forEach((c) => cls.add(c))
+      }
+      // أصنافٌ تُبنى في JS ('pd-chip-' + …) أو تُمرَّر نصّاً
+      for (const m of src.matchAll(/['"`]((?:pd|od)-[-a-z0-9]*[a-z0-9])['"`\s]/g)) cls.add(m[1])
+    }
+    ok(cls.has('pd-banner-number') && cls.has('pd-title') && cls.has('pd-offline-alert') && cls.size > 40,
+      `CSS الشاشة: جمع الأصناف من الشيفرة ناقص (${cls.size})`)
+    const CLS = [...cls].map((c) => new RegExp(`\\.${c}(?![-a-z0-9])`))
+    const isScreen = (sel) => CLS.some((re) => re.test(sel))
+    const BAN = /\b(clamp|min|max)\(|(^|[;\s])inset(-[a-z]+)?\s*:/
+    const bad = offending(isScreen, BAN)
+    ok(bad.length === 0, `CSS الشاشة: clamp/min/max/inset غير مدعومة في Chrome 66 — ${bad.join(' | ')}`)
+    console.log(`  CSS الشاشة │ ${cls.size} صنفاً، ${rules.filter((r) => isScreen(r.sel)).length} قاعدة: ${bad.length ? '✖ ' + bad.join(' | ') : 'بلا clamp/min/max/inset/inset-inline'}`)
+
+    // ٢) الترويسة وبطاقة النداء أيضاً بلا flex gap ولا margin-inline (أُصلحتا لذلك)
     const AREAS = [
       ['الترويسة', /\.pd-(head|brand|logo|title|clock|time|date|tools|dot|icon-btn)\b/],
       ['بطاقة النداء', /\.pd-banner\b|\.pd-banner-/],
     ]
     for (const [name, SEL] of AREAS) {
-      const bad = []
-      for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
-        // وgap (في flex) وmargin-inline-*/padding-inline-* وinset: كلّها أحدث من Chrome 66
-        if (SEL.test(m[1]) && /\b(clamp|min|max)\(|(^|[;\s])gap\s*:|(margin|padding)-inline|(^|[;\s])inset(-[a-z]+)?\s*:/.test(m[2])) bad.push(m[1].trim())
-      }
-      ok(bad.length === 0, `${name}: خصائص غير مدعومة في Chrome 66 (clamp/min/max/gap/inline/inset) — ${bad.join(' | ')}`)
-      console.log(`  ${name} (CSS) │ ${bad.length ? '✖ ' + bad.join(' | ') : 'بلا clamp/min/max/gap/margin-inline/inset'}`)
+      const b2 = offending((s) => SEL.test(s), /(^|[;\s])gap\s*:|(margin|padding)-inline/)
+      ok(b2.length === 0, `${name}: gap/margin-inline غير مدعومة في Chrome 66 — ${b2.join(' | ')}`)
     }
   }
 
