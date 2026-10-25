@@ -2747,3 +2747,28 @@ button.visit-fold {
 }
 button.visit-fold:hover { filter: none; color: var(--accent-text); }
 .visit-fold-icon { font-size: 12px; color: var(--muted); width: 12px; }
+
+/* ═══ قائمة الدور بتبويبات — الحضور · بانتظار الحضور · انتهى · ما حضر ═══
+   أزرار التطبيق نفسها بشكل «حبّة»؛ المفتوح بلون التطبيق، والذي فيه نتائج بحثٍ بإطارٍ يلفت. */
+.queue-tabs-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin-bottom: 12px; }
+.queue-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+button.queue-tab {
+  background: var(--primary-soft); color: var(--text-secondary); border: 1px solid transparent;
+  border-radius: 999px; padding: 7px 16px; font-size: 13px; font-weight: 700; white-space: nowrap;
+}
+button.queue-tab:hover { filter: none; border-color: var(--primary); }
+button.queue-tab.on { background: var(--primary); color: #fff; }
+:root[data-theme='dark'] button.queue-tab.on { color: #06301b; }
+button.queue-tab.hit:not(.on) { border-color: var(--primary); color: var(--accent-text); }
+.queue-search { position: relative; flex: 0 1 300px; min-width: 220px; }
+.queue-search input { width: 100%; padding: 7px 34px 7px 12px; font-size: 13px; }
+.queue-search input::-webkit-search-cancel-button { display: none; }
+button.queue-search-clear {
+  position: absolute; inset-inline-end: 6px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; color: var(--muted); font-size: 18px; line-height: 1; padding: 2px 6px;
+}
+button.queue-search-clear:hover { color: var(--text-primary); filter: none; }
+.queue-tabs-card .queue-tab-hint { margin: 0 0 10px; font-size: 12.5px; }
+.queue-tab-empty { padding: 26px 12px; text-align: center; color: var(--muted); font-size: 13.5px; }
+.queue-tab-empty p + p, .queue-tab-empty p + button { margin-top: 8px; }
+button.queue-tab-jump { padding: 3px 12px; font-size: 12.5px; margin-inline-start: 6px; }

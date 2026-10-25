@@ -2,11 +2,12 @@ import { Fragment, useEffect, useRef, useState } from 'react'
 import { useDialogs } from '../dialogs.jsx'
 import { loadPrinter, ticketFrom } from '../ticket-print.js'
 import { printViaHelper } from '../print-helper.js'
-import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api, APPOINTMENT_STATUSES, BOOKING_TYPES, VISIT_TYPES, PRIORITIES, DELAY_CAUSES, WEEKDAYS, addDays, todayLocal, fmtMoney, fmtTime, toLatinDigits } from '../api.js'
 import { AttendanceBadge, urgentRowClass, isAttendanceSession, usePolling, fmtClock, FlowModeTag, FLOW_MODE_LABELS,
   AttendanceNumber, turnLabel, fmtTimeOfDay } from '../attendance-ui.jsx'
 import { attendanceBookedMessage } from '../booking-message.js'
+import { QUEUE_TABS, DEFAULT_TAB, isTab, rowsOfTab, matchesQuery, tabCounts, tabLabel } from '../queue-tabs.js'
 import { useRole } from '../RoleContext.jsx'
 import { useToast, RecallButton } from '../action-feedback.jsx'
 import { canStepOutAsSupervisor } from '../permissions.js'
@@ -53,8 +54,11 @@ function SlotCell({ appt }) {
 
 export function appointmentBadge(status) {
   const cls = status === 'in_service' ? 'good' : status === 'no_show' || status === 'cancelled' ? 'bad'
+    : status === 'postponed' ? 'warn'
     : status === 'arrived' ? 'warn' : status === WAITING_RETURN ? 'blue' : ''
-  return <span className={`badge ${cls}`}>{APPOINTMENT_STATUSES[status] || status}</span>
+  // «مؤجَّل» ليس في قائمة الحالات القابلة للاختيار، فكان يظهر بالاسم الإنكليزي في «ما حضر»
+  const label = APPOINTMENT_STATUSES[status] || (status === 'postponed' ? 'مؤجَّل' : status)
+  return <span className={`badge ${cls}`}>{label}</span>
 }
 
 // ═══ خانة الحالة في الطابور ═══
@@ -1060,17 +1064,11 @@ function QueueNote({ appt }) {
 
 // طابور نمط الحضور: بترتيب الخادم (قيد الكشف، ثم الحاضرون — الإسعافي أولاً ثم الأقدم
 // حضوراً — ثم من لم يحضر). لا عمود موعد ولا انتظار متوقَّع: لا خانات ولا تقدير هنا.
-function AttendanceQueueTable({ data, actions }) {
+function AttendanceQueueTable({ data, rows, tab, actions }) {
   const { reload, toast } = actions
   const offset = serverOffsetOf(data)
   return (
-    <div className="card">
-      <h3>قائمة الدور ({data.appointments.length})</h3>
-      <p className="subtitle" style={{ marginTop: -6 }}>
-        رقم الدور يُعطى عند <strong>الحضور</strong> (١، ٢، ٣…) ولا يتغيّر، والنداء بترتيبه —
-        الإسعافي الحاضر أولاً. تحته صغيراً: رقم الحجز والوقت التقريبي.
-      </p>
-      <table style={{ marginTop: 14 }}>
+      <table>
         <thead>
           <tr>
             <th>الدور</th><th>الاسم</th><th>الموبايل</th><th>نوع الزيارة</th><th>السعر</th>
@@ -1078,7 +1076,7 @@ function AttendanceQueueTable({ data, actions }) {
           </tr>
         </thead>
         <tbody>
-          {data.appointments.map((a) => (
+          {rows.map((a) => (
             <Fragment key={a.id}>
             <tr className={urgentRowClass(a)}>
               <td className="num"><AttendanceNumber appt={a} /><AttendanceBadge priority={a.priority} /></td>
@@ -1098,24 +1096,22 @@ function AttendanceQueueTable({ data, actions }) {
               <td className="queue-row-actions">
                 <VisitActions appt={a} data={data} actions={actions}
                   onDone={(msg) => { toast(msg, 'success'); reload() }} onError={(msg) => { toast(msg); reload() }} />{' '}
+                {tab === 'pending' && <><NoShowButton appt={a} onChanged={reload} onError={toast} />{' '}</>}
                 <OpenVisit appt={a} />
               </td>
             </tr>
             </Fragment>
           ))}
-          {data.appointments.length === 0 && <tr><td colSpan={9} className="empty">لا حجوزات بعد في هذه الجلسة</td></tr>}
         </tbody>
       </table>
-    </div>
   )
 }
 
-// «لسا بانتظار»: المحجوزون غير الحاضرين — ظاهرة دائماً (الطبيب قد يُنهي مبكراً).
-// لا إلغاء ولا عدم حضور تلقائي: الإنسان يقرّر لكل واحد.
-function PendingArrivalList({ data, onChanged, onError }) {
+// زرّ «ما حضر» لمن لم يحضر (نمط الحضور) — كان في بطاقة «لسا بانتظار» وصار في تبويب
+// «بانتظار الحضور». لا إلغاء ولا عدم حضور تلقائي: الإنسان يقرّر لكل واحد.
+function NoShowButton({ appt: a, onChanged, onError }) {
   const dlg = useDialogs()
-  const pending = data.appointments.filter((a) => a.status === 'waiting')
-  const noShow = async (a) => {
+  const noShow = async () => {
     const ok = await dlg.confirm({
       title: 'تعليم «ما حضر»',
       body: `تعليم ${turnLabel(a, true)} (${a.full_name}) «ما حضر»؟`,
@@ -1124,30 +1120,130 @@ function PendingArrivalList({ data, onChanged, onError }) {
     if (!ok) return
     try { await api.clinic.noShow(a.id); onChanged() } catch (ex) { onError(ex.message) }
   }
+  return <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }} onClick={noShow}>ما حضر</button>
+}
+
+// جدول نمط الخانات — صفوف التبويب
+function SlotsQueueTable({ data, rows, actions, onDone, onError }) {
   return (
-    <div className="card attn-pending-card">
-      <h3>لسا بانتظار ({pending.length})</h3>
-      <p className="subtitle" style={{ marginTop: -6 }}>
-        محجوزون لم يحضروا بعد. لا يظهرون للطبيب ولا يوقفون أحداً — وعند الإقفال يقرّر الاستقبال لكلٍّ منهم.
-      </p>
-      {pending.length === 0 ? <p className="empty">لا أحد — كل المحجوزين حضروا أو أُقفلت حالتهم.</p> : (
-        <table>
-          <thead><tr><th>الدور</th><th>الاسم</th><th>الموبايل</th><th>طريقة الحجز</th><th></th></tr></thead>
-          <tbody>
-            {pending.map((a) => (
-              <tr key={a.id}>
-                <td className="num"><AttendanceNumber appt={a} /><AttendanceBadge priority={a.priority} /></td>
-                <td>{a.full_name}</td>
-                <td dir="ltr">{a.mobile || '—'}</td>
-                <td>{BOOKING_TYPES[a.booking_type] || a.booking_type}</td>
-                <td>
-                  <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }}
-                    onClick={() => noShow(a)}>ما حضر</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+    <table>
+      <thead>
+        <tr>
+          <th>الدور</th><th>الاسم</th><th>الموبايل</th><th>نوع الزيارة</th><th>السعر</th>
+          <th>الموعد (الأصلي ← الحالي)</th><th>الحالة</th><th>الانتظار المتوقع</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((a) => (
+          <tr key={a.id}>
+            <td className="num">{a.queue_number}{priorityBadge(a.priority)}</td>
+            <td><VisitLink appt={a} /><QueueNote appt={a} /></td>
+            <td dir="ltr">{a.mobile}</td>
+            <td>
+              {VISIT_TYPES[a.visit_type] || a.visit_type}
+              {a.followup_override_by && (
+                <span className="badge warn" style={{ marginInlineStart: 6 }}
+                  title={a.followup_override_reason || ''}>تجاوز</span>
+              )}
+            </td>
+            <td className="num"><FeeCell appt={a} /></td>
+            <td><SlotCell appt={a} /></td>
+            <td><StatusCell appt={a} offset={serverOffsetOf(data)} /></td>
+            <td className="num">
+              {['waiting', 'arrived', 'in_service'].includes(a.status) ? `~${a.wait_minutes} د` : '—'}
+            </td>
+            <td className="queue-row-actions">
+              <VisitActions appt={a} data={data} actions={actions} onDone={onDone} onError={onError} />{' '}
+              <OpenVisit appt={a} />
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+}
+
+// ═══ قائمة الدور بتبويبات: الحضور · بانتظار الحضور · انتهى · ما حضر ═══
+// التبويب والبحث في العنوان (?tab=&q=) لا في حالةٍ محلّية: الرجوع من صفحة الزيارة يعيدهما
+// كما كانا (والموضع من useRestoreScroll)، ورابطٌ منسوخ يفتح على التبويب نفسه.
+const TAB_HINTS = {
+  attendance: {
+    present: <>رقم الدور يُعطى عند <strong>الحضور</strong> (١، ٢، ٣…) ولا يتغيّر، والنداء بترتيبه —
+      الإسعافي الحاضر أولاً. تحته صغيراً: رقم الحجز والوقت التقريبي.</>,
+    pending: <>محجوزون لم يحضروا بعد، بترتيب وقت الحجز. لا يظهرون للطبيب ولا يوقفون أحداً —
+      وعند الإقفال يقرّر الاستقبال لكلٍّ منهم.</>,
+  },
+  slots: {
+    present: <>مرتَّب بترتيب الخدمة الفعلي: أصحاب الأولوية أولاً ثم بقية الأدوار.
+      <strong> رقم الدور لا يتغير</strong> عند دخول حالة فورية — يتغيّر الوقت فقط، ويظهر أدناه أصله ومقدار انزياحه.</>,
+    pending: <>محجوزون لم يحضروا بعد، بترتيب مواعيدهم.</>,
+  },
+}
+function QueueTabsCard({ data, attendance, actions, reload, toast }) {
+  const [params, setParams] = useSearchParams()
+  const tab = isTab(params.get('tab')) ? params.get('tab') : DEFAULT_TAB
+  const query = params.get('q') || ''
+  const searching = query.trim() !== ''
+  const update = (patch) => setParams((p) => {
+    const n = new URLSearchParams(p)
+    for (const [k, v] of Object.entries(patch)) { if (v) n.set(k, v); else n.delete(k) }
+    if (n.get('tab') === DEFAULT_TAB) n.delete('tab')
+    return n
+  }, { replace: true })
+
+  const counts = tabCounts(data.appointments, query)
+  const rows = rowsOfTab(data.appointments, tab, attendance).filter((a) => matchesQuery(a, query))
+  const current = QUEUE_TABS.find((t) => t.key === tab)
+  // البحث لم يجد شيئاً هنا لكنّه وجد في تبويبٍ آخر — نقول أين
+  const elsewhere = searching && rows.length === 0
+    ? QUEUE_TABS.filter((t) => t.key !== tab && counts[t.key].matched > 0) : []
+  const hint = TAB_HINTS[attendance ? 'attendance' : 'slots'][tab]
+
+  return (
+    <div className="card queue-tabs-card">
+      <div className="queue-tabs-head">
+        <div className="queue-tabs" role="tablist" aria-label="حالات الدور">
+          {QUEUE_TABS.map((t) => (
+            <button key={t.key} role="tab" aria-selected={t.key === tab} data-tab={t.key}
+              className={`queue-tab${t.key === tab ? ' on' : ''}${searching && counts[t.key].matched > 0 ? ' hit' : ''}`}
+              onClick={() => update({ tab: t.key })}>
+              {tabLabel(t, counts[t.key], searching)}
+            </button>
+          ))}
+        </div>
+        <div className="queue-search">
+          <input type="search" value={query} aria-label="بحث في قائمة الدور"
+            placeholder="بحث: الاسم أو الهاتف أو رقم الدور"
+            onChange={(e) => update({ q: e.target.value })}
+            onKeyDown={(e) => { if (e.key === 'Escape') update({ q: '' }) }} />
+          {searching && <button className="queue-search-clear" aria-label="مسح البحث" onClick={() => update({ q: '' })}>×</button>}
+        </div>
+      </div>
+      {hint && !searching && <p className="subtitle queue-tab-hint">{hint}</p>}
+
+      {rows.length === 0 ? (
+        <div className="queue-tab-empty">
+          {searching ? (
+            <>
+              <p>ما في نتائج لـ «{query.trim()}» بتبويب «{current.label}».</p>
+              {elsewhere.length > 0 && (
+                <p>موجود في:{' '}
+                  {elsewhere.map((t) => (
+                    <button key={t.key} className="ghost queue-tab-jump" onClick={() => update({ tab: t.key })}>
+                      {t.label} ({counts[t.key].matched})
+                    </button>
+                  ))}
+                </p>
+              )}
+              <button className="link-btn" onClick={() => update({ q: '' })}>مسح البحث</button>
+            </>
+          ) : <p>{data.appointments.length === 0 ? 'لا حجوزات بعد في هذه الجلسة.' : current.empty}</p>}
+        </div>
+      ) : attendance ? (
+        <AttendanceQueueTable data={data} rows={rows} tab={tab} actions={{ ...actions, reload, toast }} />
+      ) : (
+        <SlotsQueueTable data={data} rows={rows} actions={actions}
+          onDone={(msg) => { toast(msg, 'success'); reload() }} onError={(msg) => { toast(msg); reload() }} />
       )}
     </div>
   )
@@ -1508,61 +1604,8 @@ export default function SessionQueue() {
 
       {actions.dialogs}
 
-      {attendance && (
-        <>
-          <AttendanceQueueTable data={data} actions={{ ...actions, reload: load,
-            toast: (msg, kind) => showToast(msg, kind, kind === 'success' ? 3500 : 6000) }} />
-          <PendingArrivalList data={data} onChanged={load} onError={showToast} />
-        </>
-      )}
-
-      {!attendance && (
-      <div className="card">
-        <h3>قائمة الدور ({data.appointments.length})</h3>
-        <p className="subtitle" style={{ marginTop: -6 }}>
-          مرتَّب بترتيب الخدمة الفعلي: أصحاب الأولوية أولاً ثم بقية الأدوار.
-          <strong> رقم الدور لا يتغير</strong> عند دخول حالة فورية — يتغيّر الوقت فقط، ويظهر أدناه أصله ومقدار انزياحه.
-        </p>
-        <table style={{ marginTop: 14 }}>
-          <thead>
-            <tr>
-              <th>الدور</th><th>الاسم</th><th>الموبايل</th><th>نوع الزيارة</th><th>السعر</th>
-              <th>الموعد (الأصلي ← الحالي)</th><th>الحالة</th><th>الانتظار المتوقع</th><th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.appointments.map((a) => (
-              <Fragment key={a.id}>
-              <tr>
-                <td className="num">{a.queue_number}{priorityBadge(a.priority)}</td>
-                <td><VisitLink appt={a} /><QueueNote appt={a} /></td>
-                <td dir="ltr">{a.mobile}</td>
-                <td>
-                  {VISIT_TYPES[a.visit_type] || a.visit_type}
-                  {a.followup_override_by && (
-                    <span className="badge warn" style={{ marginInlineStart: 6 }}
-                      title={a.followup_override_reason || ''}>تجاوز</span>
-                  )}
-                </td>
-                <td className="num"><FeeCell appt={a} /></td>
-                <td><SlotCell appt={a} /></td>
-                <td><StatusCell appt={a} offset={serverOffsetOf(data)} /></td>
-                <td className="num">
-                  {['waiting', 'arrived', 'in_service'].includes(a.status) ? `~${a.wait_minutes} د` : '—'}
-                </td>
-                <td className="queue-row-actions">
-                  <VisitActions appt={a} data={data} actions={actions}
-                    onDone={(msg) => { showToast(msg, 'success', 3500); load() }} onError={(msg) => { showToast(msg); load() }} />{' '}
-                  <OpenVisit appt={a} />
-                </td>
-              </tr>
-              </Fragment>
-            ))}
-            {data.appointments.length === 0 && <tr><td colSpan={9} className="empty">لا حجوزات بعد في هذه الجلسة</td></tr>}
-          </tbody>
-        </table>
-      </div>
-      )}
+      <QueueTabsCard data={data} attendance={attendance} actions={actions} reload={load}
+        toast={(msg, kind) => showToast(msg, kind, kind === 'success' ? 3500 : 6000)} />
     </>
   )
 }

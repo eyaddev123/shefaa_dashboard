@@ -13,7 +13,8 @@
     "test:ticket": "node test/ticket-print-check.mjs",
     "test:copies": "node test/ticket-copies-check.mjs",
     "test:naming": "node test/ui-naming-check.mjs",
-    "test:visit": "node test/visit-page-check.mjs"
+    "test:visit": "node test/visit-page-check.mjs",
+    "test:tabs": "node test/queue-tabs-check.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",
