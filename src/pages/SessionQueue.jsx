@@ -7,7 +7,7 @@ import { api, APPOINTMENT_STATUSES, BOOKING_TYPES, VISIT_TYPES, PRIORITIES, DELA
 import { AttendanceBadge, urgentRowClass, isAttendanceSession, usePolling, fmtClock, FlowModeTag, FLOW_MODE_LABELS,
   AttendanceNumber, turnLabel, fmtTimeOfDay } from '../attendance-ui.jsx'
 import { attendanceBookedMessage } from '../booking-message.js'
-import { QUEUE_TABS, DEFAULT_TAB, isTab, rowsOfTab, matchesQuery, tabCounts, tabLabel } from '../queue-tabs.js'
+import { QUEUE_TABS, DEFAULT_TAB, isTab, rowsOfTab, matchesQuery, tabCounts, tabLabel, liveProcedures, extraTotals } from '../queue-tabs.js'
 import { useRole } from '../RoleContext.jsx'
 import { useToast, RecallButton } from '../action-feedback.jsx'
 import { canStepOutAsSupervisor } from '../permissions.js'
@@ -52,13 +52,13 @@ function SlotCell({ appt }) {
   )
 }
 
-export function appointmentBadge(status) {
+export function appointmentBadge(status, small = false) {
   const cls = status === 'in_service' ? 'good' : status === 'no_show' || status === 'cancelled' ? 'bad'
     : status === 'postponed' ? 'warn'
     : status === 'arrived' ? 'warn' : status === WAITING_RETURN ? 'blue' : ''
   // «مؤجَّل» ليس في قائمة الحالات القابلة للاختيار، فكان يظهر بالاسم الإنكليزي في «ما حضر»
   const label = APPOINTMENT_STATUSES[status] || (status === 'postponed' ? 'مؤجَّل' : status)
-  return <span className={`badge ${cls}`}>{label}</span>
+  return <span className={`badge ${cls}${small ? ' sm' : ''}`}>{label}</span>
 }
 
 // ═══ خانة الحالة في الطابور ═══
@@ -1163,6 +1163,71 @@ function SlotsQueueTable({ data, rows, actions, onDone, onError }) {
   )
 }
 
+// ═══ تبويبا «الإجراءات» و«الإحالات» — تجميعٌ عرضيّ لا حالة ═══
+// من ردّ /queue نفسه، وبما يراه الاستقبال أصلاً: أسعار المريض وخصم الإحالة — لا حصص ولا مواد
+// ولا أسعار شراء. الصفّ كلّه يفتح صفحة الزيارة. والمجموع تحته لليوم كلّه (لا لنتائج البحث)،
+// والملغى ومن لم يحضر والمؤجَّل يُعرضون ولا يُجمَعون.
+function TurnCell({ appt: a, attendance }) {
+  return attendance ? <AttendanceNumber appt={a} /> : <>{a.queue_number}</>
+}
+function ExtraRow({ appt, children }) {
+  const open = useOpenVisit()
+  return (
+    <tr className="clickable" onClick={(e) => { if (!e.target.closest('a,button')) open(appt) }}>
+      {children}
+    </tr>
+  )
+}
+function ExcludedNote({ n }) {
+  return n > 0 ? <span className="muted"> (بلا {n} ملغى/لم يحضر)</span> : null
+}
+function ProceduresTable({ data, rows, all, attendance }) {
+  const t = extraTotals(all)
+  return (
+    <>
+      <table>
+        <thead><tr><th>الدور</th><th>الاسم</th><th>الدكتور</th><th>الإجراءات</th><th>المبلغ</th><th>الحالة</th></tr></thead>
+        <tbody>
+          {rows.map((a) => (
+            <ExtraRow key={a.id} appt={a}>
+              <td className="num"><TurnCell appt={a} attendance={attendance} /></td>
+              <td><VisitLink appt={a} /></td>
+              <td>{data.doctor_name}</td>
+              <td>{liveProcedures(a).map((l) => l.name).join('، ')}</td>
+              <td className="num" style={{ whiteSpace: 'nowrap' }}>{fmtMoney(a.procedures_total)}</td>
+              <td>{appointmentBadge(a.status, true)}</td>
+            </ExtraRow>
+          ))}
+        </tbody>
+      </table>
+      <p className="queue-extra-total">إجمالي الإجراءات اليوم: <strong>{fmtMoney(t.procedures)}</strong><ExcludedNote n={t.excluded} /></p>
+    </>
+  )
+}
+function ReferralsTable({ rows, all, attendance }) {
+  const t = extraTotals(all)
+  return (
+    <>
+      <table>
+        <thead><tr><th>الدور</th><th>الاسم</th><th>الجهة</th><th>الخصم</th><th>المطلوب من المريض</th><th>الحالة</th></tr></thead>
+        <tbody>
+          {rows.map((a) => (
+            <ExtraRow key={a.id} appt={a}>
+              <td className="num"><TurnCell appt={a} attendance={attendance} /></td>
+              <td><VisitLink appt={a} /></td>
+              <td>{(a.referrals || []).map((r) => r.source_name).join('، ')}</td>
+              <td className="num" style={{ whiteSpace: 'nowrap' }}>{fmtMoney(a.referral_discount)}</td>
+              <td className="num" style={{ whiteSpace: 'nowrap' }}><strong>{fmtMoney(a.patient_total)}</strong></td>
+              <td>{appointmentBadge(a.status, true)}</td>
+            </ExtraRow>
+          ))}
+        </tbody>
+      </table>
+      <p className="queue-extra-total">إجمالي خصومات الإحالات اليوم: <strong>{fmtMoney(t.discounts)}</strong><ExcludedNote n={t.excluded} /></p>
+    </>
+  )
+}
+
 // ═══ قائمة الدور بتبويبات: الحضور · بانتظار الحضور · انتهى · ما حضر ═══
 // التبويب والبحث في العنوان (?tab=&q=) لا في حالةٍ محلّية: الرجوع من صفحة الزيارة يعيدهما
 // كما كانا (والموضع من useRestoreScroll)، ورابطٌ منسوخ يفتح على التبويب نفسه.
@@ -1179,6 +1244,10 @@ const TAB_HINTS = {
     pending: <>محجوزون لم يحضروا بعد، بترتيب مواعيدهم.</>,
   },
 }
+const EXTRA_HINTS = {
+  procedures: <>كل من عليه إجراءٌ قائم أياً كانت حالته، برقم الدور. المبلغ سعر الإجراءات للمريض قبل خصم الإحالة.</>,
+  referrals: <>كل من عليه إحالة أياً كانت حالته، برقم الدور. الخصم الفعليّ لكل الجهات، والمطلوب بعده.</>,
+}
 function QueueTabsCard({ data, attendance, actions, reload, toast }) {
   const [params, setParams] = useSearchParams()
   const tab = isTab(params.get('tab')) ? params.get('tab') : DEFAULT_TAB
@@ -1192,12 +1261,13 @@ function QueueTabsCard({ data, attendance, actions, reload, toast }) {
   }, { replace: true })
 
   const counts = tabCounts(data.appointments, query)
-  const rows = rowsOfTab(data.appointments, tab, attendance).filter((a) => matchesQuery(a, query))
+  const tabRows = rowsOfTab(data.appointments, tab, attendance)
+  const rows = tabRows.filter((a) => matchesQuery(a, query))
   const current = QUEUE_TABS.find((t) => t.key === tab)
   // البحث لم يجد شيئاً هنا لكنّه وجد في تبويبٍ آخر — نقول أين
   const elsewhere = searching && rows.length === 0
     ? QUEUE_TABS.filter((t) => t.key !== tab && t.key !== 'all' && counts[t.key].matched > 0) : []
-  const hint = TAB_HINTS[attendance ? 'attendance' : 'slots'][tab]
+  const hint = EXTRA_HINTS[tab] || TAB_HINTS[attendance ? 'attendance' : 'slots'][tab]
 
   return (
     <div className="card queue-tabs-card">
@@ -1239,6 +1309,10 @@ function QueueTabsCard({ data, attendance, actions, reload, toast }) {
             </>
           ) : <p>{data.appointments.length === 0 ? 'لا حجوزات بعد في هذه الجلسة.' : current.empty}</p>}
         </div>
+      ) : tab === 'procedures' ? (
+        <ProceduresTable data={data} rows={rows} all={tabRows} attendance={attendance} />
+      ) : tab === 'referrals' ? (
+        <ReferralsTable rows={rows} all={tabRows} attendance={attendance} />
       ) : attendance ? (
         <AttendanceQueueTable data={data} rows={rows} tab={tab} actions={{ ...actions, reload, toast }} />
       ) : (
