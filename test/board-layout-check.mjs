@@ -439,13 +439,12 @@ const run = async () => {
   }
 
   // ═══ CSS الشاشة بلا ما يغيب عن Chrome 66 ═══
-  // Chrome 66 (تلفاز الصالة) لا يملك clamp()/min()/max() (79) ولا inset/inset-inline (87)
-  // فيُسقط التصريح كلّه — الخطّ إلى ١٦px، والطبقة بلا حواف. والمتصفّح الحديث في هذا الفحص
+  // Chrome 66 (تلفاز الصالة) لا يملك clamp()/min()/max() ولا inset ولا *-inline* ولا gap في flex
+  // فيُسقط التصريح كلّه — الخطّ إلى ١٦px، والطبقة بلا حواف، والعناصر ملتصقة. والمتصفّح الحديث في هذا الفحص
   // يملكها فلا يرى العطب — فنفحص المصدر نفسه.
   {
     const css = readFileSync(resolve(ROOT, 'src/styles.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
     const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((m) => ({ sel: m[1].trim(), body: m[2] }))
-    const offending = (SEL, BAN) => rules.filter((r) => SEL(r.sel) && BAN.test(r.body)).map((r) => r.sel)
 
     // ١) كلّ قاعدةٍ تمسّ صنفاً تستعمله الشاشة (/display و/order): الأصناف تُجمع من شيفرتها
     //    نفسها، فصنفٌ جديد يدخل الفحص وحده بلا قائمة تُنسى. styles.css مشترك مع بقيّة النظام،
@@ -464,20 +463,21 @@ const run = async () => {
       `CSS الشاشة: جمع الأصناف من الشيفرة ناقص (${cls.size})`)
     const CLS = [...cls].map((c) => new RegExp(`\\.${c}(?![-a-z0-9])`))
     const isScreen = (sel) => CLS.some((re) => re.test(sel))
-    const BAN = /\b(clamp|min|max)\(|(^|[;\s])inset(-[a-z]+)?\s*:/
-    const bad = offending(isScreen, BAN)
-    ok(bad.length === 0, `CSS الشاشة: clamp/min/max/inset غير مدعومة في Chrome 66 — ${bad.join(' | ')}`)
-    console.log(`  CSS الشاشة │ ${cls.size} صنفاً، ${rules.filter((r) => isScreen(r.sel)).length} قاعدة: ${bad.length ? '✖ ' + bad.join(' | ') : 'بلا clamp/min/max/inset/inset-inline'}`)
-
-    // ٢) الترويسة وبطاقة النداء أيضاً بلا flex gap ولا margin-inline (أُصلحتا لذلك)
-    const AREAS = [
-      ['الترويسة', /\.pd-(head|brand|logo|title|clock|time|date|tools|dot|icon-btn)\b/],
-      ['بطاقة النداء', /\.pd-banner\b|\.pd-banner-/],
-    ]
-    for (const [name, SEL] of AREAS) {
-      const b2 = offending((s) => SEL.test(s), /(^|[;\s])gap\s*:|(margin|padding)-inline/)
-      ok(b2.length === 0, `${name}: gap/margin-inline غير مدعومة في Chrome 66 — ${b2.join(' | ')}`)
+    // clamp()/min()/max() (79) · inset/inset-* (87) · أيّ خاصيّة *-inline* (margin/padding/border/inset:
+    // 69–87) · وgap في flex (84). gap الشبكة يعمل في 66 — فيُقبل gap فقط في قاعدةٍ تُعلن
+    // display: grid بنفسها (وإلا لا يُعرف أهو flex)
+    const why = (body) => {
+      const r = []
+      if (/\b(clamp|min|max)\(/.test(body)) r.push('clamp/min/max')
+      if (/(^|[;\s])inset(-[a-z]+)?\s*:/.test(body)) r.push('inset')
+      const inl = body.match(/(^|[;\s])([a-z-]*-inline(-[a-z]+)?)\s*:/)
+      if (inl) r.push(inl[2])
+      if (/(^|[;\s])(row-|column-)?gap\s*:/.test(body) && !/display\s*:\s*(inline-)?grid/.test(body)) r.push('gap بلا grid')
+      return r
     }
+    const bad = rules.filter((r) => isScreen(r.sel) && why(r.body).length).map((r) => `${r.sel} (${why(r.body).join('، ')})`)
+    ok(bad.length === 0, `CSS الشاشة: خصائص غير مدعومة في Chrome 66 — ${bad.join(' | ')}`)
+    console.log(`  CSS الشاشة │ ${cls.size} صنفاً، ${rules.filter((r) => isScreen(r.sel)).length} قاعدة: ${bad.length ? '✖ ' + bad.join(' | ') : 'بلا clamp/min/max/inset/*-inline*/flex gap'}`)
   }
 
   await browser.close()

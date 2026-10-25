@@ -957,13 +957,19 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
      الترتيب يتبع ترتيب العناصر في JSX، وشبكة البطاقات وحدها تتمدّد (flex:1). */
   display: flex;
   flex-direction: column;
-  gap: 1.2vh;
   overflow: hidden;              /* لا تمرير على شاشة الصالة إطلاقاً */
   background: #0b1615;
   color: #eef7f5;
   padding: 1.6vh 1.8vw;
   font-family: 'Cairo', sans-serif;
 }
+/* ★ Chrome 66: لا gap في flex (Chrome 84) — هامشٌ علويّ بين الإخوة بدلها (1.2vh).
+   gap لا يحسب الثابتَين (تنبيه الانقطاع وبطاقة النداء): هامشهما صفر (وإلا انزاحت بطاقة
+   النداء عن أعلى الشاشة)، ومن يليهما أوّلاً لا يأخذ هامشاً. */
+.pd-root > * + * { margin-top: 1.2vh; }
+.pd-root > .pd-offline-alert,
+.pd-root > .pd-banner,
+.pd-root > .pd-offline-alert:first-child + * { margin-top: 0; }
 
 /* ── الترويسة: الهوية، الساعة، ومؤشّرات صغيرة ── */
 /* ★ Chrome 66: لا gap في flex ولا margin-inline-* — فكانت الساعة تلتصق باسم المجمع بدل
@@ -1212,12 +1218,19 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
 
 /* لوحة إعدادات الصوت — للاستقبال وقت الضبط، لا للعرض الدائم */
 .pd-settings {
-  display: flex; flex-wrap: wrap; gap: 1.5vw; align-items: center;
   background: #10201e; border: 1px solid rgba(127, 214, 184, 0.25);
   border-radius: 12px; padding: 1vh 1vw;
   font-size: 1vw;
 }
-.pd-settings label { display: flex; align-items: center; gap: 0.5vw; }
+.pd-settings label { display: flex; align-items: center; }
+/* ★ Chrome 66: لا gap في flex. الصفّ يلتفّ، والفراغ 1.5vw أفقياً وعمودياً — الصفّ الداخليّ
+   بهامشٍ سالب نصف الفراغ وكلّ عنصرٍ بنصفه موجباً: يتقابلان بين العناصر (1.5vw) ويتلاشيان
+   عند الحواف، فالنتيجة مطابقةٌ لـ gap حتى عند الالتفاف. */
+.pd-settings-row { display: flex; flex-wrap: wrap; align-items: center; margin: -0.75vw; }
+.pd-settings-row > * { margin: 0.75vw; }
+/* داخل التسمية: النصّ أوّلاً ثمّ الحقل ثمّ القيمة — الفراغ (0.5vw) على يمين كلّ عنصر:
+   الصفحة RTL دائماً فهو الجانب الذي يلي سابقه */
+.pd-settings label > * { margin-right: 0.5vw; }
 .pd-settings input[type='number'] { width: 4.5em; }
 .pd-missing { color: #f0b37e; font-weight: 700; }
 /* ═══ حدود لافتة الصوت والانقطاع والرسائل والإعدادات: media queries بدل clamp() ═══
@@ -2035,7 +2048,8 @@ button.danger:hover:not(:disabled) { filter: brightness(1.08); }
 /* صفٌّ أفقي بلا flex gap: الهامش بين الابنَين يعمل في كل متصفّح */
 .od-list li { display: block; white-space: nowrap; }
 .od-idx { color: #7d938f; font-weight: 700; }
-.od-num { margin-inline-start: 0.4em; color: #eef7f5; }
+/* margin-right لا margin-inline-start (Chrome 69): الشاشة RTL دائماً فالبداية يمين */
+.od-num { margin-right: 0.4em; color: #eef7f5; }
 /* «+N»: ما لم يتّسع له ارتفاع البطاقة — فلا تُقصّ القائمة بصمت */
 .od-more { color: #7fd6b8; font-weight: 800; }
 .od-empty { font-size: var(--od-label, 13px); color: #7d938f; margin-top: 0.6vh; }
