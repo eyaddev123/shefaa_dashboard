@@ -1096,7 +1096,7 @@ function AttendanceQueueTable({ data, rows, tab, actions }) {
               <td className="queue-row-actions">
                 <VisitActions appt={a} data={data} actions={actions}
                   onDone={(msg) => { toast(msg, 'success'); reload() }} onError={(msg) => { toast(msg); reload() }} />{' '}
-                {tab === 'pending' && <><NoShowButton appt={a} onChanged={reload} onError={toast} />{' '}</>}
+                {a.status === 'waiting' && <><NoShowButton appt={a} onChanged={reload} onError={toast} />{' '}</>}
                 <OpenVisit appt={a} />
               </td>
             </tr>
@@ -1196,7 +1196,7 @@ function QueueTabsCard({ data, attendance, actions, reload, toast }) {
   const current = QUEUE_TABS.find((t) => t.key === tab)
   // البحث لم يجد شيئاً هنا لكنّه وجد في تبويبٍ آخر — نقول أين
   const elsewhere = searching && rows.length === 0
-    ? QUEUE_TABS.filter((t) => t.key !== tab && counts[t.key].matched > 0) : []
+    ? QUEUE_TABS.filter((t) => t.key !== tab && t.key !== 'all' && counts[t.key].matched > 0) : []
   const hint = TAB_HINTS[attendance ? 'attendance' : 'slots'][tab]
 
   return (

@@ -96,15 +96,22 @@ const run = async () => {
   console.log('\n── ١) التوزيع والترتيب والعدّادات ──')
   {
     const { ctx, page, errors } = await open(browser, `/clinic/session/${ATT}`)
-    ok(await selected(page) === 'present', '«الحضور» افتراضاً')
+    ok(await selected(page) === 'pending', '«بانتظار الحضور» افتراضاً')
     ok(!(await page.$('.attn-pending-card')), 'بطاقة «لسا بانتظار» صارت تبويباً')
+    const order = await page.locator('.queue-tab').evaluateAll((els) => els.map((e) => e.dataset.tab))
+    ok(order.join() === 'pending,all,present,done,absent', `ترتيب التبويبات (${order})`)
+    // «الكل»: القائمة كاملة بترتيب الخادم، وعدّادها = كل الحجوزات
+    await page.locator('.queue-tab[data-tab="all"]').click()
+    ok(JSON.stringify(await rowNames(page)) === JSON.stringify(APPTS.map((a) => a.full_name)), 'الكل: كل الحجوزات بترتيب الخادم')
+    ok((await tabText(page, 'all')).includes(`(${APPTS.length})`), `الكل: العدّاد (${await tabText(page, 'all')})`)
+    ok(await page.locator('.queue-tabs-card tbody button', { hasText: 'ما حضر' }).count() === expectedNames('pending').length, 'الكل: «ما حضر» لمن لم يحضر وحده')
     for (const tab of Object.keys(EXPECT)) {
       await page.locator(`.queue-tab[data-tab="${tab}"]`).click()
       const want = expectedNames(tab)
       const got = await rowNames(page)
       ok(JSON.stringify(got) === JSON.stringify(want), `${tab}: الصفوف والترتيب\n     got  ${got.join('، ')}\n     want ${want.join('، ')}`)
       ok((await tabText(page, tab)).includes(`(${want.length})`), `${tab}: العدّاد (${await tabText(page, tab)})`)
-      ok(new URL(page.url()).searchParams.get('tab') === (tab === 'present' ? null : tab), `${tab}: في العنوان`)
+      ok(new URL(page.url()).searchParams.get('tab') === (tab === 'pending' ? null : tab), `${tab}: في العنوان`)
     }
     // الحالات الخاصّة
     await page.locator('.queue-tab[data-tab="present"]').click()
@@ -182,6 +189,8 @@ const run = async () => {
     let c = await counts()
     ok(c.present.includes(`(0 من ${expectedNames('present').length})`), `اسم جزئي: الحضور (0 من N) — ${c.present}`)
     ok(c.done.includes(`(1 من ${expectedNames('done').length})`), `اسم جزئي: انتهى (1 من N) — ${c.done}`)
+    ok((await tabText(page, 'all')).includes(`(1 من ${APPTS.length})`), `اسم جزئي: الكل (1 من N) — ${await tabText(page, 'all')}`)
+    ok(!(await page.locator('.queue-tab-jump', { hasText: 'الكل' }).count()), '«موجود في» بلا «الكل»')
     ok((await page.locator('.queue-tab-empty').innerText()).includes('موجود في'), 'لا نتيجة هنا ⇐ «موجود في: انتهى»')
     await page.locator('.queue-tab-jump', { hasText: 'انتهى' }).click()
     ok(await selected(page) === 'done' && JSON.stringify(await rowNames(page)) === JSON.stringify([rana.full_name]), 'القفز إلى التبويب ⇐ النتيجة وحدها')
