@@ -83,6 +83,9 @@ export default function OrderDisplay() {
   const gridRef = useRef(null)
   const [gridBox, setGridBox] = useState({ w: 0, h: 0 })
   const retryStep = useRef(0)
+  // صفوفٌ تُنقَص بعد القياس الفعلي (انظر «التصحيح بالقياس» أدناه)، و«نبضة» تحميل الخطوط
+  const [trim, setTrim] = useState(0)
+  const [fontTick, setFontTick] = useState(0)
 
   const deviceKey = new URLSearchParams(window.location.search).get('key') || ''
 
@@ -213,7 +216,39 @@ export default function OrderDisplay() {
         // فالنقصان يُظهر «+N» (مرئيّ ومفهوم)، والزيادة تقصّ بصمت.
         - 40)
     : 0
-  const fit = fonts ? visibleRows(listPx, fonts.item, maxArrived) : 0
+  // ═══ التصحيح بالقياس ═══
+  // الاشتقاق أعلاه تقديرٌ: ارتفاع السطر الفعلي يتبع خطّ Cairo حين يكتمل تحميله، فيزيد
+  // التقدير ببضع بكسلات على 1920 مع شريط المتصفّح ويدخل سطرٌ يُقصّ بصمت — وفي الفحص
+  // يظهر مرّةً ويغيب مرّة بحسب لحظة تحميل الخطّ. فبعد الرسم (قبل أن يُرى) نقيس: إن تجاوز
+  // آخر سطرٍ قائمتَه في أيّ بطاقة نُنقص سطراً ويذهب الباقي إلى «+N» — كحبّات شاشة الصالة.
+  // والخطّ لا يصغر تحت حدّه المقروء (MIN.item). ويُعاد القياس من الصفر عند تغيّر المقاس
+  // أو العدد أو اكتمال الخطوط.
+  const baseFit = fonts ? visibleRows(listPx, fonts.item, maxArrived) : 0
+  const fit = baseFit > 0 ? Math.max(1, baseFit - trim) : 0
+  const layoutKey = `${gridBox.w}x${gridBox.h}|${docCount}|${maxArrived}|${fonts ? fonts.item : 0}|${fontTick}`
+  useLayoutEffect(() => { setTrim(0) }, [layoutKey])
+  useLayoutEffect(() => {
+    const el = gridRef.current
+    if (!el || fit <= 1) return
+    const cards = el.querySelectorAll('.od-card')
+    const over = Array.prototype.some.call(cards, (c) => {
+      const wrap = c.querySelector('.od-list-wrap')
+      const lis = c.querySelectorAll('.od-list li')
+      if (!wrap || !lis.length) return false
+      return lis[lis.length - 1].getBoundingClientRect().bottom > wrap.getBoundingClientRect().bottom + 1
+    })
+    if (over) setTrim((t) => t + 1)
+  })
+  // الخطوط: يتغيّر ارتفاع السطر حين يكتمل تحميل Cairo — فنقيس من جديد
+  // (document.fonts موجودة في Chrome 66، ونفحصها مع ذلك)
+  useEffect(() => {
+    const f = typeof document !== 'undefined' ? document.fonts : null
+    if (!f) return undefined
+    const bump = () => setFontTick((x) => x + 1)
+    if (f.ready && f.ready.then) f.ready.then(bump)
+    if (f.addEventListener) f.addEventListener('loadingdone', bump)
+    return () => { if (f.removeEventListener) f.removeEventListener('loadingdone', bump) }
+  }, [])
 
   const fontVars = fonts ? {
     '--od-current': `${fonts.current}px`,
