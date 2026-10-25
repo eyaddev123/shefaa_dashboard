@@ -5,9 +5,11 @@
 // الموظفين تحميلها.
 import { normalizeAr } from './arabic-search.js'
 
+// الترتيب (RTL): بانتظار الحضور · الكل · الحضور · انتهى · ما حضر — والافتراضي «الحضور»
 export const QUEUE_TABS = [
-  { key: 'present', label: 'الحضور', empty: 'ما في حدا حاضر حالياً — اللي بيوصل بيظهر هون.' },
   { key: 'pending', label: 'بانتظار الحضور', empty: 'ما في حدا بانتظار الحضور.' },
+  { key: 'all', label: 'الكل', empty: 'لا حجوزات بعد في هذه الجلسة.' },
+  { key: 'present', label: 'الحضور', empty: 'ما في حدا حاضر حالياً — اللي بيوصل بيظهر هون.' },
   { key: 'done', label: 'انتهى', empty: 'ما في حدا انتهى كشفه بعد.' },
   { key: 'absent', label: 'ما حضر', empty: 'ما في غياب ولا إلغاء بهالجلسة.' },
 ]
@@ -33,6 +35,8 @@ const time = (t) => (t ? Date.parse(t) || 0 : 0)
 //   انتهى — الأحدث انتهاءً أولاً
 //   ما حضر — بالرقم
 export function rowsOfTab(appointments, tab, attendance) {
+  // «الكل»: القائمة كاملة بترتيب الخادم — كما كانت قبل التبويبات
+  if (tab === 'all') return [...(appointments || [])]
   const indexed = (appointments || []).map((a, i) => ({ a, i })).filter(({ a }) => tabOf(a) === tab)
   const cmp = {
     present: (x, y) => x.i - y.i,
@@ -66,9 +70,8 @@ export function matchesQuery(a, query) {
 export function tabCounts(appointments, query) {
   const out = Object.fromEntries(QUEUE_TABS.map((t) => [t.key, { total: 0, matched: 0 }]))
   for (const a of appointments || []) {
-    const c = out[tabOf(a)]
-    c.total++
-    if (matchesQuery(a, query)) c.matched++
+    const hit = matchesQuery(a, query)
+    for (const c of [out[tabOf(a)], out.all]) { c.total++; if (hit) c.matched++ }
   }
   return out
 }
