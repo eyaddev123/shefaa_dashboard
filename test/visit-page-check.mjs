@@ -251,7 +251,8 @@ const run = async () => {
   // ═══ ٤) الطابور ⇐ الزيارة ⇐ رجوع إلى الموضع نفسه ═══
   console.log('\n── ٤) من الطابور وإليه ──')
   {
-    const { ctx, page } = await open(browser, { h: 600, path: `/clinic/session/${S.procedures.session}` })
+    // تبويب «الكل»: الافتراضي «بانتظار الحضور» لا يُظهر من هو قيد الكشف أو حاضر
+    const { ctx, page } = await open(browser, { h: 600, path: `/clinic/session/${S.procedures.session}?tab=all` })
     await page.waitForSelector('a.visit-link')
     ok(!(await page.$('.appt-details-row')), 'الطابور: لا سطر تفاصيل ينفتح')
     const link = page.locator('a.visit-link', { hasText: apptOf('procedures').full_name })
@@ -267,6 +268,7 @@ const run = async () => {
     await page.waitForTimeout(200)
     const y1 = await page.evaluate(() => window.scrollY)
     ok(new URL(page.url()).pathname === `/clinic/session/${S.procedures.session}`, 'رجوع ⇐ الطابور')
+    ok(new URL(page.url()).searchParams.get('tab') === 'all', 'رجوع ⇐ التبويب نفسه')
     ok(Math.abs(y1 - y0) <= 4, `رجوع ⇐ الموضع نفسه (${y0} ⇐ ${y1})`)
     // زرّ «تفاصيل» في الصفّ يفتحها أيضاً
     await page.locator('tr', { hasText: apptOf('arrived').full_name }).locator('button', { hasText: 'تفاصيل' }).click()
