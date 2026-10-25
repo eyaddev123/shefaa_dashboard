@@ -64,6 +64,26 @@ async function downloadFile(url, fallbackName) {
   return name
 }
 
+// رفع ملفّ (FormData) — بلا Content-Type: المتصفّح يضعه بحدوده. والخطأ يحمل جسمه
+// كاملاً (err.data) كـhttp(): معاينة الاستيراد الجديدة تصل مع 409 PREVIEW_STALE.
+async function postForm(path, form) {
+  let res
+  try {
+    res = await fetch(`/api${path}`, { method: 'POST', headers: { Authorization: `Bearer ${getToken()}` }, body: form })
+  } catch {
+    const err = new Error('تعذّر الاتصال بالخادم — تحقّق من الشبكة وأعد المحاولة')
+    err.status = 0; err.data = { code: 'NETWORK_ERROR' }
+    throw err
+  }
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    const err = new Error(data.error || `HTTP ${res.status}`)
+    err.status = res.status; err.data = data
+    throw err
+  }
+  return data
+}
+
 export const api = {
   login: (username, password) =>
     http('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
@@ -295,6 +315,11 @@ export const api = {
     done: (appointmentId) => http(`/clinic/appointments/${appointmentId}/done`, { method: 'POST' }),
     noShow: (appointmentId) => http(`/clinic/appointments/${appointmentId}/no-show`, { method: 'POST' }),
     recall: (appointmentId) => http(`/clinic/appointments/${appointmentId}/recall`, { method: 'POST' }),
+    // ── «خروج مؤقت»: المريض يخرج (قطرة، صورة) ويعود بلا أن يخسر دوره ──
+    // للطبيب صاحب الحجز ولمشرف العيادات (طوارئ). العودة نداءٌ على شاشة الصالة،
+    // ويرفضها الخادم (409 DOCTOR_BUSY) والطبيب في منتصف كشف مريضٍ آخر.
+    stepOut: (appointmentId) => http(`/clinic/appointments/${appointmentId}/step-out`, { method: 'POST' }),
+    returnCall: (appointmentId) => http(`/clinic/appointments/${appointmentId}/return`, { method: 'POST' }),
     // ── نمط الحضور ──
     // بدء الكشف: منفصل عن النداء — يسجّل started_at وحده
     start: (appointmentId) => http(`/clinic/appointments/${appointmentId}/start`, { method: 'POST' }),
@@ -370,6 +395,40 @@ export const api = {
     const data = await res.json().catch(() => ({}))
     if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
     return data
+  },
+
+  // ═══ مخزون المواد — مشرفة العيادات وحدها (الخادم يردّ 403 لغيرها) ═══
+  inventory: {
+    materials: () => http('/inventory/materials'),
+    material: (id) => http(`/inventory/materials/${id}`),
+    units: () => http('/inventory/units'),
+    addMaterial: (body) => http('/inventory/materials', { method: 'POST', body: JSON.stringify(body) }),
+    updateMaterial: (id, body) => http(`/inventory/materials/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+    setPrice: (id, body) => http(`/inventory/materials/${id}/price`, { method: 'POST', body: JSON.stringify(body) }),
+    prices: (id) => http(`/inventory/materials/${id}/prices`),
+    movements: (id, page = 1, per = 20) => http(`/inventory/materials/${id}/movements?page=${page}&per=${per}`),
+    purchase: (body) => http('/inventory/purchases', { method: 'POST', body: JSON.stringify(body) }),
+    stocktakePreview: (items) => http('/inventory/stocktake/preview', { method: 'POST', body: JSON.stringify({ items }) }),
+    stocktake: (items) => http('/inventory/stocktake', { method: 'POST', body: JSON.stringify({ items }) }),
+    consumption: ({ from, to, group }) => http(`/inventory/reports/consumption?${new URLSearchParams({ from, to, group })}`),
+    exportConsumption: ({ from, to, group }) => downloadFile(
+      `/api/inventory/reports/consumption?${new URLSearchParams({ from, to, group, format: 'xlsx' })}`, `استهلاك المواد-${from}.xlsx`),
+    purchases: ({ from, to }) => http(`/inventory/reports/purchases?${new URLSearchParams({ from, to })}`),
+    exportPurchases: ({ from, to }) => downloadFile(
+      `/api/inventory/reports/purchases?${new URLSearchParams({ from, to, format: 'xlsx' })}`, `المشتريات-${from}.xlsx`),
+    template: () => downloadFile('/api/inventory/import/template', 'قالب استيراد المواد.xlsx'),
+    importPreview: (file) => { const f = new FormData(); f.append('file', file); return postForm('/inventory/import/preview', f) },
+    importCommit: (file, fingerprint) => {
+      const f = new FormData(); f.append('fingerprint', fingerprint); f.append('file', file)
+      return postForm('/inventory/import/commit', f)
+    },
+  },
+
+  // ═══ الإشعارات داخل النظام — لكلّ مستخدمٍ ما وُجّه إليه ═══
+  notifications: {
+    list: () => http('/notifications'),
+    read: (id) => http(`/notifications/${id}/read`, { method: 'POST' }),
+    readAll: () => http('/notifications/read-all', { method: 'POST' }),
   },
 }
 
@@ -522,6 +581,7 @@ export const SESSION_STATUSES = {
 
 export const APPOINTMENT_STATUSES = {
   waiting: 'بانتظار الحضور', arrived: 'حاضر — بانتظار الدور', in_service: 'قيد الكشف',
+  waiting_return: 'بانتظار العودة',
   done: 'انتهى', no_show: 'لم يحضر', cancelled: 'ملغى',
 }
 
@@ -570,3 +630,48 @@ export const fmtDate = (d) =>
 // تاريخ ووقت — لسجل التعديلات (متى غُيّر الحقل بالضبط)
 export const fmtDateTime = (d) =>
   d ? new Date(d).toLocaleString('ar-SY', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'
+
+// ═══ بثّ الموظفين: «تغيّر شيءٌ في جلسة كذا» ═══
+// يفتح /api/clinic/events ويستدعي onEvent(name, data) لكل حدث. بـ fetch لا EventSource:
+// المسار مصادَق بتوكن الموظف في الترويسة، وEventSource لا يرسل ترويسات (والتوكن في
+// العنوان يُسجَّل في سجلّات الوسطاء). يُعيد الاتصال وحده بتباعدٍ متزايد، ويُعيد دالّةً
+// تُغلقه. والتحديث الدوري في الشاشة يبقى شبكة أمان لو انقطع البثّ صامتاً.
+const STAFF_RETRY_MS = [2000, 5000, 15000, 30000]
+export function openStaffStream(onEvent) {
+  let closed = false, ctrl = null, timer = null, step = 0
+  const parse = (frame) => {
+    const ev = /^event: (.+)$/m.exec(frame)
+    const data = /^data: (.+)$/m.exec(frame)
+    if (!ev || !data) return
+    try { onEvent(ev[1], JSON.parse(data[1])) } catch { /* إطارٌ تالف — التحديث الدوري يُصلح */ }
+  }
+  const connect = async () => {
+    if (closed) return
+    const token = getToken()
+    if (!token || typeof ReadableStream === 'undefined' || typeof AbortController === 'undefined') return
+    ctrl = new AbortController()
+    try {
+      const res = await fetch('/api/clinic/events', {
+        headers: { Authorization: `Bearer ${token}` }, signal: ctrl.signal })
+      // 401/403: لا معنى لإعادة المحاولة — التوكن انتهى أو الدور لا يملك القسم
+      if (res.status === 401 || res.status === 403) return
+      if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`)
+      step = 0
+      const reader = res.body.getReader()
+      const dec = new TextDecoder()
+      let buf = ''
+      for (;;) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buf += dec.decode(value, { stream: true })
+        const frames = buf.split('\n\n')
+        buf = frames.pop()
+        frames.forEach(parse)
+      }
+    } catch { /* انقطاع — نعيد الاتصال أدناه */ }
+    if (closed) return
+    timer = setTimeout(connect, STAFF_RETRY_MS[Math.min(step++, STAFF_RETRY_MS.length - 1)])
+  }
+  connect()
+  return () => { closed = true; clearTimeout(timer); if (ctrl) ctrl.abort() }
+}

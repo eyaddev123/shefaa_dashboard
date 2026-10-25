@@ -44,6 +44,14 @@ export const canSeePrinterSetup = (role) => role === 'clinic_admin' || role === 
 // والخادم هو الحارس — هذا لإخفاء ما لا يُفيد الضغط عليه.
 export const canEditBooking = (role) => role === 'clinic_admin' || role === 'clinic_reception'
 
+// «خروج مؤقت» ونداء العودة من شاشة الاستقبال: مشرف العيادات وحده، صلاحيةَ طوارئ
+// (طبيبٌ غادر ومريضه «خارج»، أو جهازه تعطّل). الطبيب يفعلها من شاشته، والاستقبال لا:
+// قرارٌ طبّي داخل الغرفة. والخادم هو الحارس — هذا لإظهار الزرّ وحده.
+export const canStepOutAsSupervisor = (role) => role === 'clinic_admin'
+
+// صفحة «المخزون» (الأرصدة وأسعار الشراء والجرد): مشرفة العيادات وحدها.
+// الاستقبال والطبيب لا يرون شيئاً منها، والخادم يردّ 403 لغيرها.
+export const canSeeInventory = (role) => role === 'clinic_admin'
 // الإحالات: إدارة الجهات وتقرير المستحقات — مشرف العيادات وحده (الخادم يردّ غيره 403).
 // وتسجيل الإحالة على زيارة للاستقبال والمشرف (نفس canEditBooking). الطبيب لا يرى شيئاً.
 export const canSeeReferralsPage = (role) => role === 'clinic_admin'
@@ -76,6 +84,7 @@ export const ROUTE_ACCESS = {
   '/search': canSearchAid,
   '/clinic/doctors': canSeeDoctorsPage,
   '/clinic/procedures': canSeeProceduresPage,
+  '/inventory': canSeeInventory,
   '/clinic/referrals': canSeeReferralsPage,
   '/clinic/board': canSeeClinicBoard,
   '/clinic/session': canSeeClinicBoard,

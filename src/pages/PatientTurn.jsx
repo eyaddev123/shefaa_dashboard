@@ -53,6 +53,10 @@ export default function PatientTurn() {
               ? <div className="ptr-number">{result.queue_number}</div>
               : <div className="ptr-status">يُعطى رقم دورك عند حضورك إلى الاستقبال</div>}
             <div className="ptr-status">{APPOINTMENT_STATUSES[result.status] || result.status}</div>
+            {/* خروج مؤقت: دوره محفوظ، والطبيب يناديه على شاشة الصالة حين يجهز */}
+            {result.status === 'waiting_return' && (
+              <div className="ptr-wait">دورك محفوظ — سيناديك الطبيب للعودة على شاشة الصالة</div>
+            )}
             {/* من تجاوز الدوام: نعرض عدد من أمامه بلا وقت متوقّع — لا وقت له أصلاً،
                 وعرض تقديرٍ محسوب من مواعيد انتهت وعدٌ لا يُوفى. */}
             {['waiting', 'arrived', 'in_service'].includes(result.status) && (

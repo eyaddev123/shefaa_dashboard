@@ -66,72 +66,231 @@ export function lastRowOffset(n, cols) {
 // 17px لـ«يُخدَم الآن» و24px للغرفة. هذه هي «النقاط الصغيرة» التي تُرى من بعيد.
 //
 // فنحسبها من **مقاس البطاقة نفسه**، ولكلّ عنصرٍ حدٌّ أدنى بالبكسل يُقرأ من ٤–٥ م.
-// الترتيب البصري مقصود: الرقم ← الغرفة ← الاسم ← التالي/بعده ← الاختصاص.
-const MIN = { number: 56, room: 28, doctor: 20, label: 15, upNum: 24, upLabel: 13, specialty: 13 }
+// الترتيب البصري مقصود: الرقم ← الغرفة ← الاسم ← حبّات التالي ← الاختصاص.
+const MIN = { number: 56, room: 28, doctor: 20, label: 15, upLabel: 13, specialty: 13 }
 
-export function cardFonts(cardW, cardH) {
-  if (!cardW || !cardH) return null
-  // الأضيق يحكم: نصٌّ مربوط بالعرض وحده يفيض طولاً في بطاقة عريضة قصيرة، والعكس.
-  const base = Math.min(cardW, cardH * 1.35)
+// ═══ الحبّات (chips): الحدّ الأدنى لرقم الحبّة ═══
+// ٣٤px على شاشة عرضها 1920: ارتفاع الرقم في Cairo العريض ≈٠٫٧em ⇒ ≈٢٤px ≈ ١٫٥ سم
+// على تلفاز ٥٥″ — نحو ضعف ما يلزم لقراءة رقمٍ من ٥ أمتار.
+// ويتناسب مع **عرض** النافذة لا ارتفاعها: التلفاز الذي يُبلغ عن 960×540 يرسم بكثافة ٢
+// (WebView أندرويد) فبكسله ضعف حجمه الفعلي، وشريط المتصفّح يسرق ارتفاعاً لا عرضاً.
+// وأرضيّته ٢٤px — حدّ أرقام «التالي» قبل الحبّات.
+// ★ القاعدة: إن لم تتّسع البطاقة للحدّ الأدنى يقلّ **عدد** الحبّات («+N») ولا يصغر الخطّ.
+export const CHIP_MIN_AT_1920 = 34
+export function chipMinPx(viewW) {
+  return Math.max(24, Math.round(CHIP_MIN_AT_1920 * (viewW || 1920) / 1920))
+}
+
+// ═══ ثلاثة مستويات بعدد العيادات المعروضة ═══
+export const TIERS = {
+  // ١–٢: بطاقة كبيرة — الحبّة ≈ نصف الرقم الحالي، حتى ٦، وعنوانان
+  large:   { chipRatio: 0.5,  nextCap: 6, slots: 6, specialty: true,  nextTitle: true,  returnTitle: true,  merged: false },
+  // ٣–٤: الرقم أصغر قليلاً ويبقى المسيطر، حتى ٤ + «+N»، والعودة بأيقونةٍ بلا كلمة
+  medium:  { chipRatio: 0.42, nextCap: 4, slots: 5, specialty: true,  nextTitle: true,  returnTitle: false, merged: false },
+  // ٥ فأكثر: الاسم والرقم والعيادة، وتحتها صفّ حبّاتٍ واحد مدموج بلا أيّ عنوان —
+  // اللون يفرّق «التالي» عن «بانتظار العودة»
+  compact: { chipRatio: 0.4,  nextCap: 3, slots: 5, specialty: false, nextTitle: false, returnTitle: false, merged: true },
+}
+export const tierOf = (n) => (n <= 2 ? 'large' : n <= 4 ? 'medium' : 'compact')
+
+// هندسة الحبّة بوحدة em من خطّها — نفسها في CSS (.pd-chip). عرض رقم Cairo العريض
+// مقيسٌ بالمتصفّح: ٠٫٥٥٥em لكل خانة، و«+» مثلها.
+const CHIP = { digit: 0.56, padX: 0.4, margin: 0.15, padY: 0.12, lineH: 1.2, border: 1 }
+export const chipWidth = (chars, C) =>
+  Math.ceil(C * (chars * CHIP.digit + 2 * CHIP.padX + 2 * CHIP.margin) + 2 * CHIP.border)
+const chipHeight = (C) => Math.ceil(C * (CHIP.lineH + 2 * CHIP.padY) + 2 * CHIP.border) + 2
+// كلمة «بانتظار العودة» بخطّ 700 = ٦٫١em مقيسة؛ والأيقونة ١٫١em وهامشها
+const RETURN_WORD_EM = 6.1
+const BORDER = 2     // حدّ البطاقة (CSS)
+const SECTION_GAP = 4 // gap بين أقسام البطاقة (CSS)
+
+// ═══ الوسط: «يُخدَم الآن» + الرقم + العيادة ضمن ارتفاعٍ معلوم ═══
+// ارتفاع الصندوق ≈ الخطّ × ارتفاع السطر. نوزّع الوسط: «يُخدَم الآن» ١٦٪ · الرقم ٥٤٪ ·
+// الغرفة ٢٢٪ · ٨٪ للفجوات. وبلا «يُخدَم الآن» (المستوى المكبوس) يأخذ الرقم نصيبه.
+function fitMiddle(midH, cardW, base, allowLabel) {
   const px = (frac, min) => Math.max(min, Math.round(base * frac))
-  // ═══ الميزانية العمودية: مقيسة لا مخمَّنة ═══
-  // البطاقة ثلاثة صفوف (grid: auto 1fr auto). قياسٌ فعلي بالمتصفّح أعطى
-  // الترويسة ≈٢٢٪ وصفّ التالي ≈٢١٪ والوسط ≈٤٨٪ من ارتفاع البطاقة.
-  // والوسط يحمل ثلاثة: «يُخدَم الآن» ثم الرقم ثم الغرفة — ومجموع ارتفاعاتها
-  // الصندوقية يجب أن يبقى **داخل** الوسط، وإلا فاضت الغرفة فقصّها overflow
-  // واختفت من الشاشة (رُصد فعلاً: صندوقها ٩px وخطّها ٥٨px).
-  //
-  // ارتفاع الصندوق ≈ الخطّ × ارتفاع السطر. فنوزّع الوسط بنسبٍ تجمع إلى ١:
-  //   «يُخدَم الآن» ١٦٪ · الرقم ٥٤٪ · الغرفة ٢٢٪ · ٨٪ للفجوات والحشو.
-  // نصيب الوسط من البطاقة. الترويسة وصفّ «التالي» يتناسبان مع الخطّ أيضاً،
-  // فنسبتهما شبه ثابتة: قياسٌ فعلي أعطى الوسط ٤٦–٤٨٪ عند ٧ و٩ بطاقات.
-  // ونأخذ ٤٦٪ لا أكثر: التقدير الزائد يُخفي الغرفة تماماً (خطأٌ صامت لا يُرى
-  // إلا في الصالة)، والناقص يصغّر الخطّ قليلاً فقط (خطأٌ مرئي وقابل للضبط).
-  // بطاقةٌ قليلة العدد تملك فائض ارتفاع (الترويسة وصفّ التالي لا ينموان بنفس
-  // النسبة)، فنعطيها نصيباً أكبر من الوسط. والصغيرة تبقى على ٤٦٪ المقيسة.
-  const midH = cardH * (cardH >= 600 ? 0.56 : cardH >= 380 ? 0.50 : 0.46)
-  // الخطّ = نصيب الصندوق ÷ ارتفاع السطر (number 1.02، room 1.25 + حشو 0.16em)
-  const numberByH = (midH * 0.54) / 1.02
+  const numberByH = (midH * (allowLabel ? 0.54 : 0.62)) / 1.02
   const roomByH = (midH * 0.22) / 1.41
   // الرقم بطل الشاشة: الأضيق بين نصيبه العمودي وعرض البطاقة يحكم
   let number = Math.max(MIN.number, Math.round(Math.min(cardW * 0.44, numberByH)))
   // الغرفة ثانية الأهمية: عدّة أطباء يتشاركون رقم «التالي» فالغرفة هي المميِّز
-  let room = Math.max(MIN.room, Math.round(Math.min(cardW * 0.15, roomByH)))
+  const room = Math.max(MIN.room, Math.round(Math.min(cardW * 0.15, roomByH)))
 
   // ═══ حين لا يتّسع الوسط للحدّين الأدنيين معاً ═══
-  // (٩ أطباء على ١٣٦٦×٧٦٨: البطاقة ١٩٩px، الترويسة وصفّ التالي يأخذان ١٠٢ فيبقى
-  // ٦٨ بينما «يُخدَم الآن» + الرقم + الغرفة تحتاج ١١٦.) الحدّ الأدنى يمنع «النقاط
-  // الصغيرة» لكنّه إن تجاوز المتاح فاضت الغرفة فقصّها overflow واختفت **بلا أثر**
-  // — وهو أسوأ عطبٍ ممكن: الغرفة ثانية الأهمية.
-  //
-  // فبدل تصغير الخطّ إلى ما لا يُقرأ، نُقلّل **عدد الأسطر**:
+  // الحدّ الأدنى يمنع «النقاط الصغيرة» لكنّه إن تجاوز المتاح فاضت الغرفة فقصّها
+  // overflow واختفت **بلا أثر** — أسوأ عطبٍ ممكن. فبدل تصغير الخطّ نُقلّل الأسطر:
   //   أولاً: يسقط «يُخدَم الآن» — الرقم الضخم تحت اسم الدكتور مفهومٌ بذاته.
-  //   ثم: الغرفة تُختصر إلى رقمها («٦» بدل «الغرفة ٦») وتنتقل بجانب الرقم.
-  const labelH = () => Math.max(MIN.label, Math.min(px(0.062, MIN.label), Math.round(room * 0.7)))
+  //   ثم: الغرفة تُختصر إلى رقمها («٦» بدل «العيادة ٦») وتنتقل بجانب الرقم.
+  const label = Math.max(MIN.label, Math.min(px(0.062, MIN.label), Math.round(room * 0.7)))
   const budget = midH * 0.95
   const needed = (withLabel, roomBeside) =>
-    number * 1.02 + (roomBeside ? 0 : room * 1.41) + (withLabel ? labelH() * 1.2 : 0)
-
-  let showLabel = true
+    number * 1.02 + (roomBeside ? 0 : room * 1.41) + (withLabel ? label * 1.2 : 0)
+  let showLabel = allowLabel
   let roomBeside = false
   if (needed(showLabel, roomBeside) > budget) showLabel = false
   if (needed(showLabel, roomBeside) > budget) roomBeside = true
-  if (needed(showLabel, roomBeside) > budget) {
-    // آخر ما يُضحّى به: الرقم ينزل إلى حدّه الأدنى — والغرفة تبقى كما هي
-    number = Math.max(MIN.number, Math.floor((budget - 0) / 1.02))
+  // آخر ما يُضحّى به: الرقم ينزل إلى حدّه الأدنى — والغرفة تبقى كما هي
+  const fits = needed(showLabel, roomBeside) <= budget
+  if (!fits) number = Math.max(MIN.number, Math.floor(budget / 1.02))
+  return { number, room, label, showLabel, roomCompact: roomBeside, fits }
+}
+
+// ═══ مقاسات البطاقة ═══
+// opts: tier (من tierOf) · chipMin (من chipMinPx) · nextRow/returnRow: هل في الشبكة
+// بطاقةٌ لها «تالي»/«بانتظار العودة» · digits: أطول رقمٍ معروض.
+// المقاسات واحدة للشبكة كلّها (فلا تختلف بطاقةٌ عن جارتها في حجم رقمها)، فيُحجز
+// ارتفاع الصفّ متى وُجد في إحداها؛ والبطاقة التي لا صفّ لها يتوسّط وسطُها فقط.
+//
+// ★ الميزانية العمودية **محسوبة** لا نسبٌ مقيسة: الترويسة والحبّات تُطرح بارتفاعها
+// الفعليّ (خطّ × ارتفاع سطر + حشو)، والباقي للوسط. والحبّات تكبر مع الرقم والرقم
+// يصغر معها، فنكرّر الحساب حتى يستقرّ.
+// ★ وإن لم يتّسع الوسط حتى للرقم والعيادة بحدّيهما الأدنيين (بطاقةٌ قصيرة: ٤ عيادات على
+// 960×540 تعطي ١٩٠px لا تحمل صفَّي حبّات) ينزل المستوى درجةً — صفٌّ مدموج بلا عناوين —
+// بدل أن يُقصّ الرقم أو تختفي العيادة. فـ fonts.tier هو المستوى **الفعليّ**.
+const TIER_ORDER = ['large', 'medium', 'compact']
+export function cardFonts(cardW, cardH, opts = {}) {
+  if (!cardW || !cardH) return null
+  const start = TIER_ORDER.indexOf(opts.tier) >= 0 ? TIER_ORDER.indexOf(opts.tier) : 0
+  let out = null
+  for (let i = start; i < TIER_ORDER.length; i++) {
+    out = cardFontsAt(cardW, cardH, { ...opts, tier: TIER_ORDER[i] })
+    if (out.fits) break
   }
-  const roomCompact = roomBeside
-  const doctor = Math.min(px(0.105, MIN.doctor), Math.round(room * 0.88))
-  const upNum = Math.min(px(0.105, MIN.upNum), Math.round(room * 0.88))
+  return out
+}
+
+function cardFontsAt(cardW, cardH, opts) {
+  const tierKey = opts.tier
+  const tier = TIERS[tierKey]
+  const chipMin = opts.chipMin || 24
+  const hasNext = opts.nextRow !== false
+  const hasReturn = !!opts.returnRow
+  const digits = Math.max(2, opts.digits || 2)
+  // الأضيق يحكم: نصٌّ مربوط بالعرض وحده يفيض طولاً في بطاقة عريضة قصيرة، والعكس.
+  const base = Math.min(cardW, cardH * 1.35)
+  const px = (frac, min) => Math.max(min, Math.round(base * frac))
+
+  const padY = Math.max(6, Math.round(cardH * 0.02))
+  const padX = Math.max(8, Math.round(cardW * 0.025))
+  const innerW = Math.floor(cardW - 2 * padX - 2 * BORDER)
+  const innerH = cardH - 2 * padY - 2 * BORDER
+
+  const titleOf = (C, D) => Math.max(MIN.upLabel, Math.min(Math.round(C * 0.42), Math.round(D * 0.85)))
+  const chipsH = (C, T) => {
+    if (!hasNext && !hasReturn) return 0
+    let h = 1 + Math.round(C * 0.25)                    // الحدّ العلوي وحشوه
+    if (tier.merged) return h + chipHeight(C)
+    if (hasNext) h += (tier.nextTitle ? Math.ceil(T * 1.25) + 4 + Math.round(C * 0.08) : 0) + chipHeight(C)
+    if (hasReturn) h += (hasNext ? Math.round(C * 0.2) : 0) + chipHeight(C)
+    return h
+  }
+  const layout = (C, D) => {
+    const specialty = tier.specialty ? Math.max(MIN.specialty, Math.min(px(0.055, MIN.specialty), Math.round(D * 0.7))) : 0
+    const headH = Math.ceil(D * 1.15) + (specialty ? 3 + Math.ceil(specialty * 1.15) : 0)
+    const T = titleOf(C, D)
+    const ch = chipsH(C, T)
+    const midH = innerH - headH - SECTION_GAP - (ch ? ch + SECTION_GAP : 0)
+    return { specialty, T, mid: fitMiddle(midH, cardW, base, tier.nextTitle) }
+  }
+  // سقف العرض: عدد الحبّات المرغوب للمستوى يتّسع في سطرٍ واحد
+  const unit = digits * CHIP.digit + 2 * CHIP.padX + 2 * CHIP.margin
+  const byWidth = Math.floor((innerW - 4 - tier.slots * 2 * CHIP.border) / (tier.slots * unit + (tier.merged ? 0.4 : 0)))
+
+  // الاسم يتبع الغرفة والغرفة تتبع الوسط: بضع جولات تكفي ليستقرّ
+  const settle = (C) => {
+    let D = MIN.doctor
+    for (let i = 0; i < 4; i++) {
+      const { mid } = layout(C, D)
+      D = Math.max(MIN.doctor, Math.min(px(0.105, MIN.doctor), Math.round(mid.room * 0.88)))
+    }
+    return { D, mid: layout(C, D).mid }
+  }
+  // ═══ حجم الحبّة: أكبر C تبقى عنده ≤ نسبةً من الرقم الحالي ═══
+  // الحبّة الأكبر تأكل من الوسط فيصغر الرقم — فالتكرار البسيط يتأرجح (بطاقةٌ واحدة
+  // أعطت رقماً ١٠٤px وحبّاتٍ ٦٢px). والعلاقة رتيبة: بحثٌ ثنائيّ يجد نقطة التوازن.
+  // ولا تنزل عن حدّها مهما ضاق العرض أو الارتفاع — يقلّ عددها بدلاً من ذلك.
+  let lo = chipMin
+  // وسقفٌ بالارتفاع للبطاقة الكبيرة جداً (عيادةٌ وحدها): صفّا حبّاتٍ بنصف الرقم
+  // يأكلان ثلث البطاقة فيصغر «يُخدَم الآن» عمّا كان — وهو يجب أن يبقى ضخماً.
+  let hi = Math.max(chipMin, Math.min(byWidth, tierKey === 'large' ? Math.round(innerH * 0.07) : byWidth))
+  while (hi - lo > 1) {
+    const C = Math.floor((lo + hi) / 2)
+    if (C <= settle(C).mid.number * tier.chipRatio) lo = C
+    else hi = C
+  }
+  const C = hi > lo && hi <= settle(hi).mid.number * tier.chipRatio ? hi : lo
+  const D = settle(C).D
+  const { specialty, T, mid } = layout(C, D)
+  // الغرفة تبقى ≥ الاسم (الترتيب البصري) — تصغير الاسم يحرّر ارتفاعاً ولا يأخذه
+  const doctor = Math.max(MIN.doctor, Math.min(D, mid.room))
+  // الحبّة لا تنافس الرقم الحالي — يبقى المسيطر في كل المستويات
+  const chip = Math.max(chipMin, Math.min(C, Math.round(mid.number * 0.6)))
+
   return {
-    number,
-    room,
-    roomCompact,
-    showLabel,
+    tier: tierKey,
+    number: mid.number,
+    room: mid.room,
+    roomCompact: mid.roomCompact,
+    fits: mid.fits,
+    showLabel: mid.showLabel,
+    label: mid.label,
     doctor,
-    upNum,
-    label: Math.min(px(0.062, MIN.label), Math.round(doctor * 0.8)),
-    upLabel: Math.min(px(0.052, MIN.upLabel), Math.round(doctor * 0.7)),
-    specialty: Math.min(px(0.055, MIN.specialty), Math.round(doctor * 0.7)),
+    specialty,
+    showSpecialty: tier.specialty,
+    chip,
+    chipMin,
+    chipTitle: T,
+    padX,
+    padY,
+    innerW,
+    // عرض علامة «بانتظار العودة» قبل حبّاتها: أيقونة + كلمة (كبير) أو أيقونة وحدها (متوسّط)
+    returnMarkW: tier.merged ? 0 : tier.returnTitle
+      ? Math.ceil(T * (RETURN_WORD_EM + 1.4) + chip * 0.3)
+      : Math.ceil(chip * 1.1),
   }
+}
+
+// ═══ كم حبّةً تُعرض؟ ═══
+// يُحسب من العرض لا يُقاس بعد الرسم: القياس يأتي متأخّراً دورةً فتُعرض حبّاتٌ تُقصّ
+// بصمت. وما لا يتّسع يُعلن عن نفسه بحبّة «+N» — قصٌّ صامت أسوأ من رقمٍ ناقص.
+// ★ أوّل «تالي» يُعرض دائماً: هو الذي سيُنادى بعد قليل.
+export function planChips(next, ret, fonts) {
+  const tier = TIERS[fonts.tier] || TIERS.large
+  const C = fonts.chip
+  const w = (n) => chipWidth(String(n).length, C)
+  const more = (k) => (k > 0 ? chipWidth(String(k).length + 1, C) : 0)
+  const sum = (arr, k) => arr.slice(0, k).reduce((s, n) => s + w(n), 0)
+  const avail = fonts.innerW - 4
+
+  if (tier.merged) {
+    // صفٌّ واحد: «التالي» ثم «العودة» بفاصلٍ صغير. نجرّب كل توزيع (a من التالي، b من
+    // العودة) ونفضّل بالترتيب: حبّتَي «تالي» (من ينتظر يبحث عن رقمه أولاً) ← ظهور
+    // العودة بلونها ولو حبّةً أو «+N» ← أكثر الحبّات ← الأكثر من «التالي».
+    const aMax = Math.min(tier.nextCap, next.length)
+    const aMin = next.length > 0 ? 1 : 0
+    let best = null
+    for (let a = aMax; a >= aMin; a--) {
+      for (let b = ret.length; b >= 0; b--) {
+        const sep = a > 0 && (b > 0 || ret.length > 0) ? Math.ceil(C * 0.4) : 0
+        const width = sum(next, a) + more(next.length - a) + sep + sum(ret, b) + more(ret.length - b)
+        if (width > avail && !(a === aMin && b === 0)) continue
+        const score = [Math.min(a, 2), b > 0 || ret.length === 0 ? 1 : 0, a + b, a]
+        const better = !best || score.some((v, k) =>
+          v !== best.score[k] && score.slice(0, k).every((u, j) => u === best.score[j]) && v > best.score[k])
+        if (better) best = { a, b, score }
+      }
+    }
+    const { a, b } = best || { a: aMin, b: 0 }
+    return { next: next.slice(0, a), nextMore: next.length - a, ret: ret.slice(0, b), retMore: ret.length - b }
+  }
+
+  const fitRow = (nums, cap, room, minShown) => {
+    for (let a = Math.min(cap, nums.length); a >= minShown; a--) {
+      if (sum(nums, a) + more(nums.length - a) <= room) return a
+    }
+    return minShown
+  }
+  const a = fitRow(next, tier.nextCap, avail, next.length > 0 ? 1 : 0)
+  const b = fitRow(ret, Infinity, avail - fonts.returnMarkW, 0)
+  return { next: next.slice(0, a), nextMore: next.length - a, ret: ret.slice(0, b), retMore: ret.length - b }
 }

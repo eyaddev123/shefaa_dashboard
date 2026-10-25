@@ -11,7 +11,9 @@
 import { chromium } from 'playwright'
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
+import { chipMinPx, tierOf } from '../src/display-layout.js'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const PORT = Number(process.env.BOARD_TEST_PORT || 5232)
@@ -21,19 +23,23 @@ let pass = 0
 const failures = []
 const ok = (cond, label) => { if (cond) { pass++; return true } failures.push(label); return false }
 
-// الحدّ الأدنى المقروء من ٤–٥ أمتار (يطابق MIN في PublicDisplay.jsx)
-const MIN = { number: 56, room: 28, doctor: 20, upNum: 24, specialty: 13 }
+// الحدّ الأدنى المقروء من ٤–٥ أمتار (يطابق MIN في display-layout.js)؛ ورقم الحبّة
+// حدّه من chipMinPx(عرض النافذة): ٣٤px على 1920 — القاعدة نفسها لا نسخةٌ منها
+const MIN = { number: 56, room: 28, doctor: 20, specialty: 13 }
 
 const SIZES = [[1920, 1080], [1366, 768], [960, 540]]
-const DOCS = [1, 4, 7]
-// أعداد المنتظرين: فارغ · واحد · متوسّط · طويلٌ يتجاوز البطاقة («+N»)
-const WAITING = [0, 1, 5, 20]
+// المستويات الثلاثة: ١–٢ كبير · ٣–٤ متوسّط · ٥+ مكبوس
+const DOCS = [1, 2, 4, 7]
+// أعداد المنتظرين: فارغ · واحد · ستّة (سقف الكبير، و«+N» في الأصغر) · طويلٌ يتجاوز البطاقة
+const WAITING = [0, 1, 6, 20]
+// «بانتظار العودة» (خروج مؤقت): بلا · ثلاثة — سطرٌ رابع في البطاقة يجب ألّا يقصّ الغرفة
+const RETURNING = [0, 3]
 const BAR = 90   // شريط متصفّح التلفاز
 
 // أسماء مرضى في البيانات عمداً: إن ظهر أحدها على الشاشة فهو تسريب
 const PATIENT_NAMES = ['سمير خالد الحسن', 'ليلى أحمد النجار']
 
-const mkBoard = (n, waiting = 2) => ({
+const mkBoard = (n, waiting = 2, returning = 0) => ({
   urgent_delays: 0, seq: 1,
   board: Array.from({ length: n }, (_, i) => ({
     doctor_name: `د. ضياء الدين المنقل ${i + 1}`,
@@ -49,6 +55,7 @@ const mkBoard = (n, waiting = 2) => ({
       { queue_number: 901, arrived: false, full_name: PATIENT_NAMES[0] },
       { queue_number: 902, arrived: false, full_name: PATIENT_NAMES[1] },
     ],
+    returning: Array.from({ length: returning }, (_, k) => ({ queue_number: 60 + k })),
   })),
 })
 
@@ -74,6 +81,7 @@ const run = async () => {
       const line = []
       for (const n of DOCS) {
        for (const waiting of WAITING) {
+       for (const returning of RETURNING) {
         const ctx = await browser.newContext({ viewport: { width: w, height: h } })
         // ═══ محاكاة التلفاز: بلا container queries ولا aspect-ratio ═══
         await ctx.addInitScript((snap) => {
@@ -87,12 +95,15 @@ const run = async () => {
             removeEventListener() {} close() {}
           }
           window.EventSource = FakeES
-        }, mkBoard(n, waiting))
+        }, mkBoard(n, waiting, returning))
 
         const page = await ctx.newPage()
         const errors = []
         page.on('pageerror', (e) => errors.push(e.message))
         await page.goto(`${BASE}/display?key=test`, { waitUntil: 'load' })
+        // الخطّ أولاً: عدد الحبّات محسوب بعرض أرقام Cairo، والقياس قبل تحميله (جهازٌ مشغول)
+        // يرى خطّاً احتياطياً أعرض فيُبلغ عن قصٍّ لا وجود له — فشلٌ متنقّل بين الجولات
+        await page.evaluate(() => (document.fonts ? document.fonts.ready.then(() => 0) : 0))
         await page.waitForTimeout(600)
 
         const m = await page.evaluate(() => {
@@ -125,36 +136,69 @@ const run = async () => {
           const used = cards.reduce((s, c) => { const r = c.getBoundingClientRect()
             return s + r.width * r.height }, 0)
 
-          // صفّ المنتظرين في أول بطاقة: كم رقماً ظهر، وهل خرج شيءٌ عن البطاقة
+          // ═══ الحبّات في أول بطاقة: كم ظهر، وهل خرج شيءٌ عن البطاقة أو صفّه ═══
           const first = cards[0]
-          const nums = first ? [...first.querySelectorAll('.pd-wait-num')] : []
-          const moreEl = first ? first.querySelector('.pd-wait-more') : null
-          const waitRow = first ? first.querySelector('.pd-waiting') : null
-          if (waitRow && first) {
+          const q = (sel) => (first ? [...first.querySelectorAll(sel)] : [])
+          const nextEls = q('.pd-chip:not(.pd-chip-return):not(.pd-chip-more)')
+          const nextMore = q('.pd-chip-more:not(.pd-chip-return)')[0]
+          const retEls = q('.pd-chip-return:not(.pd-chip-more)')
+          const retMore = q('.pd-chip-return.pd-chip-more')[0]
+          if (first) {
             const cr = first.getBoundingClientRect()
-            const wr = waitRow.getBoundingClientRect()
-            if (wr.bottom > cr.bottom + 1) clipped.push('card0:waiting-row')
-            nums.forEach((el, k) => {
+            q('.pd-chip').forEach((el, k) => {
               const r = el.getBoundingClientRect()
-              if (r.bottom > wr.bottom + 1 || r.right > cr.right + 1 || r.left < cr.left - 1)
-                clipped.push(`card0:wait${k}`)
+              const row = el.parentElement.getBoundingClientRect()
+              if (r.bottom > cr.bottom + 1 || r.right > cr.right + 1 || r.left < cr.left - 1 || r.width < 2 ||
+                r.right > row.right + 1 || r.left < row.left - 1 || r.bottom > row.bottom + 1 || r.top < row.top - 1)
+                clipped.push(`card0:chip${k}(${el.textContent})`)
             })
+            const block = first.querySelector('.pd-chips')
+            if (block && block.getBoundingClientRect().bottom > cr.bottom + 1) clipped.push('card0:chips-block')
           }
+          // كلّ حبّات الشبكة (لا الأولى وحدها): لا واحدة تحت الحدّ الأدنى ولا خارج بطاقتها
+          let smallest = Infinity
+          cards.forEach((c, i) => {
+            const cr = c.getBoundingClientRect()
+            c.querySelectorAll('.pd-chip').forEach((el) => {
+              smallest = Math.min(smallest, parseFloat(getComputedStyle(el).fontSize))
+              const r = el.getBoundingClientRect()
+              if (r.right > cr.right + 1 || r.left < cr.left - 1 || r.bottom > cr.bottom + 1)
+                clipped.push(`card${i}:chip(${el.textContent})`)
+            })
+          })
+          const firstChip = nextEls[0]
+          const rightmost = nextEls.length > 1 &&
+            nextEls.every((e) => e.getBoundingClientRect().left <= firstChip.getBoundingClientRect().left)
+          const fsOf = (e) => (e ? parseFloat(getComputedStyle(e).fontSize) : 0)
 
           return {
             cards: cards.length, rowCounts, clipped,
             fillPct: Math.round(used / (gr.width * gr.height) * 100),
             number: fs('.pd-number'), room: fs('.pd-room'), doctor: fs('.pd-doctor'),
-            upNum: fs('.pd-wait-num'), specialty: fs('.pd-specialty'),
-            shownNums: nums.map((e) => e.textContent.trim()),
-            moreText: moreEl ? moreEl.textContent.trim() : '',
-            hasWaitRow: !!waitRow,
+            specialty: fs('.pd-specialty'), hasSpecialty: !!document.querySelector('.pd-specialty'),
+            hasLabel: !!document.querySelector('.pd-label'),
+            firstChip: fsOf(firstChip), smallestChip: smallest,
+            firstIsFirst: !!firstChip && firstChip.classList.contains('pd-chip-first'),
+            firstRightmost: nextEls.length < 2 || rightmost,
+            shownNums: nextEls.map((e) => e.textContent.trim()),
+            moreText: nextMore ? nextMore.textContent.trim() : '',
+            returningNums: retEls.map((e) => e.textContent.trim()),
+            retMoreText: retMore ? retMore.textContent.trim() : '',
+            hasChipsBlock: !!(first && first.querySelector('.pd-chips')),
+            titles: q('.pd-chip-title').map((e) => e.textContent.trim()),
+            returnWord: q('.pd-return-word').length,
+            returnIcon: q('.pd-return-icon').length,
+            chipRows: q('.pd-chip-row').length,
+            tier: first ? first.getAttribute('data-tier') : '',
+            // الصفّ المدموج: «التالي» والعودة في الصندوق نفسه
+            sameRow: !!(firstChip && retEls[0] && firstChip.parentElement === retEls[0].parentElement),
+            returningFlash: !!document.querySelector('.pd-flash'),
             text: document.body.innerText,
             scrollY: document.documentElement.scrollHeight - document.documentElement.clientHeight,
           }
         })
 
-        const tag = `${w}×${h0}${bar ? '+شريط' : ''} ${n}د/${waiting}منتظر`
+        const tag = `${w}×${h0}${bar ? '+شريط' : ''} ${n}د/${waiting}منتظر/${returning}عودة`
         ok(m.cards === n, `${tag}: ظهرت ${m.cards} بطاقة من ${n}`)
 
         // ═══ لا بطاقة يتيمة ═══
@@ -171,28 +215,60 @@ const run = async () => {
         ok(m.number >= MIN.number, `${tag}: الرقم ${m.number}px < ${MIN.number}`)
         ok(m.room >= MIN.room, `${tag}: الغرفة ${m.room}px < ${MIN.room}`)
         ok(m.doctor >= MIN.doctor, `${tag}: اسم الدكتور ${m.doctor}px < ${MIN.doctor}`)
-        if (waiting > 0) ok(m.upNum >= MIN.upNum, `${tag}: رقم الانتظار ${m.upNum}px < ${MIN.upNum}`)
-        ok(m.specialty >= MIN.specialty, `${tag}: الاختصاص ${m.specialty}px < ${MIN.specialty}`)
+        // ★ القاعدة الذهبية: رقم الحبّة لا ينزل عن حدّه — في كلّ حبّات الشبكة
+        const chipMin = chipMinPx(w)
+        if (waiting > 0) ok(m.firstChip >= chipMin, `${tag}: أوّل حبّة ${m.firstChip}px < ${chipMin}`)
+        if (m.smallestChip !== Infinity) ok(m.smallestChip >= chipMin, `${tag}: حبّةٌ ${m.smallestChip}px < ${chipMin}`)
+        // المكبوس بلا اختصاص (الاسم وحده سطراً واحداً) — فيُفحص حيث يظهر
+        if (m.hasSpecialty) ok(m.specialty >= MIN.specialty, `${tag}: الاختصاص ${m.specialty}px < ${MIN.specialty}`)
 
         // ═══ الترتيب البصري: الرقم ← الغرفة ← الاسم ← الاختصاص ═══
         ok(m.number > m.room, `${tag}: الرقم (${m.number}) ليس أكبر من الغرفة (${m.room})`)
         ok(m.room >= m.doctor, `${tag}: الغرفة (${m.room}) أصغر من اسم الدكتور (${m.doctor})`)
-        ok(m.doctor >= m.specialty, `${tag}: الاسم (${m.doctor}) أصغر من الاختصاص (${m.specialty})`)
+        if (m.hasSpecialty) ok(m.doctor >= m.specialty, `${tag}: الاسم (${m.doctor}) أصغر من الاختصاص (${m.specialty})`)
 
         // ═══ لا شيء مقصوص — والغرفة خاصّةً (ثانية الأهمية) ═══
         ok(m.clipped.length === 0, `${tag}: عناصر مقصوصة: ${m.clipped.join(', ')}`)
 
-        // ═══ صفّ المنتظرين ═══
+        // ═══ حبّات «التالي» ═══
         if (waiting === 0) {
-          ok(m.shownNums.length === 0, `${tag}: ظهرت أرقامٌ ولا منتظر — ${JSON.stringify(m.shownNums)}`)
-          ok(/لا أحد بانتظار/.test(m.text), `${tag}: قائمةٌ فارغة بلا رسالة`)
+          ok(m.shownNums.length === 0 && !m.moreText, `${tag}: ظهرت حبّاتٌ ولا منتظر — ${JSON.stringify(m.shownNums)}`)
+          // لا منتظر ولا عائد: الصفّ لا يظهر ولا يحجز مكاناً
+          if (returning === 0) ok(!m.hasChipsBlock, `${tag}: صفّ حبّاتٍ فارغ ظاهر`)
         } else {
           // المعروض + المخفيّ = عدد المنتظرين بالضبط — لا رقمَ يضيع بصمت
           const hidden = m.moreText ? Number(m.moreText.replace(/\D/g, '')) : 0
           ok(m.shownNums.length + hidden === waiting,
             `${tag}: ${m.shownNums.length} معروضاً + ${hidden} مخفيّاً ≠ ${waiting}`)
-          ok(m.shownNums.length >= 1, `${tag}: لم يظهر ولا رقم`)
+          ok(m.shownNums.length >= 1, `${tag}: لم تظهر ولا حبّة`)
+          ok(m.shownNums[0] === '10', `${tag}: أوّل حبّة ${m.shownNums[0]} ليست التالي (10)`)
+          ok(m.firstIsFirst, `${tag}: أوّل حبّة بلا تمييز`)
+          ok(m.firstRightmost, `${tag}: أوّل حبّة ليست في أقصى اليمين (RTL)`)
+          ok(!m.moreText || /^\+\d+$/.test(m.moreText), `${tag}: نصّ «+N» «${m.moreText}»`)
         }
+        // ═══ المستوى ═══
+        // المستوى بعدد العيادات، وقد ينزل درجةً في بطاقةٍ قصيرة (لا يصعد أبداً)
+        const ORDER = ['large', 'medium', 'compact']
+        const tier = m.tier
+        ok(ORDER.indexOf(tier) >= ORDER.indexOf(tierOf(n)), `${tag}: المستوى «${tier}» أعلى من ${tierOf(n)}`)
+        if (w === 1920) ok(tier === tierOf(n), `${tag}: على 1920 نزل المستوى إلى «${tier}»`)
+        const cap = { large: 6, medium: 4, compact: 3 }[tier]
+        ok(m.shownNums.length <= cap, `${tag}: ${m.shownNums.length} حبّة > سقف ${tier} (${cap})`)
+        if (waiting > cap) ok(!!m.moreText, `${tag}: ${waiting} منتظراً بلا «+N»`)
+        if (tier === 'compact') {
+          ok(m.titles.length === 0 && m.returnWord === 0 && !m.hasLabel && !m.hasSpecialty,
+            `${tag}: نصٌّ في البطاقة المكبوسة (عنوان/يُخدَم الآن/اختصاص)`)
+          ok(m.chipRows <= 1, `${tag}: ${m.chipRows} صفوف حبّات في المكبوس`)
+          if (waiting > 0 && returning > 0 && m.returningNums.length > 0)
+            ok(m.sameRow, `${tag}: التالي والعودة ليسا في صفٍّ واحد`)
+        } else {
+          if (waiting > 0) ok(m.titles.join() === 'التالي', `${tag}: عنوان الصفّ «${m.titles.join()}»`)
+          if (returning > 0) {
+            ok(m.returnIcon === 1, `${tag}: أيقونة العودة غائبة`)
+            ok(m.returnWord === (tier === 'large' ? 1 : 0), `${tag}: كلمة «بانتظار العودة» في ${tier}`)
+          }
+        }
+
         // ★ الخصوصية: أرقامٌ فقط
         ok(!PATIENT_NAMES.some((nm) => m.text.includes(nm)),
           `${tag}: ★ تسرّب اسم مريض إلى الشاشة العامة`)
@@ -205,10 +281,21 @@ const run = async () => {
         // أصلاً — المهمّ ألّا تظهر «الغرفة» إطلاقاً.
         ok(!/الغرفة/.test(m.text), `${tag}: ★ ظهرت «الغرفة» — التسمية يجب أن تكون «العيادة»`)
 
+        // ═══ «بانتظار العودة»: بترتيبها، والمعروض + «+N» = الكلّ، ولا تختلط بالمنتظرين، وبلا وميض ═══
+        const retHidden = m.retMoreText ? Number(m.retMoreText.replace(/\D/g, '')) : 0
+        ok(m.returningNums.join() === Array.from({ length: m.returningNums.length }, (_, k) => 60 + k).join() &&
+          m.returningNums.length + retHidden === returning,
+          `${tag}: أرقام «بانتظار العودة» ${JSON.stringify(m.returningNums)} +${retHidden}`)
+        if (returning === 0) ok(m.returnIcon === 0 && !m.retMoreText, `${tag}: علامة عودة بلا عائدين`)
+        ok(!m.shownNums.some((x) => Number(x) >= 60 && Number(x) < 70),
+          `${tag}: ★ رقمٌ «بانتظار العودة» ظهر بين المنتظرين`)
+        ok(!m.returningFlash, `${tag}: ★ وميضٌ على اللقطة الأولى`)
+
         ok(errors.length === 0, `${tag}: أخطاء صفحة: ${errors.join(' | ')}`)
 
-        line.push(`${n}د/${waiting}:${m.shownNums.length}${m.moreText ? '+' : ''}`)
+        if (returning === 0) line.push(`${n}د/${waiting}:${m.shownNums.length}${m.moreText ? '+' : ''}@${m.firstChip || '-'}`)
         await ctx.close()
+       }
        }
       }
       console.log(`  ${String(w).padStart(4)}×${String(h0).padEnd(4)}${bar ? ' +شريط' : '  ملء  '} │ ${line.join('  ')}`)
@@ -235,6 +322,9 @@ const run = async () => {
     }, mkBoard(2, 3))
     const page = await ctx.newPage()
     await page.goto(`${BASE}/display?key=test`, { waitUntil: 'load' })
+        // الخطّ أولاً: عدد الحبّات محسوب بعرض أرقام Cairo، والقياس قبل تحميله (جهازٌ مشغول)
+        // يرى خطّاً احتياطياً أعرض فيُبلغ عن قصٍّ لا وجود له — فشلٌ متنقّل بين الجولات
+        await page.evaluate(() => (document.fonts ? document.fonts.ready.then(() => 0) : 0))
     await page.waitForTimeout(900)
     await page.evaluate(() => window.__sse.emit('call', {
       queue_number: 7, room: '1', doctor_name: 'د. ضياء الدين المنقل 1',
@@ -277,6 +367,9 @@ const run = async () => {
         const errors = []
         page.on('pageerror', (e) => errors.push(e.message))
         await page.goto(`${BASE}/display?key=test`, { waitUntil: 'load' })
+        // الخطّ أولاً: عدد الحبّات محسوب بعرض أرقام Cairo، والقياس قبل تحميله (جهازٌ مشغول)
+        // يرى خطّاً احتياطياً أعرض فيُبلغ عن قصٍّ لا وجود له — فشلٌ متنقّل بين الجولات
+        await page.evaluate(() => (document.fonts ? document.fonts.ready.then(() => 0) : 0))
         await page.waitForTimeout(600)
         const hd = await page.evaluate(() => {
           const t = document.querySelector('.pd-title')
@@ -302,6 +395,9 @@ const run = async () => {
         ok(hd.notClipped, `${tag}: الاسم مقصوص`)
         ok(hd.inView && hd.inHead, `${tag}: الاسم خارج الشاشة أو الترويسة`)
         ok(hd.gap >= 8, `${tag}: الاسم يلامس الساعة (المسافة ${hd.gap}px)`)
+        // الحجم = ما كانت clamp(16px, 1.8vw, 34px) ستعطيه — بلا clamp
+        const want = Math.min(34, Math.max(16, w * 0.018))
+        ok(Math.abs(hd.fsz - want) < 0.6, `${tag}: خطّ الاسم ${hd.fsz}px ≠ ${want.toFixed(1)}`)
         ok(hd.scrollX <= 0, `${tag}: تمرير أفقي ${hd.scrollX}px`)
         ok(errors.length === 0, `${tag}: أخطاء صفحة: ${errors.join(' | ')}`)
         line.push(`${w}×${h}:${hd.fsz}px/${hd.gap}px`)
@@ -309,6 +405,21 @@ const run = async () => {
       }
     }
     console.log(`  الترويسة │ ${line.join('  ')}`)
+  }
+
+  // ═══ الترويسة بلا clamp()/min()/max() ولا flex gap ولا margin-inline ═══
+  // Chrome 66 (تلفاز الصالة) لا يملكها فيُسقط التصريح كلّه إلى ١٦px، والمتصفّح الحديث
+  // في هذا الفحص يملكها فلا يرى العطب — فنفحص المصدر نفسه.
+  {
+    const css = readFileSync(resolve(ROOT, 'src/styles.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+    const HEAD = /\.pd-(head|brand|logo|title|clock|time|date|tools|dot|icon-btn)\b/
+    const bad = []
+    for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      // وgap (في flex) وmargin-inline-*/padding-inline-*: كلّها أحدث من Chrome 66
+      if (HEAD.test(m[1]) && /\b(clamp|min|max)\(|(^|[;\s])gap\s*:|(margin|padding)-inline/.test(m[2])) bad.push(m[1].trim())
+    }
+    ok(bad.length === 0, `الترويسة: خصائص غير مدعومة في Chrome 66 (clamp/min/max/gap/inline) — ${bad.join(' | ')}`)
+    console.log(`  الترويسة (CSS) │ ${bad.length ? '✖ ' + bad.join(' | ') : 'بلا clamp/min/max/gap/margin-inline'}`)
   }
 
   await browser.close()

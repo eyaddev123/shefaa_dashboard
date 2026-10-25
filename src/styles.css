@@ -966,25 +966,50 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
 }
 
 /* ── الترويسة: الهوية، الساعة، ومؤشّرات صغيرة ── */
-.pd-head { display: flex; align-items: center; gap: 1.5vw; }
-.pd-brand { display: flex; align-items: center; gap: 0.8vw; }
-.pd-logo { font-size: clamp(24px, 3vw, 52px); }
-.pd-title { font-size: clamp(16px, 1.8vw, 34px); font-weight: 800; white-space: nowrap; }  /* سطرٌ واحد — والفحص يقيس أنّه لا يلامس الساعة */
-.pd-clock { margin-inline-start: auto; text-align: center; line-height: 1.1; }
-.pd-time { font-size: clamp(22px, 2.6vw, 48px); font-weight: 800; color: #7fd6b8; }
-.pd-date { font-size: clamp(11px, 1vw, 19px); color: #b3c6c2; }
-.pd-tools { display: flex; align-items: center; gap: 0.6vw; }
+/* ★ Chrome 66: لا gap في flex ولا margin-inline-* — فكانت الساعة تلتصق باسم المجمع بدل
+   أن تُدفع يساراً، والشعار يلامس الاسم. البديل هوامش فيزيائية: الصفحة RTL دائماً، فالتالي
+   من الإخوة يقع يسار سابقه والفاصل هامشه الأيمن، و«البداية» = اليمين. */
+.pd-head { display: flex; align-items: center; }
+.pd-head > * + * { margin-right: 1.5vw; }
+.pd-brand { display: flex; align-items: center; }
+.pd-brand > * + * { margin-right: 0.8vw; }
+.pd-logo { font-size: 3vw; }
+.pd-title { font-size: 1.8vw; font-weight: 800; white-space: nowrap; }  /* سطرٌ واحد — والفحص يقيس أنّه لا يلامس الساعة */
+.pd-head > .pd-clock { margin-right: auto; }   /* يدفع الساعة والأدوات إلى اليسار */
+.pd-clock { text-align: center; line-height: 1.1; }
+.pd-time { font-size: 2.6vw; font-weight: 800; color: #7fd6b8; }
+.pd-date { font-size: 1vw; color: #b3c6c2; }
+.pd-tools { display: flex; align-items: center; }
+.pd-tools > * + * { margin-right: 0.6vw; }
 /* height صريح لا aspect-ratio: الأخيرة غائبة في Chrome 66 فيبقى الارتفاع صفراً */
-.pd-dot { width: clamp(8px, 0.8vw, 14px); height: clamp(8px, 0.8vw, 14px); border-radius: 50%; }
+.pd-dot { width: 0.8vw; height: 0.8vw; border-radius: 50%; }
 .pd-dot-on { background: #14b8a6; }
 .pd-dot-off { background: #f0b37e; animation: pd-blink 1.2s ease-in-out infinite; }
 .pd-icon-btn {
   font-family: inherit; cursor: pointer; line-height: 1;
-  font-size: clamp(13px, 1.1vw, 20px);
+  font-size: 1.1vw;
   color: #7fd6b8; background: rgba(127, 214, 184, 0.12);
   border: 1px solid rgba(127, 214, 184, 0.3);
   padding: 0.5vh 0.7vw; border-radius: 10px;
 }
+/* ═══ حدود الترويسة: media queries بدل clamp() ═══
+   clamp() (Chrome 79) غائبة في Chrome 66 — متصفّح تلفاز الصالة — فكان التصريح كلّه
+   يسقط إلى حجم المتصفّح الافتراضي ١٦px: اسم المجمع والساعة صغيران على الشاشة الفعلية.
+   القيمة الأساسية أعلاه بـ vw، وكلّ حدٍّ عند العرض الذي يبلغه فيه vw بالضبط
+   (الحدّ ÷ النسبة × ١٠٠)، فالنتيجة مطابقةٌ لـ clamp في كلّ عرض. وCSS لا JS: الترويسة
+   مشتركة مع شاشة الدور (/order). والفحص يمنع عودة clamp/min()/max() هنا. */
+@media (max-width: 800px)   { .pd-logo { font-size: 24px; } }        /* 24 ÷ 3%   */
+@media (min-width: 1734px)  { .pd-logo { font-size: 52px; } }        /* 52 ÷ 3%   */
+@media (max-width: 888px)   { .pd-title { font-size: 16px; } }       /* 16 ÷ 1.8% */
+@media (min-width: 1889px)  { .pd-title { font-size: 34px; } }       /* 34 ÷ 1.8% */
+@media (max-width: 846px)   { .pd-time { font-size: 22px; } }        /* 22 ÷ 2.6% */
+@media (min-width: 1847px)  { .pd-time { font-size: 48px; } }        /* 48 ÷ 2.6% */
+@media (max-width: 1100px)  { .pd-date { font-size: 11px; } }        /* 11 ÷ 1%   */
+@media (min-width: 1900px)  { .pd-date { font-size: 19px; } }        /* 19 ÷ 1%   */
+@media (max-width: 1000px)  { .pd-dot { width: 8px; height: 8px; } }    /* 8 ÷ 0.8%  */
+@media (min-width: 1750px)  { .pd-dot { width: 14px; height: 14px; } }  /* 14 ÷ 0.8% */
+@media (max-width: 1181px)  { .pd-icon-btn { font-size: 13px; } }    /* 13 ÷ 1.1% */
+@media (min-width: 1819px)  { .pd-icon-btn { font-size: 20px; } }    /* 20 ÷ 1.1% */
 
 /* ── لافتة التأخير: عامة بلا ذكر عيادة (ذكرها يكشف واقعة طبية عن مريض بعينه) ── */
 .pd-urgent-banner {
@@ -1011,7 +1036,7 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
 .pd-card {
   display: grid;
   grid-template-rows: auto 1fr auto;
-  gap: 0.3vh;
+  gap: 4px;                      /* ثابتٌ بالبكسل: داخلٌ في ميزانية cardFonts (SECTION_GAP) */
   /* تملأ خانتها طولاً وعرضاً — min-*:0 يمنع المحتوى من تمديدها خارج الخانة */
   width: 100%;
   height: 100%;
@@ -1022,7 +1047,8 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
   background: #10201e;
   border: 2px solid rgba(127, 214, 184, 0.18);
   border-radius: 1.4vh;
-  padding: 0.8vh 0.8vw;
+  /* الحشو يُحسب في JS (cardFonts) لأنه داخلٌ في ميزانية الارتفاع */
+  padding: var(--pd-pad-y, 0.8vh) var(--pd-pad-x, 0.8vw);
 }
 /* ترويسة البطاقة: كتلة مرنة عمودية بأسطر لا تتراكب. الاعتماد على ارتفاع
    السطر وحده جعل «يُخدَم الآن» يركب على الاختصاص عند أربع بطاقات. */
@@ -1031,7 +1057,7 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
   display: flex; flex-direction: column;
   min-height: min-content; flex: none;
 }
-.pd-card-head > * + * { margin-top: 0.2vh; }
+.pd-card-head > * + * { margin-top: 3px; }
 .pd-doctor {
   font-size: var(--pd-doctor, 20px); font-weight: 800; line-height: 1.15;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -1091,31 +1117,56 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
-/* ═══ صفّ المنتظرين: الأرقام كاملةً بترتيب الخدمة ═══
-   بدل «التالي/بعده» (اثنان فقط) — من رقمه الخامس يعرف أين هو بلا سؤال.
-   ولا flex gap: متصفّح التلفاز (Chrome 66) يتجاهلها بصمت، فالهوامش بديلٌ يعمل.
-   والمقاسات تصل متغيّراتِ CSS محسوبةً من JS — لا container queries. */
-.pd-waiting {
-  display: flex; align-items: baseline; justify-content: center;
+/* ═══ حبّات «التالي» و«بانتظار العودة» ═══
+   سطر النصّ الصغير «التالي: ٧ ٨ ٩» لم يكن يلفت أحداً في الصالة. الحبّة صندوقٌ بخلفيةٍ
+   أفتح من البطاقة ورقمٍ عريض يُقرأ من بعيد. المقاس (--pd-chip) والعدد يُحسبان في JS
+   (cardFonts/planChips) بحدٍّ أدنى لا يُنزل عنه — يقلّ العدد («+N») لا الخطّ.
+   ★ Chrome 66: لا flex gap — الحبّات inline-block بهوامش متناظرة (لا margin-inline،
+   وهي أحدث منه)، وكلّ أبعادها بـ em من خطّها فتطابق حساب chipWidth في JS. */
+.pd-chips {
   flex: none; min-width: 0;
-  padding-top: 0.6vh; border-top: 1px solid rgba(127, 214, 184, 0.18);
+  padding-top: calc(var(--pd-chip, 34px) * 0.25);
+  border-top: 1px solid rgba(127, 214, 184, 0.18);
+  text-align: center;
   overflow: hidden;
 }
-.pd-wait-nums { display: inline-block; margin-inline-start: 0.45em; min-width: 0; }
-.pd-wait-num {
-  display: inline-block;
-  font-size: var(--pd-up-num, 24px); font-weight: 800; line-height: 1.3;
-  color: #eef7f5;
-  margin-inline-end: 0.5em;
+.pd-chip-title {
+  font-size: var(--pd-chip-title, 15px); color: #9fb4b0; font-weight: 700;
+  line-height: 1.25; margin-bottom: calc(4px + var(--pd-chip, 34px) * 0.08);
 }
-/* الأول هو «التالي» — يتميّز بلونه لا بشارةٍ تكشف شيئاً عن صاحبه */
-.pd-wait-first { color: #14b8a6; }
-/* ما لم يتّسع يُعلن عن نفسه: قصٌّ صامت أسوأ من رقمٍ ناقص */
-.pd-wait-more {
-  display: inline-block;
-  font-size: var(--pd-up-num, 24px); font-weight: 800; line-height: 1.3;
-  color: #7fd6b8;
+.pd-chip-row {
+  font-size: var(--pd-chip, 34px); line-height: 1;
+  white-space: nowrap; overflow: hidden;
 }
+.pd-chip-row-gap { margin-top: calc(var(--pd-chip, 34px) * 0.2); }
+.pd-chip {
+  display: inline-block; vertical-align: middle;
+  font-size: var(--pd-chip, 34px); font-weight: 800; line-height: 1.2;
+  padding: 0.12em 0.4em; margin: 0 0.15em;
+  border: 1px solid transparent; border-radius: 0.28em;
+  color: #eef7f5; background: rgba(238, 247, 245, 0.1);
+  /* الانتقال الوحيد: حين تصير الحبّة الثانية أولى بعد نداء — تلوّنٌ هادئ لا حركة */
+  transition: background-color 0.4s ease, color 0.4s ease;
+}
+/* الأولى = التالي مباشرةً: بلون «يُخدَم الآن» نفسه ونصٍّ داكن (تباين ≈٨:١، والأبيض ≈٢٫٥:١) */
+.pd-chip-first { background: #14b8a6; color: #0b1615; }
+/* ما لم يتّسع يُعلن عن نفسه — قصٌّ صامت أسوأ من رقمٍ ناقص */
+.pd-chip-more { color: #7fd6b8; background: transparent; border-color: rgba(127, 214, 184, 0.3); }
+/* «بانتظار العودة» (خروج مؤقت): أزرق هادئ من عائلة شارة الاستقبال (--status-review
+   الداكنة) — ليسوا التالين، فلا لون لافت ولا وميض */
+.pd-chip-return { color: #58b6e8; background: rgba(88, 182, 232, 0.14); border-color: rgba(88, 182, 232, 0.35); }
+.pd-chip-return.pd-chip-more { background: transparent; }
+/* فاصلٌ بين المجموعتين في الصفّ المدموج (٠٫٤em — محسوبٌ في planChips) */
+.pd-chip-sep { display: inline-block; width: 0.4em; }
+/* علامة العودة قبل حبّاتها: أيقونة + كلمة (كبير) أو أيقونة وحدها بحجم الحبّة (متوسّط) */
+.pd-return-mark {
+  display: inline-block; vertical-align: middle;
+  font-size: var(--pd-chip-title, 15px); font-weight: 700; line-height: 1.2;
+  color: #58b6e8; margin: 0 0.15em;
+}
+.pd-return-mark-icon { font-size: calc(var(--pd-chip, 34px) * 0.75); }
+.pd-return-icon { display: inline-block; vertical-align: -0.15em; width: 1.1em; height: 1.1em; }
+.pd-return-word { margin-right: 0.3em; }
 
 /* الرقمان الجايان */
 .pd-upcoming {
@@ -1206,6 +1257,7 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
 /* من يعاني حساسية الحركة: نُبقي كل شيء ثابتاً بلا نبض ولا وميض */
 @media (prefers-reduced-motion: reduce) {
   .pd-banner, .pd-banner-inner, .pd-card.pd-flash, .pd-dot-off { animation: none; }
+  .pd-chip { transition: none; }
 }
 
 /* ═══ موقع المريض العام — بحث عن الدور ═══ */
@@ -1323,7 +1375,7 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
 .bf-row-identity { grid-template-columns: 2fr 1fr; }
 
 /* صفّ التفاصيل: الجنس وسنة الميلاد ضيّقان (قيمهما قصيرة)، ونوع الزيارة
-   والأولوية أوسع (قيمهما نصوص طويلة مثل «حالة فورية (إسعافية)»)، وسبب الزيارة
+   والأولوية أوسع (قيمهما نصوص طويلة مثل «حالة فورية (إسعافية)»)، وملاحظة الحجز
    يأخذ ما تبقّى. النسب لا القياسات: تنكمش معاً على الشاشات الأضيق. */
 .bf-row-details {
   grid-template-columns:
@@ -1332,7 +1384,7 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
     minmax(110px, 1fr)     /* طريقة الحجز */
     minmax(110px, 1fr)     /* نوع الزيارة */
     minmax(130px, 1.2fr)   /* الأولوية — أطول القيم */
-    minmax(140px, 1.4fr);  /* سبب الزيارة */
+    minmax(140px, 1.4fr);  /* ملاحظة الحجز */
 }
 
 /* الحقل: عمودٌ ثابت البنية — تسمية، مُدخَل، ثم تلميح بارتفاع محجوز */
@@ -1819,6 +1871,8 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
 .ad-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
 .ad-actions button { padding: 6px 18px; font-size: 12.5px; }
 .ad-missing { font-size: 11.5px; color: var(--status-pending); }
+.queue-note { font-size: 11.5px; color: var(--muted); max-width: 260px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ad-readonly { font-size: 12px; color: var(--muted); margin: 6px 0; }
 
 .ad-links { display: flex; gap: 14px; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--grid); }
@@ -2021,6 +2075,38 @@ button.danger:hover:not(:disabled) { filter: brightness(1.08); }
   /* الشارات تأخذ السطر كاملاً تحت الأزرار */
   .action-row > .doc-actions > .doc-procs { flex: 1 1 100%; }
 }
+
+/* ═══ «بانتظار العودة» — خرجوا مؤقتاً وسيُنادَون ليُكملوا ═══
+   صغيرٌ هادئ تحت «قيد الكشف»: حشوٌ أقلّ وخطٌّ أصغر، فلا يزاحم المريض الحالي.
+   ألوان الثيم وحدها (متغيّرات) — يعمل في الفاتح والداكن بلا قواعد إضافية. */
+.wr-card { padding-top: 14px; padding-bottom: 14px; }
+.wr-card h3 { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 15px; }
+.wr-count {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px;
+  font-size: 12px; font-weight: 700;
+  color: var(--status-review); background: var(--status-review-bg);
+}
+.wr-list { list-style: none; margin: 0; padding: 0; }
+.wr-item {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 7px 0; border-top: 1px solid var(--grid);
+}
+.wr-item:first-child { border-top: none; }
+.wr-num { font-weight: 800; color: var(--accent-text); min-width: 64px; }
+.wr-name { flex: 1 1 140px; min-width: 0; color: var(--text-secondary); }
+/* العدّاد: أرقامٌ لاتينية بعرضٍ ثابت فلا يرتجّ السطر كل ثانية */
+.wr-elapsed {
+  font-variant-numeric: tabular-nums; font-weight: 700; font-size: 13.5px;
+  color: var(--status-review);
+}
+.wr-call { padding: 6px 16px; font-size: 13px; }
+.wr-hint { font-size: 12px; color: var(--muted); margin: 8px 0 0; }
+
+/* الاستقبال: سطر «بانتظار العودة» داخل بطاقة «قيد الكشف الآن» */
+.wr-inline { margin-top: 8px; font-size: 12.5px; color: var(--muted); }
+.wr-inline .wr-inline-num { font-weight: 800; color: var(--status-review); margin-inline-start: 6px; }
+.wr-status { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 
 /* ── ما أُضيف على هذا المريض: أسماءٌ فقط، للاطّلاع ── */
 .doc-procs {
@@ -2289,6 +2375,162 @@ button.danger:hover:not(:disabled) { filter: brightness(1.08); }
 /* عدد النسخ: القائمة بعرض حقل الورق، والشرح تحتها بعرضٍ مريح */
 .ps-copies { max-width: 460px; }
 .ps-copies select { max-width: 220px; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   المخزون — هادئٌ بمتغيّرات النظام نفسها: البرتقالي للشراء، والأحمر
+   للسالب والخسارة، والباقي محايد. لا ظلال ولا تدرّجات جديدة.
+   ═══════════════════════════════════════════════════════════════════ */
+.inv-tabs { gap: 8px; margin-bottom: 14px; }
+.inv-tabs button, .inv-subtabs button { padding: 6px 16px; }
+.inv-subtabs { gap: 8px; margin-bottom: 14px; }
+.inv-toolbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.inv-actions-top { display: flex; flex-wrap: wrap; gap: 8px; }
+.inv-filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.inv-search { width: 220px; max-width: 100%; padding: 7px 12px; }
+.inv-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* شريط تنبيهٍ برتقاليّ خفيف — زرٌّ يعرض ما وصل للحدّ */
+button.inv-banner {
+  display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 12px;
+  margin-bottom: 12px; padding: 10px 14px; border-radius: 10px; text-align: start;
+  background: var(--status-pending-bg); color: var(--status-pending);
+  border: 1px solid transparent; font-size: 13px; font-weight: 700;
+}
+button.inv-banner:hover { filter: none; border-color: var(--status-pending); }
+.inv-banner-link { font-weight: 600; text-decoration: underline; }
+
+.inv-table td { padding: 13px 12px; }
+.inv-table .num { white-space: nowrap; }
+.inv-name { font-weight: 700; }
+td.inv-balance { font-size: 15.5px; font-weight: 800; }
+.inv-status { display: flex; flex-wrap: wrap; gap: 4px; }
+.inv-row-actions { white-space: nowrap; text-align: end; }
+.inv-row-actions button { padding: 3px 10px; font-size: 11.5px; margin-inline-start: 4px; }
+.inv-footnote { margin-top: 12px; font-size: 12.5px; color: var(--text-secondary); }
+.inv-muted { color: var(--muted); font-weight: 500; }
+.inv-sub { display: block; font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+.inv-nowrap { white-space: nowrap; }
+.inv-qty { font-weight: 700; }
+.inv-qty.is-out { color: var(--text-secondary); }
+.inv-detail { font-size: 13px; max-width: 320px; }
+.inv-who { font-size: 12.5px; white-space: nowrap; }
+.inv-grouped > td { border-top: none; }
+
+.inv-empty { text-align: center; padding: 30px 16px 26px; }
+.inv-empty-text { font-size: 14px; font-weight: 700; color: var(--text-primary); }
+.inv-empty-hint { font-size: 12.5px; color: var(--muted); margin-top: 6px; }
+.inv-empty-actions { display: flex; gap: 8px; justify-content: center; margin-top: 14px; flex-wrap: wrap; }
+
+.inv-pager { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 14px; font-size: 12.5px; color: var(--text-secondary); }
+.inv-pager button { padding: 5px 14px; font-size: 12px; }
+
+/* كرت المادة */
+.inv-back { margin-bottom: 10px; font-size: 13px; }
+.inv-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.inv-card-title { font-size: 19px; margin-bottom: 6px; }
+.inv-card-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.inv-card-actions { display: flex; gap: 8px; }
+.inv-stats {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px;
+  margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--grid);
+}
+.inv-stat { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.inv-stat .label { font-size: 12px; color: var(--muted); font-weight: 600; }
+.inv-stat .value { font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.inv-stat-main .value { font-size: 30px; line-height: 1.1; color: var(--accent-text); }
+.inv-stat-main .value.neg { color: var(--status-bad); }
+.inv-stat .value small { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+.inv-stat .link-btn { font-size: 12px; }
+
+/* النوافذ */
+.inv-modal { max-height: calc(100vh - 32px); overflow-y: auto; }
+.inv-modal-wide { max-width: 940px; }
+.inv-modal-title { font-size: 17px; margin-bottom: 4px; }
+.inv-modal-sub { font-size: 12.5px; color: var(--text-secondary); margin: 2px 0 14px; line-height: 1.7; }
+.inv-form { display: flex; flex-direction: column; gap: 12px; }
+.inv-form-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-start; }
+.inv-form-row > .field { flex: 1 1 160px; }
+.inv-actions { justify-content: flex-end; margin-top: 16px; align-items: center; }
+.inv-actions > .inv-muted { margin-inline-end: auto; font-size: 12.5px; }
+.inv-note { font-size: 12px; color: var(--muted); }
+.inv-hint-bad { color: var(--status-bad) !important; font-weight: 600; }
+.inv-total { font-size: 13px; color: var(--text-secondary); margin-top: -4px; }
+.inv-optional { border: 1px solid var(--grid); border-radius: 10px; padding: 10px 14px; }
+.inv-optional > summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+.inv-optional[open] > summary { margin-bottom: 12px; }
+.inv-optional > .field, .inv-optional > .inv-form-row { margin-bottom: 10px; }
+.inv-unit-new { display: flex; gap: 8px; align-items: center; }
+.inv-unit-new .link-btn { white-space: nowrap; font-size: 12px; }
+.inv-chosen {
+  display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  padding: 9px 12px; border: 1.5px solid var(--grid); border-radius: 10px; font-size: 13.5px;
+}
+.inv-subform { padding: 12px; border: 1px dashed var(--grid); border-radius: 10px; display: flex; flex-direction: column; gap: 10px; }
+.inv-subform-actions { display: flex; gap: 8px; align-self: flex-end; }
+.inv-subform-actions button { padding: 8px 14px; }
+.inv-search-wide { max-width: none; }
+.inv-search-wide input { font-size: 13.5px; padding: 9px 12px; }
+.mat-results button.inv-add-new { color: var(--accent-text); }
+.inv-new-link { margin-top: 6px; font-size: 12.5px; }
+dl.inv-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 0 0 4px; }
+dl.inv-facts dt { font-size: 11.5px; color: var(--muted); font-weight: 600; }
+dl.inv-facts dd { margin: 3px 0 0; font-size: 15px; font-weight: 800; }
+.inv-up { color: var(--status-bad); font-size: 12.5px; font-weight: 700; }
+
+/* الاستيراد: الأخضر يُضاف، والأزرق شراء على موجودة، والأحمر لا يُستورد */
+.inv-drop { margin-top: 12px; padding: 26px 16px; }
+.inv-imp-summary { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+.inv-imp-table { max-height: 52vh; overflow: auto; border: 1px solid var(--grid); border-radius: 10px; }
+.inv-imp-table table { font-size: 12.5px; }
+.inv-imp-table th { position: sticky; top: 0; background: var(--surface-1); z-index: 1; }
+.inv-imp-table td { padding: 8px 10px; vertical-align: top; }
+tr.inv-imp-new > td:first-child { box-shadow: inset -3px 0 0 var(--status-good); }
+tr.inv-imp-buy > td:first-child { box-shadow: inset -3px 0 0 var(--status-review); }
+tr.inv-imp-bad > td { background: var(--status-bad-bg); }
+tr.inv-imp-bad > td:first-child { box-shadow: inset -3px 0 0 var(--status-bad); }
+.inv-imp-reason { display: block; margin-top: 4px; font-size: 11.5px; font-weight: 700; color: var(--status-bad); }
+.inv-imp-note { display: block; margin-top: 4px; font-size: 11.5px; color: var(--text-secondary); }
+
+/* الجرد والتقارير */
+input.inv-count { width: 110px; padding: 6px 10px; }
+input.inv-count.is-bad { border-color: var(--status-bad); }
+.inv-reason-cell { display: flex; flex-direction: column; gap: 6px; min-width: 180px; }
+.inv-reason-cell select, .inv-reason-cell input { padding-top: 6px; padding-bottom: 6px; font-size: 13px; }
+.inv-range { gap: 10px; margin-bottom: 12px; align-items: flex-end; }
+.inv-range > .field { flex: 0 1 180px; }
+
+/* الإشعارات */
+.user-box .notif-btn {
+  margin-top: 10px; width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 6px; font-size: 12px; border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1); color: rgba(255, 255, 255, 0.85);
+}
+.user-box .notif-btn:hover { background: rgba(255, 255, 255, 0.2); filter: none; }
+.notif-count {
+  min-width: 20px; padding: 0 6px; border-radius: 999px; line-height: 18px; font-size: 11px; font-weight: 800;
+  background: var(--status-pending-bg); color: var(--status-pending);
+}
+.notif-panel { max-width: 460px; max-height: calc(100vh - 32px); overflow-y: auto; }
+.notif-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; }
+.notif-head h3 { margin: 0; font-size: 17px; }
+.notif-head .link-btn { font-size: 12px; }
+.notif-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+button.notif-item {
+  all: unset; box-sizing: border-box; display: flex; flex-direction: column; gap: 2px; width: 100%;
+  padding: 10px 12px; border-radius: 10px; border: 1px solid var(--grid); cursor: pointer;
+}
+button.notif-item:hover, button.notif-item:focus-visible { background: var(--primary-soft); }
+button.notif-item.is-unread { border-inline-start: 3px solid var(--status-pending); }
+.notif-title { font-size: 13.5px; font-weight: 700; }
+.notif-item:not(.is-unread) .notif-title { font-weight: 600; color: var(--text-secondary); }
+.notif-body { font-size: 12.5px; color: var(--text-secondary); }
+.notif-time { font-size: 11px; color: var(--muted); }
+
+@media (max-width: 700px) {
+  .inv-search { width: 100%; }
+  .inv-filters { width: 100%; }
+  .inv-row-actions button { margin-top: 4px; }
+}
 
 /* ═══ الإحالة — قسمٌ مطويّ في نموذج الحجز وفي تفاصيل الحجز ═══
    مطويّاً: خانةٌ واحدة «معه إحالة؟» بلا إطار، فلا يطول النموذج على الحالة العادية.

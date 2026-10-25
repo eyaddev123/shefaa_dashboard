@@ -51,7 +51,7 @@ export function AttendanceNumber({ appt }) {
 
 // صف الإسعافي الحاضر أحمر — في قائمة الطبيب وقائمة الاستقبال معاً
 export const urgentRowClass = (a) =>
-  a.priority === 'urgent' && ['arrived', 'in_service'].includes(a.status) ? 'attn-row-urgent' : undefined
+  a.priority === 'urgent' && ['arrived', 'in_service', 'waiting_return'].includes(a.status) ? 'attn-row-urgent' : undefined
 
 // وقت طابعٍ زمني كاملٍ بالساعة المحلية للجهاز (HH:MM). للطوابع فقط — لا لعمود TIME.
 export const fmtClock = (ts) => (ts

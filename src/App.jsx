@@ -3,10 +3,11 @@ import { Navigate, NavLink, Route, Routes, useLocation, useNavigate } from 'reac
 import { RoleProvider, useRole } from './RoleContext.jsx'
 import {
   canManageUsers, canReadAid, canSearchAid, canSeeClinicBoard, canSeeDoctorsPage,
-  canSeeDoctorScreen, canSeeSettings, canSeeProceduresPage, canSeePrinterSetup, canSeeReferralsPage, homePathFor,
+  canSeeDoctorScreen, canSeeSettings, canSeeProceduresPage, canSeePrinterSetup, canSeeInventory, canSeeReferralsPage, homePathFor,
 } from './permissions.js'
 import { ROLE_LABELS } from './api.js'
 import ThemeToggle from './components/ThemeToggle.jsx'
+import NotificationsBell from './components/NotificationsBell.jsx'
 import Login from './pages/Login.jsx'
 import Search from './pages/Search.jsx'
 import Dashboard from './pages/Dashboard.jsx'
@@ -30,6 +31,7 @@ import Users from './pages/Users.jsx'
 import ClinicBoard from './pages/ClinicBoard.jsx'
 import ClinicReferrals from './pages/ClinicReferrals.jsx'
 import ClinicProcedures from './pages/ClinicProcedures.jsx'
+import Inventory from './pages/Inventory.jsx'
 import SessionQueue from './pages/SessionQueue.jsx'
 import DoctorScreen from './pages/DoctorScreen.jsx'
 import PublicDisplay from './pages/PublicDisplay.jsx'
@@ -48,6 +50,7 @@ const I = {
   clinic: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M2 12h20"/><circle cx="12" cy="12" r="10"/></svg>,
   users: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg>,
   quality: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>,
+  inventory: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/></svg>,
   settings: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
 }
 
@@ -91,6 +94,8 @@ function Sidebar({ onNavigate }) {
         <div className="user-role">
           {isChairman ? 'المدير المسؤول — قرار نهائي' : user.member_title || ROLE_LABELS[role]}
         </div>
+        {/* الإشعارات اليوم للمخزون وحده — فتظهر لمن يتسلّمها */}
+        {canSeeInventory(role) && <NotificationsBell />}
         <button className="logout" onClick={logout}>تسجيل الخروج</button>
       </div>
 
@@ -109,6 +114,7 @@ function Sidebar({ onNavigate }) {
         {(role === 'officer' || role === 'accountant') && <NavLink to="/reconciliation">{I.sync} مطابقة الأمين</NavLink>}
         {canSeeDoctorsPage(role) && <NavLink to="/clinic/doctors">{I.clinic} العيادات — الدكاترة والدوام</NavLink>}
         {canSeeProceduresPage(role) && <NavLink to="/clinic/procedures">{I.clinic} العيادات — الإجراءات</NavLink>}
+        {canSeeInventory(role) && <NavLink to="/inventory">{I.inventory} المخزون</NavLink>}
         {canSeeReferralsPage(role) && <NavLink to="/clinic/referrals">{I.clinic} العيادات — الإحالات</NavLink>}
         {canSeeClinicBoard(role) && <NavLink to="/clinic/board">{I.clinic} لوحة العيادات اليومية</NavLink>}
         {canSeeDoctorScreen(role) && <NavLink to="/clinic/doctor">{I.clinic} شاشتي</NavLink>}
@@ -202,6 +208,8 @@ function Shell() {
             <Guard allow={canSeeDoctorsPage}><DoctorProfile /></Guard>} />
           <Route path="/clinic/procedures" element={
             <Guard allow={canSeeProceduresPage}><ClinicProcedures /></Guard>} />
+          <Route path="/inventory" element={
+            <Guard allow={canSeeInventory}><Inventory /></Guard>} />
           <Route path="/clinic/referrals" element={
             <Guard allow={canSeeReferralsPage}><ClinicReferrals /></Guard>} />
           <Route path="/clinic/board" element={
