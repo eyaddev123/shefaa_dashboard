@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { SpecialtyPicker } from '../SpecialtyPicker.jsx'
 import { useParams, Link } from 'react-router-dom'
-import { api, WEEKDAYS, fmtMoney, fmtTime } from '../api.js'
+import { api, WEEKDAYS, fmtMoney, fmtTime, fmtDateTime } from '../api.js'
 import { useRole } from '../RoleContext.jsx'
 import DoctorShareRules from '../components/DoctorShareRules.jsx'
 
@@ -162,14 +162,53 @@ function SlotPreview({ schedule, minutes }) {
   )
 }
 
+// ═══ سجلّ التعديلات: الغرفة وتفعيل/إيقاف سطور الدوام — من ومتى ═══
+// يُعاد تحميله مع البروفايل (reloadKey)، فتغيير الغرفة من النموذج أعلاه يظهر فوراً.
+const roomLabel = (r) => (r ? `العيادة ${r}` : 'بلا غرفة')
+function changeText(h) {
+  if (h.field === 'room') return `الغرفة: ${roomLabel(h.old_value)} ← ${roomLabel(h.new_value)}`
+  const line = h.weekday == null ? 'سطر دوامٍ حُذف لاحقاً'
+    : `دوام ${WEEKDAYS[h.weekday]} ${h.start_time}–${h.end_time}${h.repeat_weeks === 2 ? ' (كل أسبوعين)' : ''}`
+  return `${h.new_value === 'true' ? 'فُعِّل' : 'أُوقف'} ${line}`
+}
+function ChangeLog({ doctorId, reloadKey }) {
+  const [rows, setRows] = useState(null)
+  const [err, setErr] = useState(null)
+  useEffect(() => {
+    api.clinic.doctorHistory(doctorId).then(setRows).catch((e) => setErr(e.message))
+  }, [doctorId, reloadKey])
+  if (err) return <div className="card"><h3>سجلّ التعديلات</h3><p className="error">{err}</p></div>
+  if (!rows) return null
+  return (
+    <div className="card">
+      <h3>سجلّ التعديلات</h3>
+      {rows.length === 0
+        ? <p className="empty">لا تعديلات مسجَّلة على الغرفة أو سطور الدوام بعد.</p>
+        : (
+          <ul className="change-log">
+            {rows.map((h) => (
+              <li key={h.id}>
+                <time dateTime={h.changed_at}>{fmtDateTime(h.changed_at)}</time>
+                <span>{changeText(h)}</span>
+                <span className="muted">— {h.changed_by_name || 'غير معروف'}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+    </div>
+  )
+}
+
 export default function DoctorProfile() {
   const { id } = useParams()
   const { role } = useRole()
   const [doctor, setDoctor] = useState(null)
   const [globalBuffer, setGlobalBuffer] = useState(null)
   const [err, setErr] = useState(null)
+  const [reloadKey, setReloadKey] = useState(0)
 
-  const load = () => api.clinic.doctor(id).then(setDoctor).catch((e) => setErr(e.message))
+  const load = () => api.clinic.doctor(id).then((d) => { setDoctor(d); setReloadKey((k) => k + 1) })
+    .catch((e) => setErr(e.message))
   useEffect(() => { load() }, [id])
   // الإعداد العام للفراغ — يُعرض كقيمة افتراضية عند ترك حقل الدكتور فارغاً
   useEffect(() => {
@@ -209,8 +248,16 @@ export default function DoctorProfile() {
               <thead><tr><th>اليوم</th><th>من</th><th>إلى</th><th>الاستراحة</th><th>الخانات الناتجة</th></tr></thead>
               <tbody>
                 {doctor.schedules.map((s) => (
-                  <tr key={s.id}>
-                    <td>{WEEKDAYS[s.weekday]}</td>
+                  <tr key={s.id} className={s.is_active ? undefined : 'sched-off ro'}>
+                    <td>
+                      <span className="sched-day">{WEEKDAYS[s.weekday]}</span>
+                      {!s.is_active && (
+                        <span className="badge" style={{ marginInlineStart: 6 }}
+                          title={s.toggled_by_name ? `أوقفه ${s.toggled_by_name} — ${fmtDateTime(s.toggled_at)}` : undefined}>
+                          موقوف
+                        </span>
+                      )}
+                    </td>
                     <td>{fmtTime(s.start_time)}</td>
                     <td>{fmtTime(s.end_time)}</td>
                     <td>{s.break_start ? `${fmtTime(s.break_start)} – ${fmtTime(s.break_end)}` : '—'}</td>
@@ -225,6 +272,9 @@ export default function DoctorProfile() {
       {SHARE_VIEWERS.includes(role) && (
         <DoctorShareRules doctor={doctor} canEdit={role === 'clinic_admin'} onSaved={load} />
       )}
+
+      {/* نفس من يرى «دكاترة اليوم» (APOLOGY_VIEWERS بالخادم) — والخادم يردّ غيرهم 403 */}
+      {SHARE_VIEWERS.includes(role) && <ChangeLog doctorId={doctor.id} reloadKey={reloadKey} />}
     </>
   )
 }
