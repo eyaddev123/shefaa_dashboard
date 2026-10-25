@@ -43,12 +43,13 @@
   "clinic": null,
   "clinicText": "كل العيادات",
   "totals": {
-   "patients": 8,
-   "procCount": 4,
-   "fee": 165000,
-   "procTotal": 110000,
-   "discount": 15000,
-   "total": 260000
+   "patients": 9,
+   "procCount": 5,
+   "referralCount": 3,
+   "fee": 195000,
+   "procTotal": 140000,
+   "discount": 40000,
+   "total": 295000
   },
   "doctors": [
    {
@@ -77,9 +78,10 @@
       "procCount": 0,
       "procTotal": 0,
       "referral": "",
+      "referralCount": 0,
       "discount": 0,
       "total": 20000,
-      "arrived": "21:49",
+      "arrived": "22:48",
       "remarks": [
        "إسعافي"
       ],
@@ -109,9 +111,10 @@
       "procCount": 1,
       "procTotal": 0,
       "referral": "",
+      "referralCount": 0,
       "discount": 0,
       "total": 20000,
-      "arrived": "21:49",
+      "arrived": "22:48",
       "remarks": [],
       "flags": [
        "سعر ناقص"
@@ -123,6 +126,7 @@
     "totals": {
      "patients": 2,
      "procCount": 1,
+     "referralCount": 0,
      "fee": 40000,
      "procTotal": 0,
      "discount": 0,
@@ -156,9 +160,10 @@
       "procCount": 0,
       "procTotal": 0,
       "referral": "",
+      "referralCount": 0,
       "discount": 0,
       "total": 25000,
-      "arrived": "21:49",
+      "arrived": "22:48",
       "remarks": [
        "ألم ضرس"
       ],
@@ -192,9 +197,10 @@
       "procCount": 2,
       "procTotal": 80000,
       "referral": "",
+      "referralCount": 0,
       "discount": 0,
       "total": 105000,
-      "arrived": "21:49",
+      "arrived": "22:48",
       "remarks": [],
       "flags": [],
       "notes": "",
@@ -217,9 +223,10 @@
       "procCount": 0,
       "procTotal": 0,
       "referral": "",
+      "referralCount": 0,
       "discount": 0,
       "total": 0,
-      "arrived": "21:49",
+      "arrived": "22:48",
       "remarks": [
        "بلا رسم كشف",
        "مراجعة بتجاوز الشرط: مراجعة مجانية بطلب الإدارة"
@@ -232,6 +239,7 @@
     "totals": {
      "patients": 3,
      "procCount": 2,
+     "referralCount": 0,
      "fee": 50000,
      "procTotal": 80000,
      "discount": 0,
@@ -270,9 +278,10 @@
       "procCount": 1,
       "procTotal": 30000,
       "referral": "",
+      "referralCount": 0,
       "discount": 0,
       "total": 60000,
-      "arrived": "21:49",
+      "arrived": "22:48",
       "remarks": [],
       "flags": [],
       "notes": "",
@@ -295,9 +304,41 @@
       "procCount": 0,
       "procTotal": 0,
       "referral": "جمعية النور",
+      "referralCount": 1,
       "discount": 15000,
       "total": 15000,
-      "arrived": "21:49",
+      "arrived": "22:48",
+      "remarks": [],
+      "flags": [],
+      "notes": "",
+      "flagged": false
+     },
+     {
+      "id": "12",
+      "queue": 3,
+      "name": "لمى إحالتان معاً",
+      "room": "5",
+      "clinic": "العيادة 5",
+      "doctorId": "3",
+      "doctor": "د. سامر الخطيب",
+      "specialty": "قلبية",
+      "sessionStart": "09:00",
+      "visit": "معاينة",
+      "fee": 30000,
+      "procItems": [
+       {
+        "name": "حشوة",
+        "price": 30000
+       }
+      ],
+      "procs": "حشوة (30,000)",
+      "procCount": 1,
+      "procTotal": 30000,
+      "referral": "جمعية النور، جمعية الأمل",
+      "referralCount": 2,
+      "discount": 25000,
+      "total": 35000,
+      "arrived": "22:48",
       "remarks": [],
       "flags": [],
       "notes": "",
@@ -305,12 +346,13 @@
      }
     ],
     "totals": {
-     "patients": 2,
-     "procCount": 1,
-     "fee": 60000,
-     "procTotal": 30000,
-     "discount": 15000,
-     "total": 75000
+     "patients": 3,
+     "procCount": 2,
+     "referralCount": 3,
+     "fee": 90000,
+     "procTotal": 60000,
+     "discount": 40000,
+     "total": 110000
     },
     "flagged": 0
    },
@@ -340,9 +382,10 @@
       "procCount": 0,
       "procTotal": 0,
       "referral": "",
+      "referralCount": 0,
       "discount": 0,
       "total": 15000,
-      "arrived": "21:49",
+      "arrived": "22:48",
       "remarks": [],
       "flags": [],
       "notes": "",
@@ -352,6 +395,7 @@
     "totals": {
      "patients": 1,
      "procCount": 0,
+     "referralCount": 0,
      "fee": 15000,
      "procTotal": 0,
      "discount": 0,
@@ -362,8 +406,8 @@
   ],
   "flagged": 1,
   "check": {
-   "independentTotal": 260000,
-   "independentPatients": 8,
+   "independentTotal": 295000,
+   "independentPatients": 9,
    "diff": 0,
    "ok": true
   }
@@ -375,6 +419,7 @@
   "totals": {
    "patients": 5,
    "procCount": 3,
+   "referralCount": 0,
    "fee": 90000,
    "procTotal": 80000,
    "discount": 0,
@@ -407,9 +452,10 @@
       "procCount": 0,
       "procTotal": 0,
       "referral": "",
+      "referralCount": 0,
       "discount": 0,
       "total": 20000,
-      "arrived": "21:49",
+      "arrived": "22:48",
       "remarks": [
        "إسعافي"
       ],
@@ -439,9 +485,10 @@
       "procCount": 1,
       "procTotal": 0,
       "referral": "",
+      "referralCount": 0,
       "discount": 0,
       "total": 20000,
-      "arrived": "21:49",
+      "arrived": "22:48",
       "remarks": [],
       "flags": [
        "سعر ناقص"
@@ -453,6 +500,7 @@
     "totals": {
      "patients": 2,
      "procCount": 1,
+     "referralCount": 0,
      "fee": 40000,
      "procTotal": 0,
      "discount": 0,
@@ -486,9 +534,10 @@
       "procCount": 0,
       "procTotal": 0,
       "referral": "",
+      "referralCount": 0,
       "discount": 0,
       "total": 25000,
-      "arrived": "21:49",
+      "arrived": "22:48",
       "remarks": [
        "ألم ضرس"
       ],
@@ -522,9 +571,10 @@
       "procCount": 2,
       "procTotal": 80000,
       "referral": "",
+      "referralCount": 0,
       "discount": 0,
       "total": 105000,
-      "arrived": "21:49",
+      "arrived": "22:48",
       "remarks": [],
       "flags": [],
       "notes": "",
@@ -547,9 +597,10 @@
       "procCount": 0,
       "procTotal": 0,
       "referral": "",
+      "referralCount": 0,
       "discount": 0,
       "total": 0,
-      "arrived": "21:49",
+      "arrived": "22:48",
       "remarks": [
        "بلا رسم كشف",
        "مراجعة بتجاوز الشرط: مراجعة مجانية بطلب الإدارة"
@@ -562,6 +613,7 @@
     "totals": {
      "patients": 3,
      "procCount": 2,
+     "referralCount": 0,
      "fee": 50000,
      "procTotal": 80000,
      "discount": 0,
@@ -585,6 +637,7 @@
   "totals": {
    "patients": 0,
    "procCount": 0,
+   "referralCount": 0,
    "fee": 0,
    "procTotal": 0,
    "discount": 0,

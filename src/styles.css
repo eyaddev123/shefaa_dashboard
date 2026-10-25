@@ -2880,3 +2880,17 @@ table.cash-table { font-size: 13px; table-layout: fixed; min-width: 860px; }
   .cash-head-actions { width: 100%; }
   .cash-doc-total { min-width: 0; }
 }
+
+/* سطر التفصيل في رأس الكتلة: دائماً سطرٌ ثانٍ تحت الاسم (لا يزاحم المجموع على 1366)،
+   بنبرة النص الثانوي — المجموع وحده هو الأبرز */
+.cash-doc-break {
+  flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 2px 0;
+  padding-inline-start: 28px; margin-top: -4px;
+  font-size: 12.5px; color: var(--text-secondary); font-variant-numeric: tabular-nums;
+}
+.cash-doc-break > span { white-space: nowrap; }
+.cash-doc-break > span + span { border-inline-start: 1px solid var(--grid); margin-inline-start: 12px; padding-inline-start: 12px; }
+.cash-doc-break-ref { color: var(--status-review); }
+.cash-hint-sub { display: block; margin-top: 2px; }
+.cash-grand-sub { display: flex; flex-wrap: wrap; gap: 2px 0; }
+.cash-grand-sub > span + span { border-inline-start: 1px solid var(--grid); margin-inline-start: 10px; padding-inline-start: 10px; }

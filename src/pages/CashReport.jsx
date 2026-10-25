@@ -23,8 +23,10 @@ const CARDS = [
   { key: 'total', label: 'إجمالي اليوم', money: true, hero: true },
   { key: 'patients', label: 'عدد المرضى' },
   { key: 'fee', label: 'مجموع الكشوف', money: true },
-  { key: 'procTotal', label: 'مجموع الإجراءات', money: true },
-  { key: 'discount', label: 'خصومات الإحالات', money: true, hint: 'على الجهات لا على الصندوق' },
+  { key: 'procTotal', label: 'مجموع الإجراءات', money: true,
+    hint: (t) => `عدد الإجراءات: ${fmtNum(t.procCount)}` },
+  { key: 'discount', label: 'خصومات الإحالات', money: true,
+    hint: (t) => <>عدد الإحالات: {fmtNum(t.referralCount)}<span className="cash-hint-sub">على الجهات لا على الصندوق</span></> },
 ]
 
 function SummaryTiles({ totals }) {
@@ -34,7 +36,7 @@ function SummaryTiles({ totals }) {
         <div key={c.key} className={`tile${c.hero ? ' cash-hero' : ''}`}>
           <div className="label">{c.label}</div>
           <div className="value">{c.money ? <Money value={totals[c.key]} /> : fmtNum(totals[c.key])}</div>
-          {c.hint && <div className="hint">{c.hint}</div>}
+          {c.hint && <div className="hint">{c.hint(totals)}</div>}
         </div>
       ))}
     </div>
@@ -69,6 +71,27 @@ function LineRow({ l }) {
   )
 }
 
+// سطر التفصيل تحت الاسم: ما لا قيمة له عند الدكتور لا يظهر أصلاً (لا «الإجراءات: ٠»).
+// لا «·» بجانب رقم: الصفر العربي «٠» نقطةٌ هو الآخر، فيُقرأ «٣ · ٩٠» «٣٠٩٠». العدد بين قوسين بعد
+// العنوان، والعناصر يفصلها خطٌّ رفيع لا نقطة. والمبلغ <bdi dir="rtl">: بلا حرفٍ عربي فيه يُعزَل
+// يساراً فتنتقل «−» إلى يسار الرقم.
+function Breakdown({ t }) {
+  const item = (label, count, amount) => (
+    <>{label} (<bdi>{fmtNum(count)}</bdi>): <bdi dir="rtl">{amount}</bdi></>
+  )
+  return (
+    <span className="cash-doc-break">
+      <span>{item('الكشوف', t.patients, `${fmtNum(t.fee)} ل.س`)}</span>
+      {t.procCount > 0 && <span>{item('الإجراءات', t.procCount, `${fmtNum(t.procTotal)} ل.س`)}</span>}
+      {t.referralCount > 0 && (
+        <span className="cash-doc-break-ref">
+          {item('الإحالات', t.referralCount, `− ${fmtNum(t.discount)} ل.س`)} على الجهات
+        </span>
+      )}
+    </span>
+  )
+}
+
 function DoctorBlock({ d, open, onToggle }) {
   const id = `cash-doc-${d.key}`
   const t = d.totals
@@ -84,6 +107,7 @@ function DoctorBlock({ d, open, onToggle }) {
         {d.flagged > 0 && <span className="badge warn sm">{fmtNum(d.flagged)} للمراجعة</span>}
         <span className="cash-doc-count">{patientsText(t.patients)}</span>
         <span className="cash-doc-total"><Money value={t.total} /></span>
+        <Breakdown t={t} />
       </button>
       {open && (
         <div className="cash-doc-body" id={id}>
@@ -125,9 +149,12 @@ function GrandTotal({ data }) {
       <div className="cash-grand-row">
         <div>
           <div className="cash-grand-label">المجموع الكلي</div>
+          {/* فواصل خطّية لا «·»: الصفر العربي نقطة فيلتبس بها (انظر Breakdown) */}
           <div className="cash-grand-sub">
-            {patientsText(totals.patients)} · كشوف {fmtNum(totals.fee)} · إجراءات {fmtNum(totals.procTotal)}
-            {totals.discount > 0 && <> · خصومات الإحالات − {fmtNum(totals.discount)}</>}
+            <span>{patientsText(totals.patients)}</span>
+            <span>كشوف <bdi>{fmtNum(totals.fee)}</bdi></span>
+            <span>إجراءات <bdi>{fmtNum(totals.procTotal)}</bdi></span>
+            {totals.discount > 0 && <span>خصومات الإحالات <bdi dir="rtl">− {fmtNum(totals.discount)}</bdi></span>}
           </div>
         </div>
         <div className="cash-grand-value"><Money value={totals.total} /></div>
