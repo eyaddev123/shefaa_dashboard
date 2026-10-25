@@ -31,6 +31,10 @@ const DEFAULTS = {
   feed_mm: 5,
   threshold: 160,
   width_dots: 576,
+  // عرض الورق المركَّب: 80 أو 58. الرأس والصورة يبقيان ٥٧٦ نقطة في الحالين؛
+  // على 58 ترسم الواجهة البطاقة في الشريط الأيسر (٣٨٤ نقطة) لأنّ ورق ٥٨مم
+  // يقف على يسار الرأس، وما عن يمينه يُطبع في الهواء.
+  printable_width: 80,
   origins: ['http://localhost:5173', 'http://localhost:5199', 'http://127.0.0.1:5173',
             'https://dashboard-shefaa.abukm.com'],
   log: process.platform === 'win32'
@@ -41,7 +45,9 @@ const DEFAULTS = {
 function loadConfig() {
   for (const p of CFG_PATHS) {
     if (p && existsSync(p)) {
-      try { return { ...DEFAULTS, ...JSON.parse(readFileSync(p, 'utf8')), _from: p } }
+      // ★ BOM يُنزع: Notepad القديم يضيفه عند الحفظ، وJSON.parse يرفضه فيسقط
+      // الإعداد كلّه إلى الافتراضات (واسم طابعةٍ خاطئ) بصمت
+      try { return { ...DEFAULTS, ...JSON.parse(readFileSync(p, 'utf8').replace(/^\uFEFF/, '')), _from: p } }
       catch (e) { console.error(`تعذّرت قراءة ${p}: ${e.message}`) }
     }
   }
@@ -49,6 +55,18 @@ function loadConfig() {
 }
 
 const CFG = loadConfig()
+const PRINTABLE = Number(CFG.printable_width) === 58 ? 58 : 80
+// الشريط الأيسر المضمون على ورق ٥٨مم: ٣٨٤ نقطة = ٤٨مم (مساحة الطباعة القياسية له)
+const STRIP_DOTS = { 80: 576, 58: 384 }
+
+/** أهناك بكسلٌ أسود يمين الشريط؟ تشخيصٌ وحده — واجهةٌ قديمة ترسم على ٨٠ */
+function inkBeyond(mono, x0) {
+  const bpl = Math.ceil(mono.width / 8)
+  for (let y = 0; y < mono.height; y++)
+    for (let x = x0; x < mono.width; x++)
+      if (mono.bits[y * bpl + (x >> 3)] & (0x80 >> (x & 7))) return true
+  return false
+}
 
 // أقصى عدد نسخٍ في الطلب الواحد — حارسٌ من طلبٍ خاطئ يُفرغ بكرة الورق
 const MAX_COPIES = 5
@@ -244,6 +262,8 @@ const server = http.createServer(async (req, res) => {
       // الفحوص تتحقّق من هذا قبل أيّ طباعة: لا ترسل إلا لوسيطٍ جافٍّ شغّلته هي
       dry_run: !!DRY_RUN,
       printer: CFG.printer,
+      // الواجهة تقرؤه قبل كلّ طباعة فترسم البطاقة داخل هذا العرض
+      printable_width: PRINTABLE,
       printer_ready: !!(st.known && !st.disabled && !st.offline),
       printer_state: st.text || 'غير معروفة',
       needs_token: !!CFG.token,
@@ -282,6 +302,8 @@ const server = http.createServer(async (req, res) => {
         return rgbaToBits(img.width, img.height, img.rgba, CFG.threshold)
       })
       const img = monos[0]
+      if (PRINTABLE === 58 && monos.some((m) => inkBeyond(m, STRIP_DOTS[58])))
+        log('WARN', 'حبرٌ يمين حدّ ٥٨مم — الواجهة لم ترسم على الشريط (أهي أقدم من الوسيط؟)')
       // ★ مهمّةٌ واحدة: اطبع، اقطع، اطبع، اقطع
       const job = buildJob(monos, { feedMm: CFG.feed_mm })
       const sent = await sendRaw(job, CFG.printer)
@@ -305,6 +327,7 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(CFG.port, '127.0.0.1', () => {
   log('INFO', `خادم الطباعة يعمل على 127.0.0.1:${CFG.port} — الطابعة ${CFG.printer}`
+    + ` — ورق ${PRINTABLE}مم`
     + ` — الإعداد من ${CFG._from}${CFG.token ? ' — برمز' : ' — ★ بلا رمز'}`
     + (DRY_RUN ? ` — ★ تشغيلٌ جافّ: لا شيء يُرسل للطابعة (${DRY_RUN})` : ''))
 })

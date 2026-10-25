@@ -76,6 +76,8 @@ const run = async () => {
     res.setHeader('Access-Control-Allow-Origin', BASE)
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Print-Token')
     if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return }
+    // الواجهة تسأل /health قبل الطباعة (عرض الورق) — والإصدار ١ لا يذكره
+    if (req.url === '/health') { res.setHeader('Content-Type', 'application/json'); res.end('{"ok":true,"version":1}'); return }
     let body = ''
     req.on('data', (c) => { body += c })
     req.on('end', () => {
