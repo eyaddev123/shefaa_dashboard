@@ -74,7 +74,7 @@ const measure = (page) => page.evaluate(() => {
   const tiles = [...document.querySelectorAll('.cash-tiles .tile')].map((t) => {
     const b = t.getBoundingClientRect()
     return { top: Math.round(b.top), w: Math.round(b.width), label: t.querySelector('.label').textContent,
-      value: t.querySelector('.value').textContent }
+      value: t.querySelector('.value').textContent, hint: t.querySelector('.hint')?.textContent || '' }
   })
   const docs = [...document.querySelectorAll('.cash-doc')].map((d) => ({
     open: d.classList.contains('is-open'),
@@ -84,6 +84,15 @@ const measure = (page) => page.evaluate(() => {
     total: d.querySelector('.cash-doc-total').textContent,
     count: d.querySelector('.cash-doc-count').textContent,
     rows: d.querySelectorAll('tbody tr').length,
+    brk: [...d.querySelectorAll('.cash-doc-break > span')].map((x) => x.textContent),
+    nameTop: Math.round(d.querySelector('.cash-doc-who strong').getBoundingClientRect().top),
+    totalTop: Math.round(d.querySelector('.cash-doc-total').getBoundingClientRect().top),
+    totalBottom: Math.round(d.querySelector('.cash-doc-total').getBoundingClientRect().bottom),
+    brkTop: Math.round(d.querySelector('.cash-doc-break')?.getBoundingClientRect().top ?? -1),
+    brkW: Math.round(d.querySelector('.cash-doc-break')?.scrollWidth ?? 0),
+    brkCW: Math.round(d.querySelector('.cash-doc-break')?.clientWidth ?? 0),
+    totalFs: parseFloat(getComputedStyle(d.querySelector('.cash-doc-total')).fontSize),
+    brkFs: parseFloat(getComputedStyle(d.querySelector('.cash-doc-break')).fontSize),
   }))
   return {
     scrollW: document.documentElement.scrollWidth, innerW: window.innerWidth,
@@ -137,6 +146,27 @@ const run = async () => {
           && digits(d.count) === R.doctors[i].totals.patients), `${tag}: رأس الكتلة = الخادم (الاسم والمجموع والعدد)`)
         ok(m.docs.every((d, i) => d.spec === (R.doctors[i].specialty || '—')), `${tag}: الاختصاص أو «—»`)
         ok(digits(m.grand) === R.totals.total && m.checkOk, `${tag}: المجموع الكلي وفحص التطابق الأخضر`)
+        // سطر التفصيل: ما لا قيمة له لا يظهر، والأرقام من الخادم كما هي
+        ok(m.docs.every((d, i) => {
+          const t = R.doctors[i].totals
+          const want = [`الكشوف ${t.patients} ${t.fee}`]
+          if (t.procCount > 0) want.push(`الإجراءات ${t.procCount} ${t.procTotal}`)
+          if (t.referralCount > 0) want.push(`الإحالات ${t.referralCount} ${t.discount}`)
+          return d.brk.length === want.length && d.brk.every((x, j) => {
+            const [label, n, amount] = want[j].split(' ')
+            const nums = x.replace(/[٠-٩]/g, (c) => '٠١٢٣٤٥٦٧٨٩'.indexOf(c)).match(/[\d,٬]+/g).map((v) => Number(v.replace(/[,٬]/g, '')))
+            return x.startsWith(label) && nums[0] === Number(n) && nums[1] === Number(amount)
+          })
+        }), `${tag}: سطر التفصيل = الخادم (${m.docs.map((d) => d.brk.join(' | ')).join(' ‖ ')})`)
+        ok(m.docs.every((d) => d.brk.every((x) => !/\(٠\)/.test(x) && !x.includes('·'))), `${tag}: لا «(٠)» ولا «·» بجانب الأرقام في التفصيل`)
+        ok(m.docs.filter((d, i) => R.doctors[i].totals.referralCount > 0).every((d) => d.brk.some((x) => x.includes('−') && x.includes('على الجهات'))),
+          `${tag}: الإحالات بصيغة خصم «− … على الجهات»`)
+        ok(m.docs.every((d) => d.brkTop > d.nameTop && d.brkTop >= d.totalBottom - 4 && Math.abs(d.nameTop - d.totalTop) < 14),
+          `${tag}: الاسم والمجموع في سطر، والتفصيل سطرٌ ثانٍ تحتهما`)
+        ok(m.docs.every((d) => d.brkW <= d.brkCW + 1), `${tag}: التفصيل لا يفيض عن الرأس`)
+        ok(m.docs.every((d) => d.totalFs > d.brkFs * 1.3), `${tag}: المجموع أبرز من التفصيل`)
+        ok(digits(m.tiles[3].hint) === R.totals.procCount && digits(m.tiles[4].hint.split('على')[0]) === R.totals.referralCount,
+          `${tag}: عدد الإجراءات والإحالات تحت بطاقتيهما (${m.tiles[3].hint} / ${m.tiles[4].hint})`)
         const autoOpen = R.doctors.length <= 3
         ok(m.docs.every((d) => d.open === autoOpen), `${tag}: الكتل ${autoOpen ? 'مفتوحة' : 'مطويّة'} افتراضاً`)
         await shot(page, `${state}-${autoOpen ? 'open' : 'closed'}-${w}-${theme}`)
