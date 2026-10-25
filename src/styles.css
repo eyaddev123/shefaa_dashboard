@@ -979,13 +979,19 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
      الترتيب يتبع ترتيب العناصر في JSX، وشبكة البطاقات وحدها تتمدّد (flex:1). */
   display: flex;
   flex-direction: column;
-  gap: 1.2vh;
   overflow: hidden;              /* لا تمرير على شاشة الصالة إطلاقاً */
   background: #0b1615;
   color: #eef7f5;
   padding: 1.6vh 1.8vw;
   font-family: 'Cairo', sans-serif;
 }
+/* ★ Chrome 66: لا gap في flex (Chrome 84) — هامشٌ علويّ بين الإخوة بدلها (1.2vh).
+   gap لا يحسب الثابتَين (تنبيه الانقطاع وبطاقة النداء): هامشهما صفر (وإلا انزاحت بطاقة
+   النداء عن أعلى الشاشة)، ومن يليهما أوّلاً لا يأخذ هامشاً. */
+.pd-root > * + * { margin-top: 1.2vh; }
+.pd-root > .pd-offline-alert,
+.pd-root > .pd-banner,
+.pd-root > .pd-offline-alert:first-child + * { margin-top: 0; }
 
 /* ── الترويسة: الهوية، الساعة، ومؤشّرات صغيرة ── */
 /* ★ Chrome 66: لا gap في flex ولا margin-inline-* — فكانت الساعة تلتصق باسم المجمع بدل
@@ -1036,10 +1042,13 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
 /* ── لافتة التأخير: عامة بلا ذكر عيادة (ذكرها يكشف واقعة طبية عن مريض بعينه) ── */
 .pd-urgent-banner {
   text-align: center; font-weight: 800;
-  font-size: clamp(13px, 1.4vw, 26px);
+  font-size: 1.4vw;
   color: #0b1615; background: #f0b37e;
   padding: 0.8vh 1vw; border-radius: 12px;
 }
+/* clamp(13px, 1.4vw, 26px) بلا clamp — Chrome 66 (انظر حدود الترويسة أعلاه) */
+@media (max-width: 928px)   { .pd-urgent-banner { font-size: 13px; } }   /* 13 ÷ 1.4% */
+@media (min-width: 1858px)  { .pd-urgent-banner { font-size: 26px; } }   /* 26 ÷ 1.4% */
 
 /* ── الشبكة: عمود لكل عيادة، والصفوف تتوزّع الارتفاع المتاح ── */
 .pd-grid {
@@ -1212,36 +1221,58 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
    والساعة تماماً. تبقى بارزة بلونها وحجمها، وتختفي فور تفعيل الصوت. */
 .pd-audio-gate {
   font-family: inherit; cursor: pointer; border: none;
-  font-size: clamp(15px, 1.8vw, 34px); font-weight: 800;
+  font-size: 1.8vw; font-weight: 800;
   color: #3a1d02; background: #f0b37e;
   padding: 1.2vh 1vw; border-radius: 12px;
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
 }
 .pd-offline-alert {
-  position: fixed; inset-inline: 0; bottom: 0; z-index: 55;
+  /* left/right لا inset-inline (Chrome 87) */
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 55;
   text-align: center; font-weight: 800;
-  font-size: clamp(14px, 1.5vw, 28px);
+  font-size: 1.5vw;
   color: #2a0a0a; background: #f08a8a;
   padding: 1vh 1vw;
 }
 
-.pd-msg { text-align: center; font-size: clamp(16px, 2vw, 34px); color: #b3c6c2; align-self: center; }
-.pd-err { text-align: center; font-size: clamp(12px, 1.2vw, 22px); color: #f08a8a; }
+.pd-msg { text-align: center; font-size: 2vw; color: #b3c6c2; align-self: center; }
+.pd-err { text-align: center; font-size: 1.2vw; color: #f08a8a; }
 
 /* لوحة إعدادات الصوت — للاستقبال وقت الضبط، لا للعرض الدائم */
 .pd-settings {
-  display: flex; flex-wrap: wrap; gap: 1.5vw; align-items: center;
   background: #10201e; border: 1px solid rgba(127, 214, 184, 0.25);
   border-radius: 12px; padding: 1vh 1vw;
-  font-size: clamp(11px, 1vw, 18px);
+  font-size: 1vw;
 }
-.pd-settings label { display: flex; align-items: center; gap: 0.5vw; }
+.pd-settings label { display: flex; align-items: center; }
+/* ★ Chrome 66: لا gap في flex. الصفّ يلتفّ، والفراغ 1.5vw أفقياً وعمودياً — الصفّ الداخليّ
+   بهامشٍ سالب نصف الفراغ وكلّ عنصرٍ بنصفه موجباً: يتقابلان بين العناصر (1.5vw) ويتلاشيان
+   عند الحواف، فالنتيجة مطابقةٌ لـ gap حتى عند الالتفاف. */
+.pd-settings-row { display: flex; flex-wrap: wrap; align-items: center; margin: -0.75vw; }
+.pd-settings-row > * { margin: 0.75vw; }
+/* داخل التسمية: النصّ أوّلاً ثمّ الحقل ثمّ القيمة — الفراغ (0.5vw) على يمين كلّ عنصر:
+   الصفحة RTL دائماً فهو الجانب الذي يلي سابقه */
+.pd-settings label > * { margin-right: 0.5vw; }
 .pd-settings input[type='number'] { width: 4.5em; }
 .pd-missing { color: #f0b37e; font-weight: 700; }
+/* ═══ حدود لافتة الصوت والانقطاع والرسائل والإعدادات: media queries بدل clamp() ═══
+   كالترويسة وبطاقة النداء: Chrome 66 يُسقط clamp فينزل الخطّ إلى ١٦px. كلّ حدٍّ عند العرض
+   الذي يبلغه فيه vw بالضبط (الحدّ ÷ النسبة × ١٠٠)، فالنتيجة مطابقةٌ لـ clamp في كلّ عرض. */
+@media (max-width: 833px)   { .pd-audio-gate { font-size: 15px; } }     /* 15 ÷ 1.8% */
+@media (min-width: 1889px)  { .pd-audio-gate { font-size: 34px; } }     /* 34 ÷ 1.8% */
+@media (max-width: 933px)   { .pd-offline-alert { font-size: 14px; } }  /* 14 ÷ 1.5% */
+@media (min-width: 1867px)  { .pd-offline-alert { font-size: 28px; } }  /* 28 ÷ 1.5% */
+@media (max-width: 800px)   { .pd-msg { font-size: 16px; } }            /* 16 ÷ 2%   */
+@media (min-width: 1700px)  { .pd-msg { font-size: 34px; } }            /* 34 ÷ 2%   */
+@media (max-width: 1000px)  { .pd-err { font-size: 12px; } }            /* 12 ÷ 1.2% */
+@media (min-width: 1834px)  { .pd-err { font-size: 22px; } }            /* 22 ÷ 1.2% */
+@media (max-width: 1100px)  { .pd-settings { font-size: 11px; } }       /* 11 ÷ 1%   */
+@media (min-width: 1800px)  { .pd-settings { font-size: 18px; } }       /* 18 ÷ 1%   */
 
 /* ═══ بطاقة النداء: تغطي الشاشة لحظة النداء ثم تنسحب ═══ */
 .pd-banner {
-  position: fixed; inset: 0; z-index: 50;
+  /* top/right/bottom/left لا inset (Chrome 87): التلفاز على Chrome 66 */
+  position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 50;
   display: flex; align-items: center; justify-content: center;
   background: rgba(6, 15, 14, 0.94);
   animation: pd-banner-in 0.35s ease-out;
@@ -1253,14 +1284,24 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
   animation: pd-pulse 1.4s ease-in-out infinite;
 }
 .pd-banner-label {
-  font-size: clamp(14px, 1.5vw, 28px); font-weight: 700; color: #7fd6b8;
+  font-size: 1.5vw; font-weight: 700; color: #7fd6b8;
   letter-spacing: 0.4em; margin-bottom: 1vh;
 }
 .pd-banner-number {
-  font-size: clamp(90px, 16vw, 300px); font-weight: 800; color: #14b8a6; line-height: 0.9;
+  font-size: 16vw; font-weight: 800; color: #14b8a6; line-height: 0.9;
 }
-.pd-banner-dest { font-size: clamp(18px, 2.4vw, 46px); font-weight: 600; color: #b3c6c2; margin-top: 2vh; }
+.pd-banner-dest { font-size: 2.4vw; font-weight: 600; color: #b3c6c2; margin-top: 2vh; }
 .pd-banner-dest b { color: #7fd6b8; font-weight: 800; }
+/* ═══ حدود بطاقة النداء: media queries بدل clamp() — كالترويسة ═══
+   clamp() غائبة في Chrome 66 فكان الرقم المنادى نفسه ينزل إلى ١٦px على التلفاز.
+   كلّ حدٍّ عند العرض الذي يبلغه فيه vw بالضبط (الحدّ ÷ النسبة × ١٠٠). وما تحت 1024
+   تحكمه كتلة الجوال أدناه (رقمٌ بـ 34vw وتسميةٌ 16px) بحدودها هي. */
+@media (max-width: 933px)   { .pd-banner-label { font-size: 14px; } }    /* 14 ÷ 1.5%  */
+@media (min-width: 1867px)  { .pd-banner-label { font-size: 28px; } }    /* 28 ÷ 1.5%  */
+@media (max-width: 562px)   { .pd-banner-number { font-size: 90px; } }   /* 90 ÷ 16%   */
+@media (min-width: 1875px)  { .pd-banner-number { font-size: 300px; } }  /* 300 ÷ 16%  */
+@media (max-width: 750px)   { .pd-banner-dest { font-size: 18px; } }     /* 18 ÷ 2.4%  */
+@media (min-width: 1917px)  { .pd-banner-dest { font-size: 46px; } }     /* 46 ÷ 2.4%  */
 
 @keyframes pd-banner-in {
   from { opacity: 0; transform: scale(0.92); }
@@ -1742,13 +1783,18 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
      54px على أي تلفاز يُبلغ المتصفح بعرضٍ أقل من 1024 مهما كبر ارتفاعه. المقاسات الآن
      تتبع البطاقة، وتُحسب في JS — انظر cardFonts في PublicDisplay.jsx.) */
 
-  /* رقم النداء 190px يفيض عرض الجوال — clamp يُبقيه أكبر ما تحتمله الشاشة */
-  .pd-banner-inner { padding: 32px 24px; border-radius: 24px; width: min(92vw, 560px); }
-  .pd-banner-number { font-size: clamp(88px, 34vw, 190px); }
+  /* رقم النداء 190px يفيض عرض الجوال — 34vw بحدَّين (أدناه) يُبقيه أكبر ما تحتمله الشاشة.
+     width + max-width = min(92vw, 560px) بلا min() — غائبة في Chrome 66 */
+  .pd-banner-inner { padding: 32px 24px; border-radius: 24px; width: 92vw; max-width: 560px; }
+  .pd-banner-number { font-size: 34vw; }
   .pd-banner-label { font-size: 16px; letter-spacing: 4px; }
   .pd-banner-doctor { font-size: 22px; margin-top: 14px; }
   .pd-banner-room { font-size: 20px; }
 }
+
+/* حدّا رقم النداء على الجوال (كانا clamp(88px, 34vw, 190px)) — بعد كتلة 1023 لتغلبها */
+@media (max-width: 258px)                        { .pd-banner-number { font-size: 88px; } }   /* 88 ÷ 34%  */
+@media (min-width: 559px) and (max-width: 1023px) { .pd-banner-number { font-size: 190px; } }  /* 190 ÷ 34% */
 
 @media (max-width: 639px) {
   .public-display-grid { grid-template-columns: 1fr; }
@@ -2024,7 +2070,8 @@ button.danger:hover:not(:disabled) { filter: brightness(1.08); }
 /* صفٌّ أفقي بلا flex gap: الهامش بين الابنَين يعمل في كل متصفّح */
 .od-list li { display: block; white-space: nowrap; }
 .od-idx { color: #7d938f; font-weight: 700; }
-.od-num { margin-inline-start: 0.4em; color: #eef7f5; }
+/* margin-right لا margin-inline-start (Chrome 69): الشاشة RTL دائماً فالبداية يمين */
+.od-num { margin-right: 0.4em; color: #eef7f5; }
 /* «+N»: ما لم يتّسع له ارتفاع البطاقة — فلا تُقصّ القائمة بصمت */
 .od-more { color: #7fd6b8; font-weight: 800; }
 .od-empty { font-size: var(--od-label, 13px); color: #7d938f; margin-top: 0.6vh; }

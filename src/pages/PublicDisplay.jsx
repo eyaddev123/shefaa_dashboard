@@ -458,6 +458,8 @@ export default function PublicDisplay() {
 
       {showSettings && (
         <div className="pd-settings">
+          {/* الصفّ الداخليّ يحمل الفراغات بالهوامش — لا gap في flex على Chrome 66 */}
+          <div className="pd-settings-row">
           <label>
             مستوى الصوت
             <input type="range" min="0" max="1" step="0.05" value={settings.volume}
@@ -474,6 +476,7 @@ export default function PublicDisplay() {
             <p className="pd-missing">مقاطع ناقصة: {callAudio.missingClips()
               .map((c) => (CLIP_TEXT[c] ? `${c} («${CLIP_TEXT[c]}»)` : c)).join('، ')}</p>
           )}
+          </div>
         </div>
       )}
 
