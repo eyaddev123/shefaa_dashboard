@@ -4,6 +4,7 @@ import { addDays, api, dayLabel, SESSION_STATUSES, fmtTime, todayLocal } from '.
 import { useRole } from '../RoleContext.jsx'
 import { FlowModeTag } from '../attendance-ui.jsx'
 import CashReportDialog from '../components/CashReportDialog.jsx'
+import RoomBadge from '../components/RoomBadge.jsx'
 
 // من يرى قسم «دكاترة اليوم» والاعتذارات — يطابق APOLOGY_VIEWERS في الخادم.
 // الاستقبال غائبٌ عمداً: المعتذر لا وجود له عنده ذلك اليوم.
@@ -317,6 +318,15 @@ export default function ClinicBoard() {
   const load = () => api.clinic.sessions(date).then(setSessions).catch((e) => setErr(e.message))
   useEffect(() => { setSessions(null); load() }, [date])
 
+  // رقم العيادة بجانب كل دكتور: ردّ الجلسات لا يحمل الغرفة، فنأخذها من قائمة الدكاترة
+  // (المصدر نفسه doctors.room). فشلها لا يُفسد اللوحة — تغيب الشارة ولا تكذب «بلا عيادة».
+  const [rooms, setRooms] = useState(null)   // doctor_id → room
+  useEffect(() => {
+    api.clinic.doctors()
+      .then((ds) => setRooms(Object.fromEntries(ds.map((d) => [d.id, d.room]))))
+      .catch(() => setRooms(null))
+  }, [])
+
   const generate = async () => {
     setBusy(true); setErr(null)
     try { await api.clinic.generateSessions(date); await load() }
@@ -329,7 +339,7 @@ export default function ClinicBoard() {
       <div className="page-head">
         <div>
           <h2>لوحة العيادات</h2>
-          <p className="subtitle">جلسات الدكاترة لليوم المحدد وطول طابور كل منها — تنقّل بالأيام للحجز المسبق</p>
+          <p className="subtitle">جلسات الدكاترة لليوم المحدد وطول الدور عند كلٍّ منها — تنقّل بالأيام للحجز المسبق</p>
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }}>
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
@@ -387,12 +397,12 @@ export default function ClinicBoard() {
         ) : (
           <table>
             <thead>
-              <tr><th>الدكتور</th><th>الاختصاص</th><th>الوقت</th><th>النمط</th><th>الحالة</th><th>الطابور</th><th></th></tr>
+              <tr><th>الدكتور</th><th>الاختصاص</th><th>الوقت</th><th>النمط</th><th>الحالة</th><th>الدور</th><th></th></tr>
             </thead>
             <tbody>
               {sessions.map((s) => (
                 <tr key={s.id} className="clickable" onClick={() => navigate(`/clinic/session/${s.id}`)}>
-                  <td>{s.doctor_name}</td>
+                  <td>{s.doctor_name}{rooms && <RoomBadge room={rooms[s.doctor_id]} />}</td>
                   <td>{s.specialty || '—'}</td>
                   <td className="num">{fmtTime(s.start_time)} – {fmtTime(s.end_time)}</td>
                   {/* نمط الجلسة يُثبَّت عند توليدها — يُعرض كي لا يُفاجأ أحد يوم التبديل */}
@@ -406,7 +416,7 @@ export default function ClinicBoard() {
                   <td className="num">{s.active_count} نشِط / {s.total_count} إجمالي</td>
                   <td onClick={(e) => e.stopPropagation()}>
                     <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }}
-                      onClick={() => navigate(`/clinic/session/${s.id}`)}>فتح الطابور</button>
+                      onClick={() => navigate(`/clinic/session/${s.id}`)}>فتح الدور</button>
                     {canCloseSession && (
                       <button type="button" className="ghost"
                         style={{ padding: '3px 10px', fontSize: 11.5, marginInlineStart: 6 }}

@@ -64,7 +64,7 @@ export default function PatientTurn() {
                 {result.ahead_count === 0
                   ? 'دورك التالي مباشرة'
                   : result.session_overflow
-                    ? <>أمامك <strong>{result.ahead_count}</strong> في الطابور</>
+                    ? <>أمامك <strong>{result.ahead_count}</strong> في الدور</>
                     : <>أمامك <strong>{result.ahead_count}</strong> — الوقت المتوقع ~<strong>{result.wait_minutes}</strong> دقيقة</>}
               </div>
             )}

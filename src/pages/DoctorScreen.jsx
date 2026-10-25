@@ -42,7 +42,7 @@ export default function DoctorScreen() {
     api.clinic.queue(sessionId).then((q) => { setQueue(q); setLoadErr(null) })
       .catch((e) => {
         // طابورٌ معروض ⇒ يبقى، والتحديث الدوري يُعيد المحاولة وحده
-        if (queue) showToast(`تعذّر تحديث الطابور — يُعاد المحاولة تلقائياً (${e.message})`)
+        if (queue) showToast(`تعذّر تحديث قائمة الدور — يُعاد المحاولة تلقائياً (${e.message})`)
         else setLoadErr(e.message)
       })
   }
@@ -193,7 +193,7 @@ export default function DoctorScreen() {
           )}
 
           <div className="card">
-            <h3>التالي في الطابور</h3>
+            <h3>التالي في الدور</h3>
             {nextUp ? (
               <div className="action-row">
                 <div>
@@ -223,7 +223,7 @@ export default function DoctorScreen() {
           {/* الطابور كامل: مَن وصل ومَن لم يصل في مكان واحد، بالترتيب */}
           <div className="card">
             <h3>
-              {attendance ? `الحاضرون (${arrivedWaiting.length})` : `الطابور كامل (${arrivedWaiting.length + stillWaiting.length})`}
+              {attendance ? `الحاضرون (${arrivedWaiting.length})` : `قائمة الدور كاملة (${arrivedWaiting.length + stillWaiting.length})`}
               {!attendance && (
                 <span className="doc-queue-legend">
                   <span className="doc-dot doc-dot-here" /> وصل ({arrivedWaiting.length})

@@ -180,7 +180,7 @@ export default function Dashboard() {
         <div className="card">
           <h3>جلسات اليوم</h3>
           <table>
-            <thead><tr><th>الوقت</th><th>الدكتور</th><th>الحالة</th><th>الطابور النشط</th></tr></thead>
+            <thead><tr><th>الوقت</th><th>الدكتور</th><th>الحالة</th><th>على الدور الآن</th></tr></thead>
             <tbody>
               {d.todaySessions.map((s) => (
                 <tr key={s.id}>
@@ -206,7 +206,7 @@ export default function Dashboard() {
         <p className="subtitle">جلساتك اليوم</p>
         <div className="card">
           <table>
-            <thead><tr><th>الوقت</th><th>الحالة</th><th>الطابور النشط</th></tr></thead>
+            <thead><tr><th>الوقت</th><th>الحالة</th><th>على الدور الآن</th></tr></thead>
             <tbody>
               {d.mySessions.map((s) => (
                 <tr key={s.id}>
