@@ -215,13 +215,10 @@ export const api = {
     removeDoctorProcedureShare: (id, procId) =>
       http(`/clinic/doctors/${id}/procedure-shares/${procId}`, { method: 'DELETE' }),
     reopenSession: (id) => http(`/clinic/sessions/${id}/reopen`, { method: 'POST' }),
-    // جرد الصندوق: ملفّ إكسل ليومٍ وعيادة (غرفة) أو للكلّ — الحساب كلّه في الخادم
-    cashReportClinics: (date) => http(`/reception/cash-report/clinics?${new URLSearchParams({ date })}`),
-    cashReport: ({ date, clinicId }) => {
-      const q = new URLSearchParams({ date })
-      if (clinicId) q.set('clinic_id', clinicId)
-      return downloadFile(`/api/reception/cash-report?${q}`, `jard-${date}.xlsx`)
-    },
+    // جرد الصندوق: الشاشة (format=json) والملفّ من المسار نفسه والحساب نفسه — كلّه في الخادم
+    cashReportData: ({ date }) => http(`/reception/cash-report?${new URLSearchParams({ date, format: 'json' })}`),
+    cashReport: ({ date }) =>
+      downloadFile(`/api/reception/cash-report?${new URLSearchParams({ date })}`, `jard-${date}.xlsx`),
     // ═══ الإحالات ═══
     // قائمة الاختيار (الفعّالة) للاستقبال والمشرفة؛ والإدارة والتقرير للمشرفة وحدها
     referralOptions: () => http('/clinic/referral-sources/options'),

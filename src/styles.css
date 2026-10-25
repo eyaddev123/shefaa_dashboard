@@ -2775,3 +2775,108 @@ button.queue-tab-jump { padding: 3px 12px; font-size: 12.5px; margin-inline-star
 /* سطر المجموع تحت تبويبي «الإجراءات» و«الإحالات» */
 .queue-extra-total { margin-top: 10px; padding-top: 10px; border-top: 2px solid var(--grid); font-size: 13.5px; text-align: start; }
 .queue-extra-total strong { color: var(--primary); font-size: 15px; }
+
+/* ═══ جرد الصندوق — شاشة الاستقبال بآخر الدوام ═══
+   بطاقات الداشبورد نفسها فوق (الأولى أعرض وأبرز)، ثمّ كتلة لكل دكتور تنفتح وتنطوي،
+   ثمّ المجموع الكلي وفحص التطابق. الأرقام بخطٍّ جدوليّ كي تصطفّ الخانات عموداً. */
+.cash-head-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; flex-shrink: 0; }
+.cash-head-actions button { white-space: nowrap; }
+.cash-head-actions input[type='date'] { width: 165px; }
+.cash-unit { font-size: 0.5em; font-weight: 700; color: var(--muted); margin-inline-start: 5px; }
+
+.tiles.cash-tiles { grid-template-columns: 1.45fr repeat(4, minmax(0, 1fr)); }
+.cash-tiles .tile { min-width: 0; }
+.cash-tiles .tile:hover { transform: none; box-shadow: var(--shadow-card); }
+.cash-tiles .value { font-size: 26px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cash-tiles .tile.cash-hero { background: var(--primary-soft); border-color: transparent; }
+.cash-tiles .tile.cash-hero::before { width: 5px; background: var(--primary); opacity: 1; }
+.cash-tiles .tile.cash-hero .label { color: var(--accent-text); font-size: 13px; }
+.cash-tiles .tile.cash-hero .value { font-size: 36px; color: var(--accent-text); }
+@media (max-width: 1100px) {
+  .tiles.cash-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cash-tiles .tile.cash-hero { grid-column: 1 / -1; }
+}
+
+.cash-docs-head { display: flex; align-items: center; gap: 10px; margin: 6px 2px 12px; }
+.cash-docs-head h3 { font-size: 15px; font-weight: 800; }
+.cash-docs-head .link-btn { margin-inline-start: auto; font-size: 12.5px; }
+
+/* الكتلة: الرأس زرٌّ بعرضها كله — هادئ، والمجموع وحده بخطٍّ أثقل */
+.card.cash-doc { padding: 0; margin-bottom: 12px; overflow: hidden; }
+button.cash-doc-head {
+  all: unset; box-sizing: border-box; width: 100%; cursor: pointer;
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; padding: 14px 20px;
+  transition: background 0.12s;
+}
+button.cash-doc-head:hover { background: var(--primary-soft); }
+button.cash-doc-head:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; border-radius: var(--radius); }
+.cash-doc.is-open button.cash-doc-head { border-bottom: 1px solid var(--grid); }
+.cash-chev { color: var(--muted); font-size: 20px; line-height: 1; width: 14px; text-align: center; transition: transform 0.15s; }
+.cash-doc.is-open .cash-chev { transform: rotate(-90deg); }
+.cash-doc-who { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.cash-doc-who strong { font-size: 15px; font-weight: 700; color: var(--text-primary); }
+.cash-doc-spec { font-size: 12.5px; color: var(--text-secondary); }
+.cash-doc-head .room-badge { margin-inline-start: 0; }
+.cash-doc-count { margin-inline-start: auto; font-size: 12.5px; color: var(--text-secondary); white-space: nowrap; }
+.cash-doc-total { font-size: 19px; font-weight: 800; color: var(--text-primary); font-variant-numeric: tabular-nums; white-space: nowrap; min-width: 130px; text-align: end; }
+
+.cash-doc-body { padding: 4px 20px 14px; overflow-x: auto; }
+table.cash-table { font-size: 13px; table-layout: fixed; min-width: 860px; }
+.cash-table col.c-q { width: 5%; }
+.cash-table col.c-name { width: 18%; }
+.cash-table col.c-visit { width: 8%; }
+.cash-table col.c-fee { width: 9%; }
+.cash-table col.c-procs { width: 16%; }
+.cash-table col.c-ref { width: 13%; }
+.cash-table col.c-due { width: 10%; }
+.cash-table col.c-notes { width: 21%; }
+.cash-table th, .cash-table td { overflow-wrap: anywhere; }
+.cash-table th { padding: 10px 8px; }
+.cash-table td { padding: 10px 8px; vertical-align: top; }
+.cash-table td.num { white-space: nowrap; }
+.cash-table .cash-q { color: var(--text-secondary); font-weight: 700; }
+.cash-table .cash-name { font-weight: 600; }
+.cash-table .cash-visit { white-space: nowrap; color: var(--text-secondary); }
+.cash-proc { display: block; line-height: 1.6; }
+.cash-proc .muted { font-variant-numeric: tabular-nums; }
+.cash-ref-name { display: block; line-height: 1.5; }
+.cash-ref-disc { display: block; font-size: 12px; color: var(--status-review); font-variant-numeric: tabular-nums; }
+.cash-table .cash-due { font-weight: 800; }
+.cash-notes { font-size: 12.5px; color: var(--text-secondary); line-height: 1.6; }
+.cash-notes .badge { margin: 0 0 3px 4px; }
+.cash-remarks { display: block; }
+/* التحقّق التلقائي: الصفّ نفسه بالأصفر كما في الملفّ، والشارة تقول السبب */
+.cash-table tr.cash-flag td { background: var(--status-pending-bg); }
+.cash-table tr.cash-flag td:first-child { box-shadow: inset -3px 0 0 var(--status-pending); }
+.cash-table tfoot td {
+  border-top: 2px solid var(--grid); border-bottom: none; padding-top: 11px;
+  font-weight: 700; color: var(--text-secondary);
+}
+.cash-table tfoot td.cash-due { color: var(--text-primary); font-size: 14.5px; }
+
+/* المجموع الكلي وفحص التطابق */
+.card.cash-grand { border-inline-start: 4px solid var(--primary); margin-top: 8px; }
+.cash-grand-row { display: flex; align-items: center; justify-content: space-between; gap: 12px 24px; flex-wrap: wrap; }
+.cash-grand-label { font-size: 16px; font-weight: 800; }
+.cash-grand-sub { font-size: 12.5px; color: var(--text-secondary); margin-top: 4px; font-variant-numeric: tabular-nums; }
+.cash-grand-value { font-size: 34px; font-weight: 800; color: var(--accent-text); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cash-check { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--grid); font-size: 13px; font-weight: 700; }
+.cash-check.ok { color: var(--status-good); }
+.cash-check.bad {
+  padding: 12px 16px; border-radius: 10px; border: 1px solid var(--status-bad);
+  background: var(--status-bad-bg); color: var(--status-bad); line-height: 1.8;
+}
+.cash-check-hint { font-weight: 600; font-size: 12.5px; }
+
+.card.cash-empty { text-align: center; padding: 48px 20px 44px; }
+.card.cash-empty .inv-empty-text { font-size: 16px; }
+.cash-empty-icon {
+  display: inline-flex; align-items: center; justify-content: center; width: 56px; height: 56px;
+  margin-bottom: 14px; border-radius: 50%; background: var(--primary-soft); color: var(--accent-text);
+}
+.cash-empty-icon svg { width: 28px; height: 28px; }
+
+@media (max-width: 700px) {
+  .cash-head-actions { width: 100%; }
+  .cash-doc-total { min-width: 0; }
+}

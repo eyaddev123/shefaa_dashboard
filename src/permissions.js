@@ -57,6 +57,11 @@ export const canSeeInventory = (role) => role === 'clinic_admin'
 export const canSeeReferralsPage = (role) => role === 'clinic_admin'
 export const canEditReferral = (role) => role === 'clinic_admin' || role === 'clinic_reception'
 
+// جرد الصندوق (الشاشة والملفّ): الاستقبال والمشرفة والمدير — يطابق CASH_REPORT_ROLES في الخادم.
+// الطبيب لا يراه، والخادم يردّه 403.
+export const canSeeCashReport = (role) =>
+  role === 'clinic_admin' || role === 'clinic_reception' || role === MANAGER
+
 // شاشة الطبيب الخاصة — مربوطة بسجلّ دكتور، فلا معنى لها لغير الطبيب
 export const canSeeDoctorScreen = (role) => role === 'doctor'
 
@@ -87,6 +92,7 @@ export const ROUTE_ACCESS = {
   '/inventory': canSeeInventory,
   '/clinic/referrals': canSeeReferralsPage,
   '/clinic/board': canSeeClinicBoard,
+  '/clinic/cash-report': canSeeCashReport,
   '/clinic/session': canSeeClinicBoard,
   '/clinic/doctor': canSeeDoctorScreen,
   '/clinic/printer': canSeePrinterSetup,
