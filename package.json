@@ -17,7 +17,8 @@
     "test:tabs": "node test/queue-tabs-check.mjs",
     "test:paper": "node test/paper-58-check.mjs",
     "test:cash": "node test/cash-report-check.mjs",
-    "test:sidebar": "node test/sidebar-order-check.mjs"
+    "test:sidebar": "node test/sidebar-order-check.mjs",
+    "test:rooms": "node test/room-occupancy-check.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

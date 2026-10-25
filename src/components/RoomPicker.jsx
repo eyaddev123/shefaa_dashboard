@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { RECORDED_ROOMS } from '../audio-clips.js'
+import { occupantLabel } from '../room-occupancy.js'
 
 // ═══ تعديل الغرفة بنقرة — من لوحة العيادات اليومية ═══
 // الشارة نفسها (RoomBadge) لكنها زرّ: نقرةٌ تفتح قائمة الغرف و«بلا غرفة»، والاختيار
@@ -10,7 +11,9 @@ import { RECORDED_ROOMS } from '../audio-clips.js'
 //
 // الغرف = المسجَّلة صوتياً (RECORDED_ROOMS) ∪ ما على الدكاترة فعلاً (rooms). غرفةٌ بلا
 // تسجيل تبقى قابلةً للاختيار لكنها موسومة: النداء إليها بصوت المتصفّح الآلي.
-// occupants: غرفة ← أسماء من فيها اليوم غير هذا الدكتور — تحذيرٌ هادئ من غرفتين لدكتورَين.
+// occupants: غرفة ← [{name, live, hours}] من فيها اليوم غير هذا الدكتور (roomOccupants):
+// «الآن» بلونٍ تحذيريّ هادئ (تسحبها من دكتورٍ شغّال)، وغيره باهتٌ بأوقات دوامه (متاحةٌ
+// عملياً لوقتٍ آخر). والاختيار مسموحٌ في الحالتين.
 const roomSort = (a, b) => {
   const na = /^\d+$/.test(a), nb = /^\d+$/.test(b)
   if (na && nb) return Number(a) - Number(b)
@@ -32,7 +35,7 @@ export default function RoomPicker({ room, rooms = [], occupants = {}, disabled,
     if (!open || !btn.current) return
     const r = btn.current.getBoundingClientRect()
     // RTL: حافّة القائمة اليمنى على حافّة الزرّ اليمنى، ولا تخرج من الشاشة يساراً
-    const width = 248
+    const width = 320
     const right = Math.max(8, Math.min(window.innerWidth - r.right, window.innerWidth - width - 8))
     const below = window.innerHeight - r.bottom
     setPos(below < 260 && r.top > below
@@ -86,16 +89,25 @@ export default function RoomPicker({ room, rooms = [], occupants = {}, disabled,
           <div className="room-pop-grid">
             {options.map((r) => {
               const taken = occupants[r] || []
+              const first = taken[0]
               const recorded = RECORDED_ROOMS.includes(r)
+              const label = [...taken.map((o) => occupantLabel(r, o)),
+                recorded ? '' : 'لا تسجيل صوتي لهذه الغرفة — يُنطق بالصوت الآلي'].filter(Boolean).join(' · ')
               return (
                 <button key={r} type="button" role="menuitemradio" aria-checked={r === current}
-                  className={`room-pop-item${r === current ? ' on' : ''}${taken.length ? ' taken' : ''}`}
-                  title={[taken.length ? `فيها اليوم: ${taken.join('، ')}` : '',
-                    recorded ? '' : 'لا تسجيل صوتي لهذه الغرفة — يُنطق بالصوت الآلي'].filter(Boolean).join(' · ') || undefined}
+                  className={`room-pop-item${r === current ? ' on' : ''}${first ? (first.live ? ' live' : ' later') : ''}`}
+                  title={label || undefined} aria-label={label ? `العيادة ${r} — ${label}` : `العيادة ${r}`}
                   onClick={() => pick(r)}>
                   <span className="room-pop-num">{r}</span>
-                  {taken.length > 0 && <span className="room-pop-who">{taken[0]}{taken.length > 1 ? ` +${taken.length - 1}` : ''}</span>}
-                  {!recorded && <span className="room-pop-who">بلا صوت</span>}
+                  <span className="room-pop-text">
+                    {first && (
+                      <span className="room-pop-who">{first.name}{taken.length > 1 ? ` +${taken.length - 1}` : ''}</span>
+                    )}
+                    {first && (
+                      <span className="room-pop-when">{first.live ? 'الآن' : first.hours || '—'}</span>
+                    )}
+                    {!first && !recorded && <span className="room-pop-when">بلا صوت</span>}
+                  </span>
                 </button>
               )
             })}

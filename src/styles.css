@@ -441,25 +441,35 @@ button.room-badge.editable:focus-visible { outline: 2px solid var(--primary); ou
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22); animation: toast-in-plain 0.12s ease-out;
 }
 @keyframes toast-in-plain { from { opacity: 0; } to { opacity: 1; } }
-.room-pop-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.room-pop-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
 .room-pop-item, .room-pop-none {
   font-family: inherit; cursor: pointer; border-radius: 9px; padding: 6px 4px;
   background: transparent; color: var(--text-primary); border: 1px solid var(--border);
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; min-width: 0;
 }
-.room-pop-item { min-height: 48px; }   /* بساكنٍ وبلا ساكن: الخانات بارتفاعٍ واحد */
+/* الخانة: الرقم في البداية، والاسم ووقته بجانبه — بساكنٍ وبلا ساكن بارتفاعٍ واحد */
+.room-pop-item { min-height: 46px; flex-direction: row; justify-content: flex-start; gap: 8px; padding: 5px 9px; text-align: start; }
+.room-pop-item .room-pop-num { min-width: 22px; text-align: center; }
+.room-pop-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.35; }
+.room-pop-when { font-size: 10.5px; font-weight: 700; color: var(--muted); white-space: nowrap; }
+/* يستقبل الآن: تحذيرٌ هادئ — الاختيار يسحبها من دكتورٍ شغّال */
+.room-pop-item.live { border-color: var(--status-pending); background: var(--status-pending-bg); }
+.room-pop-item.live .room-pop-who { color: var(--text-primary); font-weight: 700; }
+.room-pop-item.live .room-pop-when { color: var(--status-pending); }
+/* انتهى دوامه أو لم يبدأ: باهتٌ بأوقاته — متاحةٌ عملياً لوقتٍ آخر */
+.room-pop-item.later { border-style: dashed; }
+.room-pop-item.later .room-pop-text { opacity: 0.6; }
 .room-pop-item:hover, .room-pop-none:hover { background: var(--primary-soft); filter: none; }
 .room-pop-num { font-size: 15px; font-weight: 800; line-height: 1.3; }
 .room-pop-who {
   font-size: 10px; color: var(--muted); max-width: 100%;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.room-pop-item.taken { border-style: dashed; }
 .room-pop-item.on, .room-pop-none.on {
   background: var(--status-good); border-color: var(--status-good); color: #fff;
 }
 :root[data-theme='dark'] .room-pop-item.on, :root[data-theme='dark'] .room-pop-none.on { color: #06301b; }
-.room-pop-item.on .room-pop-who, .room-pop-none.on .room-pop-who { color: inherit; opacity: 0.85; }
+.room-pop-item.on .room-pop-who, .room-pop-item.on .room-pop-when { color: inherit; opacity: 0.85; }
 .room-pop-none { width: 100%; margin-top: 8px; flex-direction: row; justify-content: center; font-size: 13px; font-weight: 700; }
 
 /* ═══ سطر دوام موقوف: باهتٌ بشارة «موقوف» — مرئيٌّ ليُفعَّل، لا مخفيّ ═══ */

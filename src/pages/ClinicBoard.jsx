@@ -7,6 +7,7 @@ import { FlowModeTag } from '../attendance-ui.jsx'
 import RoomBadge from '../components/RoomBadge.jsx'
 import RoomPicker from '../components/RoomPicker.jsx'
 import { useToast } from '../action-feedback.jsx'
+import { nowHHMM, roomOccupants } from '../room-occupancy.js'
 
 // من يرى قسم «دكاترة اليوم» والاعتذارات — يطابق APOLOGY_VIEWERS في الخادم.
 // الاستقبال غائبٌ عمداً: المعتذر لا وجود له عنده ذلك اليوم.
@@ -207,16 +208,9 @@ function DayDoctors({ date, canEdit, onChanged, allRooms, onRoomChanged }) {
     } finally { setBusy(null) }
   }
 
-  // غرفة ← من فيها اليوم (عدا المعتذر) — يظهر في القائمة كي لا تُعطى غرفةٌ لاثنين سهواً
-  const occupantsFor = (doctorId) => {
-    const out = {}
-    data.doctors.forEach((x) => {
-      const r = String(x.room ?? '').trim()
-      if (!r || x.apologized || String(x.doctor_id) === String(doctorId)) return
-      ;(out[r] = out[r] || []).push(x.doctor_name)
-    })
-    return out
-  }
+  // غرفة ← من فيها اليوم (عدا المعتذر)، ومعه «الآن» أو أوقات دوامه — تُحسب لحظة فتح القائمة
+  const occupantsFor = (doctorId) =>
+    roomOccupants(data.doctors, doctorId, { date, today: todayLocal(), now: nowHHMM() })
 
   const confirmUndo = async () => {
     const d = askUndo.doctor
