@@ -96,7 +96,7 @@ const run = async () => {
   console.log('\n── ١) التوزيع والترتيب والعدّادات ──')
   {
     const { ctx, page, errors } = await open(browser, `/clinic/session/${ATT}`)
-    ok(await selected(page) === 'present', '«الحضور» افتراضاً')
+    ok(await selected(page) === 'pending', '«بانتظار الحضور» افتراضاً')
     ok(!(await page.$('.attn-pending-card')), 'بطاقة «لسا بانتظار» صارت تبويباً')
     const order = await page.locator('.queue-tab').evaluateAll((els) => els.map((e) => e.dataset.tab))
     ok(order.join() === 'pending,all,present,done,absent', `ترتيب التبويبات (${order})`)
@@ -111,7 +111,7 @@ const run = async () => {
       const got = await rowNames(page)
       ok(JSON.stringify(got) === JSON.stringify(want), `${tab}: الصفوف والترتيب\n     got  ${got.join('، ')}\n     want ${want.join('، ')}`)
       ok((await tabText(page, tab)).includes(`(${want.length})`), `${tab}: العدّاد (${await tabText(page, tab)})`)
-      ok(new URL(page.url()).searchParams.get('tab') === (tab === 'present' ? null : tab), `${tab}: في العنوان`)
+      ok(new URL(page.url()).searchParams.get('tab') === (tab === 'pending' ? null : tab), `${tab}: في العنوان`)
     }
     // الحالات الخاصّة
     await page.locator('.queue-tab[data-tab="present"]').click()

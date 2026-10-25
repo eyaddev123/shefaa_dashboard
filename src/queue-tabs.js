@@ -5,7 +5,7 @@
 // الموظفين تحميلها.
 import { normalizeAr } from './arabic-search.js'
 
-// الترتيب (RTL): بانتظار الحضور · الكل · الحضور · انتهى · ما حضر — والافتراضي «الحضور»
+// الترتيب (RTL): بانتظار الحضور · الكل · الحضور · انتهى · ما حضر — والافتراضي أوّلها
 export const QUEUE_TABS = [
   { key: 'pending', label: 'بانتظار الحضور', empty: 'ما في حدا بانتظار الحضور.' },
   { key: 'all', label: 'الكل', empty: 'لا حجوزات بعد في هذه الجلسة.' },
@@ -13,7 +13,7 @@ export const QUEUE_TABS = [
   { key: 'done', label: 'انتهى', empty: 'ما في حدا انتهى كشفه بعد.' },
   { key: 'absent', label: 'ما حضر', empty: 'ما في غياب ولا إلغاء بهالجلسة.' },
 ]
-export const DEFAULT_TAB = 'present'
+export const DEFAULT_TAB = 'pending'
 export const isTab = (k) => QUEUE_TABS.some((t) => t.key === k)
 
 // الحالة ⇐ التبويب. «بانتظار العودة» (خروج مؤقت) حاضرٌ في الصالة فمكانه «الحضور».
