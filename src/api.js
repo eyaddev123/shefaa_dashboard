@@ -225,6 +225,9 @@ export const api = {
     reopenSession: (id) => http(`/clinic/sessions/${id}/reopen`, { method: 'POST' }),
     // جرد الصندوق: الشاشة (format=json) والملفّ من المسار نفسه والحساب نفسه — كلّه في الخادم
     cashReportData: ({ date }) => http(`/reception/cash-report?${new URLSearchParams({ date, format: 'json' })}`),
+    // المساءلة (المشرفة والمدير): نشاط الموظفين في يوم الجرد، والخط الزمني لكل زيارة
+    cashStaffActivity: ({ date }) => http(`/reception/cash-report/staff-activity?${new URLSearchParams({ date })}`),
+    appointmentTimeline: (appointmentId) => http(`/clinic/appointments/${appointmentId}/timeline`),
     cashReport: ({ date }) =>
       downloadFile(`/api/reception/cash-report?${new URLSearchParams({ date })}`, `jard-${date}.xlsx`),
     // ═══ الإحالات ═══

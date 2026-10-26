@@ -1,8 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { api, fmtMoney, todayLocal } from '../api.js'
 import RoomBadge from '../components/RoomBadge.jsx'
+import { TimelineDrawer } from '../components/VisitTimeline.jsx'
 import { useToast } from '../action-feedback.jsx'
+import { useRole } from '../RoleContext.jsx'
+import { canSeeVisitAudit } from '../permissions.js'
 
 // ═══ جرد الصندوق — شاشةٌ داخل النظام، دكتوراً دكتوراً ═══
 // الاستقبال (والمشرفة والمدير) بآخر الدوام: ما دخل الصندوق في يوم، بطاقاتٌ فوق ثمّ كتلة لكل
@@ -10,6 +13,8 @@ import { useToast } from '../action-feedback.jsx'
 // الحساب كلّه في الخادم (GET /api/reception/cash-report?format=json) — وهو نفسه ما يُبنى منه
 // ملفّ الإكسل، فالشاشة والملفّ لا يختلفان برقم. لا شيء يُجمع هنا.
 // اليوم في الرابط (?date=) فيبقى بعد التحديث ويُشارَك.
+// المشرفة والمدير يزيدان قسمين (canSeeVisitAudit): «نشاط الموظفين» تحت البطاقات، وعمود
+// «السجل» يفتح الخط الزمني لكل مريض. الاستقبال يرى الشاشة بلاهما — والخادم يردّه 403 عليهما.
 
 const fmtNum = (n) => Number(n || 0).toLocaleString('ar-SY')
 const patientsText = (n) => `${fmtNum(n)} ${n === 1 ? 'مريض' : 'مرضى'}`
@@ -43,7 +48,7 @@ function SummaryTiles({ totals }) {
   )
 }
 
-function LineRow({ l }) {
+function LineRow({ l, onLog }) {
   return (
     <tr className={l.flagged ? 'cash-flag' : undefined}>
       <td className="num cash-q">{l.queue === '' || l.queue == null ? '—' : fmtNum(l.queue)}</td>
@@ -67,7 +72,85 @@ function LineRow({ l }) {
         {l.remarks.length > 0 && <span className="cash-remarks">{l.remarks.join(' · ')}</span>}
         {l.flags.length === 0 && l.remarks.length === 0 && <span className="muted">—</span>}
       </td>
+      {onLog && (
+        <td className="cash-log">
+          <button type="button" className="cash-log-btn" title="سجل الزيارة" aria-label={`سجل زيارة ${l.name}`}
+            onClick={() => onLog(l)}>
+            <LogIcon />
+          </button>
+        </td>
+      )}
     </tr>
+  )
+}
+
+function LogIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.8"
+      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" />
+    </svg>
+  )
+}
+
+// ═══ نشاط الموظفين — مطويٌّ، ويُحمَّل حين يُفتح ═══
+// أرقامٌ للمراجعة السريعة لا أكثر؛ التفصيل من سجلّ كل مريض. الحجز والحضور يُحصيان من
+// سجلّ الحجز (يبدأ بتفعيل السجلّ الكامل)، والإجراء والإحالة من فاعلهما على سطرهما.
+const ROLE_LABELS = { clinic_reception: 'استقبال', clinic_admin: 'مشرفة' }
+
+function StaffActivity({ date }) {
+  const [open, setOpen] = useState(false)
+  const [data, setData] = useState(null)
+  const [err, setErr] = useState(null)
+  useEffect(() => { setData(null); setErr(null) }, [date])
+  useEffect(() => {
+    if (!open || data) return
+    let alive = true
+    api.clinic.cashStaffActivity({ date })
+      .then((d) => { if (alive) setData(d) })
+      .catch((e) => { if (alive) setErr(e.message) })
+    return () => { alive = false }
+  }, [open, date, data])
+  const partial = data && (!data.full_log_since || data.full_log_since > date)
+  return (
+    <section className={`card cash-staff${open ? ' is-open' : ''}`}>
+      <button type="button" className="cash-staff-head" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+        <span className="cash-chev" aria-hidden="true">‹</span>
+        <strong>نشاط الموظفين</strong>
+        <span className="cash-staff-hint">من سجّل وعلّم حاضراً وأضاف — لكل موظف</span>
+      </button>
+      {open && (
+        <div className="cash-staff-body">
+          {err ? <p className="error">{err}</p>
+            : !data ? <p className="ad-readonly">جارٍ التحميل…</p>
+            : data.staff.length === 0 ? <p className="ad-readonly">لا نشاط مسجَّل لموظفي الاستقبال في هذا اليوم.</p>
+            : (
+              <table className="cash-staff-table">
+                <thead>
+                  <tr><th>الموظف</th><th>الحجوزات</th><th>علّم حاضراً</th><th>الإجراءات</th><th>الإحالات</th></tr>
+                </thead>
+                <tbody>
+                  {data.staff.map((s) => (
+                    <tr key={s.id}>
+                      <td><span className="cash-staff-name">{s.name}</span> <span className="muted">{ROLE_LABELS[s.role]}</span></td>
+                      <td className="num">{fmtNum(s.bookings)}</td>
+                      <td className="num">{fmtNum(s.arrivals)}</td>
+                      <td className="num">{fmtNum(s.procedures)}</td>
+                      <td className="num">{fmtNum(s.referrals)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          {partial && (
+            <p className="vt-note">
+              الحجوزات والحضور تُحصى من تفعيل السجلّ الكامل
+              {data.full_log_since ? <> (<bdi dir="ltr">{data.full_log_since}</bdi>)</> : null} — قبله لم يُسجَّل فاعلهما.
+            </p>
+          )}
+        </div>
+      )}
+    </section>
   )
 }
 
@@ -92,7 +175,7 @@ function Breakdown({ t }) {
   )
 }
 
-function DoctorBlock({ d, open, onToggle }) {
+function DoctorBlock({ d, open, onToggle, onLog }) {
   const id = `cash-doc-${d.key}`
   const t = d.totals
   return (
@@ -116,14 +199,16 @@ function DoctorBlock({ d, open, onToggle }) {
             <colgroup>
               <col className="c-q" /><col className="c-name" /><col className="c-visit" /><col className="c-fee" />
               <col className="c-procs" /><col className="c-ref" /><col className="c-due" /><col className="c-notes" />
+              {onLog && <col className="c-log" />}
             </colgroup>
             <thead>
               <tr>
                 <th>الدور</th><th>الاسم</th><th>الزيارة</th><th>الكشف</th><th>الإجراءات</th>
                 <th>الإحالة</th><th>المطلوب</th><th>الملاحظات</th>
+                {onLog && <th className="cash-log" aria-label="السجل" />}
               </tr>
             </thead>
-            <tbody>{d.rows.map((l) => <LineRow key={l.id} l={l} />)}</tbody>
+            <tbody>{d.rows.map((l) => <LineRow key={l.id} l={l} onLog={onLog} />)}</tbody>
             <tfoot>
               <tr>
                 <td colSpan={3}>مجموع الدكتور</td>
@@ -132,6 +217,7 @@ function DoctorBlock({ d, open, onToggle }) {
                 <td className="num">{t.discount > 0 ? `− ${fmtNum(t.discount)}` : ''}</td>
                 <td className="num cash-m cash-due">{fmtNum(t.total)}</td>
                 <td />
+                {onLog && <td />}
               </tr>
             </tfoot>
           </table>
@@ -183,6 +269,9 @@ export default function CashReport() {
   const [err, setErr] = useState(null)
   const [open, setOpen] = useState({})
   const [downloading, setDownloading] = useState(false)
+  const { role } = useRole()
+  const audit = canSeeVisitAudit(role)
+  const [logOf, setLogOf] = useState(null)   // { line, doctor } — اللوحة الجانبية مفتوحة عليه
 
   useEffect(() => {
     let alive = true
@@ -207,6 +296,7 @@ export default function CashReport() {
     finally { setDownloading(false) }
   }
 
+  const closeLog = useCallback(() => setLogOf(null), [])
   const docs = data?.doctors || []
   const allOpen = docs.length > 0 && docs.every((d) => open[d.key])
   const setAll = (v) => setOpen(Object.fromEntries(docs.map((d) => [d.key, v])))
@@ -254,6 +344,7 @@ export default function CashReport() {
         ) : (
           <>
             <SummaryTiles totals={data.totals} />
+            {audit && <StaffActivity date={date} />}
             <div className="cash-docs-head">
               <h3>دكاترة {date === today ? 'اليوم' : 'اليوم المحدّد'} <span className="muted">({fmtNum(docs.length)})</span></h3>
               {data.flagged > 0 && <span className="badge warn">{fmtNum(data.flagged)} سطر للمراجعة</span>}
@@ -263,11 +354,18 @@ export default function CashReport() {
             </div>
             {docs.map((d) => (
               <DoctorBlock key={d.key} d={d} open={!!open[d.key]}
-                onToggle={() => setOpen((o) => ({ ...o, [d.key]: !o[d.key] }))} />
+                onToggle={() => setOpen((o) => ({ ...o, [d.key]: !o[d.key] }))}
+                onLog={audit ? (line) => setLogOf({ line, doctor: d.doctor }) : null} />
             ))}
             <GrandTotal data={data} />
           </>
         )}
+      {logOf && (
+        <TimelineDrawer appointmentId={logOf.line.id} sessionDay={date} onClose={closeLog}
+          title={`سجل زيارة ${logOf.line.name}`}
+          subtitle={[logOf.doctor, logOf.line.queue !== '' && logOf.line.queue != null && `الدور ${fmtNum(logOf.line.queue)}`]
+            .filter(Boolean).join(' — ')} />
+      )}
     </>
   )
 }
