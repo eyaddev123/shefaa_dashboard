@@ -120,20 +120,3 @@ export function chime() {
     })
   } catch { /* الصوت رفاهية — لا يُعطّل الشاشة */ }
 }
-
-// المتصفحات تمنع الصوت قبل أول لمسة من المستخدم. تُستدعى من زر «تفعيل الصوت» على الشاشة.
-export function unlockAudio() {
-  try {
-    const Ctx = window.AudioContext || window.webkitAudioContext
-    if (Ctx) {
-      audioCtx = audioCtx || new Ctx()
-      audioCtx.resume()
-    }
-    if (speechSupported()) {
-      // نطق صامت يفتح قناة الكلام ضمن سياق اللمسة
-      const u = new SpeechSynthesisUtterance('')
-      u.volume = 0
-      window.speechSynthesis.speak(u)
-    }
-  } catch { /* تجاهل */ }
-}

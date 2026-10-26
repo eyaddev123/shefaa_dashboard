@@ -17,7 +17,6 @@ export const DEFAULT_HELPER = { port: 17625, token: '' }
 // ★ ٥٧٦ نقطة = ٧٢مم على ٢٠٣ نقطة/بوصة — مساحة الطباعة على ورق ٨٠مم.
 // (و٣٨٤ نقطة = ٤٨مم لورق ٥٨مم.)
 export const DOTS = { 80: 576, 58: 384 }
-export const DPI = 203
 
 export const helperUrl = (port) => `http://127.0.0.1:${port || DEFAULT_HELPER.port}`
 

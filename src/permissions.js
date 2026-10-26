@@ -75,27 +75,3 @@ export function homePathFor(role) {
   if (role === 'clinic_admin' || role === 'clinic_reception') return '/clinic/board'
   return '/'
 }
-
-// خريطة المسار ← من يسمح له بفتحه. تُستخدم لحراسة الراوتس في App.jsx
-export const ROUTE_ACCESS = {
-  '/': () => true, // لوحة القيادة تتفرّع بنفسها حسب الدور
-  '/requests': canReadAid,
-  '/families': canReadAid,
-  '/persons': canReadAid,
-  '/vouchers': canReadAid,
-  '/treasury': canReadAid,
-  '/catalog': canReadAid,
-  '/reconciliation': (role) => role === 'officer' || role === 'accountant',
-  '/search': canSearchAid,
-  '/clinic/doctors': canSeeDoctorsPage,
-  '/clinic/procedures': canSeeProceduresPage,
-  '/inventory': canSeeInventory,
-  '/clinic/referrals': canSeeReferralsPage,
-  '/clinic/board': canSeeClinicBoard,
-  '/clinic/cash-report': canSeeCashReport,
-  '/clinic/session': canSeeClinicBoard,
-  '/clinic/doctor': canSeeDoctorScreen,
-  '/clinic/printer': canSeePrinterSetup,
-  '/settings': canSeeSettings,
-  '/users': canManageUsers,
-}
