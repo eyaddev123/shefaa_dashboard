@@ -114,12 +114,14 @@ function Sidebar({ onNavigate }) {
         {aid && <NavLink to="/treasury">{I.treasury} الخزينة والإيرادات</NavLink>}
         {aid && <NavLink to="/catalog">{I.catalog} الأسعار الطبية</NavLink>}
         {(role === 'officer' || role === 'accountant') && <NavLink to="/reconciliation">{I.sync} مطابقة الأمين</NavLink>}
-        {canSeeDoctorsPage(role) && <NavLink to="/clinic/doctors">{I.clinic} العيادات — الدكاترة والدوام</NavLink>}
-        {canSeeProceduresPage(role) && <NavLink to="/clinic/procedures">{I.clinic} العيادات — الإجراءات</NavLink>}
-        {canSeeInventory(role) && <NavLink to="/inventory">{I.inventory} المخزون</NavLink>}
-        {canSeeReferralsPage(role) && <NavLink to="/clinic/referrals">{I.clinic} العيادات — الإحالات</NavLink>}
+        {/* العيادات: اليوميّ أولاً، ثمّ الإدارة الأسبوعية (صفحاتها الثلاث متتالية)، ثمّ
+            المخزون، والإعدادات في الذيل. الترتيب وحده — من يرى ماذا لم يتغيّر. */}
         {canSeeClinicBoard(role) && <NavLink to="/clinic/board">{I.clinic} لوحة العيادات اليومية</NavLink>}
         {canSeeDoctorScreen(role) && <NavLink to="/clinic/doctor">{I.clinic} شاشتي</NavLink>}
+        {canSeeDoctorsPage(role) && <NavLink to="/clinic/doctors">{I.clinic} العيادات — الدكاترة والدوام</NavLink>}
+        {canSeeProceduresPage(role) && <NavLink to="/clinic/procedures">{I.clinic} العيادات — الإجراءات</NavLink>}
+        {canSeeReferralsPage(role) && <NavLink to="/clinic/referrals">{I.clinic} العيادات — الإحالات</NavLink>}
+        {canSeeInventory(role) && <NavLink to="/inventory">{I.inventory} المخزون</NavLink>}
         {canManageUsers(role) && <NavLink to="/users">{I.users} الموظفون والصلاحيات</NavLink>}
         {canSeePrinterSetup(role) && <NavLink to="/clinic/printer">{I.settings} إعداد الطابعة</NavLink>}
         {canSeeSettings(role) && <NavLink to="/settings">{I.settings} الإعدادات</NavLink>}

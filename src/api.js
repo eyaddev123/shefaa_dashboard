@@ -181,6 +181,14 @@ export const api = {
     addSchedule: (doctorId, body) =>
       http(`/clinic/doctors/${doctorId}/schedules`, { method: 'POST', body: JSON.stringify(body) }),
     deleteSchedule: (id) => http(`/clinic/schedules/${id}`, { method: 'DELETE' }),
+    // تفعيل/إيقاف سطر الدوام بلا حذف — الموقوف لا تُولَّد منه جلسات
+    setScheduleActive: (id, isActive) =>
+      http(`/clinic/schedules/${id}`, { method: 'PATCH', body: JSON.stringify({ is_active: isActive }) }),
+    // تعديل الغرفة السريع من لوحة اليوم: null = «بلا غرفة»، وconfirm بعد 409 ROOM_CHANGE_LIVE_SESSION
+    setDoctorRoom: (id, room, confirm = false) =>
+      http(`/clinic/doctors/${id}/room`, { method: 'PATCH',
+        body: JSON.stringify({ room, ...(confirm ? { confirm: true } : {}) }) }),
+    doctorHistory: (id) => http(`/clinic/doctors/${id}/history`),
     schedulePreview: (from, weeks = 6) =>
       http(`/clinic/schedules/preview?from=${from}&weeks=${weeks}`),
     dayDoctors: (date) => http(`/clinic/day-doctors?date=${date}`),

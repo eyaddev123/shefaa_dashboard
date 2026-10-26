@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { SpecialtyPicker } from '../SpecialtyPicker.jsx'
 import { useDialogs } from '../dialogs.jsx'
 import { Link } from 'react-router-dom'
-import { api, WEEKDAYS, fmtMoney, fmtTime, todayLocal } from '../api.js'
+import { api, WEEKDAYS, fmtMoney, fmtTime, fmtDateTime, todayLocal } from '../api.js'
+import { useRole } from '../RoleContext.jsx'
 
 function NewDoctorForm({ onCreated }) {
   const blank = { name: '', specialty_id: '', phone: '', consultation_fee: '', followup_fee: '',
@@ -126,10 +127,13 @@ function NewScheduleForm({ doctorId, onCreated }) {
   )
 }
 
-function DoctorRow({ doctor, onChanged }) {
+function DoctorRow({ doctor, onChanged, onSchedulesChanged }) {
   const dlg = useDialogs()
+  const { role } = useRole()
+  const canEdit = role === 'clinic_admin'
   const [expanded, setExpanded] = useState(false)
   const [schedules, setSchedules] = useState(null)
+  const [toggling, setToggling] = useState(null)
 
   const loadSchedules = () => api.clinic.schedules(doctor.id).then(setSchedules)
   const toggle = () => {
@@ -159,7 +163,18 @@ function DoctorRow({ doctor, onChanged }) {
         .map((a) => `${a.session_date}${a.slot_time ? ` ${a.slot_time}` : ''} — ${a.full_name}`)
       await dlg.alert({ title: 'تعذّر حذف الدوام', body: [ex.message, ...list].join('\n') })
     }
-    loadSchedules()
+    loadSchedules(); onSchedulesChanged()
+  }
+
+  // ═══ إيقاف/تفعيل السطر بلا حذف ═══
+  // دكتورٌ يغيب فترة: يُوقَف يومه ويُفعَّل يوم بديله، وحين يعود يُعكَس. الموقوف لا تُولَّد
+  // منه جلسات — والمولَّدة قبله تبقى (إلغاؤها اعتذارٌ أو إلغاءٌ عاديّ، لا أثرٌ لمفتاح).
+  const toggleSchedule = async (s) => {
+    setToggling(s.id)
+    try { await api.clinic.setScheduleActive(s.id, !s.is_active) }
+    catch (ex) { await dlg.alert({ title: 'تعذّر التنفيذ', body: ex.message }) }
+    setToggling(null)
+    loadSchedules(); onSchedulesChanged()
   }
 
   return (
@@ -206,8 +221,16 @@ function DoctorRow({ doctor, onChanged }) {
                       <thead><tr><th>اليوم</th><th>التكرار</th><th>من</th><th>إلى</th><th>السعة</th><th></th></tr></thead>
                       <tbody>
                         {schedules.map((s) => (
-                          <tr key={s.id}>
-                            <td>{WEEKDAYS[s.weekday]}</td>
+                          <tr key={s.id} className={s.is_active ? undefined : 'sched-off'}>
+                            <td>
+                              <span className="sched-day">{WEEKDAYS[s.weekday]}</span>
+                              {!s.is_active && (
+                                <span className="badge" style={{ marginInlineStart: 6 }}
+                                  title={s.toggled_by_name ? `أوقفه ${s.toggled_by_name} — ${fmtDateTime(s.toggled_at)}` : undefined}>
+                                  موقوف
+                                </span>
+                              )}
+                            </td>
                             <td>
                               {s.repeat_weeks === 2
                                 ? <span className="badge warn">كل أسبوعين</span>
@@ -216,7 +239,16 @@ function DoctorRow({ doctor, onChanged }) {
                             <td>{fmtTime(s.start_time)}</td>
                             <td>{fmtTime(s.end_time)}</td>
                             <td className="num">{s.capacity || '—'}</td>
-                            <td>
+                            <td style={{ whiteSpace: 'nowrap' }}>
+                              {canEdit && (
+                                <label className="sched-switch" style={{ marginInlineEnd: 10 }}
+                                  title={s.is_active ? 'إيقاف مؤقّت: لا تُولَّد منه جلسات حتى يُفعَّل' : 'تفعيل: تُولَّد منه الجلسات من جديد'}>
+                                  <input type="checkbox" role="switch" checked={s.is_active}
+                                    disabled={toggling === s.id} onChange={() => toggleSchedule(s)}
+                                    aria-label={`${WEEKDAYS[s.weekday]} ${fmtTime(s.start_time)} — ${s.is_active ? 'مفعّل' : 'موقوف'}`} />
+                                  {s.is_active ? 'مفعّل' : 'موقوف'}
+                                </label>
+                              )}
                               <button className="ghost" style={{ padding: '2px 8px', fontSize: 11 }} onClick={() => removeSchedule(s)}>حذف</button>
                             </td>
                           </tr>
@@ -224,7 +256,7 @@ function DoctorRow({ doctor, onChanged }) {
                       </tbody>
                     </table>
                   )}
-                <NewScheduleForm doctorId={doctor.id} onCreated={loadSchedules} />
+                <NewScheduleForm doctorId={doctor.id} onCreated={() => { loadSchedules(); onSchedulesChanged() }} />
                 {/* حصّته من الإجراءات (النسبة العامّة والحالات الخاصّة) في بروفايله */}
                 <p className="subtitle" style={{ marginTop: 10 }}>
                   حصّة الدكتور من الإجراءات: <Link to={`/clinic/doctors/${doctor.id}`}>في بروفايله</Link>
@@ -241,15 +273,17 @@ function DoctorRow({ doctor, onChanged }) {
 // ═══ معاينة التواريخ القادمة ═══
 // مشرفٌ يضبط دكتورَين متناوبَين لا يملك طريقةً ليتأكّد إلا الانتظار أسبوعين.
 // هذه تعرض من يعمل في كل تاريخ قادم — فيُكتشف خطأ المرساة قبل أن يراه المرضى.
-function SchedulePreview() {
+// version: يتغيّر مع كل إضافة/حذف/إيقاف لسطر — فتُعاد المعاينة المفتوحة لا تبقى قديمة
+function SchedulePreview({ version }) {
   const [data, setData] = useState(null)
   const [err, setErr] = useState(null)
   const [open, setOpen] = useState(false)
 
+  useEffect(() => { setData(null) }, [version])
   useEffect(() => {
     if (!open || data) return
     api.clinic.schedulePreview(todayLocal(), 6).then(setData).catch((e) => setErr(e.message))
-  }, [open])
+  }, [open, data])
 
   return (
     <div className="card">
@@ -302,6 +336,8 @@ function SchedulePreview() {
 export default function ClinicDoctors() {
   const [doctors, setDoctors] = useState(null)
   const [err, setErr] = useState(null)
+  const [schedVersion, setSchedVersion] = useState(0)
+  const bumpSchedules = () => setSchedVersion((v) => v + 1)
 
   const load = () => api.clinic.doctors().then(setDoctors).catch((e) => setErr(e.message))
   useEffect(() => { load() }, [])
@@ -325,12 +361,12 @@ export default function ClinicDoctors() {
             <tr><th>الاسم</th><th>الاختصاص</th><th>الجوال</th><th>سعر المعاينة</th><th>سعر المراجعة</th><th>مدة الكشف</th><th>الحالة</th><th></th></tr>
           </thead>
           <tbody>
-            {doctors.map((d) => <DoctorRow key={d.id} doctor={d} onChanged={load} />)}
+            {doctors.map((d) => <DoctorRow key={d.id} doctor={d} onChanged={load} onSchedulesChanged={bumpSchedules} />)}
           </tbody>
         </table>
       </div>
 
-      <SchedulePreview />
+      <SchedulePreview version={schedVersion} />
     </>
   )
 }

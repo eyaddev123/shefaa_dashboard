@@ -5,6 +5,9 @@ import { useRole } from '../RoleContext.jsx'
 import { canSeeCashReport } from '../permissions.js'
 import { FlowModeTag } from '../attendance-ui.jsx'
 import RoomBadge from '../components/RoomBadge.jsx'
+import RoomPicker from '../components/RoomPicker.jsx'
+import { useToast } from '../action-feedback.jsx'
+import { nowHHMM, roomOccupants } from '../room-occupancy.js'
 
 // من يرى قسم «دكاترة اليوم» والاعتذارات — يطابق APOLOGY_VIEWERS في الخادم.
 // الاستقبال غائبٌ عمداً: المعتذر لا وجود له عنده ذلك اليوم.
@@ -106,6 +109,10 @@ function ApologyDialog({ doctor, date, onClose, onDone }) {
   )
 }
 
+// «مريضٌ واحد، مريضان، ٣ مرضى، ١١ مريضاً» — العدد في نافذة نقل الغرفة
+const patientsAr = (n) => n === 1 ? 'مريضٌ واحد' : n === 2 ? 'مريضان'
+  : n >= 3 && n <= 10 ? `${n} مرضى` : `${n} مريضاً`
+
 // ═══ نافذة تأكيد عامّة — بديل confirm() ═══
 function ConfirmDialog({ title, body, confirmLabel, onConfirm, onClose, busy }) {
   useEffect(() => {
@@ -134,7 +141,7 @@ function ConfirmDialog({ title, body, confirmLabel, onConfirm, onClose, busy }) 
 //
 // والاستقبال لا يراها إطلاقاً: المعتذر ببساطة غير موجود ذلك اليوم، لا سطرَ
 // معلومةٍ ولا سبب. القرار قرار المشرف.
-function DayDoctors({ date, canEdit, onChanged }) {
+function DayDoctors({ date, canEdit, onChanged, allRooms, onRoomChanged }) {
   const [data, setData] = useState(null)
   const [err, setErr] = useState(null)
   const [busy, setBusy] = useState(null)
@@ -142,6 +149,8 @@ function DayDoctors({ date, canEdit, onChanged }) {
   const [askUndo, setAskUndo] = useState(null)           // {doctor, warning} بعد جلسةٍ يدوية
   const [exportTo, setExportTo] = useState('')           // مدى التصدير: فارغ = يومٌ واحد
   const [exporting, setExporting] = useState(null)
+  const [roomAsk, setRoomAsk] = useState(null)           // {doctor, room, ...ردّ 409} قبل نقل غرفةٍ عاملة
+  const [toastNode, showToast] = useToast()
 
   const load = () => api.clinic.dayDoctors(date).then(setData).catch((e) => setErr(e.message))
   useEffect(() => { setData(null); setErr(null); load() }, [date])
@@ -182,6 +191,26 @@ function DayDoctors({ date, canEdit, onChanged }) {
     catch (ex) { setErr(ex.message) }
     finally { setExporting(null) }
   }
+
+  // ═══ تغيير الغرفة: فوريّ، وتأكيدٌ إن كان الدكتور يستقبل الآن ═══
+  // الخادم هو من يعرف «يستقبل الآن» (جلسة اليوم وفيها مرضى في الدور) فيردّ 409،
+  // والنافذة تقول ما سيحدث: النداء والشاشة ينتقلان، والبطاقات المطبوعة لا.
+  const changeRoom = async (d, room, confirmIt = false) => {
+    setBusy(d.doctor_id)
+    try {
+      const r = await api.clinic.setDoctorRoom(d.doctor_id, room, confirmIt)
+      setRoomAsk(null)
+      showToast(r.room ? `${d.doctor_name} ← العيادة ${r.room}` : `${d.doctor_name} ← بلا غرفة`, 'success', 3500)
+      await load(); onRoomChanged()
+    } catch (ex) {
+      if (ex.data?.code === 'ROOM_CHANGE_LIVE_SESSION') setRoomAsk({ doctor: d, room, ...ex.data })
+      else { setRoomAsk(null); showToast(ex.message) }
+    } finally { setBusy(null) }
+  }
+
+  // غرفة ← من فيها اليوم (عدا المعتذر)، ومعه «الآن» أو أوقات دوامه — تُحسب لحظة فتح القائمة
+  const occupantsFor = (doctorId) =>
+    roomOccupants(data.doctors, doctorId, { date, today: todayLocal(), now: nowHHMM() })
 
   const confirmUndo = async () => {
     const d = askUndo.doctor
@@ -229,7 +258,12 @@ function DayDoctors({ date, canEdit, onChanged }) {
               <td className="num">
                 {d.start_time ? `${d.start_time} – ${d.end_time}` : <span className="muted">جلسة يدوية</span>}
               </td>
-              <td className="num">{d.room || '—'}</td>
+              <td className="num">
+                {canEdit
+                  ? <RoomPicker room={d.room} rooms={allRooms} occupants={occupantsFor(d.doctor_id)}
+                      disabled={busy === d.doctor_id} onPick={(room) => changeRoom(d, room)} />
+                  : (d.room || '—')}
+              </td>
               <td>
                 {d.apologized
                   ? <span className="badge bad" title={d.apology_reason || ''}>معتذر</span>
@@ -274,6 +308,18 @@ function DayDoctors({ date, canEdit, onChanged }) {
         <ApologyDialog doctor={apologizing} date={date}
           onClose={() => setApologizing(null)} onDone={afterApology} />
       )}
+      {roomAsk && (
+        <ConfirmDialog
+          title={`نقل ${roomAsk.doctor.doctor_name} ${roomAsk.room ? `إلى العيادة ${roomAsk.room}` : 'إلى «بلا غرفة»'}`}
+          body={`${roomAsk.doctor.doctor_name} يستقبل الآن${roomAsk.old_room ? ` في العيادة ${roomAsk.old_room}` : ''} وفي دوره ${patientsAr(roomAsk.active_count)} — `
+            + `النداءات والشاشة ستتحوّل ${roomAsk.room ? `إلى العيادة ${roomAsk.room}` : 'إلى «بلا غرفة» (نداءٌ بلا وجهة)'} فوراً. `
+            + `${roomAsk.old_room ? `البطاقات المطبوعة سابقاً عليها الرقم القديم (${roomAsk.old_room}). ` : ''}متابعة؟`}
+          confirmLabel={roomAsk.room ? `نعم، انقله إلى العيادة ${roomAsk.room}` : 'نعم، بلا غرفة'}
+          busy={busy === roomAsk.doctor.doctor_id}
+          onConfirm={() => changeRoom(roomAsk.doctor, roomAsk.room, true)}
+          onClose={() => setRoomAsk(null)} />
+      )}
+      {toastNode}
       {askUndo && (
         <ConfirmDialog
           title="الدكتور معلَّم معتذر لهذا اليوم"
@@ -320,11 +366,10 @@ export default function ClinicBoard() {
   // رقم العيادة بجانب كل دكتور: ردّ الجلسات لا يحمل الغرفة، فنأخذها من قائمة الدكاترة
   // (المصدر نفسه doctors.room). فشلها لا يُفسد اللوحة — تغيب الشارة ولا تكذب «بلا عيادة».
   const [rooms, setRooms] = useState(null)   // doctor_id → room
-  useEffect(() => {
-    api.clinic.doctors()
-      .then((ds) => setRooms(Object.fromEntries(ds.map((d) => [d.id, d.room]))))
-      .catch(() => setRooms(null))
-  }, [])
+  const loadRooms = () => api.clinic.doctors()
+    .then((ds) => setRooms(Object.fromEntries(ds.map((d) => [d.id, d.room]))))
+    .catch(() => setRooms(null))
+  useEffect(() => { loadRooms() }, [])
 
   const generate = async () => {
     setBusy(true); setErr(null)
@@ -382,7 +427,8 @@ export default function ClinicBoard() {
 
       {/* الاستقبال لا يرى هذا القسم إطلاقاً — ولا الخادم يُجيبه عليه */}
       {APOLOGY_VIEWERS.includes(role) && (
-        <DayDoctors date={date} canEdit={role === 'clinic_admin'} onChanged={load} />
+        <DayDoctors date={date} canEdit={role === 'clinic_admin'} onChanged={load}
+          allRooms={rooms ? Object.values(rooms) : []} onRoomChanged={loadRooms} />
       )}
 
       <div className="card">
