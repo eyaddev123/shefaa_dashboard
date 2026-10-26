@@ -13,13 +13,14 @@ import { api, APPOINTMENT_STATUSES, BOOKING_TYPES, VISIT_TYPES, PRIORITIES, fmtM
 import { isAttendanceSession, usePolling, fmtClock, turnLabel, fmtTimeOfDay } from '../attendance-ui.jsx'
 import { useRole } from '../RoleContext.jsx'
 import { useToast } from '../action-feedback.jsx'
-import { canEditAppointmentProcedures, canEditBooking, canEditReferral } from '../permissions.js'
+import { canEditAppointmentProcedures, canEditBooking, canEditReferral, canSeeVisitAudit } from '../permissions.js'
 import { WAITING_RETURN, serverOffsetOf, useStaffEvents } from '../waiting-return.jsx'
 import { ReferralRow, ReferralTotals, useReferralOptions } from '../components/ReferralFields.jsx'
 import { DISCOUNT_SCOPES, amountText, availableScopes, blankReferral, coverageFull, draftDiscount, draftFromReferral,
   referralPayload, referralReady } from '../referral.js'
 import MaterialsEditor, { qtyValid, toPayload, fmtQty, materialsSummary } from '../components/MaterialsEditor.jsx'
 import RoomBadge from '../components/RoomBadge.jsx'
+import VisitTimeline from '../components/VisitTimeline.jsx'
 import { MissingBadge, StatusCell, VisitActions, missingOf, priorityBadge, useVisitActions } from './SessionQueue.jsx'
 
 // ═══ رأس الصفحة — ثابتٌ مع التمرير ═══
@@ -333,21 +334,34 @@ function PatientCard({ appt, session, onChanged, onToast, onArrived }) {
 }
 
 // ═══ السجل — مطويٌّ افتراضياً، ويُحمَّل حين يُفتح ═══
+// المشرفة والمدير: الخط الزمني الكامل (من سجّل وعلّم حاضراً وأضاف…) بالصيغة نفسها التي
+// في لوحة الجرد. والاستقبال سجلّ التعديلات كما كان — لا يراقب الموظفون بعضهم.
 function HistoryCard({ appt, session, onToast }) {
+  const { role } = useRole()
+  const full = canSeeVisitAudit(role)
   const [open, setOpen] = useState(false)
   return (
     <section className="card visit-history">
       <h3 className="visit-card-head">
         <button className="visit-fold" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
-          <span className="visit-fold-icon" aria-hidden="true">{open ? '▾' : '◂'}</span> سجل التعديلات
+          <span className="visit-fold-icon" aria-hidden="true">{open ? '▾' : '◂'}</span>
+          {full ? ' سجل الزيارة الكامل' : ' سجل التعديلات'}
         </button>
       </h3>
-      {open
-        ? <BookingHistory appt={appt} session={session} onToast={onToast} />
-        : <p className="visit-empty">من غيّر ماذا ومتى على هذه الزيارة — اضغط العنوان لعرضه.</p>}
+      {!open ? (
+        <p className="visit-empty">
+          {full ? 'قصة الزيارة: من فعل ماذا ومتى، من الحجز إلى الخروج — اضغط العنوان لعرضها.'
+            : 'من غيّر ماذا ومتى على هذه الزيارة — اضغط العنوان لعرضه.'}
+        </p>
+      ) : full
+        // المفتاح: كل تغيّرٍ في الزيارة (بثٌّ أو حفظ) يُعيد تحميل القصة وهي مفتوحة
+        ? <VisitTimeline key={timelineKey(appt)} appointmentId={appt.id} sessionDay={session.session_day} />
+        : <BookingHistory appt={appt} session={session} onToast={onToast} />}
     </section>
   )
 }
+const timelineKey = (a) => [a.status, a.priority, a.reason, (a.procedures || []).length,
+  (a.procedures || []).filter((p) => p.removed_at).length, (a.referrals || []).length].join('|')
 
 export default function VisitPage() {
   const { sessionId, id } = useParams()

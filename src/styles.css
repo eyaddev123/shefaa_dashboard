@@ -2964,3 +2964,79 @@ table.cash-table { font-size: 13px; table-layout: fixed; min-width: 860px; }
 .cash-hint-sub { display: block; margin-top: 2px; }
 .cash-grand-sub { display: flex; flex-wrap: wrap; gap: 2px 0; }
 .cash-grand-sub > span + span { border-inline-start: 1px solid var(--grid); margin-inline-start: 10px; padding-inline-start: 10px; }
+
+/* ═══ المساءلة: الخط الزمني للزيارة ونشاط الموظفين (المشرفة والمدير) ═══ */
+.vt-note {
+  margin: 0 0 12px; padding: 9px 12px; border-radius: 10px; font-size: 12.5px; line-height: 1.7;
+  background: var(--status-neutral-bg); color: var(--status-neutral);
+}
+.vt-list { list-style: none; margin: 4px 0 0; padding: 0; }
+.vt-item { display: grid; grid-template-columns: 52px 1fr; gap: 0 12px; position: relative; padding-bottom: 14px; }
+/* الخطّ العمودي والنقطة: يمرّان بين عمود الوقت والنصّ */
+.vt-item::before {
+  content: ''; position: absolute; inset-inline-start: 58px; top: 6px; bottom: -6px;
+  width: 2px; background: var(--grid);
+}
+.vt-item:last-child::before { display: none; }
+.vt-item::after {
+  content: ''; position: absolute; inset-inline-start: 54px; top: 4px; width: 10px; height: 10px;
+  border-radius: 50%; background: var(--surface-1); border: 2px solid var(--primary);
+}
+.vt-item.vt-add::after { background: var(--primary); }
+.vt-item.vt-remove::after { border-color: var(--status-bad); background: var(--status-bad-bg); }
+.vt-time { font-size: 12px; color: var(--text-secondary); font-variant-numeric: tabular-nums; text-align: end; padding-top: 1px; }
+.vt-body { padding-inline-start: 16px; min-width: 0; }
+.vt-title { font-size: 13.5px; font-weight: 700; color: var(--text-primary); line-height: 1.5; overflow-wrap: anywhere; }
+.vt-remove .vt-title { color: var(--status-bad); }
+.vt-detail { font-size: 12.5px; color: var(--text-secondary); line-height: 1.6; overflow-wrap: anywhere; }
+.vt-reason { font-size: 12.5px; color: var(--muted); line-height: 1.6; }
+.vt-actor {
+  display: inline-block; margin-top: 4px; padding: 1px 9px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; background: var(--primary-soft); color: var(--accent-text);
+}
+.vt-actor.is-system { background: var(--status-neutral-bg); color: var(--status-neutral); }
+
+/* اللوحة الجانبية — من طرف السطر (اليسار بالعربية) فوق الصفحة */
+.vt-scrim { position: fixed; inset: 0; z-index: 1000; background: rgba(0, 0, 0, 0.35); }
+.vt-drawer {
+  position: absolute; inset-block: 0; inset-inline-end: 0; width: min(440px, 100vw);
+  display: flex; flex-direction: column; background: var(--surface-1); color: var(--text-primary);
+  border-inline-start: 1px solid var(--border); box-shadow: var(--shadow-pop);
+}
+.vt-drawer-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+  padding: 18px 20px 14px; border-bottom: 1px solid var(--grid);
+}
+.vt-drawer-head h3 { margin: 0; font-size: 16px; font-weight: 800; }
+.vt-drawer-sub { margin: 4px 0 0; font-size: 12.5px; color: var(--text-secondary); }
+.vt-close { padding: 4px 10px; line-height: 1; flex-shrink: 0; }
+.vt-drawer-body { padding: 16px 20px 24px; overflow-y: auto; flex: 1; }
+@media (max-width: 480px) { .vt-drawer-body, .vt-drawer-head { padding-inline: 16px; } }
+
+/* عمود «السجل» في جدول الجرد */
+.cash-table col.c-log { width: 44px; }
+.cash-table td.cash-log { padding: 6px 4px; text-align: center; vertical-align: middle; }
+button.cash-log-btn {
+  display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 0;
+  border-radius: 8px; background: transparent; border: 1px solid transparent; color: var(--text-secondary);
+}
+button.cash-log-btn:hover { background: var(--primary-soft); color: var(--accent-text); filter: none; }
+button.cash-log-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+
+/* «نشاط الموظفين» — مطويٌّ تحت البطاقات */
+.card.cash-staff { padding: 0; margin-bottom: 14px; overflow: hidden; }
+button.cash-staff-head {
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 13px 20px; text-align: start;
+  background: transparent; color: var(--text-primary); border: none; border-radius: 0;
+}
+button.cash-staff-head:hover { background: var(--primary-soft); filter: none; }
+button.cash-staff-head strong { font-size: 14.5px; font-weight: 800; }
+.cash-staff-hint { font-size: 12.5px; color: var(--text-secondary); }
+.cash-staff.is-open .cash-chev { transform: rotate(-90deg); }
+.cash-staff.is-open button.cash-staff-head { border-bottom: 1px solid var(--grid); }
+.cash-staff-body { padding: 8px 20px 14px; overflow-x: auto; }
+table.cash-staff-table { font-size: 13px; min-width: 480px; }
+.cash-staff-table th, .cash-staff-table td { padding: 9px 8px; }
+.cash-staff-table td.num { font-variant-numeric: tabular-nums; font-weight: 700; }
+.cash-staff-name { font-weight: 600; }
+.cash-staff-body .vt-note { margin: 10px 0 0; }
