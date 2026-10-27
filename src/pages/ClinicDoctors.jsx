@@ -56,21 +56,31 @@ function NewDoctorForm({ onCreated }) {
   )
 }
 
-function NewScheduleForm({ doctorId, onCreated }) {
-  const blank = { weekday: '3', start_time: '16:00', end_time: '19:00', capacity: '',
-    repeat_weeks: '1', anchor_date: '' }
+// ═══ نموذج سطر الدوام — للإضافة، وللتعديل معبّأً بقيم السطر (schedule) ═══
+// التعديل يغيّر السطر نفسه (نفس id). الجلسات المولَّدة قبله نُسخٌ ثابتة فلا تتأثر — فإن كان
+// منه جلسة اليوم (أو جلساتٌ قادمة وُلِّدت سلفاً) قيل ذلك صراحةً قبل الحفظ.
+function ScheduleForm({ doctorId, schedule, onSaved, onCancel }) {
+  const editing = !!schedule
+  const blank = editing
+    ? { weekday: String(schedule.weekday), start_time: fmtTime(schedule.start_time),
+        end_time: fmtTime(schedule.end_time), capacity: schedule.capacity ? String(schedule.capacity) : '',
+        repeat_weeks: String(schedule.repeat_weeks || 1), anchor_date: schedule.anchor_ymd || '' }
+    : { weekday: '3', start_time: '16:00', end_time: '19:00', capacity: '', repeat_weeks: '1', anchor_date: '' }
   const [form, setForm] = useState(blank)
-  const [hasBreak, setHasBreak] = useState(false)
-  const [breakTimes, setBreakTimes] = useState({ break_start: '17:00', break_end: '17:30' })
+  const [hasBreak, setHasBreak] = useState(editing && !!schedule.break_start)
+  const [breakTimes, setBreakTimes] = useState(editing && schedule.break_start
+    ? { break_start: fmtTime(schedule.break_start), break_end: fmtTime(schedule.break_end) }
+    : { break_start: '17:00', break_end: '17:30' })
   const [err, setErr] = useState(null)
+  const [busy, setBusy] = useState(false)
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
   const setBreak = (k) => (e) => setBreakTimes((f) => ({ ...f, [k]: e.target.value }))
   const submit = async (e) => {
     e.preventDefault()
-    setErr(null)
+    setErr(null); setBusy(true)
     try {
       const biweekly = form.repeat_weeks === '2'
-      await api.clinic.addSchedule(doctorId, {
+      const body = {
         ...form,
         weekday: Number(form.weekday),
         capacity: form.capacity ? Number(form.capacity) : null,
@@ -79,12 +89,32 @@ function NewScheduleForm({ doctorId, onCreated }) {
         repeat_weeks: biweekly ? 2 : 1,
         // المرساة للثنائي وحده — القاعدة ترفض مرساةً على قالبٍ أسبوعي
         anchor_date: biweekly ? form.anchor_date : null,
-      })
-      setForm(blank); setHasBreak(false); onCreated()
+      }
+      if (editing) await api.clinic.updateSchedule(schedule.id, body)
+      else { await api.clinic.addSchedule(doctorId, body); setForm(blank); setHasBreak(false) }
+      onSaved()
     } catch (ex) { setErr(ex.message) }
+    finally { setBusy(false) }
   }
+  const today = todayLocal()
+  const upcoming = editing ? (schedule.upcoming_sessions || []) : []
+  const todaySession = upcoming.find((x) => x.date === today)
+  const later = upcoming.filter((x) => x.date !== today)
   return (
-    <form className="inline" onSubmit={submit} style={{ marginTop: 10, flexWrap: 'wrap' }}>
+    <form className={`inline sched-form${editing ? ' editing' : ''}`} onSubmit={submit}
+      style={{ marginTop: 10, flexWrap: 'wrap' }}>
+      {editing && (
+        <div className="sched-form-head">
+          <strong>تعديل دوام {WEEKDAYS[schedule.weekday]} <bdi dir="ltr">{fmtTime(schedule.start_time)}–{fmtTime(schedule.end_time)}</bdi></strong>
+          {(todaySession || later.length > 0) && (
+            <p className="sched-form-note" role="note">
+              {todaySession && <>جلسة اليوم قائمة على الوقت القديم (<bdi dir="ltr">{todaySession.start_time}–{todaySession.end_time}</bdi>) ولن تتغير. </>}
+              {later.length > 0 && <>{later.length === 1 ? 'وجلسة' : 'وجلسات'} {later.map((x) => x.date).join('، ')} مولَّدة مسبقاً وتبقى كما هي. </>}
+              التعديل يسري من التوليد القادم.
+            </p>
+          )}
+        </div>
+      )}
       <div className="field">
         <label>اليوم</label>
         <select value={form.weekday} onChange={set('weekday')}>
@@ -121,7 +151,14 @@ function NewScheduleForm({ doctorId, onCreated }) {
           <div className="field"><label>إلى (استراحة)</label><input type="time" value={breakTimes.break_end} onChange={setBreak('break_end')} required /></div>
         </>
       )}
-      <button type="submit" style={{ padding: '6px 14px', fontSize: 12.5 }}>إضافة موعد دوام</button>
+      <div className="sched-form-actions">
+        <button type="submit" disabled={busy} style={{ padding: '6px 14px', fontSize: 12.5 }}>
+          {busy ? 'جارٍ الحفظ…' : editing ? 'حفظ التعديل' : 'إضافة موعد دوام'}
+        </button>
+        {editing && (
+          <button type="button" className="ghost" style={{ padding: '6px 14px', fontSize: 12.5 }} onClick={onCancel}>إلغاء</button>
+        )}
+      </div>
       {err && <p className="error">{err}</p>}
     </form>
   )
@@ -134,6 +171,7 @@ function DoctorRow({ doctor, onChanged, onSchedulesChanged }) {
   const [expanded, setExpanded] = useState(false)
   const [schedules, setSchedules] = useState(null)
   const [toggling, setToggling] = useState(null)
+  const [editingId, setEditingId] = useState(null)
 
   const loadSchedules = () => api.clinic.schedules(doctor.id).then(setSchedules)
   const toggle = () => {
@@ -177,11 +215,14 @@ function DoctorRow({ doctor, onChanged, onSchedulesChanged }) {
     loadSchedules(); onSchedulesChanged()
   }
 
+  const editing = schedules?.find((s) => s.id === editingId)
+  const afterSave = () => { setEditingId(null); loadSchedules(); onSchedulesChanged() }
+
   return (
     <>
       <tr style={doctor.is_active ? undefined : { opacity: 0.5 }}>
-        <td><Link to={`/clinic/doctors/${doctor.id}`}>{doctor.name}</Link></td>
-        <td>
+        <td className="rt-title"><Link to={`/clinic/doctors/${doctor.id}`}>{doctor.name}</Link></td>
+        <td data-label="الاختصاص">
           {doctor.specialty_name || doctor.specialty || <span className="muted">—</span>}
           {/* بلا اختصاص ⇒ يرى الإجراءات العامّة وحدها — تحذيرٌ ظاهر لا صمت */}
           {!doctor.specialty_id && (
@@ -189,14 +230,14 @@ function DoctorRow({ doctor, onChanged, onSchedulesChanged }) {
               title="سيرى الإجراءات العامّة وحدها حتى يُختار اختصاصه">بلا اختصاص</span>
           )}
         </td>
-        <td>{doctor.phone || '—'}</td>
-        <td className="num">{fmtMoney(doctor.consultation_fee)}</td>
-        <td className="num">{fmtMoney(doctor.followup_fee)}</td>
-        <td className="num">{doctor.expected_visit_minutes} د</td>
-        <td>
+        <td data-label="الجوال" dir={doctor.phone ? 'ltr' : undefined}>{doctor.phone || '—'}</td>
+        <td className="num" data-label="سعر المعاينة">{fmtMoney(doctor.consultation_fee)}</td>
+        <td className="num" data-label="سعر المراجعة">{fmtMoney(doctor.followup_fee)}</td>
+        <td className="num" data-label="مدة الكشف">{doctor.expected_visit_minutes} د</td>
+        <td className="rt-badge">
           {doctor.is_active ? <span className="badge good">فعّال</span> : <span className="badge">موقوف</span>}
         </td>
-        <td>
+        <td className="rt-actions">
           <Link to={`/clinic/doctors/${doctor.id}`} className="ghost"
             style={{ padding: '3px 10px', fontSize: 11.5, display: 'inline-block' }}>البروفايل</Link>{' '}
           <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }} onClick={toggle}>
@@ -208,8 +249,8 @@ function DoctorRow({ doctor, onChanged, onSchedulesChanged }) {
         </td>
       </tr>
       {expanded && (
-        <tr>
-          <td colSpan={8} style={{ background: 'var(--bg-soft, rgba(0,0,0,0.02))' }}>
+        <tr className="rt-sub">
+          <td colSpan={8} className="rt-full" style={{ background: 'var(--bg-soft, rgba(0,0,0,0.02))' }}>
             {!schedules ? (
               <p className="empty">جارٍ التحميل…</p>
             ) : (
@@ -217,12 +258,13 @@ function DoctorRow({ doctor, onChanged, onSchedulesChanged }) {
                 {schedules.length === 0
                   ? <p className="empty">لا يوجد جدول دوام بعد لهذا الدكتور.</p>
                   : (
-                    <table style={{ marginTop: 6 }}>
+                    <table className="rtable" style={{ marginTop: 6 }}>
                       <thead><tr><th>اليوم</th><th>التكرار</th><th>من</th><th>إلى</th><th>السعة</th><th></th></tr></thead>
                       <tbody>
                         {schedules.map((s) => (
-                          <tr key={s.id} className={s.is_active ? undefined : 'sched-off'}>
-                            <td>
+                          <tr key={s.id} className={[s.is_active ? '' : 'sched-off', s.id === editingId ? 'sched-editing' : '']
+                            .filter(Boolean).join(' ') || undefined}>
+                            <td className="rt-title">
                               <span className="sched-day">{WEEKDAYS[s.weekday]}</span>
                               {!s.is_active && (
                                 <span className="badge" style={{ marginInlineStart: 6 }}
@@ -231,15 +273,15 @@ function DoctorRow({ doctor, onChanged, onSchedulesChanged }) {
                                 </span>
                               )}
                             </td>
-                            <td>
+                            <td className="rt-badge">
                               {s.repeat_weeks === 2
                                 ? <span className="badge warn">كل أسبوعين</span>
                                 : <span className="muted">كل أسبوع</span>}
                             </td>
-                            <td>{fmtTime(s.start_time)}</td>
-                            <td>{fmtTime(s.end_time)}</td>
-                            <td className="num">{s.capacity || '—'}</td>
-                            <td style={{ whiteSpace: 'nowrap' }}>
+                            <td data-label="من">{fmtTime(s.start_time)}</td>
+                            <td data-label="إلى">{fmtTime(s.end_time)}</td>
+                            <td className="num" data-label="السعة">{s.capacity || '—'}</td>
+                            <td className="rt-actions" style={{ whiteSpace: 'nowrap' }}>
                               {canEdit && (
                                 <label className="sched-switch" style={{ marginInlineEnd: 10 }}
                                   title={s.is_active ? 'إيقاف مؤقّت: لا تُولَّد منه جلسات حتى يُفعَّل' : 'تفعيل: تُولَّد منه الجلسات من جديد'}>
@@ -249,6 +291,12 @@ function DoctorRow({ doctor, onChanged, onSchedulesChanged }) {
                                   {s.is_active ? 'مفعّل' : 'موقوف'}
                                 </label>
                               )}
+                              {canEdit && (
+                                <button className="ghost" style={{ padding: '2px 8px', fontSize: 11, marginInlineEnd: 6 }}
+                                  aria-pressed={s.id === editingId}
+                                  aria-label={`تعديل دوام ${WEEKDAYS[s.weekday]} ${fmtTime(s.start_time)}`}
+                                  onClick={() => setEditingId(s.id === editingId ? null : s.id)}>تعديل</button>
+                              )}
                               <button className="ghost" style={{ padding: '2px 8px', fontSize: 11 }} onClick={() => removeSchedule(s)}>حذف</button>
                             </td>
                           </tr>
@@ -256,7 +304,10 @@ function DoctorRow({ doctor, onChanged, onSchedulesChanged }) {
                       </tbody>
                     </table>
                   )}
-                <NewScheduleForm doctorId={doctor.id} onCreated={() => { loadSchedules(); onSchedulesChanged() }} />
+                {/* التعديل يحلّ محلّ نموذج الإضافة (نفس الحقول معبّأة) حتى يُحفظ أو يُلغى */}
+                {editing
+                  ? <ScheduleForm key={editing.id} schedule={editing} onSaved={afterSave} onCancel={() => setEditingId(null)} />
+                  : <ScheduleForm doctorId={doctor.id} onSaved={afterSave} />}
                 {/* حصّته من الإجراءات (النسبة العامّة والحالات الخاصّة) في بروفايله */}
                 <p className="subtitle" style={{ marginTop: 10 }}>
                   حصّة الدكتور من الإجراءات: <Link to={`/clinic/doctors/${doctor.id}`}>في بروفايله</Link>
@@ -299,14 +350,14 @@ function SchedulePreview({ version }) {
         : !data ? <p className="empty">جارٍ التحميل…</p>
         : data.days.length === 0 ? <p className="empty">لا دوامات مُعرَّفة بعد.</p>
         : (
-          <table style={{ marginTop: 10 }}>
+          <table className="rtable" style={{ marginTop: 10 }}>
             <thead><tr><th>التاريخ</th><th>اليوم</th><th>الدكاترة العاملون</th></tr></thead>
             <tbody>
               {data.days.map((d) => (
                 <tr key={d.date}>
-                  <td>{d.date}</td>
-                  <td>{WEEKDAYS[d.weekday]}</td>
-                  <td>
+                  <td className="rt-title num">{d.date}</td>
+                  <td className="rt-badge">{WEEKDAYS[d.weekday]}</td>
+                  <td className="rt-full">
                     {d.doctors.length === 0
                       ? <span className="muted">لا أحد</span>
                       : d.doctors.map((x) => (
@@ -356,7 +407,7 @@ export default function ClinicDoctors() {
       <div className="card">
         <h3>الدكاترة ({doctors.length})</h3>
         <NewDoctorForm onCreated={load} />
-        <table style={{ marginTop: 14 }}>
+        <table className="rtable" style={{ marginTop: 14 }}>
           <thead>
             <tr><th>الاسم</th><th>الاختصاص</th><th>الجوال</th><th>سعر المعاينة</th><th>سعر المراجعة</th><th>مدة الكشف</th><th>الحالة</th><th></th></tr>
           </thead>

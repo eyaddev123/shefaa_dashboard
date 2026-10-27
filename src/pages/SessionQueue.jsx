@@ -1068,7 +1068,7 @@ function AttendanceQueueTable({ data, rows, tab, actions }) {
   const { reload, toast } = actions
   const offset = serverOffsetOf(data)
   return (
-      <table>
+      <table className="rtable">
         <thead>
           <tr>
             <th>الدور</th><th>الاسم</th><th>الموبايل</th><th>نوع الزيارة</th><th>السعر</th>
@@ -1079,21 +1079,21 @@ function AttendanceQueueTable({ data, rows, tab, actions }) {
           {rows.map((a) => (
             <Fragment key={a.id}>
             <tr className={urgentRowClass(a)}>
-              <td className="num"><AttendanceNumber appt={a} /><AttendanceBadge priority={a.priority} /></td>
-              <td><VisitLink appt={a} /> <MissingBadge appt={a} /><QueueNote appt={a} /></td>
-              <td dir="ltr">{a.mobile || '—'}</td>
-              <td>
+              <td className="num" data-label="الدور"><AttendanceNumber appt={a} /><AttendanceBadge priority={a.priority} /></td>
+              <td className="rt-title"><VisitLink appt={a} /> <MissingBadge appt={a} /><QueueNote appt={a} /></td>
+              <td data-label="الموبايل"><bdi dir="ltr">{a.mobile || '—'}</bdi></td>
+              <td data-label="نوع الزيارة">
                 {VISIT_TYPES[a.visit_type] || a.visit_type}
                 {a.followup_override_by && (
                   <span className="badge warn" style={{ marginInlineStart: 6 }}
                     title={a.followup_override_reason || ''}>تجاوز</span>
                 )}
               </td>
-              <td className="num" style={{ whiteSpace: 'nowrap' }}><FeeCell appt={a} /></td>
-              <td dir="ltr">{a.arrived_at ? fmtClock(a.arrived_at) : '—'}</td>
-              <td><StatusCell appt={a} offset={offset} /></td>
-              <td className="num">{a.ahead_count ?? '—'}</td>
-              <td className="queue-row-actions">
+              <td className="num" data-label="السعر" style={{ whiteSpace: 'nowrap' }}><FeeCell appt={a} /></td>
+              <td data-label="وقت الحضور"><bdi dir="ltr">{a.arrived_at ? fmtClock(a.arrived_at) : '—'}</bdi></td>
+              <td className="rt-badge"><StatusCell appt={a} offset={offset} /></td>
+              <td className="num" data-label="قبله">{a.ahead_count ?? '—'}</td>
+              <td className="queue-row-actions rt-actions">
                 <VisitActions appt={a} data={data} actions={actions}
                   onDone={(msg) => { toast(msg, 'success'); reload() }} onError={(msg) => { toast(msg); reload() }} />{' '}
                 {a.status === 'waiting' && <><NoShowButton appt={a} onChanged={reload} onError={toast} />{' '}</>}
@@ -1126,7 +1126,7 @@ function NoShowButton({ appt: a, onChanged, onError }) {
 // جدول نمط الخانات — صفوف التبويب
 function SlotsQueueTable({ data, rows, actions, onDone, onError }) {
   return (
-    <table>
+    <table className="rtable">
       <thead>
         <tr>
           <th>الدور</th><th>الاسم</th><th>الموبايل</th><th>نوع الزيارة</th><th>السعر</th>
@@ -1136,23 +1136,23 @@ function SlotsQueueTable({ data, rows, actions, onDone, onError }) {
       <tbody>
         {rows.map((a) => (
           <tr key={a.id}>
-            <td className="num">{a.queue_number}{priorityBadge(a.priority)}</td>
-            <td><VisitLink appt={a} /><QueueNote appt={a} /></td>
-            <td dir="ltr">{a.mobile}</td>
-            <td>
+            <td className="num" data-label="الدور">{a.queue_number}{priorityBadge(a.priority)}</td>
+            <td className="rt-title"><VisitLink appt={a} /><QueueNote appt={a} /></td>
+            <td data-label="الموبايل"><bdi dir="ltr">{a.mobile}</bdi></td>
+            <td data-label="نوع الزيارة">
               {VISIT_TYPES[a.visit_type] || a.visit_type}
               {a.followup_override_by && (
                 <span className="badge warn" style={{ marginInlineStart: 6 }}
                   title={a.followup_override_reason || ''}>تجاوز</span>
               )}
             </td>
-            <td className="num"><FeeCell appt={a} /></td>
-            <td><SlotCell appt={a} /></td>
-            <td><StatusCell appt={a} offset={serverOffsetOf(data)} /></td>
-            <td className="num">
+            <td className="num" data-label="السعر"><FeeCell appt={a} /></td>
+            <td data-label="الموعد"><SlotCell appt={a} /></td>
+            <td className="rt-badge"><StatusCell appt={a} offset={serverOffsetOf(data)} /></td>
+            <td className="num" data-label="الانتظار المتوقع">
               {['waiting', 'arrived', 'in_service'].includes(a.status) ? `~${a.wait_minutes} د` : '—'}
             </td>
-            <td className="queue-row-actions">
+            <td className="queue-row-actions rt-actions">
               <VisitActions appt={a} data={data} actions={actions} onDone={onDone} onError={onError} />{' '}
               <OpenVisit appt={a} />
             </td>
@@ -1185,17 +1185,17 @@ function ProceduresTable({ data, rows, all, attendance }) {
   const t = extraTotals(all)
   return (
     <>
-      <table>
+      <table className="rtable">
         <thead><tr><th>الدور</th><th>الاسم</th><th>الدكتور</th><th>الإجراءات</th><th>المبلغ</th><th>الحالة</th></tr></thead>
         <tbody>
           {rows.map((a) => (
             <ExtraRow key={a.id} appt={a}>
-              <td className="num"><TurnCell appt={a} attendance={attendance} /></td>
-              <td><VisitLink appt={a} /></td>
-              <td>{data.doctor_name}</td>
-              <td>{liveProcedures(a).map((l) => l.name).join('، ')}</td>
-              <td className="num" style={{ whiteSpace: 'nowrap' }}>{fmtMoney(a.procedures_total)}</td>
-              <td>{appointmentBadge(a.status, true)}</td>
+              <td className="num" data-label="الدور"><TurnCell appt={a} attendance={attendance} /></td>
+              <td className="rt-title"><VisitLink appt={a} /></td>
+              <td data-label="الدكتور">{data.doctor_name}</td>
+              <td className="rt-full" data-label="الإجراءات">{liveProcedures(a).map((l) => l.name).join('، ')}</td>
+              <td className="num" data-label="المبلغ" style={{ whiteSpace: 'nowrap' }}>{fmtMoney(a.procedures_total)}</td>
+              <td className="rt-badge">{appointmentBadge(a.status, true)}</td>
             </ExtraRow>
           ))}
         </tbody>
@@ -1208,17 +1208,17 @@ function ReferralsTable({ rows, all, attendance }) {
   const t = extraTotals(all)
   return (
     <>
-      <table>
+      <table className="rtable">
         <thead><tr><th>الدور</th><th>الاسم</th><th>الجهة</th><th>الخصم</th><th>المطلوب من المريض</th><th>الحالة</th></tr></thead>
         <tbody>
           {rows.map((a) => (
             <ExtraRow key={a.id} appt={a}>
-              <td className="num"><TurnCell appt={a} attendance={attendance} /></td>
-              <td><VisitLink appt={a} /></td>
-              <td>{(a.referrals || []).map((r) => r.source_name).join('، ')}</td>
-              <td className="num" style={{ whiteSpace: 'nowrap' }}>{fmtMoney(a.referral_discount)}</td>
-              <td className="num" style={{ whiteSpace: 'nowrap' }}><strong>{fmtMoney(a.patient_total)}</strong></td>
-              <td>{appointmentBadge(a.status, true)}</td>
+              <td className="num" data-label="الدور"><TurnCell appt={a} attendance={attendance} /></td>
+              <td className="rt-title"><VisitLink appt={a} /></td>
+              <td data-label="الجهة">{(a.referrals || []).map((r) => r.source_name).join('، ')}</td>
+              <td className="num" data-label="الخصم" style={{ whiteSpace: 'nowrap' }}>{fmtMoney(a.referral_discount)}</td>
+              <td className="num" data-label="المطلوب من المريض" style={{ whiteSpace: 'nowrap' }}><strong>{fmtMoney(a.patient_total)}</strong></td>
+              <td className="rt-badge">{appointmentBadge(a.status, true)}</td>
             </ExtraRow>
           ))}
         </tbody>
@@ -1655,16 +1655,16 @@ export default function SessionQueue() {
               <strong> ما زالوا في قائمة الدور</strong> ويُنادى عليهم إن فرغ الدكتور —
               أو أجّل موعدهم إلى جلسة أخرى.
             </p>
-            <table>
+            <table className="rtable">
               <thead><tr><th>الدور</th><th>الاسم</th><th>الموبايل</th><th>الحالة</th><th></th></tr></thead>
               <tbody>
                 {overflowed.map((a) => (
                   <tr key={a.id}>
-                    <td className="num">{a.queue_number}</td>
-                    <td>{a.full_name}</td>
-                    <td dir="ltr">{a.mobile}</td>
-                    <td>{appointmentBadge(a.status)}</td>
-                    <td>
+                    <td className="num" data-label="الدور">{a.queue_number}</td>
+                    <td className="rt-title">{a.full_name}</td>
+                    <td data-label="الموبايل"><bdi dir="ltr">{a.mobile}</bdi></td>
+                    <td className="rt-badge">{appointmentBadge(a.status)}</td>
+                    <td className="rt-actions">
                       <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }}
                         onClick={() => actions.setPostponing(a)}>تأجيل لموعد آخر</button>
                     </td>

@@ -162,13 +162,32 @@ function SlotPreview({ schedule, minutes }) {
   )
 }
 
-// ═══ سجلّ التعديلات: الغرفة وتفعيل/إيقاف سطور الدوام — من ومتى ═══
+// ═══ سجلّ التعديلات: الغرفة، وتفعيل/إيقاف سطور الدوام وتعديلها — من ومتى ═══
 // يُعاد تحميله مع البروفايل (reloadKey)، فتغيير الغرفة من النموذج أعلاه يظهر فوراً.
 const roomLabel = (r) => (r ? `العيادة ${r}` : 'بلا غرفة')
+// مدى الوقت معزولاً من اليسار لليمين (LRI…PDI): في سطرٍ عربيّ يُقرأ «12:00–09:00» مقلوباً
+const ltr = (x) => `\u2066${x}\u2069`
+// تعديل السطر: القيمتان JSON بحقول السطر — يُكتب السطر القديم كاملاً ثمّ ما تغيّر وحده
+const schedLine = (v) => `${WEEKDAYS[v.weekday]} ${ltr(`${v.start_time}–${v.end_time}`)}`
+const SCHED_DIFF = [
+  ['weekday', 'اليوم', (v) => WEEKDAYS[v.weekday]],
+  ['time', 'الوقت', (v) => ltr(`${v.start_time}–${v.end_time}`)],
+  ['break', 'الاستراحة', (v) => (v.break_start ? ltr(`${v.break_start}–${v.break_end}`) : 'بلا')],
+  ['capacity', 'السعة', (v) => (v.capacity ? String(v.capacity) : 'بلا')],
+  ['repeat', 'التكرار', (v) => (v.repeat_weeks === 2 ? `كل أسبوعين من ${v.anchor_date}` : 'كل أسبوع')],
+]
+function scheduleEditText(h) {
+  let a, b
+  try { a = JSON.parse(h.old_value); b = JSON.parse(h.new_value) } catch { return 'عُدِّل سطر دوام' }
+  const diffs = SCHED_DIFF.map(([, label, f]) => [label, f(a), f(b)]).filter(([, x, y]) => x !== y)
+    .map(([label, x, y]) => `${label}: ${x} ← ${y}`)
+  return `عُدِّل دوام ${schedLine(a)} — ${diffs.join('، ')}`
+}
 function changeText(h) {
   if (h.field === 'room') return `الغرفة: ${roomLabel(h.old_value)} ← ${roomLabel(h.new_value)}`
+  if (h.field === 'schedule') return scheduleEditText(h)
   const line = h.weekday == null ? 'سطر دوامٍ حُذف لاحقاً'
-    : `دوام ${WEEKDAYS[h.weekday]} ${h.start_time}–${h.end_time}${h.repeat_weeks === 2 ? ' (كل أسبوعين)' : ''}`
+    : `دوام ${WEEKDAYS[h.weekday]} ${ltr(`${h.start_time}–${h.end_time}`)}${h.repeat_weeks === 2 ? ' (كل أسبوعين)' : ''}`
   return `${h.new_value === 'true' ? 'فُعِّل' : 'أُوقف'} ${line}`
 }
 function ChangeLog({ doctorId, reloadKey }) {
@@ -244,12 +263,12 @@ export default function DoctorProfile() {
         {doctor.schedules.length === 0
           ? <p className="empty">لا يوجد جدول دوام بعد — أضفه من صفحة الدكاترة.</p>
           : (
-            <table style={{ marginTop: 10 }}>
+            <table className="rtable" style={{ marginTop: 10 }}>
               <thead><tr><th>اليوم</th><th>من</th><th>إلى</th><th>الاستراحة</th><th>الخانات الناتجة</th></tr></thead>
               <tbody>
                 {doctor.schedules.map((s) => (
                   <tr key={s.id} className={s.is_active ? undefined : 'sched-off ro'}>
-                    <td>
+                    <td className="rt-title">
                       <span className="sched-day">{WEEKDAYS[s.weekday]}</span>
                       {!s.is_active && (
                         <span className="badge" style={{ marginInlineStart: 6 }}
@@ -258,10 +277,10 @@ export default function DoctorProfile() {
                         </span>
                       )}
                     </td>
-                    <td>{fmtTime(s.start_time)}</td>
-                    <td>{fmtTime(s.end_time)}</td>
-                    <td>{s.break_start ? `${fmtTime(s.break_start)} – ${fmtTime(s.break_end)}` : '—'}</td>
-                    <td><SlotPreview schedule={s} minutes={doctor.expected_visit_minutes} /></td>
+                    <td data-label="من">{fmtTime(s.start_time)}</td>
+                    <td data-label="إلى">{fmtTime(s.end_time)}</td>
+                    <td data-label="الاستراحة">{s.break_start ? `${fmtTime(s.break_start)} – ${fmtTime(s.break_end)}` : '—'}</td>
+                    <td className="rt-full" data-label="الخانات الناتجة"><SlotPreview schedule={s} minutes={doctor.expected_visit_minutes} /></td>
                   </tr>
                 ))}
               </tbody>

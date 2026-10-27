@@ -51,32 +51,32 @@ function SummaryTiles({ totals }) {
 function LineRow({ l, onLog }) {
   return (
     <tr className={l.flagged ? 'cash-flag' : undefined}>
-      <td className="num cash-q">{l.queue === '' || l.queue == null ? '—' : fmtNum(l.queue)}</td>
-      <td className="cash-name">{l.name}</td>
-      <td className="cash-visit">{l.visit}</td>
-      <td className="num cash-m">{fmtNum(l.fee)}</td>
-      <td className="cash-procs">
+      <td className="num cash-q rt-badge" data-label="الدور">{l.queue === '' || l.queue == null ? '—' : fmtNum(l.queue)}</td>
+      <td className="cash-name rt-title">{l.name}</td>
+      <td className="cash-visit" data-label="الزيارة">{l.visit}</td>
+      <td className="num cash-m" data-label="الكشف">{fmtNum(l.fee)}</td>
+      <td className="cash-procs" data-label="الإجراءات">
         {l.procItems.length === 0 ? <span className="muted">—</span> : l.procItems.map((p, i) => (
           <span key={i} className="cash-proc">{p.name} <span className="muted">{fmtNum(p.price)}</span></span>
         ))}
       </td>
-      <td className="cash-ref">
+      <td className="cash-ref" data-label="الإحالة">
         {l.referral ? (
           <><span className="cash-ref-name">{l.referral}</span>
             {l.discount > 0 && <span className="cash-ref-disc">− {fmtNum(l.discount)}</span>}</>
         ) : <span className="muted">—</span>}
       </td>
-      <td className="num cash-m cash-due">{fmtNum(l.total)}</td>
-      <td className="cash-notes">
+      <td className="num cash-m cash-due" data-label="المطلوب">{fmtNum(l.total)}</td>
+      <td className="cash-notes rt-full" data-label="الملاحظات">
         {l.flags.map((f) => <span key={f} className="badge warn sm">{f}</span>)}
         {l.remarks.length > 0 && <span className="cash-remarks">{l.remarks.join(' · ')}</span>}
         {l.flags.length === 0 && l.remarks.length === 0 && <span className="muted">—</span>}
       </td>
       {onLog && (
-        <td className="cash-log">
+        <td className="cash-log rt-actions">
           <button type="button" className="cash-log-btn" title="سجل الزيارة" aria-label={`سجل زيارة ${l.name}`}
             onClick={() => onLog(l)}>
-            <LogIcon />
+            <LogIcon /><span className="rt-only">سجل الزيارة</span>
           </button>
         </td>
       )}
@@ -125,18 +125,18 @@ function StaffActivity({ date }) {
             : !data ? <p className="ad-readonly">جارٍ التحميل…</p>
             : data.staff.length === 0 ? <p className="ad-readonly">لا نشاط مسجَّل لموظفي الاستقبال في هذا اليوم.</p>
             : (
-              <table className="cash-staff-table">
+              <table className="cash-staff-table rtable">
                 <thead>
                   <tr><th>الموظف</th><th>الحجوزات</th><th>علّم حاضراً</th><th>الإجراءات</th><th>الإحالات</th></tr>
                 </thead>
                 <tbody>
                   {data.staff.map((s) => (
                     <tr key={s.id}>
-                      <td><span className="cash-staff-name">{s.name}</span> <span className="muted">{ROLE_LABELS[s.role]}</span></td>
-                      <td className="num">{fmtNum(s.bookings)}</td>
-                      <td className="num">{fmtNum(s.arrivals)}</td>
-                      <td className="num">{fmtNum(s.procedures)}</td>
-                      <td className="num">{fmtNum(s.referrals)}</td>
+                      <td className="rt-title"><span className="cash-staff-name">{s.name}</span> <span className="muted">{ROLE_LABELS[s.role]}</span></td>
+                      <td className="num" data-label="الحجوزات">{fmtNum(s.bookings)}</td>
+                      <td className="num" data-label="علّم حاضراً">{fmtNum(s.arrivals)}</td>
+                      <td className="num" data-label="الإجراءات">{fmtNum(s.procedures)}</td>
+                      <td className="num" data-label="الإحالات">{fmtNum(s.referrals)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -194,7 +194,7 @@ function DoctorBlock({ d, open, onToggle, onLog }) {
       </button>
       {open && (
         <div className="cash-doc-body" id={id}>
-          <table className="cash-table">
+          <table className="cash-table rtable">
             {/* عرضٌ ثابت للأعمدة: الكتل كلّها تصطفّ عموداً تحت عمود مهما اختلف محتواها */}
             <colgroup>
               <col className="c-q" /><col className="c-name" /><col className="c-visit" /><col className="c-fee" />
@@ -211,11 +211,11 @@ function DoctorBlock({ d, open, onToggle, onLog }) {
             <tbody>{d.rows.map((l) => <LineRow key={l.id} l={l} onLog={onLog} />)}</tbody>
             <tfoot>
               <tr>
-                <td colSpan={3}>مجموع الدكتور</td>
-                <td className="num cash-m">{fmtNum(t.fee)}</td>
-                <td className="num">{fmtNum(t.procTotal)}</td>
-                <td className="num">{t.discount > 0 ? `− ${fmtNum(t.discount)}` : ''}</td>
-                <td className="num cash-m cash-due">{fmtNum(t.total)}</td>
+                <td colSpan={3} className="rt-title">مجموع الدكتور</td>
+                <td className="num cash-m" data-label="الكشوف">{fmtNum(t.fee)}</td>
+                <td className="num" data-label="الإجراءات">{fmtNum(t.procTotal)}</td>
+                <td className={`num${t.discount > 0 ? '' : ' rt-hide'}`} data-label="الإحالات">{t.discount > 0 ? `− ${fmtNum(t.discount)}` : ''}</td>
+                <td className="num cash-m cash-due rt-badge">{fmtNum(t.total)}</td>
                 <td />
                 {onLog && <td />}
               </tr>

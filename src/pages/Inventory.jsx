@@ -70,7 +70,7 @@ function MaterialsTable({ data, onOpen, onPurchase, onEdit, onAdd, onImport, onB
           <button type="button" className="ghost" onClick={() => { setQuery(''); setFilter('all') }}>عرض الكل</button>
         </EmptyState>
       ) : (
-        <table className="inv-table inv-materials">
+        <table className="inv-table inv-materials rtable">
           <thead><tr>
             <th>المادة</th><th>الوحدة</th><th>الرصيد</th><th>القيمة</th><th>سعر البيع</th><th>الحدّ الأدنى</th><th>الحالة</th><th></th>
           </tr></thead>
@@ -79,19 +79,20 @@ function MaterialsTable({ data, onOpen, onPurchase, onEdit, onAdd, onImport, onB
               const st = stockStatus(m)
               return (
                 <tr key={m.id} className={`clickable${m.is_active ? '' : ' proc-inactive'}`} onClick={() => onOpen(m.id)}>
-                  <td className="inv-name">{m.name}</td>
-                  <td>{m.unit}</td>
-                  <td className={`num inv-balance${m.balance < 0 ? ' neg' : ''}`} dir="ltr">{fmtQty(m.balance)}</td>
-                  <td className="num">{m.stock_value === null ? '—' : fmtMoney(m.stock_value)}</td>
-                  <td className="num">{fmtMoney(m.unit_price)}</td>
-                  <td className="num">{m.min_quantity ? fmtQty(m.min_quantity) : '—'}</td>
-                  <td>
+                  <td className="inv-name rt-title">{m.name}</td>
+                  <td data-label="الوحدة">{m.unit}</td>
+                  <td className={`num inv-balance${m.balance < 0 ? ' neg' : ''}`} data-label="الرصيد">
+                    <bdi dir="ltr">{fmtQty(m.balance)}</bdi></td>
+                  <td className="num" data-label="القيمة">{m.stock_value === null ? '—' : fmtMoney(m.stock_value)}</td>
+                  <td className="num" data-label="سعر البيع">{fmtMoney(m.unit_price)}</td>
+                  <td className="num" data-label="الحدّ الأدنى">{m.min_quantity ? fmtQty(m.min_quantity) : '—'}</td>
+                  <td className="rt-badge">
                     <div className="inv-status">
                       <span className={`badge sm ${st.cls}`}>{st.label}</span>
                       {m.selling_at_loss && m.is_active && <span className="badge sm bad">بيع بخسارة</span>}
                     </div>
                   </td>
-                  <td className="inv-row-actions" onClick={(e) => e.stopPropagation()}>
+                  <td className="inv-row-actions rt-actions" onClick={(e) => e.stopPropagation()}>
                     {m.is_active && <button type="button" className="ghost" onClick={() => onPurchase(m)}>شراء</button>}
                     <button type="button" className="ghost" onClick={() => onOpen(m.id)}>الكرت</button>
                     <button type="button" className="ghost" onClick={() => onEdit(m)}>تعديل</button>

@@ -233,7 +233,7 @@ function DayDoctors({ date, canEdit, onChanged, allRooms, onRoomChanged }) {
             المتوقَّعون حسب جداول الدوام — حتى لو لم تُولَّد جلساتهم بعد.
           </p>
         </div>
-        <div className="inline" style={{ alignItems: 'center', gap: 8, flexShrink: 0 }}>
+        <div className="inline dd-export" style={{ alignItems: 'center', gap: 8, flexShrink: 0 }}>
           {/* مدى اختياري: فارغ = يوم اللوحة وحده */}
           <label className="muted" style={{ whiteSpace: 'nowrap' }}>إلى تاريخ</label>
           <input type="date" value={exportTo} min={date}
@@ -246,25 +246,25 @@ function DayDoctors({ date, canEdit, onChanged, allRooms, onRoomChanged }) {
         </div>
       </div>
       {err && <p className="error">{err}</p>}
-      <table>
+      <table className="rtable">
         <thead>
           <tr><th>الدكتور</th><th>الاختصاص</th><th>الوقت</th><th>الغرفة</th><th>الحالة</th><th></th></tr>
         </thead>
         <tbody>
           {data.doctors.map((d) => (
             <tr key={d.doctor_id} className={d.off_week || d.apologized ? 'row-faded' : ''}>
-              <td>{d.doctor_name}</td>
-              <td>{d.specialty || '—'}</td>
-              <td className="num">
-                {d.start_time ? `${d.start_time} – ${d.end_time}` : <span className="muted">جلسة يدوية</span>}
+              <td className="rt-title">{d.doctor_name}</td>
+              <td data-label="الاختصاص">{d.specialty || '—'}</td>
+              <td className="num" data-label="الوقت">
+                {d.start_time ? <bdi dir="ltr">{d.start_time} – {d.end_time}</bdi> : <span className="muted">جلسة يدوية</span>}
               </td>
-              <td className="num">
+              <td className="num" data-label="الغرفة">
                 {canEdit
                   ? <RoomPicker room={d.room} rooms={allRooms} occupants={occupantsFor(d.doctor_id)}
                       disabled={busy === d.doctor_id} onPick={(room) => changeRoom(d, room)} />
                   : (d.room || '—')}
               </td>
-              <td>
+              <td className="rt-badge">
                 {d.apologized
                   ? <span className="badge bad" title={d.apology_reason || ''}>معتذر</span>
                   : d.off_week
@@ -276,7 +276,7 @@ function DayDoctors({ date, canEdit, onChanged, allRooms, onRoomChanged }) {
                   <span className="muted" style={{ marginInlineStart: 6 }}>{d.apology_reason}</span>
                 )}
               </td>
-              <td>
+              <td className="rt-actions">
                 {/* التصدير متاحٌ لمن يراه (مشرف/مدير/مجلس) لا لمن يُعدّل وحده */}
                 <button type="button" className="ghost"
                   style={{ padding: '3px 10px', fontSize: 11.5, marginInlineEnd: 6 }}
@@ -385,7 +385,7 @@ export default function ClinicBoard() {
           <h2>لوحة العيادات</h2>
           <p className="subtitle">جلسات الدكاترة لليوم المحدد وطول الدور عند كلٍّ منها — تنقّل بالأيام للحجز المسبق</p>
         </div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }}>
+        <div className="board-head-actions" style={{ display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }}>
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
           {canCashReport && (
             <button type="button" className="ghost" style={{ whiteSpace: 'nowrap' }}
@@ -440,26 +440,26 @@ export default function ClinicBoard() {
             {role === 'clinic_admin' && ' اضغط «توليد جلسات هذا اليوم» إن وُجد دوام مطابق في جداول الدكاترة.'}
           </p>
         ) : (
-          <table>
+          <table className="rtable">
             <thead>
               <tr><th>الدكتور</th><th>الاختصاص</th><th>الوقت</th><th>النمط</th><th>الحالة</th><th>الدور</th><th></th></tr>
             </thead>
             <tbody>
               {sessions.map((s) => (
                 <tr key={s.id} className="clickable" onClick={() => navigate(`/clinic/session/${s.id}`)}>
-                  <td>{s.doctor_name}{rooms && <RoomBadge room={rooms[s.doctor_id]} />}</td>
-                  <td>{s.specialty || '—'}</td>
-                  <td className="num">{fmtTime(s.start_time)} – {fmtTime(s.end_time)}</td>
+                  <td className="rt-title">{s.doctor_name}{rooms && <RoomBadge room={rooms[s.doctor_id]} />}</td>
+                  <td data-label="الاختصاص">{s.specialty || '—'}</td>
+                  <td className="num" data-label="الوقت"><bdi dir="ltr">{fmtTime(s.start_time)} – {fmtTime(s.end_time)}</bdi></td>
                   {/* نمط الجلسة يُثبَّت عند توليدها — يُعرض كي لا يُفاجأ أحد يوم التبديل */}
-                  <td><FlowModeTag mode={s.flow_mode} /></td>
-                  <td>
+                  <td data-label="النمط"><FlowModeTag mode={s.flow_mode} /></td>
+                  <td className="rt-badge">
                     {sessionBadge(s.status)}
                     {/* «مغلقة» حالةٌ محسوبة تعلو حالة الجلسة المخزّنة:
                         انتهى الدوام فعلاً وإن بقيت الجلسة «مفتوحة» في القاعدة */}
                     {s.closed && <span className="badge" style={{ marginInlineStart: 5 }}>مغلقة</span>}
                   </td>
-                  <td className="num">{s.active_count} نشِط / {s.total_count} إجمالي</td>
-                  <td onClick={(e) => e.stopPropagation()}>
+                  <td className="num" data-label="الدور">{s.active_count} نشِط / {s.total_count} إجمالي</td>
+                  <td className="rt-actions" onClick={(e) => e.stopPropagation()}>
                     <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }}
                       onClick={() => navigate(`/clinic/session/${s.id}`)}>فتح الدور</button>
                     {canCloseSession && (
