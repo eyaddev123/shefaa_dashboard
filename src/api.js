@@ -180,6 +180,9 @@ export const api = {
     schedules: (doctorId) => http(`/clinic/doctors/${doctorId}/schedules`),
     addSchedule: (doctorId, body) =>
       http(`/clinic/doctors/${doctorId}/schedules`, { method: 'POST', body: JSON.stringify(body) }),
+    // تعديل السطر نفسه (نفس id): 409 SCHEDULE_OVERLAP إن تداخل مع سطرٍ آخر لنفس الدكتور
+    updateSchedule: (id, body) =>
+      http(`/clinic/schedules/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
     deleteSchedule: (id) => http(`/clinic/schedules/${id}`, { method: 'DELETE' }),
     // تفعيل/إيقاف سطر الدوام بلا حذف — الموقوف لا تُولَّد منه جلسات
     setScheduleActive: (id, isActive) =>

@@ -720,12 +720,12 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
       {lines.length === 0 ? (
         <p className="visit-empty">{canEdit ? 'لا إجراءات بعد — اختر الإجراء من القائمة وأضفه.' : 'لا إجراءات على هذه الزيارة.'}</p>
       ) : (
-        <table className="appt-procs-table">
+        <table className="appt-procs-table rtable">
           <tbody>
             {lines.map((l) => (
               <Fragment key={l.id}>
                 <tr className={l.removed_at ? 'proc-removed' : undefined}>
-                  <td>
+                  <td className="rt-title">
                     {l.name}
                     {/* أُضيف خارج اختصاص دكتوره بقرار المشرف — العلامة تُبقي الأثر */}
                     {l.off_specialty && (
@@ -733,8 +733,8 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
                         title="أُضيف خارج اختصاص الدكتور بقرار مشرف العيادات">خارج الاختصاص</span>
                     )}
                   </td>
-                  <td className="num">{fmtMoney(l.price)}</td>
-                  <td className="appt-procs-meta">
+                  <td className="num rt-badge">{fmtMoney(l.price)}</td>
+                  <td className="appt-procs-meta rt-full">
                     أضافه {l.added_by_name || '—'} <span dir="ltr">{whenAt(l.added_at, session.session_day)}</span>
                     {l.removed_at && (
                       <span className="proc-removed-why">
@@ -742,7 +742,7 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
                       </span>
                     )}
                   </td>
-                  <td>
+                  <td className="rt-actions">
                     {!l.removed_at && canEdit && removing !== l.id && editing !== l.id && (
                       <span className="proc-line-actions">
                         <button className="ghost" style={{ padding: '2px 10px', fontSize: 11.5 }}
@@ -766,7 +766,7 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
                 </tr>
                 {/* مواد السطر: بالاسم والكمّية — أو محرّرها إن فُتح */}
                 {!l.removed_at && (editing === l.id ? (
-                  <tr className="proc-mats-row">
+                  <tr className="proc-mats-row rt-sub">
                     <td colSpan={4}>
                       <MaterialsEditor catalog={matCatalog} value={editMats} onChange={setEditMats} disabled={busy} />
                       <div className="mat-actions">
@@ -776,7 +776,7 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
                     </td>
                   </tr>
                 ) : (
-                  <tr className="proc-mats-row">
+                  <tr className="proc-mats-row rt-sub">
                     <td colSpan={4} className="proc-mats-text">
                       {(l.materials || []).length
                         ? <>المواد: {materialsSummary(l.materials)}</>

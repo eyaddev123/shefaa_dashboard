@@ -81,14 +81,14 @@ function SourcesTab({ showToast, onOpenDues }) {
     <div className="card">
       <h3>الجهات المحيلة ({list.length} — الفعّالة {list.filter((s) => s.is_active).length})</h3>
       <NewSourceForm onCreated={(n) => { showToast(`أُضيفت «${n}»`, 'success', 3000); load() }} />
-      <table style={{ marginTop: 14 }}>
+      <table className="rtable" style={{ marginTop: 14 }}>
         <thead>
           <tr><th>الجهة</th><th>الحالة</th><th>إحالات هذا الشهر</th><th>مستحق هذا الشهر</th><th></th></tr>
         </thead>
         <tbody>
           {list.map((s) => (
             <tr key={s.id} className={s.is_active ? undefined : 'proc-inactive'}>
-              <td>
+              <td className="rt-title">
                 {editing?.id === s.id ? (
                   <div className="inline" style={{ gap: 6 }}>
                     <input value={editing.name} maxLength={150} aria-label="اسم الجهة" autoFocus
@@ -98,14 +98,14 @@ function SourcesTab({ showToast, onOpenDues }) {
                   </div>
                 ) : s.name}
               </td>
-              <td>{s.is_active ? <span className="badge good">فعّالة</span> : <span className="badge">موقوفة</span>}</td>
-              <td className="num">{s.month_referrals.toLocaleString('en-US')}</td>
-              <td className="num">
+              <td className="rt-badge">{s.is_active ? <span className="badge good">فعّالة</span> : <span className="badge">موقوفة</span>}</td>
+              <td className="num" data-label="إحالات هذا الشهر">{s.month_referrals.toLocaleString('en-US')}</td>
+              <td className="num" data-label="مستحق هذا الشهر">
                 {s.month_due > 0
                   ? <button className="link-btn" onClick={() => onOpenDues(s.id)}>{fmtMoney(s.month_due)}</button>
                   : fmtMoney(0)}
               </td>
-              <td className="proc-actions-cell">
+              <td className="proc-actions-cell rt-actions">
                 {editing?.id !== s.id && (
                   <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }}
                     onClick={() => setEditing({ id: s.id, name: s.name })}>تعديل</button>
@@ -182,20 +182,20 @@ function DuesTab({ showToast, initialSource }) {
               <span className="muted">{data.visits.toLocaleString('en-US')} زيارة · {from} — {to}</span>
             </div>
             {all && data.totals.length > 1 && (
-              <table className="ref-totals">
+              <table className="ref-totals rtable">
                 <thead><tr><th>الجهة</th><th>الزيارات</th><th>المستحق</th></tr></thead>
                 <tbody>
                   {data.totals.map((t) => (
                     <tr key={t.source_id}>
-                      <td><button className="link-btn" onClick={() => setSourceId(String(t.source_id))}>{t.source}</button></td>
-                      <td className="num">{t.visits.toLocaleString('en-US')}</td>
-                      <td className="num">{fmtMoney(t.due)}</td>
+                      <td className="rt-title"><button className="link-btn" onClick={() => setSourceId(String(t.source_id))}>{t.source}</button></td>
+                      <td className="num" data-label="الزيارات">{t.visits.toLocaleString('en-US')}</td>
+                      <td className="num" data-label="المستحق">{fmtMoney(t.due)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             )}
-            <table className="ref-dues">
+            <table className="ref-dues rtable">
               <thead>
                 <tr>
                   <th>التاريخ</th>{all && <th>الجهة</th>}<th>المريض</th><th>الدكتور</th><th>كشف/إجراء</th>
@@ -205,20 +205,20 @@ function DuesTab({ showToast, initialSource }) {
               <tbody>
                 {data.lines.map((l, i) => (
                   <tr key={`${l.appointment_id}-${i}`}>
-                    <td dir="ltr" className="num">{l.date}</td>
-                    {all && <td>{l.source}</td>}
-                    <td>{l.patient}</td>
-                    <td>{l.doctor || '—'}</td>
-                    <td>{l.item} <span className="muted ref-doc-pct">{l.discount_type === 'percent'
+                    <td dir="ltr" className="num rt-badge">{l.date}</td>
+                    {all && <td data-label="الجهة">{l.source}</td>}
+                    <td className="rt-title">{l.patient}</td>
+                    <td data-label="الدكتور">{l.doctor || '—'}</td>
+                    <td data-label="كشف/إجراء">{l.item} <span className="muted ref-doc-pct">{l.discount_type === 'percent'
                       ? `${l.discount_value.toLocaleString('ar-SY')}٪` : `${fmtMoney(l.discount_value)} ثابت`}</span></td>
-                    <td className="num">{fmtMoney(l.original)}</td>
-                    <td className="num"><strong>{fmtMoney(l.discount)}</strong></td>
-                    <td dir="auto">{l.doc_number || '—'}</td>
+                    <td className="num" data-label="المبلغ الأصلي">{fmtMoney(l.original)}</td>
+                    <td className="num" data-label="الخصم"><strong>{fmtMoney(l.discount)}</strong></td>
+                    <td dir="auto" data-label="رقم ورقة الإحالة">{l.doc_number || '—'}</td>
                   </tr>
                 ))}
                 <tr className="rev-total-row">
-                  <td colSpan={all ? 6 : 5}>المجموع</td>
-                  <td className="num">{fmtMoney(data.total_due)}</td>
+                  <td colSpan={all ? 6 : 5} className="rt-title">المجموع</td>
+                  <td className="num rt-badge">{fmtMoney(data.total_due)}</td>
                   <td></td>
                 </tr>
               </tbody>

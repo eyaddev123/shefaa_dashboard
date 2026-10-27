@@ -497,6 +497,16 @@ button.room-badge.editable:focus-visible { outline: 2px solid var(--primary); ou
 .change-log li:last-child { border-bottom: 0; }
 .change-log time { color: var(--muted); font-size: 12px; min-width: 130px; }
 
+/* ═══ نموذج سطر الدوام: الإضافة، والتعديل معبّأً ═══
+   التعديل يحلّ محلّ نموذج الإضافة تحت الجدول؛ إطارٌ ملوَّن ورأسٌ يسمّي السطر، والسطر نفسه
+   في الجدول مُعلَّم — فلا تحفظ المشرفة على السطر الخطأ. */
+.sched-form.editing { border: 1.5px solid var(--primary); border-radius: 12px; padding: 12px 14px; background: var(--primary-soft); }
+.sched-form-head { flex: 1 1 100%; }
+.sched-form-note { margin: 6px 0 0; padding: 8px 10px; border-radius: 8px; font-size: 12.5px; line-height: 1.6;
+  color: var(--status-pending); background: var(--status-pending-bg); }
+.sched-form-actions { display: flex; gap: 8px; align-items: flex-end; }
+tr.sched-editing > td { background: var(--primary-soft); }
+
 /* رأس صفحة الدور يبقى ظاهراً مع التمرير — الرقم مطلوبٌ وأنت أسفل الجدول تدلّ مريضاً.
    على الشاشات الضيّقة الشريط العلوي هو الثابت، فيعود الرأس إلى مكانه (لا يتراكبان). */
 .main > h2.queue-head {
@@ -3040,3 +3050,114 @@ table.cash-staff-table { font-size: 13px; min-width: 480px; }
 .cash-staff-table td.num { font-variant-numeric: tabular-nums; font-weight: 700; }
 .cash-staff-name { font-weight: 600; }
 .cash-staff-body .vt-note { margin: 10px 0 0; }
+
+.rt-only { display: none; }   /* نصٌّ يظهر في وضع البطاقات وحده (زرّ أيقونةٍ يحتاج اسماً) */
+
+/* ═══════════════════════════════════════════════════════════
+   الجداول على الموبايل: كل سطرٍ بطاقة (table.rtable)
+   ═══════════════════════════════════════════════════════════
+   تحت 768px تُمرِّر البطاقةُ الجدولَ أفقياً (أعلاه) — فيظهر من جدول الدكاترة «المدة، فعّال،
+   البروفايل» والاسم والأزرار خارج الشاشة بلا علامة تمرير. الجداول الرئيسية تتحوّل إلى بطاقات:
+     td.rt-title   المعلومة المعرِّفة، بارزة في السطر الأول
+     td.rt-badge   الحالة بجانبها في السطر نفسه
+     td[data-label] المعلومات الثانوية: اثنتان في كل سطر، والعنوان من data-label فوقها
+     td.rt-full    سطرٌ كامل (قائمة أو نصّ طويل)
+     td.rt-actions الأزرار صفٌّ أخير بحجم إصبع (44px)
+     td.rt-hide    ما لا يلزم على الجوال
+     tr.rt-sub     سطرٌ موسَّع تحت سطر (جدول دوام الدكتور) — يلتصق ببطاقته لا بطاقة مستقلة
+   الترتيب بـ order لا بإعادة ترتيب JSX، فالحاسوب لا يتغيّر. والجدول بلا .rtable يبقى كما كان.
+   !important في الأزرار وحدها: أحجامها مكتوبة inline (padding/fontSize) لسطح المكتب. */
+@media (max-width: 767px) {
+  table.rtable { display: block; width: 100%; min-width: 0; }
+  table.rtable > thead { display: none; }
+  table.rtable > tbody, table.rtable > tfoot { display: block; }
+  table.rtable > :is(tbody, tfoot) > tr {
+    display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px 12px;
+    padding: 12px 14px; margin-bottom: 10px;
+    border: 1px solid var(--grid); border-radius: 12px; background: var(--surface-1);
+  }
+  table.rtable > :is(tbody, tfoot) > tr > td {
+    display: block; flex: 1 1 calc(50% - 6px); min-width: 0; max-width: none;
+    padding: 0; border: 0; white-space: normal; overflow: visible; text-overflow: clip;
+    overflow-wrap: anywhere;
+  }
+  table.rtable > :is(tbody, tfoot) > tr > td[data-label]::before {
+    content: attr(data-label); display: block; margin-bottom: 2px;
+    font-size: 11px; font-weight: 700; color: var(--muted);
+  }
+  table.rtable > :is(tbody, tfoot) > tr > td.rt-title {
+    order: -2; flex: 1 1 0; min-width: 50%; align-self: center; font-size: 15px; font-weight: 800;
+  }
+  /* السطر الأول للعنوان والحالة وحدهما: العنوان نصف السطر على الأقلّ والحالة نصفه على الأكثر
+     (شارتان تلتفّان داخلها) — فلا تصعد معلومةٌ ثانوية بجانبهما */
+  table.rtable > :is(tbody, tfoot) > tr > td.rt-badge {
+    order: -1; flex: 0 1 auto; max-width: calc(50% - 12px); align-self: center;
+    display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end;
+  }
+  table.rtable > :is(tbody, tfoot) > tr > td.rt-badge > .badge { margin: 0 !important; }
+  table.rtable > :is(tbody, tfoot) > tr > td.rt-full { flex-basis: 100%; }
+  table.rtable > :is(tbody, tfoot) > tr > td.rt-hide { display: none; }
+  table.rtable > :is(tbody, tfoot) > tr > td.rt-actions {
+    order: 1; flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 8px;
+    padding-top: 10px; border-top: 1px solid var(--grid);
+  }
+  table.rtable > :is(tbody, tfoot) > tr > td.rt-actions > :is(button, a, .sched-switch) {
+    min-height: 44px; flex: 1 1 auto; display: inline-flex; align-items: center; justify-content: center;
+    padding: 8px 14px !important; font-size: 13px !important; margin: 0 !important;
+  }
+  /* رابطٌ بين الأزرار (البروفايل، فتح الدور) يُرسم زرّاً شبحياً مثلها */
+  table.rtable > :is(tbody, tfoot) > tr > td.rt-actions > a {
+    border: 1px solid var(--grid); border-radius: 10px; font-weight: 700; text-decoration: none;
+    color: var(--accent-text);
+  }
+  table.rtable > :is(tbody, tfoot) > tr > td.rt-actions > .sched-switch {
+    flex: 0 0 auto; border: 1px solid var(--grid); border-radius: 10px;
+  }
+  /* سطر «لا عناصر» أو المجموع: خليةٌ واحدة تملأ البطاقة */
+  table.rtable > :is(tbody, tfoot) > tr > td[colspan]:not(.rt-title) { flex-basis: 100%; }
+  table.rtable > :is(tbody, tfoot) > tr > td:empty:not([data-label]) { display: none; }
+  table.rtable > :is(tbody, tfoot) > tr.rt-sub {
+    margin-top: -14px; padding: 12px 10px; border-top: 0; border-radius: 0 0 12px 12px;
+    background: var(--page);
+  }
+  table.rtable > tbody > tr.sched-editing { background: var(--primary-soft); border-color: var(--primary); }
+  table.rtable > tbody > tr.sched-editing > td { background: none; }
+  .sched-form-actions { flex: 1 1 100%; }
+  .sched-form-actions > button { flex: 1 1 0; min-height: 44px; }
+  table.rtable > colgroup { display: none; }
+  table.rtable .rt-only { display: inline; }
+  /* الجرد: جدولٌ بعرضٍ ثابت (860px) للحاسوب — بطاقاتٍ يأخذ عرض الكتلة، والسطر المعلَّم للمراجعة
+     يصير بطاقةً صفراء كاملة لا خلايا مُلوَّنة */
+  table.cash-table.rtable { table-layout: auto; }
+  .cash-doc-body:has(> table.rtable), .cash-staff-body:has(> table.rtable) { padding-inline: 10px; }
+  table.rtable > tbody > tr.cash-flag { background: var(--status-pending-bg); border-color: var(--status-pending); }
+  table.rtable > tbody > tr.cash-flag > td { background: none; box-shadow: none; }
+  table.cash-table.rtable > tfoot > tr { margin-bottom: 0; border-width: 2px; }
+  table.rtable > :is(tbody, tfoot) > tr > td.rt-actions > .cash-log-btn { gap: 6px; }
+  table.rtable > :is(tbody, tfoot) > tr > td.rt-actions > .cash-log-btn { width: auto; border-color: var(--grid); color: var(--accent-text); }
+  table.rtable > :is(tbody, tfoot) > tr > td.rt-actions > span { display: contents; }
+  table.rtable > :is(tbody, tfoot) > tr > td.rt-actions > span > button {
+    min-height: 44px; flex: 1 1 auto; padding: 8px 14px !important; font-size: 13px !important; margin: 0 !important;
+  }
+  table.rtable > :is(tbody, tfoot) > tr > td.rt-actions > span > input { flex: 1 1 100%; min-height: 44px; }
+  table.rtable > :is(tbody, tfoot) > tr > td.rt-actions:empty { display: none; }
+  /* الإسعافي في الدور: البطاقة كلّها حمراء الحافة والخلفية لا خلاياها */
+  table.rtable > tbody > tr.attn-row-urgent { background: var(--status-bad-bg); border-color: var(--status-bad); }
+  table.rtable > tbody > tr.attn-row-urgent > td { background: none; box-shadow: none; }
+  /* لوحة العيادات: الأيام السبعة سطرٌ كامل بأعمدةٍ متساوية (بلا تمرير)، والأسهم تحتها؛
+     وأدوات تصدير «دكاترة اليوم» تلتفّ */
+  .day-strip-days {
+    order: -1; flex: 1 1 100%; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
+    overflow: visible;
+  }
+  .day-strip-days .day-chip { min-width: 0; padding: 6px 2px; }
+  .day-strip-days .day-chip-num { font-size: 13px; }
+  .day-strip .day-nav { width: 44px; }
+  .inline.dd-export { flex: 1 1 100% !important; flex-wrap: wrap; }
+  .board-head-actions { flex: 1 1 100% !important; flex-wrap: wrap; }
+  .board-head-actions > * { flex: 1 1 auto; }
+  .board-head-actions > input { flex-basis: 100%; }
+  .inline.dd-export > input { flex: 1 1 140px; }
+  /* لا تلميح تمرير أفقي على بطاقةٍ صار جدولها بطاقات */
+  .card:has(> table.rtable), .card:has(> div > table.rtable) { background-image: none; }
+}
