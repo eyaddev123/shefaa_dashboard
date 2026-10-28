@@ -1,21 +1,43 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { SpecialtyPicker } from '../SpecialtyPicker.jsx'
 import { useDialogs } from '../dialogs.jsx'
 import { Link } from 'react-router-dom'
 import { api, WEEKDAYS, fmtMoney, fmtTime, fmtDateTime, todayLocal } from '../api.js'
 import { useRole } from '../RoleContext.jsx'
+import { useToast } from '../action-feedback.jsx'
+import { doctorMatches } from '../doctor-search.js'
+import { Modal, EmptyState } from '../components/inventory/shared.jsx'
 
-function NewDoctorForm({ onCreated }) {
-  const blank = { name: '', specialty_id: '', phone: '', consultation_fee: '', followup_fee: '',
-                  followup_window_days: '7', expected_visit_minutes: '15', room: '',
-                  accepts_urgent: true }
-  const [form, setForm] = useState(blank)
+// ═══ إضافة دكتور — نافذةٌ فوق الصفحة، والحقول والتحقّق والمسار كما كانت في النموذج المضمَّن ═══
+// الخطأ يبقى داخلها بقيمه. والإغلاق (Esc، النقر خارجها، «إلغاء») يسأل أولاً إن كُتب شيء.
+const BLANK_DOCTOR = { name: '', specialty_id: '', phone: '', consultation_fee: '', followup_fee: '',
+                       followup_window_days: '7', expected_visit_minutes: '15', room: '',
+                       accepts_urgent: true }
+function NewDoctorDialog({ onClose, onCreated }) {
+  const dlg = useDialogs()
+  const [form, setForm] = useState(BLANK_DOCTOR)
   const [err, setErr] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const asking = useRef(false)   // Esc يصل نافذة التأكيد وهذه معاً — سؤالٌ واحد لا اثنان
+  const uid = useId()             // يربط كل عنوانٍ بحقله (النقر عليه، وقارئ الشاشة)
+  const fid = (k) => `${uid}-${k}`
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
   const setBool = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.checked }))
+  const dirty = Object.keys(BLANK_DOCTOR).some((k) => form[k] !== BLANK_DOCTOR[k])
+  const close = async () => {
+    if (asking.current) return
+    if (dirty) {
+      asking.current = true
+      const ok = await dlg.confirm({ title: 'تجاهل التغييرات؟', body: 'القيم المكتوبة لهذا الدكتور لن تُحفظ.',
+        confirmLabel: 'تجاهل', cancelLabel: 'متابعة الكتابة', danger: true })
+      asking.current = false
+      if (!ok) return
+    }
+    onClose()
+  }
   const submit = async (e) => {
     e.preventDefault()
-    setErr(null)
+    setErr(null); setBusy(true)
     try {
       await api.clinic.addDoctor({
         ...form,
@@ -24,23 +46,25 @@ function NewDoctorForm({ onCreated }) {
         followup_window_days: Number(form.followup_window_days) || 7,
         expected_visit_minutes: Number(form.expected_visit_minutes) || 15,
       })
-      setForm(blank); onCreated()
+      onCreated(form.name.trim())
     } catch (ex) { setErr(ex.message) }
+    finally { setBusy(false) }
   }
   return (
-    <form className="inline" onSubmit={submit} style={{ marginTop: 14 }}>
-      <div className="field"><label>اسم الدكتور</label><input value={form.name} onChange={set('name')} required /></div>
+    <Modal title="إضافة دكتور" onClose={close} busy={busy} sheet>
+    <form className="inline new-doctor-form" onSubmit={submit}>
+      <div className="field"><label htmlFor={fid('name')}>اسم الدكتور</label><input id={fid('name')} value={form.name} onChange={set('name')} required autoFocus /></div>
       <SpecialtyPicker value={form.specialty_id} canAdd
         onChange={(v) => setForm((f) => ({ ...f, specialty_id: v }))} />
-      <div className="field"><label>الجوال</label><input value={form.phone} onChange={set('phone')} /></div>
+      <div className="field"><label htmlFor={fid('phone')}>الجوال</label><input id={fid('phone')} value={form.phone} onChange={set('phone')} dir="ltr" /></div>
       {/* رقم الغرفة يُشتقّ منه اسم المقطع الصوتي (room-3.mp3) — الخادم يطبّع
           الأرقام العربية والمسافات، والتنويه هنا يمنع المشكلة من أصلها (AUDIO.md) */}
-      <div className="field"><label>الغرفة</label><input value={form.room} onChange={set('room')} placeholder="مثال: 3" />
+      <div className="field"><label htmlFor={fid('room')}>الغرفة</label><input id={fid('room')} value={form.room} onChange={set('room')} placeholder="مثال: 3" />
         <small className="hint">بالأرقام اللاتينية (3 لا ٣) — يُنطق على شاشة النداء</small></div>
-      <div className="field"><label>سعر المعاينة (ل.س)</label><input type="number" min="0" value={form.consultation_fee} onChange={set('consultation_fee')} required /></div>
-      <div className="field"><label>سعر المراجعة (ل.س)</label><input type="number" min="0" value={form.followup_fee} onChange={set('followup_fee')} required /></div>
-      <div className="field"><label>صلاحية المراجعة (يوم)</label><input type="number" min="1" value={form.followup_window_days} onChange={set('followup_window_days')} required /></div>
-      <div className="field"><label>مدة الكشف المتوقعة (دقيقة)</label><input type="number" min="1" value={form.expected_visit_minutes} onChange={set('expected_visit_minutes')} required /></div>
+      <div className="field"><label htmlFor={fid('consultation_fee')}>سعر المعاينة (ل.س)</label><input id={fid('consultation_fee')} type="number" min="0" value={form.consultation_fee} onChange={set('consultation_fee')} required /></div>
+      <div className="field"><label htmlFor={fid('followup_fee')}>سعر المراجعة (ل.س)</label><input id={fid('followup_fee')} type="number" min="0" value={form.followup_fee} onChange={set('followup_fee')} required /></div>
+      <div className="field"><label htmlFor={fid('followup_window_days')}>صلاحية المراجعة (يوم)</label><input id={fid('followup_window_days')} type="number" min="1" value={form.followup_window_days} onChange={set('followup_window_days')} required /></div>
+      <div className="field"><label htmlFor={fid('expected_visit_minutes')}>مدة الكشف المتوقعة (دقيقة)</label><input id={fid('expected_visit_minutes')} type="number" min="1" value={form.expected_visit_minutes} onChange={set('expected_visit_minutes')} required /></div>
       {/* اختصاصات كالتخاطب والعلاج الفيزيائي لا تأتيها حالات إسعافية — إطفاء العلم
           يُخفي زرّي الحجز الفوري والترقية عند هذا الدكتور، والخادم يرفضهما كذلك */}
       <div className="field field-check">
@@ -50,9 +74,14 @@ function NewDoctorForm({ onCreated }) {
         </label>
         <small className="hint">أطفئه للاختصاصات التي لا تأتيها حالات إسعافية (تخاطب، علاج فيزيائي)</small>
       </div>
-      <button type="submit">إضافة دكتور</button>
-      {err && <p className="error">{err}</p>}
+      {/* الخطأ فوق الزرّين داخل الشريط الثابت: على الجوال يبقى ظاهراً حيث نُقر «إضافة» مهما طالت الورقة */}
+      <div className="new-doctor-actions">
+        {err && <p className="error" role="alert">{err}</p>}
+        <button type="submit" disabled={busy}>{busy ? 'جارٍ الإضافة…' : 'إضافة دكتور'}</button>
+        <button type="button" className="ghost" disabled={busy} onClick={close}>إلغاء</button>
+      </div>
     </form>
+    </Modal>
   )
 }
 
@@ -385,8 +414,12 @@ function SchedulePreview({ version }) {
 }
 
 export default function ClinicDoctors() {
+  const { role } = useRole()
   const [doctors, setDoctors] = useState(null)
   const [err, setErr] = useState(null)
+  const [query, setQuery] = useState('')
+  const [adding, setAdding] = useState(false)
+  const [toast, showToast] = useToast()
   const [schedVersion, setSchedVersion] = useState(0)
   const bumpSchedules = () => setSchedVersion((v) => v + 1)
 
@@ -395,6 +428,8 @@ export default function ClinicDoctors() {
 
   if (err) return <p className="error">{err}</p>
   if (!doctors) return <p className="empty">جارٍ التحميل…</p>
+  const shown = doctors.filter((d) => doctorMatches(d, query))
+  const searching = query.trim() !== ''
 
   return (
     <>
@@ -404,18 +439,47 @@ export default function ClinicDoctors() {
         الذي تُولَّد منه جلسات كل يوم.
       </p>
 
+      {toast}
       <div className="card">
-        <h3>الدكاترة ({doctors.length})</h3>
-        <NewDoctorForm onCreated={load} />
+        <div className="doctors-head">
+          <h3>الدكاترة ({doctors.length})</h3>
+          {/* الإضافة لمشرف العيادات وحده — الخادم يرفضها لغيره أصلاً */}
+          {role === 'clinic_admin' && <button type="button" onClick={() => setAdding(true)}>+ إضافة دكتور</button>}
+        </div>
+        {doctors.length > 0 && (
+          <div className="doctors-search" role="search">
+            <div className="doctors-search-box">
+              <input type="search" value={query} onChange={(e) => setQuery(e.target.value)}
+                placeholder="ابحث بالاسم أو الاختصاص أو الجوال…" aria-label="ابحث في الدكاترة" />
+              {searching && (
+                <button type="button" className="doctors-search-clear" aria-label="مسح البحث"
+                  onClick={() => setQuery('')}>×</button>
+              )}
+            </div>
+            <span className="doctors-count" aria-live="polite">
+              {searching ? `${shown.length} من ${doctors.length} دكتور` : `${doctors.length} دكتور`}
+            </span>
+          </div>
+        )}
+        {shown.length === 0 && searching ? (
+          <EmptyState text="ما في دكتور بهالاسم" hint={`لا نتائج لـ «${query.trim()}» في الاسم ولا الاختصاص ولا الجوال.`}>
+            <button type="button" className="ghost" onClick={() => setQuery('')}>مسح البحث</button>
+          </EmptyState>
+        ) : (
         <table className="rtable" style={{ marginTop: 14 }}>
           <thead>
             <tr><th>الاسم</th><th>الاختصاص</th><th>الجوال</th><th>سعر المعاينة</th><th>سعر المراجعة</th><th>مدة الكشف</th><th>الحالة</th><th></th></tr>
           </thead>
           <tbody>
-            {doctors.map((d) => <DoctorRow key={d.id} doctor={d} onChanged={load} onSchedulesChanged={bumpSchedules} />)}
+            {shown.map((d) => <DoctorRow key={d.id} doctor={d} onChanged={load} onSchedulesChanged={bumpSchedules} />)}
           </tbody>
         </table>
+        )}
       </div>
+      {adding && (
+        <NewDoctorDialog onClose={() => setAdding(false)}
+          onCreated={(name) => { setAdding(false); load(); showToast(`أُضيف ${name}`, 'success', 3500) }} />
+      )}
 
       <SchedulePreview version={schedVersion} />
     </>

@@ -3053,6 +3053,43 @@ table.cash-staff-table { font-size: 13px; min-width: 480px; }
 
 .rt-only { display: none; }   /* نصٌّ يظهر في وضع البطاقات وحده (زرّ أيقونةٍ يحتاج اسماً) */
 
+/* ═══ الدكاترة: البحث في القائمة، ونافذة الإضافة ═══ */
+.doctors-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.doctors-head h3 { margin: 0; }
+.doctors-search { display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; margin-top: 14px; }
+.doctors-search-box { position: relative; flex: 0 1 340px; min-width: 0; }
+.doctors-search-box input { width: 100%; padding-inline-end: 38px; }
+/* زرّ المسح داخل الحقل في طرفه (يسار في RTL)؛ وعلامة المسح الأصلية للمتصفّح تُخفى كي لا يتكرّر */
+.doctors-search-box input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
+button.doctors-search-clear {
+  position: absolute; inset-inline-end: 4px; top: 50%; transform: translateY(-50%);
+  width: 32px; height: 32px; padding: 0; border-radius: 8px; font-size: 20px; line-height: 1;
+  background: transparent; color: var(--muted);
+}
+button.doctors-search-clear:hover { background: var(--primary-soft); color: var(--accent-text); filter: none; }
+.doctors-count { font-size: 12.5px; color: var(--text-secondary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.new-doctor-form { margin-top: 12px; }
+.new-doctor-actions { flex: 1 1 100%; display: flex; flex-wrap: wrap; gap: 8px; }
+.new-doctor-actions > .error { flex: 1 1 100%; margin: 0; }
+
+@media (max-width: 767px) {
+  .doctors-head > button { min-height: 44px; }
+  .doctors-search-box { flex: 1 1 100%; }
+  .doctors-search-box input { min-height: 44px; }
+  button.doctors-search-clear { width: 40px; height: 40px; }
+  /* ورقةٌ سفلية بعرض الشاشة: الحقول بعرضها كاملاً والأزرار بإصبع، وتمريرٌ رأسيّ وحده */
+  .modal-backdrop.modal-sheet { align-items: flex-end; padding: 0; }
+  .modal-sheet > .modal-card {
+    max-width: none; border-radius: 18px 18px 0 0; border-bottom: 0;
+    max-height: calc(100dvh - 24px); padding: 18px 16px calc(16px + env(safe-area-inset-bottom));
+  }
+  .modal-sheet .new-doctor-form > .field { flex: 1 1 100%; }
+  .modal-sheet .new-doctor-form :is(input:not([type='checkbox']), select, button) { min-height: 44px; }
+  .new-doctor-actions { position: sticky; bottom: -16px; padding: 10px 0 4px; background: var(--surface-1); }
+  .new-doctor-actions > button { flex: 1 1 0; min-height: 48px; }
+  .new-doctor-actions > .error { padding: 8px 10px; border-radius: 10px; background: var(--status-bad-bg); }
+}
+
 /* ═══════════════════════════════════════════════════════════
    الجداول على الموبايل: كل سطرٍ بطاقة (table.rtable)
    ═══════════════════════════════════════════════════════════
