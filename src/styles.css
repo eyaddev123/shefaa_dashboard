@@ -3198,3 +3198,107 @@ button.doctors-search-clear:hover { background: var(--primary-soft); color: var(
   /* لا تلميح تمرير أفقي على بطاقةٍ صار جدولها بطاقات */
   .card:has(> table.rtable), .card:has(> div > table.rtable) { background-image: none; }
 }
+
+/* ═══ قواعد الحصّة: نوافذ الإضافة/التعديل والتوزيع وتاريخ التسعيرة ═══
+   النوافذ Modal القائم بخيار sheet (ورقة سفلية تحت 768px). الشريط الثابت أسفلها
+   (.dialog-actions) يحمل الخطأ فوق الأزرار — كشريط «إضافة دكتور» — فيبقى ظاهراً حيث يُنقر. */
+.toast-warning { background: var(--status-pending-bg); color: var(--status-pending); border: 1px solid var(--status-pending); }
+button.danger-text { color: var(--status-bad); }
+.dialog-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.dialog-actions > .error { flex: 1 1 100%; margin: 0; }
+.rule-dialog { display: flex; flex-direction: column; gap: 12px; }
+.rule-step { border: 0; padding: 0; margin: 0; min-width: 0; }
+.rule-step > legend { padding: 0; margin-bottom: 8px; font-size: 13px; font-weight: 800; color: var(--accent-text); }
+.rule-step > .hint { font-size: 12.5px; color: var(--text-secondary); margin: 0 0 10px; line-height: 1.7; }
+.rule-step input[type='search'] { width: 100%; box-sizing: border-box; }
+.rule-fields { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: flex-end; }
+.rule-fields > .field { flex: 0 1 180px; min-width: 0; }
+.rule-fields > .field > :is(input, select) { width: 100%; box-sizing: border-box; }
+.rule-fields input[aria-invalid='true'] { border-color: var(--status-bad); }
+.rule-msg { flex: 1 1 100%; margin: 0; }
+p.hint.rule-msg { font-size: 12px; color: var(--muted); line-height: 1.6; }
+.rule-proc-fixed { margin: 0; font-size: 14px; }
+.rule-clash { padding: 10px 12px; border-radius: 10px; background: var(--status-pending-bg); color: var(--text-primary);
+  display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.rule-clash > p { margin: 0; flex: 1 1 260px; font-size: 13px; line-height: 1.7; }
+
+/* قائمة اختيار (إجراء واحد بالراديو، أو دكاترة بالمربّعات): صفٌّ كامل قابلٌ للنقر */
+.pick-list { margin-top: 8px; max-height: 240px; overflow-y: auto; border: 1px solid var(--grid); border-radius: 10px; }
+.pick-list-tall { max-height: min(46vh, 420px); }
+.pick-list > .empty { margin: 12px; }
+.pick-row { display: flex; align-items: center; gap: 6px 10px; flex-wrap: wrap; padding: 8px 12px; min-height: 40px;
+  border-bottom: 1px solid var(--grid); cursor: pointer; box-sizing: border-box; }
+.pick-row:last-child { border-bottom: 0; }
+.pick-row:hover { background: var(--primary-soft); }
+.pick-row.on { background: var(--primary-soft); }
+.pick-row > input { margin: 0; width: 18px; height: 18px; flex: 0 0 auto; accent-color: var(--primary); }
+.pick-name { font-weight: 700; font-size: 13.5px; }
+.pick-meta { font-size: 12px; color: var(--text-secondary); }
+.pick-row > .badge { margin-inline-start: auto; }
+.pick-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; margin-top: 10px; }
+
+/* شرائح الاختصاص: زرٌّ واحد مفعَّل (aria-pressed) أو «الكل» */
+.spec-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+button.spec-chip-btn { padding: 5px 12px; border-radius: 999px; font-size: 12.5px; font-weight: 700;
+  background: var(--surface-1); color: var(--text-secondary); border: 1px solid var(--grid); }
+button.spec-chip-btn[aria-pressed='true'] { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+/* المراحل الثلاث */
+.stepper { list-style: none; display: flex; gap: 6px; padding: 0; margin: 4px 0 16px; }
+.stepper > li { flex: 1 1 0; display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 10px;
+  font-size: 12.5px; font-weight: 700; color: var(--muted); background: var(--page); min-width: 0; }
+.stepper > li.on { color: var(--accent-text); background: var(--primary-soft); box-shadow: inset 0 0 0 1px var(--primary); }
+.stepper > li.done { color: var(--text-secondary); }
+.stepper-n { flex: 0 0 auto; width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center;
+  justify-content: center; font-size: 12px; background: var(--grid); color: var(--text-secondary); }
+.stepper > li.on .stepper-n { background: var(--primary); color: #fff; }
+.stepper > li.done .stepper-n { background: var(--status-good-bg); color: var(--status-good); }
+
+.dist-summary { margin: 0 0 8px; font-size: 14.5px; line-height: 1.9; }
+.dist-names { margin: 0 0 12px; font-size: 12.5px; color: var(--text-secondary); line-height: 1.8; }
+.dist-existing { margin: 12px 0; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--status-pending);
+  background: var(--status-pending-bg); }
+.dist-existing > h4 { margin: 0 0 6px; font-size: 13.5px; color: var(--status-pending); }
+.dist-existing > ul { list-style: none; margin: 0 0 10px; padding: 0; }
+.dist-existing li { display: flex; flex-wrap: wrap; gap: 2px 10px; padding: 5px 0; font-size: 13px;
+  border-bottom: 1px solid color-mix(in srgb, var(--status-pending) 25%, transparent); }
+.dist-existing li:last-child { border-bottom: 0; }
+.dist-existing .muted { color: var(--text-secondary); }
+/* زرّان متلاصقان كمفتاح: «تخطّيهم» | «استبدال» */
+.seg { display: inline-flex; border: 1px solid var(--grid); border-radius: 10px; overflow: hidden; background: var(--surface-1); }
+.seg > label { display: inline-flex; align-items: center; gap: 6px; padding: 7px 16px; font-size: 13px; font-weight: 700;
+  cursor: pointer; color: var(--text-secondary); }
+.seg > label + label { border-inline-start: 1px solid var(--grid); }
+.seg > label.on { background: var(--primary); color: #fff; }
+.seg > label > input { position: absolute; opacity: 0; pointer-events: none; }
+.seg > label:focus-within { outline: 2px solid var(--primary); outline-offset: -2px; }
+
+/* البروفايل: النسبة العامّة، ورأس القواعد بزرّ الإضافة */
+.share-general { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; }
+.share-general > .field > input { width: 110px; }
+.share-rules-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin: 16px 0 8px; }
+.share-rules-head > h4 { margin: 0; }
+.share-rule-actions { white-space: nowrap; }
+.share-rule-actions > button { padding: 3px 10px; font-size: 11.5px; }
+.share-rule-actions > button + button { margin-inline-start: 4px; }
+
+.pricing-log .pricing-names { display: block; margin-top: 2px; font-size: 12px; color: var(--text-secondary); }
+.pricing-log li > span:first-of-type { flex: 1 1 280px; min-width: 0; }
+
+@media (max-width: 767px) {
+  .modal-sheet .rule-fields > .field { flex: 1 1 100%; }
+  .modal-sheet :is(.rule-dialog, .rule-step) :is(input:not([type='checkbox']):not([type='radio']), select),
+  .modal-sheet .dialog-actions > button, .modal-sheet .rule-clash > button { min-height: 44px; }
+  .modal-sheet .pick-row { min-height: 48px; }
+  .modal-sheet .pick-bar > button, .modal-sheet button.spec-chip-btn, .modal-sheet .seg > label { min-height: 44px; }
+  .modal-sheet .seg { display: flex; }
+  .modal-sheet .seg > label { flex: 1 1 0; justify-content: center; }
+  .modal-sheet .stepper > li { flex-direction: column; gap: 2px; padding: 6px 4px; text-align: center; font-size: 12px; }
+  .dialog-actions { position: sticky; bottom: -16px; padding: 10px 0 4px; background: var(--surface-1); }
+  .dialog-actions > button { flex: 1 1 0; min-height: 48px; }
+  .dialog-actions > .error { padding: 8px 10px; border-radius: 10px; background: var(--status-bad-bg); }
+  .share-general > .field { flex: 1 1 auto; }
+  .share-general > .field > input { width: 100%; box-sizing: border-box; min-height: 44px; }
+  .share-general > button, .share-rules-head > button { min-height: 44px; }
+  .proc-edit-actions > button { flex: 1 1 0; min-height: 44px; }
+}
