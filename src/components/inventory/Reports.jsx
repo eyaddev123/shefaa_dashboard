@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, fmtMoney, todayLocal } from '../../api.js'
-import { EmptyState, fmtDay, fmtQty } from './shared.jsx'
+import { EmptyState, fmtDay, fmtQty, fmtSignedMoney, materialsCount } from './shared.jsx'
 
 const monthStart = () => `${todayLocal().slice(0, 8)}01`
 const GROUPS = [['material', 'المادة'], ['doctor', 'الدكتور'], ['procedure', 'الإجراء']]
@@ -30,7 +30,11 @@ function useReport(load, deps) {
   return [data, err]
 }
 
-function Consumption({ showToast }) {
+// ═══ تقرير الاستهلاك الواحد ═══
+// لكل مادة في المدى: الكمّية، وقيمة البيع (ما حُسب على الإجراءات من لقطاتها)، وكلفة
+// الشراء (بسعر آخر شراء)، والهامش بينهما — الفرق معلومةٌ لا تقريران يتناقضان.
+// المجلس (withCost=false) يرى الكمّية وقيمة البيع وحدهما، والخادم يحذف الباقي أصلاً.
+function Consumption({ showToast, withCost }) {
   const [from, setFrom] = useState(monthStart)
   const [to, setTo] = useState(() => todayLocal())
   const [group, setGroup] = useState('material')
@@ -42,6 +46,7 @@ function Consumption({ showToast }) {
     catch (ex) { showToast(ex.message) } finally { setBusy(false) }
   }
   const grouped = group !== 'material'
+  const groupLabel = group === 'doctor' ? 'الدكتور' : 'الإجراء'
   return (
     <div className="card">
       <div className="inv-toolbar">
@@ -60,30 +65,66 @@ function Consumption({ showToast }) {
         : data.rows.length === 0 ? (
           <EmptyState text="لا استهلاك في هذا المدى." hint="الاستهلاك يُسجَّل من مواد الإجراءات تلقائياً." />
         ) : (
-          <table className="inv-table">
-            <thead><tr>
-              {grouped && <th>{group === 'doctor' ? 'الدكتور' : 'الإجراء'}</th>}
-              <th>المادة</th><th>الكمّية المستهلكة</th><th>في إجراءات</th><th>القيمة (بسعر آخر شراء)</th>
-            </tr></thead>
-            <tbody>
-              {data.rows.map((r, i) => {
-                const first = grouped && (i === 0 || data.rows[i - 1].group_id !== r.group_id)
-                return (
-                  <tr key={`${r.group_id}-${r.material_id}`} className={grouped && !first ? 'inv-grouped' : undefined}>
-                    {grouped && <td>{first ? <strong>{r.group_name}</strong> : ''}</td>}
-                    <td>{r.material}</td>
-                    <td className="num"><strong>{fmtQty(r.qty)}</strong> {r.unit}</td>
-                    <td className="num">{r.lines.toLocaleString('ar-SY')}</td>
-                    <td className="num">{r.value === null ? '—' : fmtMoney(r.value)}</td>
-                  </tr>
-                )
-              })}
-              <tr className="rev-total-row">
-                <td colSpan={grouped ? 4 : 3}>الإجمالي{data.missing_cost ? <span className="inv-muted"> — {data.missing_cost.toLocaleString('ar-SY')} بلا سعر شراء لا تدخل فيه</span> : ''}</td>
-                <td className="num">{fmtMoney(data.total_value)}</td>
-              </tr>
-            </tbody>
-          </table>
+          <>
+            <table className="inv-table inv-cons rtable">
+              <thead><tr>
+                {grouped && <th>{groupLabel}</th>}
+                <th>المادة</th><th>الكمّية المستهلكة</th><th>في إجراءات</th><th>قيمة البيع</th>
+                {withCost && <><th>كلفة الشراء</th><th>الهامش</th></>}
+              </tr></thead>
+              <tbody>
+                {data.rows.map((r, i) => {
+                  const first = grouped && (i === 0 || data.rows[i - 1].group_id !== r.group_id)
+                  return (
+                    <tr key={`${r.group_id}-${r.material_id}`} className={grouped && !first ? 'inv-grouped' : undefined}>
+                      {/* على الجوال كلّ بطاقةٍ تحمل مجموعتها — فلا تضيع بين البطاقات */}
+                      {grouped && (
+                        <td className="rt-full inv-cons-group" data-label={groupLabel}>
+                          {first ? <strong>{r.group_name}</strong> : <span className="rt-only">{r.group_name}</span>}
+                        </td>
+                      )}
+                      <td className="rt-title">
+                        {r.material}
+                        {!r.is_active && <span className="badge sm" style={{ marginInlineStart: 6 }}>معطَّلة</span>}
+                      </td>
+                      <td className="num" data-label="الكمّية المستهلكة"><strong>{fmtQty(r.qty)}</strong> {r.unit}</td>
+                      <td className="num" data-label="في إجراءات">{r.lines.toLocaleString('ar-SY')}</td>
+                      <td className="num" data-label="قيمة البيع">{fmtMoney(r.sale_value)}</td>
+                      {withCost && (
+                        <>
+                          <td className="num" data-label="كلفة الشراء">
+                            {r.cost_value === null ? <span className="inv-muted">بلا سعر شراء</span> : fmtMoney(r.cost_value)}
+                            {r.unit_cost !== null && <span className="inv-sub">{fmtMoney(r.unit_cost)} للوحدة</span>}
+                          </td>
+                          <td className={`num inv-margin${r.margin !== null && r.margin < 0 ? ' neg' : ''}`} data-label="الهامش">
+                            {r.margin === null ? '—' : <bdi dir="rtl">{fmtSignedMoney(r.margin)}</bdi>}
+                          </td>
+                        </>
+                      )}
+                    </tr>
+                  )
+                })}
+                <tr className="rev-total-row">
+                  <td colSpan={grouped ? 4 : 3} className="rt-title">الإجمالي</td>
+                  <td className="num" data-label="قيمة البيع">{fmtMoney(data.total_sale)}</td>
+                  {withCost && (
+                    <>
+                      <td className="num" data-label="كلفة الشراء">{fmtMoney(data.total_cost)}</td>
+                      <td className={`num inv-margin${data.total_margin < 0 ? ' neg' : ''}`} data-label="الهامش">
+                        <bdi dir="rtl">{fmtSignedMoney(data.total_margin)}</bdi></td>
+                    </>
+                  )}
+                </tr>
+              </tbody>
+            </table>
+            <p className="inv-footnote">
+              قيمة البيع ما حُسب على الإجراءات بسعر المادة لحظة إضافتها.
+              {withCost && ' كلفة الشراء بسعر آخر شراء، والهامش الفرق بينهما.'}
+              {withCost && data.missing_cost > 0 && (
+                <span className="inv-muted"> {materialsCount(data.missing_cost)} بلا سعر شراء — لا تدخل في الكلفة ولا الهامش.</span>
+              )}
+            </p>
+          </>
         )}
     </div>
   )
@@ -111,21 +152,21 @@ function Purchases({ showToast }) {
         : !data ? <p className="empty">جارٍ التحميل…</p>
         : data.rows.length === 0 ? <EmptyState text="لا مشتريات في هذا المدى." />
         : (
-          <table className="inv-table">
+          <table className="inv-table rtable">
             <thead><tr><th>التاريخ</th><th>المادة</th><th>الكمّية</th><th>سعر الوحدة</th><th>المورّد</th><th>المجموع</th></tr></thead>
             <tbody>
               {data.rows.map((r) => (
                 <tr key={r.id}>
-                  <td className="inv-nowrap">{fmtDay(r.date)}</td>
-                  <td>{r.material}</td>
-                  <td className="num">{fmtQty(r.qty)} {r.unit}</td>
-                  <td className="num">{r.unit_cost === null ? '—' : fmtMoney(r.unit_cost)}</td>
-                  <td>{r.supplier || <span className="inv-muted">—</span>}</td>
-                  <td className="num">{r.total === null ? '—' : fmtMoney(r.total)}</td>
+                  <td className="inv-nowrap rt-badge">{fmtDay(r.date)}</td>
+                  <td className="rt-title">{r.material}</td>
+                  <td className="num" data-label="الكمّية">{fmtQty(r.qty)} {r.unit}</td>
+                  <td className="num" data-label="سعر الوحدة">{r.unit_cost === null ? '—' : fmtMoney(r.unit_cost)}</td>
+                  <td data-label="المورّد">{r.supplier || <span className="inv-muted">—</span>}</td>
+                  <td className="num" data-label="المجموع">{r.total === null ? '—' : fmtMoney(r.total)}</td>
                 </tr>
               ))}
               <tr className="rev-total-row">
-                <td colSpan={5}>الإجمالي{data.missing_cost ? <span className="inv-muted"> — {data.missing_cost.toLocaleString('ar-SY')} بلا سعر لا تدخل فيه</span> : ''}</td>
+                <td colSpan={5} className="rt-title">الإجمالي{data.missing_cost ? <span className="inv-muted"> — {data.missing_cost.toLocaleString('ar-SY')} بلا سعر لا تدخل فيه</span> : ''}</td>
                 <td className="num">{fmtMoney(data.total)}</td>
               </tr>
             </tbody>
@@ -135,11 +176,12 @@ function Purchases({ showToast }) {
   )
 }
 
-export default function Reports({ showToast }) {
+// withCost: المشرفة والمدير والمشرف العام. والمجلس بلا المشتريات (أسعار شراء) ولا كلفة الاستهلاك
+export default function Reports({ showToast, withCost }) {
   return (
     <>
-      <Consumption showToast={showToast} />
-      <Purchases showToast={showToast} />
+      <Consumption showToast={showToast} withCost={withCost} />
+      {withCost && <Purchases showToast={showToast} />}
     </>
   )
 }

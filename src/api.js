@@ -209,15 +209,9 @@ export const api = {
       if (doctorId) q.set('doctor_id', String(doctorId))
       return downloadFile(`/api/clinic/procedures/export?${q}`, `حصص الإجراءات-${from}.xlsx`)
     },
-    materialsConsumption: ({ from, to }) =>
-      http(`/clinic/materials/consumption?${new URLSearchParams({ from, to: to || from })}`),
-    exportConsumption: ({ from, to }) =>
-      downloadFile(`/api/clinic/materials/consumption?${new URLSearchParams({ from, to: to || from, format: 'xlsx' })}`,
-        `استهلاك المواد-${from}.xlsx`),
-    // ── كتالوج المواد ── (الاستقبال يتسلّم المفعَّل بلا سعر — من الخادم نفسه)
+    // ── كتالوج المواد: قراءةٌ وحدها ── (الاستقبال يتسلّم المفعَّل بلا سعر — من الخادم نفسه).
+    // الكتابة والاستهلاك في api.inventory: صفحة «المخزون» المكان الوحيد لإدارة المواد
     materials: () => http('/clinic/materials'),
-    addMaterial: (body) => http('/clinic/materials', { method: 'POST', body: JSON.stringify(body) }),
-    updateMaterial: (id, body) => http(`/clinic/materials/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
     setDoctorShare: (id, body) =>
       http(`/clinic/doctors/${id}/share`, { method: 'PATCH', body: JSON.stringify(body) }),
     doctorProcedureShares: (id) => http(`/clinic/doctors/${id}/procedure-shares`),

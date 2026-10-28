@@ -1,26 +1,24 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { ProcedureSpecialties, specialtiesText } from '../SpecialtyPicker.jsx'
 import { useDialogs } from '../dialogs.jsx'
 import { api, fmtMoney, toLatinDigits } from '../api.js'
 import { useRole } from '../RoleContext.jsx'
 import { useToast } from '../action-feedback.jsx'
-import MaterialsCatalog from './MaterialsCatalog.jsx'
 import ProcedureReview from './ProcedureReview.jsx'
-import MaterialsConsumption from './MaterialsConsumption.jsx'
 
 // ═══ العيادات — الإجراءات ═══
 // كتالوج عام لكل الدكاترة: اسم وسعر، بلا كمية. مسؤول العيادات يضيف ويعدّل ويعطّل —
 // ولا حذف (الحجوزات تشير إليه). تعديل السعر يسري على ما يُضاف بعده فقط: كل حجز
 // يحمل نسخة السعر لحظة إضافته. المجلس والمشرف العام والمدير يطالعون فقط.
 
-// من يرى المواد بأسعارها والمراجعة والتقارير — يطابق SETTLEMENT_VIEWERS في الخادم.
+// من يرى المراجعة (المواد بأسعارها والتقسيم) — يطابق SETTLEMENT_VIEWERS في الخادم.
 // الاستقبال غائبٌ عمداً (ولا يرى الصفحة أصلاً): يُدخل الإجراء وموادّه، ولا شأن له بالتقسيم.
+// كتالوج المواد واستهلاكها ليسا هنا: صفحة «المخزون» المكان الوحيد لإدارتهما.
 const SETTLEMENT_VIEWERS = ['clinic_admin', 'board', 'super_admin', 'manager']
 const TABS = [
   { key: 'catalog', label: 'الإجراءات' },
-  { key: 'materials', label: 'المواد' },
   { key: 'review', label: 'المراجعة' },
-  { key: 'consumption', label: 'استهلاك المواد' },
 ]
 
 function NewProcedureForm({ onCreated }) {
@@ -164,8 +162,9 @@ export default function ClinicProcedures() {
       <h2>العيادات — الإجراءات</h2>
       <p className="subtitle">
         الاستقبال يضيف الإجراء على الحجز بعد دخول المريض، ومعه المواد المستعملة فعلاً بكمّياتها؛
-        فتُحسب المواد وحصّة الدكتور وحصّة الشفاء <strong>فوراً</strong> وتُثبَّت. والمريض يدفع سعر الإجراء
-        كما هو دائماً. تعديل الأسعار والقواعد يسري على ما يُضاف بعده فقط. لا حذف: المُستغنى عنه يُعطَّل.
+        فتُحسب المواد وحصّة الدكتور وحصّة الشفاء <strong>فوراً</strong> وتُثبَّت، وتنزل المواد من رصيد
+        المخزون تلقائياً. والمريض يدفع سعر الإجراء كما هو دائماً. تعديل الأسعار والقواعد يسري على ما
+        يُضاف بعده فقط. لا حذف: المُستغنى عنه يُعطَّل. كتالوج المواد وأسعارها واستهلاكها في صفحة <Link to="/inventory">«المخزون»</Link>.
       </p>
       {toast}
 
@@ -180,9 +179,7 @@ export default function ClinicProcedures() {
         </div>
       )}
 
-      {tab === 'materials' ? <MaterialsCatalog canEdit={canEdit} showToast={showToast} />
-      : tab === 'review' ? <ProcedureReview canEdit={canEdit} showToast={showToast} />
-      : tab === 'consumption' ? <MaterialsConsumption showToast={showToast} />
+      {tab === 'review' ? <ProcedureReview canEdit={canEdit} showToast={showToast} />
       : (
       <div className="card">
         <h3>الكتالوج ({list.length} — المفعَّل {active})</h3>

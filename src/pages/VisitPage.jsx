@@ -645,6 +645,30 @@ const whenAt = (ts, sessionDay) => {
 // ★ المواد: الممرّضة تُملي ما استُعمل، والاستقبال يختاره من الكتالوج كاملاً بكمّيته.
 //   إجراءٌ بلا مواد (إيكو) طبيعيّ تماماً. ولا سعر مادة ولا تقسيم هنا — الخادم يحسبهما
 //   لحظة الحفظ ولا يرسلهما للاستقبال أصلاً.
+// ★ الرصيد لا يمنع الحفظ أبداً: إن أخذ الحفظُ مادةً إلى السالب يُرجع الخادم stock_warnings،
+//   فيبقى التحذير ظاهراً حتى يُغلق (لا toast يفوت). المشرفة تُدعى لتسجيل شراء أو جرد،
+//   والاستقبال — ولا صلاحية له على المخزون — يُدعى لإبلاغها.
+
+// «رصيد «جبس» الحالي ٣ علبة — هذا الاستهلاك سيأخذه للسالب. …»
+function stockWarningText(w, isSupervisor) {
+  const bal = <bdi dir="ltr">{fmtQty(w.balance)}</bdi>
+  const act = isSupervisor ? 'سجّلي شراء أو تسوية جرد.' : 'أبلغي مشرفة العيادات لتسجّل شراءً أو تسوية جرد.'
+  return w.balance < 0
+    ? <>رصيد «{w.name}» الحالي {bal} {w.unit} (سالب أصلاً) — هذا الاستهلاك يزيده نقصاً. {act}</>
+    : <>رصيد «{w.name}» الحالي {bal} {w.unit} — هذا الاستهلاك سيأخذه للسالب. {act}</>
+}
+
+function StockWarnings({ items, isSupervisor, onClose }) {
+  return (
+    <div className="warn-box stock-warn" role="alert">
+      <ul>
+        {items.map((w) => <li key={w.material_id}>{stockWarningText(w, isSupervisor)}</li>)}
+      </ul>
+      <button type="button" className="ghost" onClick={onClose}>حسناً</button>
+    </div>
+  )
+}
+
 function AppointmentProcedures({ appt, session, onChanged, onToast }) {
   const { role } = useRole()
   const [catalog, setCatalog] = useState(null)
@@ -656,6 +680,7 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
   const [reason, setReason] = useState('')
   const [editing, setEditing] = useState(null)     // id السطر الجاري تعديل موادّه
   const [editMats, setEditMats] = useState([])
+  const [stockWarns, setStockWarns] = useState([])   // من ردّ آخر حفظ — يبقى حتى «حسناً»
   const lines = appt.procedures || []
   // «بانتظار العودة» دخل على الطبيب ثمّ خرج مؤقتاً — والقطرة نفسها إجراءٌ يُضاف وهو في الصالة
   const entered = ['in_service', WAITING_RETURN, 'done'].includes(appt.status)
@@ -684,7 +709,8 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
     if (!chosen || !qtyValid(newMats)) return
     setBusy(true)
     try {
-      await api.clinic.addAppointmentProcedure(appt.id, chosen.id, toPayload(newMats))
+      const r = await api.clinic.addAppointmentProcedure(appt.id, chosen.id, toPayload(newMats))
+      setStockWarns(r.stock_warnings || [])
       const withMats = newMats.length ? ` + ${newMats.length} ${newMats.length === 1 ? 'مادة' : 'مواد'}` : ''
       onToast(`أُضيف «${chosen.name}» — ${fmtMoney(chosen.price)}${withMats}`, 'success')
       setPick(''); setNewMats([]); onChanged()
@@ -709,6 +735,7 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
     setBusy(true)
     try {
       const r = await api.clinic.setLineMaterials(appt.id, line.id, { materials: toPayload(editMats) })
+      setStockWarns(r.stock_warnings || [])
       onToast(r.unchanged ? 'لا تغيير في المواد' : `حُدّثت مواد «${line.name}»`, 'success')
       setEditing(null); onChanged()
     } catch (ex) { onToast(ex.message) }
@@ -717,6 +744,9 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
 
   return (
     <div className="appt-procs">
+      {stockWarns.length > 0 && (
+        <StockWarnings items={stockWarns} isSupervisor={role === 'clinic_admin'} onClose={() => setStockWarns([])} />
+      )}
       {lines.length === 0 ? (
         <p className="visit-empty">{canEdit ? 'لا إجراءات بعد — اختر الإجراء من القائمة وأضفه.' : 'لا إجراءات على هذه الزيارة.'}</p>
       ) : (

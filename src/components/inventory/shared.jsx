@@ -1,5 +1,5 @@
 import { useEffect, useId, useState } from 'react'
-import { toLatinDigits } from '../../api.js'
+import { fmtMoney, toLatinDigits } from '../../api.js'
 
 // ═══ أدوات صفحة المخزون المشتركة ═══
 // الأرقام بفواصل الآلاف وأرقامٍ عربية كبقية النظام (ar-SY)، والتواريخ بصيغته.
@@ -7,6 +7,9 @@ import { toLatinDigits } from '../../api.js'
 export const fmtQty = (q) => (q === null || q === undefined ? '—'
   : Number(q).toLocaleString('ar-SY', { maximumFractionDigits: 2 }))
 // «+٢٠» و«−٣» — علامة الطرح الحقيقية لا الشرطة
+// مبلغٌ سالب بعلامة «−» صريحة: toLocaleString('ar-SY') يسبق السالب بعلامة ALM (U+061C)
+// يرسمها خطّ الواجهة شَرطةً ثانية («--٤٠٠») — فالإشارة هنا والرقم بلا إشارة، كما في fmtSigned
+export const fmtSignedMoney = (n) => (Number(n) < 0 ? '−' : '') + fmtMoney(Math.abs(Number(n)))
 export const fmtSigned = (q) => (Number(q) > 0 ? '+' : Number(q) < 0 ? '−' : '') + fmtQty(Math.abs(Number(q)))
 // يومٌ «YYYY-MM-DD» بتوقيت الجهاز (لا UTC) — بصيغة fmtDate في النظام
 export const fmtDay = (d) => (d
