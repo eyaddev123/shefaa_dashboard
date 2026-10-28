@@ -45,8 +45,9 @@ export function parseNum(v) {
   return /^\d+(\.\d+)?$/.test(t) ? Number(t) : NaN
 }
 
-/** نافذة داخل النظام: Esc والنقر خارجها يُغلقانها (إلا أثناء الحفظ) */
-export function Modal({ title, subtitle, onClose, busy, wide, children }) {
+/** نافذة داخل النظام: Esc والنقر خارجها يُغلقانها (إلا أثناء الحفظ).
+ *  sheet: على الجوال (< 768px) تصير ورقةً سفلية بعرض الشاشة بدل بطاقةٍ في الوسط */
+export function Modal({ title, subtitle, onClose, busy, wide, sheet, children }) {
   const id = useId()
   useEffect(() => {
     const k = (e) => { if (e.key === 'Escape' && !busy) onClose() }
@@ -54,7 +55,7 @@ export function Modal({ title, subtitle, onClose, busy, wide, children }) {
     return () => window.removeEventListener('keydown', k)
   }, [busy, onClose])
   return (
-    <div className="modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose() }}>
+    <div className={`modal-backdrop${sheet ? ' modal-sheet' : ''}`} onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose() }}>
       <div className={`modal-card inv-modal${wide ? ' inv-modal-wide' : ''}`} role="dialog" aria-modal="true" aria-labelledby={id}>
         <h3 id={id} className="inv-modal-title">{title}</h3>
         {subtitle && <p className="inv-modal-sub">{subtitle}</p>}
