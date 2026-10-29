@@ -31,7 +31,7 @@ function MovementDetail({ m }) {
   )
 }
 
-function Movements({ material, refreshKey, onPurchase }) {
+function Movements({ material, refreshKey, onPurchase, canWrite }) {
   const [page, setPage] = useState(1)
   const [data, setData] = useState(null)
   const [err, setErr] = useState(null)
@@ -50,24 +50,24 @@ function Movements({ material, refreshKey, onPurchase }) {
     return (
       <EmptyState text="لا حركات لهذه المادة بعد."
         hint="الشراء يُدخلها، والإجراءات التي تستعملها تُخرجها تلقائياً.">
-        <button type="button" onClick={onPurchase}>تسجيل شراء</button>
+        {canWrite && <button type="button" onClick={onPurchase}>تسجيل شراء</button>}
       </EmptyState>
     )
   }
   const pages = Math.ceil(data.total / data.per)
   return (
     <>
-      <table className="inv-table">
+      <table className="inv-table rtable">
         <thead><tr><th>التاريخ</th><th>النوع</th><th>الكمّية</th><th>الرصيد بعدها</th><th>التفاصيل</th><th>سجّلها</th></tr></thead>
         <tbody>
           {data.rows.map((m) => (
             <tr key={m.id}>
-              <td className="inv-nowrap">{fmtDay(m.movement_date)}</td>
-              <td><span className={`badge sm ${TYPE_BADGE[m.type]}`}>{TYPE_LABELS[m.type]}</span></td>
-              <td className={`num inv-qty${m.quantity < 0 ? ' is-out' : ''}`} dir="ltr">{fmtSigned(m.quantity)}</td>
-              <td className={`num${m.balance_after < 0 ? ' neg' : ''}`} dir="ltr">{fmtQty(m.balance_after)}</td>
-              <td className="inv-detail"><MovementDetail m={m} /></td>
-              <td className="inv-who">{m.created_by_name || '—'}<span className="inv-sub">{fmtDateTime(m.created_at)}</span></td>
+              <td className="inv-nowrap rt-title">{fmtDay(m.movement_date)}</td>
+              <td className="rt-badge"><span className={`badge sm ${TYPE_BADGE[m.type]}`}>{TYPE_LABELS[m.type]}</span></td>
+              <td className={`num inv-qty${m.quantity < 0 ? ' is-out' : ''}`} data-label="الكمّية"><bdi dir="ltr">{fmtSigned(m.quantity)}</bdi></td>
+              <td className={`num${m.balance_after < 0 ? ' neg' : ''}`} data-label="الرصيد بعدها"><bdi dir="ltr">{fmtQty(m.balance_after)}</bdi></td>
+              <td className="inv-detail rt-full"><MovementDetail m={m} /></td>
+              <td className="inv-who rt-full">{m.created_by_name || '—'}<span className="inv-sub">{fmtDateTime(m.created_at)}</span></td>
             </tr>
           ))}
         </tbody>
@@ -83,7 +83,7 @@ function Movements({ material, refreshKey, onPurchase }) {
   )
 }
 
-function Prices({ material, refreshKey, onEditPrice }) {
+function Prices({ material, refreshKey, onEditPrice, canWrite }) {
   const [rows, setRows] = useState(null)
   const [err, setErr] = useState(null)
   useEffect(() => {
@@ -94,20 +94,20 @@ function Prices({ material, refreshKey, onEditPrice }) {
   if (rows.length === 0) {
     return (
       <EmptyState text="لم يُعدَّل سعر البيع بعد." hint={`السعر الحالي ${fmtMoney(material.unit_price)}.`}>
-        <button type="button" className="ghost" onClick={onEditPrice}>تعديل سعر البيع</button>
+        {canWrite && <button type="button" className="ghost" onClick={onEditPrice}>تعديل سعر البيع</button>}
       </EmptyState>
     )
   }
   return (
-    <table className="inv-table">
+    <table className="inv-table rtable">
       <thead><tr><th>التاريخ</th><th>القديم ← الجديد</th><th>الملاحظة</th><th>عدّله</th></tr></thead>
       <tbody>
         {rows.map((h) => (
           <tr key={h.id}>
-            <td className="inv-nowrap">{fmtDateTime(h.created_at)}</td>
-            <td className="num">{fmtMoney(h.old_price)} ← <strong>{fmtMoney(h.new_price)}</strong></td>
-            <td>{h.note || <span className="inv-muted">—</span>}</td>
-            <td>{h.created_by_name || '—'}</td>
+            <td className="inv-nowrap rt-title">{fmtDateTime(h.created_at)}</td>
+            <td className="num rt-full">{fmtMoney(h.old_price)} ← <strong>{fmtMoney(h.new_price)}</strong></td>
+            <td className="rt-full" data-label="الملاحظة">{h.note || <span className="inv-muted">—</span>}</td>
+            <td data-label="عدّله">{h.created_by_name || '—'}</td>
           </tr>
         ))}
       </tbody>
@@ -116,7 +116,7 @@ function Prices({ material, refreshKey, onEditPrice }) {
 }
 
 /** كرت المادة: رأسٌ بأهمّ الأرقام، وتبويبان: كشف الحركات وسجلّ الأسعار */
-export default function MaterialCard({ id, refreshKey, onBack, onPurchase, onEdit, onEditPrice }) {
+export default function MaterialCard({ id, refreshKey, canWrite, onBack, onPurchase, onEdit, onEditPrice }) {
   const [m, setM] = useState(null)
   const [err, setErr] = useState(null)
   const [tab, setTab] = useState('movements')
@@ -139,10 +139,12 @@ export default function MaterialCard({ id, refreshKey, onBack, onPurchase, onEdi
               {m.selling_at_loss && <span className="badge sm bad">بيع بخسارة</span>}
             </div>
           </div>
-          <div className="inv-card-actions">
-            <button type="button" onClick={() => onPurchase(m)}>تسجيل شراء</button>
-            <button type="button" className="ghost" onClick={() => onEdit(m)}>تعديل</button>
-          </div>
+          {canWrite && (
+            <div className="inv-card-actions">
+              <button type="button" onClick={() => onPurchase(m)}>تسجيل شراء</button>
+              <button type="button" className="ghost" onClick={() => onEdit(m)}>تعديل</button>
+            </div>
+          )}
         </div>
         <div className="inv-stats">
           <div className="inv-stat inv-stat-main">
@@ -156,7 +158,7 @@ export default function MaterialCard({ id, refreshKey, onBack, onPurchase, onEdi
           <div className="inv-stat">
             <span className="label">سعر البيع للمريض</span>
             <span className={`value${m.selling_at_loss ? ' neg' : ''}`}>{fmtMoney(m.unit_price)}</span>
-            <button type="button" className="link-btn" onClick={() => onEditPrice(m)}>تعديل سعر البيع</button>
+            {canWrite && <button type="button" className="link-btn" onClick={() => onEditPrice(m)}>تعديل سعر البيع</button>}
           </div>
           <div className="inv-stat">
             <span className="label">آخر سعر شراء</span>
@@ -178,8 +180,8 @@ export default function MaterialCard({ id, refreshKey, onBack, onPurchase, onEdi
           ))}
         </div>
         {tab === 'movements'
-          ? <Movements material={m} refreshKey={refreshKey} onPurchase={() => onPurchase(m)} />
-          : <Prices material={m} refreshKey={refreshKey} onEditPrice={() => onEditPrice(m)} />}
+          ? <Movements material={m} refreshKey={refreshKey} canWrite={canWrite} onPurchase={() => onPurchase(m)} />
+          : <Prices material={m} refreshKey={refreshKey} canWrite={canWrite} onEditPrice={() => onEditPrice(m)} />}
       </div>
     </>
   )

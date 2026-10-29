@@ -3,7 +3,7 @@ import { Navigate, NavLink, Route, Routes, useLocation, useNavigate } from 'reac
 import { RoleProvider, useRole } from './RoleContext.jsx'
 import {
   canManageUsers, canReadAid, canSearchAid, canSeeClinicBoard, canSeeCashReport, canSeeDoctorsPage,
-  canSeeDoctorScreen, canSeeSettings, canSeeProceduresPage, canSeePrinterSetup, canSeeInventory, canSeeReferralsPage, homePathFor,
+  canSeeDoctorScreen, canSeeSettings, canSeeProceduresPage, canSeePrinterSetup, canSeeInventory, canWriteInventory, canSeeReferralsPage, homePathFor,
 } from './permissions.js'
 import { ROLE_LABELS } from './api.js'
 import ThemeToggle from './components/ThemeToggle.jsx'
@@ -96,8 +96,8 @@ function Sidebar({ onNavigate }) {
         <div className="user-role">
           {isChairman ? 'المدير المسؤول — قرار نهائي' : user.member_title || ROLE_LABELS[role]}
         </div>
-        {/* الإشعارات اليوم للمخزون وحده — فتظهر لمن يتسلّمها */}
-        {canSeeInventory(role) && <NotificationsBell />}
+        {/* الإشعارات اليوم للمخزون وحده — فتظهر لمن يتسلّمها (المشرفة، لا من يطالع) */}
+        {canWriteInventory(role) && <NotificationsBell />}
         <button className="logout" onClick={logout}>تسجيل الخروج</button>
       </div>
 

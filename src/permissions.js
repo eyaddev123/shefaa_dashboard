@@ -49,9 +49,16 @@ export const canEditBooking = (role) => role === 'clinic_admin' || role === 'cli
 // قرارٌ طبّي داخل الغرفة. والخادم هو الحارس — هذا لإظهار الزرّ وحده.
 export const canStepOutAsSupervisor = (role) => role === 'clinic_admin'
 
-// صفحة «المخزون» (الأرصدة وأسعار الشراء والجرد): مشرفة العيادات وحدها.
-// الاستقبال والطبيب لا يرون شيئاً منها، والخادم يردّ 403 لغيرها.
-export const canSeeInventory = (role) => role === 'clinic_admin'
+// صفحة «المخزون» — المكان الوحيد لإدارة المواد. يطابق INVENTORY_* في server/src/inventory.js:
+// · مشرفة العيادات تكتب (وتتسلّم إشعاراته).
+// · المدير والمشرف العام يطالعون كلّ شيء: الأرصدة وأسعار الشراء والكشوف والتقارير.
+// · المجلس يطالع الكتالوج بأسعاره وتقرير الاستهلاك بقيمة البيع — بلا أرصدة ولا كلفة شراء.
+// الاستقبال والطبيب لا يرون شيئاً منها، والخادم يردّ 403 لهم.
+export const canSeeInventory = (role) =>
+  role === 'clinic_admin' || role === 'board' || role === SUPER_ADMIN || role === MANAGER
+export const canWriteInventory = (role) => role === 'clinic_admin'
+// 'full' الأرصدة والكلفة · 'catalog' الكتالوج والاستهلاك بقيمة البيع وحدهما (المجلس)
+export const inventoryView = (role) => (role === 'board' ? 'catalog' : 'full')
 // الإحالات: إدارة الجهات وتقرير المستحقات — مشرف العيادات وحده (الخادم يردّ غيره 403).
 // وتسجيل الإحالة على زيارة للاستقبال والمشرف (نفس canEditBooking). الطبيب لا يرى شيئاً.
 export const canSeeReferralsPage = (role) => role === 'clinic_admin'

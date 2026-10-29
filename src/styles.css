@@ -3199,6 +3199,21 @@ button.doctors-search-clear:hover { background: var(--primary-soft); color: var(
   .card:has(> table.rtable), .card:has(> div > table.rtable) { background-image: none; }
 }
 
+/* ═══ تحذير الرصيد السالب في إجراءات الزيارة — يبقى حتى «حسناً» ═══ */
+.stock-warn { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px 14px; margin-bottom: 12px; }
+.stock-warn ul { flex: 1 1 260px; margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.stock-warn button { padding: 4px 14px; font-size: 12px; color: var(--status-pending); border-color: var(--status-pending); }
+@media (max-width: 767px) {
+  .stock-warn button { min-height: 44px; flex: 1 1 100%; }
+}
+
+/* تقرير الاستهلاك: الهامش، ومجموعة البطاقة على الجوال */
+td.inv-margin { font-weight: 700; }
+@media (max-width: 767px) {
+  table.inv-cons > tbody > tr.inv-grouped > td { border-top: 0; }
+  td.inv-cons-group strong, td.inv-cons-group .rt-only { font-size: 12.5px; color: var(--text-secondary); }
+}
+
 /* ═══ قواعد الحصّة: نوافذ الإضافة/التعديل والتوزيع وتاريخ التسعيرة ═══
    النوافذ Modal القائم بخيار sheet (ورقة سفلية تحت 768px). الشريط الثابت أسفلها
    (.dialog-actions) يحمل الخطأ فوق الأزرار — كشريط «إضافة دكتور» — فيبقى ظاهراً حيث يُنقر. */
