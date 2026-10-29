@@ -66,8 +66,12 @@ export function lastRowOffset(n, cols) {
 // 17px لـ«يُخدَم الآن» و24px للغرفة. هذه هي «النقاط الصغيرة» التي تُرى من بعيد.
 //
 // فنحسبها من **مقاس البطاقة نفسه**، ولكلّ عنصرٍ حدٌّ أدنى بالبكسل يُقرأ من ٤–٥ م.
-// الترتيب البصري مقصود: الرقم ← الغرفة ← الاسم ← حبّات التالي ← الاختصاص.
-const MIN = { number: 56, room: 28, doctor: 20, label: 15, upLabel: 13, specialty: 13 }
+// الترتيب البصري مقصود: الرقم ← الغرفة ← الاختصاص ← حبّات التالي ← اسم الدكتور.
+// ★ الاختصاص عنوان البطاقة («عينية»، «بولية») والاسم تحته أصغر: المريض يبحث عن عيادته
+// باختصاصها قبل اسم طبيبها. فالاختصاص يأخذ مقاس سطر الاسم القديم وحدَّه، والاسم مقاسَه.
+const MIN = { number: 56, room: 28, specialty: 20, label: 15, upLabel: 13, doctor: 13 }
+// أدنى ما يصغر إليه الاختصاص بالقياس بعد الرسم (اختصاصٌ مركّب في بطاقةٍ ضيّقة) — وتحته يُقصّ بنقاط
+export const SPECIALTY_FIT_MIN = 16
 
 // ═══ الحبّات (chips): الحدّ الأدنى لرقم الحبّة ═══
 // ٣٤px على شاشة عرضها 1920: ارتفاع الرقم في Cairo العريض ≈٠٫٧em ⇒ ≈٢٤px ≈ ١٫٥ سم
@@ -82,14 +86,15 @@ export function chipMinPx(viewW) {
 }
 
 // ═══ ثلاثة مستويات بعدد العيادات المعروضة ═══
+// الترويسة سطران في كلّها: الاختصاص بارزاً واسم الدكتور تحته أصغر.
 export const TIERS = {
   // ١–٢: بطاقة كبيرة — الحبّة ≈ نصف الرقم الحالي، حتى ٦، وعنوانان
-  large:   { chipRatio: 0.5,  nextCap: 6, slots: 6, specialty: true,  nextTitle: true,  returnTitle: true,  merged: false },
+  large:   { chipRatio: 0.5,  nextCap: 6, slots: 6, nextTitle: true,  returnTitle: true,  merged: false },
   // ٣–٤: الرقم أصغر قليلاً ويبقى المسيطر، حتى ٤ + «+N»، والعودة بأيقونةٍ بلا كلمة
-  medium:  { chipRatio: 0.42, nextCap: 4, slots: 5, specialty: true,  nextTitle: true,  returnTitle: false, merged: false },
-  // ٥ فأكثر: الاسم والرقم والعيادة، وتحتها صفّ حبّاتٍ واحد مدموج بلا أيّ عنوان —
+  medium:  { chipRatio: 0.42, nextCap: 4, slots: 5, nextTitle: true,  returnTitle: false, merged: false },
+  // ٥ فأكثر: الترويسة والرقم والعيادة، وتحتها صفّ حبّاتٍ واحد مدموج بلا أيّ عنوان —
   // اللون يفرّق «التالي» عن «بانتظار العودة»
-  compact: { chipRatio: 0.4,  nextCap: 3, slots: 5, specialty: false, nextTitle: false, returnTitle: false, merged: true },
+  compact: { chipRatio: 0.4,  nextCap: 3, slots: 5, nextTitle: false, returnTitle: false, merged: true },
 }
 export const tierOf = (n) => (n <= 2 ? 'large' : n <= 4 ? 'medium' : 'compact')
 
@@ -184,24 +189,25 @@ function cardFontsAt(cardW, cardH, opts) {
     if (hasReturn) h += (hasNext ? Math.round(C * 0.2) : 0) + chipHeight(C)
     return h
   }
+  // D = سطر العنوان (الاختصاص)، وتحته الاسم بنحو سبعة أعشاره
   const layout = (C, D) => {
-    const specialty = tier.specialty ? Math.max(MIN.specialty, Math.min(px(0.055, MIN.specialty), Math.round(D * 0.7))) : 0
-    const headH = Math.ceil(D * 1.15) + (specialty ? 3 + Math.ceil(specialty * 1.15) : 0)
+    const doctor = Math.max(MIN.doctor, Math.min(px(0.055, MIN.doctor), Math.round(D * 0.7)))
+    const headH = Math.ceil(D * 1.15) + 3 + Math.ceil(doctor * 1.3)
     const T = titleOf(C, D)
     const ch = chipsH(C, T)
     const midH = innerH - headH - SECTION_GAP - (ch ? ch + SECTION_GAP : 0)
-    return { specialty, T, mid: fitMiddle(midH, cardW, base, tier.nextTitle) }
+    return { doctor, T, mid: fitMiddle(midH, cardW, base, tier.nextTitle) }
   }
   // سقف العرض: عدد الحبّات المرغوب للمستوى يتّسع في سطرٍ واحد
   const unit = digits * CHIP.digit + 2 * CHIP.padX + 2 * CHIP.margin
   const byWidth = Math.floor((innerW - 4 - tier.slots * 2 * CHIP.border) / (tier.slots * unit + (tier.merged ? 0.4 : 0)))
 
-  // الاسم يتبع الغرفة والغرفة تتبع الوسط: بضع جولات تكفي ليستقرّ
+  // العنوان يتبع الغرفة والغرفة تتبع الوسط: بضع جولات تكفي ليستقرّ
   const settle = (C) => {
-    let D = MIN.doctor
+    let D = MIN.specialty
     for (let i = 0; i < 4; i++) {
       const { mid } = layout(C, D)
-      D = Math.max(MIN.doctor, Math.min(px(0.105, MIN.doctor), Math.round(mid.room * 0.88)))
+      D = Math.max(MIN.specialty, Math.min(px(0.105, MIN.specialty), Math.round(mid.room * 0.88)))
     }
     return { D, mid: layout(C, D).mid }
   }
@@ -220,9 +226,9 @@ function cardFontsAt(cardW, cardH, opts) {
   }
   const C = hi > lo && hi <= settle(hi).mid.number * tier.chipRatio ? hi : lo
   const D = settle(C).D
-  const { specialty, T, mid } = layout(C, D)
-  // الغرفة تبقى ≥ الاسم (الترتيب البصري) — تصغير الاسم يحرّر ارتفاعاً ولا يأخذه
-  const doctor = Math.max(MIN.doctor, Math.min(D, mid.room))
+  const { doctor, T, mid } = layout(C, D)
+  // الغرفة تبقى ≥ العنوان (الترتيب البصري) — تصغيره يحرّر ارتفاعاً ولا يأخذه
+  const specialty = Math.max(MIN.specialty, Math.min(D, mid.room))
   // الحبّة لا تنافس الرقم الحالي — يبقى المسيطر في كل المستويات
   const chip = Math.max(chipMin, Math.min(C, Math.round(mid.number * 0.6)))
 
@@ -234,9 +240,8 @@ function cardFontsAt(cardW, cardH, opts) {
     fits: mid.fits,
     showLabel: mid.showLabel,
     label: mid.label,
-    doctor,
     specialty,
-    showSpecialty: tier.specialty,
+    doctor,
     chip,
     chipMin,
     chipTitle: T,

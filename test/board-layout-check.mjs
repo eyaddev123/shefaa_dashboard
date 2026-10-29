@@ -13,7 +13,7 @@ import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
-import { chipMinPx, tierOf } from '../src/display-layout.js'
+import { chipMinPx, tierOf, SPECIALTY_FIT_MIN } from '../src/display-layout.js'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const PORT = Number(process.env.BOARD_TEST_PORT || 5232)
@@ -24,12 +24,13 @@ const failures = []
 const ok = (cond, label) => { if (cond) { pass++; return true } failures.push(label); return false }
 
 // الحدّ الأدنى المقروء من ٤–٥ أمتار (يطابق MIN في display-layout.js)؛ ورقم الحبّة
-// حدّه من chipMinPx(عرض النافذة): ٣٤px على 1920 — القاعدة نفسها لا نسخةٌ منها
-const MIN = { number: 56, room: 28, doctor: 20, specialty: 13 }
+// حدّه من chipMinPx(عرض النافذة): ٣٤px على 1920 — القاعدة نفسها لا نسخةٌ منها.
+// الاختصاص عنوانٌ (٢٠px محسوباً، ويصغر بالقياس حتى SPECIALTY_FIT_MIN)، والاسم تحته (١٣px)
+const MIN = { number: 56, room: 28, specialty: 20, doctor: 13 }
 
 const SIZES = [[1920, 1080], [1366, 768], [960, 540]]
 // المستويات الثلاثة: ١–٢ كبير · ٣–٤ متوسّط · ٥+ مكبوس
-const DOCS = [1, 2, 4, 7]
+const DOCS = [1, 2, 4, 7, 8]
 // أعداد المنتظرين: فارغ · واحد · ستّة (سقف الكبير، و«+N» في الأصغر) · طويلٌ يتجاوز البطاقة
 const WAITING = [0, 1, 6, 20]
 // «بانتظار العودة» (خروج مؤقت): بلا · ثلاثة — سطرٌ رابع في البطاقة يجب ألّا يقصّ الغرفة
@@ -39,11 +40,13 @@ const BAR = 90   // شريط متصفّح التلفاز
 // أسماء مرضى في البيانات عمداً: إن ظهر أحدها على الشاشة فهو تسريب
 const PATIENT_NAMES = ['سمير خالد الحسن', 'ليلى أحمد النجار']
 
-const mkBoard = (n, waiting = 2, returning = 0) => ({
+// الاختصاصات المركّبة الطويلة أوّلاً: هي التي تفيض في البطاقة الضيّقة
+const SPECIALTIES = ['نطق وتربية خاصة', 'غدد صم وسكري', 'عينية', 'بولية', 'عظمية', 'جلدية', 'قلبية', 'أطفال']
+const mkBoard = (n, waiting = 2, returning = 0, extra = () => ({})) => ({
   urgent_delays: 0, seq: 1,
   board: Array.from({ length: n }, (_, i) => ({
     doctor_name: `د. ضياء الدين المنقل ${i + 1}`,
-    specialty: 'باطنية',
+    specialty: SPECIALTIES[i % SPECIALTIES.length],
     room: String(i + 1),
     current: { queue_number: 100 + i },
     next: null, after_next: null,
@@ -56,6 +59,7 @@ const mkBoard = (n, waiting = 2, returning = 0) => ({
       { queue_number: 902, arrived: false, full_name: PATIENT_NAMES[1] },
     ],
     returning: Array.from({ length: returning }, (_, k) => ({ queue_number: 60 + k })),
+    ...extra(i),
   })),
 })
 
@@ -170,6 +174,15 @@ const run = async () => {
           const rightmost = nextEls.length > 1 &&
             nextEls.every((e) => e.getBoundingClientRect().left <= firstChip.getBoundingClientRect().left)
           const fsOf = (e) => (e ? parseFloat(getComputedStyle(e).fontSize) : 0)
+          // ═══ الترويسة: الاختصاص عنواناً والاسم تحته — كلاهما كاملٌ لا مقصوص ═══
+          const heads = cards.map((c) => {
+            const sp = c.querySelector('.pd-specialty'), dr = c.querySelector('.pd-doctor')
+            return { sp: sp && sp.textContent, spFs: fsOf(sp), spWhole: !!sp && sp.scrollWidth <= sp.clientWidth + 1,
+              spAbove: !!sp && !!dr && sp.getBoundingClientRect().bottom <= dr.getBoundingClientRect().top + 1,
+              drFs: fsOf(dr), drWhole: !!dr && dr.scrollWidth <= dr.clientWidth + 1 }
+          })
+          const spVar = parseFloat(getComputedStyle(grid).getPropertyValue('--pd-specialty')) || 0
+          const drVar = parseFloat(getComputedStyle(grid).getPropertyValue('--pd-doctor')) || 0
 
           return {
             cards: cards.length, rowCounts, clipped,
@@ -193,6 +206,7 @@ const run = async () => {
             // الصفّ المدموج: «التالي» والعودة في الصندوق نفسه
             sameRow: !!(firstChip && retEls[0] && firstChip.parentElement === retEls[0].parentElement),
             returningFlash: !!document.querySelector('.pd-flash'),
+            heads, spVar, drVar,
             text: document.body.innerText,
             scrollY: document.documentElement.scrollHeight - document.documentElement.clientHeight,
           }
@@ -214,18 +228,28 @@ const run = async () => {
         // ═══ لا نصّ ينكمش إلى نقطة ═══
         ok(m.number >= MIN.number, `${tag}: الرقم ${m.number}px < ${MIN.number}`)
         ok(m.room >= MIN.room, `${tag}: الغرفة ${m.room}px < ${MIN.room}`)
-        ok(m.doctor >= MIN.doctor, `${tag}: اسم الدكتور ${m.doctor}px < ${MIN.doctor}`)
+        ok(m.drVar >= MIN.doctor, `${tag}: اسم الدكتور ${m.drVar}px < ${MIN.doctor}`)
+        ok(m.spVar >= MIN.specialty, `${tag}: الاختصاص محسوباً ${m.spVar}px < ${MIN.specialty}`)
         // ★ القاعدة الذهبية: رقم الحبّة لا ينزل عن حدّه — في كلّ حبّات الشبكة
         const chipMin = chipMinPx(w)
         if (waiting > 0) ok(m.firstChip >= chipMin, `${tag}: أوّل حبّة ${m.firstChip}px < ${chipMin}`)
         if (m.smallestChip !== Infinity) ok(m.smallestChip >= chipMin, `${tag}: حبّةٌ ${m.smallestChip}px < ${chipMin}`)
-        // المكبوس بلا اختصاص (الاسم وحده سطراً واحداً) — فيُفحص حيث يظهر
-        if (m.hasSpecialty) ok(m.specialty >= MIN.specialty, `${tag}: الاختصاص ${m.specialty}px < ${MIN.specialty}`)
+        // ═══ الاختصاص عنوانٌ في كلّ بطاقة، كاملاً (يصغر بالقياس ولا يُقصّ)، والاسم تحته ═══
+        m.heads.forEach((hd, i) => {
+          ok(hd.sp === SPECIALTIES[i % SPECIALTIES.length], `${tag}: بطاقة ${i}: العنوان «${hd.sp}»`)
+          ok(hd.spWhole, `${tag}: بطاقة ${i}: ★ الاختصاص «${hd.sp}» مقصوص (${hd.spFs}px)`)
+          ok(hd.spFs >= SPECIALTY_FIT_MIN, `${tag}: بطاقة ${i}: الاختصاص صغُر إلى ${hd.spFs}px`)
+          // ★ لا يصغر بلا حاجة: الاختصاص القصير بمقاسه المحسوب تماماً (والاسم كذلك)
+          if (hd.sp.length <= 6) ok(Math.abs(hd.spFs - m.spVar) < 0.6, `${tag}: بطاقة ${i}: ★ «${hd.sp}» صغُر بلا حاجة ${hd.spFs} < ${m.spVar}`)
+          if (hd.drWhole) ok(Math.abs(hd.drFs - m.drVar) < 0.6 || hd.drFs < m.drVar, `${tag}: بطاقة ${i}: الاسم أكبر من مقاسه`)
+          ok(hd.spAbove, `${tag}: بطاقة ${i}: الاسم ليس تحت الاختصاص`)
+          ok(hd.spFs > hd.drFs, `${tag}: بطاقة ${i}: الاسم (${hd.drFs}) ليس أصغر من الاختصاص (${hd.spFs})`)
+        })
 
-        // ═══ الترتيب البصري: الرقم ← الغرفة ← الاسم ← الاختصاص ═══
+        // ═══ الترتيب البصري: الرقم ← الغرفة ← الاختصاص ← الاسم ═══
         ok(m.number > m.room, `${tag}: الرقم (${m.number}) ليس أكبر من الغرفة (${m.room})`)
-        ok(m.room >= m.doctor, `${tag}: الغرفة (${m.room}) أصغر من اسم الدكتور (${m.doctor})`)
-        if (m.hasSpecialty) ok(m.doctor >= m.specialty, `${tag}: الاسم (${m.doctor}) أصغر من الاختصاص (${m.specialty})`)
+        ok(m.room >= m.spVar, `${tag}: الغرفة (${m.room}) أصغر من الاختصاص (${m.spVar})`)
+        ok(m.spVar > m.drVar, `${tag}: الاسم (${m.drVar}) ليس أصغر من الاختصاص (${m.spVar})`)
 
         // ═══ لا شيء مقصوص — والغرفة خاصّةً (ثانية الأهمية) ═══
         ok(m.clipped.length === 0, `${tag}: عناصر مقصوصة: ${m.clipped.join(', ')}`)
@@ -256,8 +280,8 @@ const run = async () => {
         ok(m.shownNums.length <= cap, `${tag}: ${m.shownNums.length} حبّة > سقف ${tier} (${cap})`)
         if (waiting > cap) ok(!!m.moreText, `${tag}: ${waiting} منتظراً بلا «+N»`)
         if (tier === 'compact') {
-          ok(m.titles.length === 0 && m.returnWord === 0 && !m.hasLabel && !m.hasSpecialty,
-            `${tag}: نصٌّ في البطاقة المكبوسة (عنوان/يُخدَم الآن/اختصاص)`)
+          ok(m.titles.length === 0 && m.returnWord === 0 && !m.hasLabel,
+            `${tag}: نصٌّ في البطاقة المكبوسة (عنوان/يُخدَم الآن)`)
           ok(m.chipRows <= 1, `${tag}: ${m.chipRows} صفوف حبّات في المكبوس`)
           if (waiting > 0 && returning > 0 && m.returningNums.length > 0)
             ok(m.sameRow, `${tag}: التالي والعودة ليسا في صفٍّ واحد`)
@@ -372,6 +396,166 @@ const run = async () => {
     console.log(`  بطاقة النداء │ رقم/تسمية/وجهة ${line.join('  ')}`)
   }
 
+
+  // ═══ «الدكتور لم يصل بعد»: باهتة بجملتها كـ«انتهى الدوام»، وأوّل نداءٍ يُعيدها طبيعية ═══
+  // اللقطة: ٤ (و٨) عيادات، الأولى والثالثة لم يصل دكتورهما (ومنتظروهما حاضرون)، والرابعة انتهت.
+  // ثمّ نداءٌ في الأولى: الشاشة تسحب اللوحة (load) فتصلها الأولى «واصلة» — نعترض الطلب هنا.
+  const fakeES = (snap) => {
+    const orig = CSS.supports.bind(CSS)
+    CSS.supports = (...a) => /container-type|aspect-ratio/.test(a.join(' ')) ? false : orig(...a)
+    class FakeES {
+      constructor() { this.l = {}; window.__sse = this
+        setTimeout(() => { if (this.onopen) this.onopen({})
+          ;(this.l.snapshot || []).forEach((f) => f({ data: JSON.stringify(snap) })) }, 30) }
+      addEventListener(t, f) { (this.l[t] = this.l[t] || []).push(f) }
+      removeEventListener() {} close() {}
+      emit(t, d) { (this.l[t] || []).forEach((f) => f({ data: JSON.stringify(d) })) }
+    }
+    window.EventSource = FakeES
+  }
+  {
+    const line = []
+    for (const [w, h] of [[1920, 1080], [960, 540]]) {
+      for (const n of [1, 4, 8]) {
+        const waitingDocs = n === 1 ? [0] : [0, 2]
+        const before = mkBoard(n, 3, 0, (i) => ({
+          awaiting_doctor: waitingDocs.includes(i),
+          closed: n > 1 && i === 3,
+          current: waitingDocs.includes(i) || (n > 1 && i === 3) ? null : { queue_number: 100 + i },
+        }))
+        const after = JSON.parse(JSON.stringify(before))
+        after.board[0].awaiting_doctor = false
+        after.board[0].current = { queue_number: 10 }
+        after.board[0].queue = after.board[0].queue.slice(1)
+        const ctx = await browser.newContext({ viewport: { width: w, height: h } })
+        await ctx.addInitScript(fakeES, before)
+        const page = await ctx.newPage()
+        const errors = []
+        page.on('pageerror', (e) => errors.push(e.message))
+        await page.route('**/api/public/clinic/board*', (r) => r.fulfill({
+          status: 200, contentType: 'application/json', body: JSON.stringify(after) }))
+        await page.goto(`${BASE}/display?key=test`, { waitUntil: 'load' })
+        await page.evaluate(() => (document.fonts ? document.fonts.ready.then(() => 0) : 0))
+        await page.waitForTimeout(700)
+        const read = () => page.evaluate(() => [...document.querySelectorAll('.pd-card')].map((c) => {
+          const msg = c.querySelector('.pd-awaiting')
+          const cr = c.getBoundingClientRect()
+          const mr = msg && msg.getBoundingClientRect()
+          return {
+            dim: c.classList.contains('pd-card-closed'), opacity: getComputedStyle(c).opacity,
+            awaiting: !!msg, msgText: msg ? msg.textContent.trim() : '', ended: !!c.querySelector('.pd-closed:not(.pd-awaiting)'),
+            msgFs: msg ? parseFloat(getComputedStyle(msg).fontSize) : 0,
+            closedFs: parseFloat(getComputedStyle(c).getPropertyValue('--pd-room')) || 0,
+            msgIn: !msg || (mr.left >= cr.left - 1 && mr.right <= cr.right + 1 && mr.bottom <= cr.bottom + 1 && mr.height > 4
+              && msg.scrollWidth <= msg.clientWidth + 1),
+            // «انتهى الدوام» كاملةً أيضاً: بجانب شارة العيادة في الصفّ المضغوط كانت تُقصّ
+            endedIn: (() => { const e = c.querySelector('.pd-closed:not(.pd-awaiting)'); if (!e) return true
+              const r = e.getBoundingClientRect(), w = c.querySelector('.pd-current-wrap').getBoundingClientRect()
+              return r.left >= w.left - 1 && r.right <= w.right + 1 && e.scrollWidth <= e.clientWidth + 1 })(),
+            chips: c.querySelectorAll('.pd-chip').length, number: !!c.querySelector('.pd-number'),
+            head: c.querySelector('.pd-specialty') ? c.querySelector('.pd-specialty').textContent : '',
+          }
+        }))
+        const tag = `لم يصل ${w}×${h} ${n}د`
+        const b0 = await read()
+        b0.forEach((c, i) => {
+          if (waitingDocs.includes(i)) {
+            ok(c.dim && c.awaiting && c.msgText === 'الدكتور لم يصل بعد', `${tag}: بطاقة ${i}: ليست باهتة بالجملة ${JSON.stringify(c)}`)
+            ok(c.opacity === b0.find((x) => x.ended)?.opacity || n === 1 && c.opacity === '0.45',
+              `${tag}: بطاقة ${i}: ★ التبهيت (${c.opacity}) غير «انتهى الدوام»`)
+            ok(c.chips === 0 && !c.number, `${tag}: بطاقة ${i}: حبّاتٌ أو رقمٌ في بطاقة «لم يصل»`)
+            ok(c.msgIn, `${tag}: بطاقة ${i}: ★ الجملة مقصوصة أو خارج البطاقة`)
+            ok(Math.abs(c.msgFs - c.closedFs) < 0.6, `${tag}: بطاقة ${i}: خطّ الجملة ${c.msgFs} ≠ «انتهى الدوام» ${c.closedFs}`)
+            ok(!!c.head, `${tag}: بطاقة ${i}: الترويسة غابت`)
+          } else if (n > 1 && i === 3) {
+            ok(c.dim && c.ended && !c.awaiting, `${tag}: بطاقة ${i}: «انتهى الدوام» تغيّرت ${JSON.stringify(c)}`)
+            ok(c.endedIn, `${tag}: بطاقة ${i}: ★ «انتهى الدوام» مقصوصة`)
+          } else {
+            ok(!c.dim && !c.awaiting && c.number && c.chips > 0, `${tag}: بطاقة ${i}: العادية باهتة ${JSON.stringify(c)}`)
+          }
+        })
+        // أوّل نداء
+        await page.evaluate((sp) => window.__sse.emit('call', { queue_number: 10, room: '1',
+          doctor_name: 'د. ضياء الدين المنقل 1', specialty: sp, patient_name: 'سمير خالد الحسن', seq: 50, repeat: false }),
+          SPECIALTIES[0])
+        await page.waitForTimeout(800)
+        const b1 = await read()
+        ok(!b1[0].dim && !b1[0].awaiting && b1[0].number, `${tag}: ★ بعد أوّل نداء بقيت البطاقة باهتة ${JSON.stringify(b1[0])}`)
+        if (n > 1) ok(b1[2].awaiting && b1[2].dim, `${tag}: نداء الأولى أعاد غيرها`)
+        ok(errors.length === 0, `${tag}: أخطاء صفحة: ${errors.join(' | ')}`)
+        line.push(`${w}/${n}:${b0.filter((c) => c.awaiting).length}→${b1.filter((c) => c.awaiting).length}`)
+        await ctx.close()
+      }
+    }
+    console.log(`  لم يصل بعد │ ${line.join('  ')}`)
+  }
+
+  // ═══ النداء بالاسم: الرقم كبيراً كما كان + اسم المريض تحته — والطويل يصغر ولا يكسر ═══
+  {
+    const NAMES = {
+      normal: 'سمير خالد الحسن',
+      long: 'عبد الرحمن محمد سعيد عبد الله الحسيني المصري الشامي',
+      huge: 'عبد الرحمن محمد سعيد عبد الله الحسيني المصري الشامي أبو العلا الدمشقي الحلبي الحمصي',
+    }
+    const line = []
+    for (const [w, h] of [[1920, 1080], [1366, 768], [960, 540], [375, 667]]) {
+      for (const kind of ['none', 'normal', 'long', 'huge']) {
+        const ctx = await browser.newContext({ viewport: { width: w, height: h } })
+        await ctx.addInitScript(fakeES, mkBoard(4, 3))
+        const page = await ctx.newPage()
+        const errors = []
+        page.on('pageerror', (e) => errors.push(e.message))
+        await page.goto(`${BASE}/display?key=test`, { waitUntil: 'load' })
+        await page.evaluate(() => (document.fonts ? document.fonts.ready.then(() => 0) : 0))
+        await page.waitForTimeout(700)
+        await page.evaluate((nm) => window.__sse.emit('call', { queue_number: 17, room: '1',
+          doctor_name: 'د. ضياء الدين المنقل 1', specialty: 'عينية', seq: 99, repeat: false,
+          ...(nm ? { patient_name: nm } : {}) }), NAMES[kind] || null)
+        await page.waitForTimeout(700)
+        const b = await page.evaluate(() => {
+          const el = document.querySelector('.pd-banner-name')
+          const num = document.querySelector('.pd-banner-number')
+          const inner = document.querySelector('.pd-banner-inner').getBoundingClientRect()
+          const r = el && el.getBoundingClientRect(), nr = num.getBoundingClientRect()
+          const lh = el ? parseFloat(getComputedStyle(el).lineHeight) : 1
+          return {
+            name: el ? el.textContent : null, fs: el ? parseFloat(getComputedStyle(el).fontSize) : 0,
+            whole: !!el && el.scrollWidth <= el.clientWidth + 1 && el.scrollHeight <= el.clientHeight + 1,
+            lines: el ? Math.round(el.clientHeight / lh) : 0,
+            clamped: !!el && getComputedStyle(el).webkitLineClamp === '2',
+            below: !el || r.top >= nr.bottom - 1,
+            innerIn: inner.left >= 0 && inner.right <= innerWidth && inner.top >= 0 && inner.bottom <= innerHeight,
+            numFs: parseFloat(getComputedStyle(num).fontSize),
+            numWhole: num.scrollWidth <= num.clientWidth + 1,
+            text: document.querySelector('.pd-banner').innerText,
+          }
+        })
+        const tag = `النداء بالاسم ${w}×${h} ${kind}`
+        const mobile = w <= 1023
+        const between = (lo, v, hi) => Math.min(hi, Math.max(lo, v))
+        const wantNum = mobile ? between(88, w * 0.34, 190) : between(90, w * 0.16, 300)
+        ok(Math.abs(b.numFs - wantNum) < 0.6, `${tag}: ★ رقم النداء تغيّر ${b.numFs} ≠ ${wantNum}`)
+        ok(b.numWhole && b.innerIn, `${tag}: البطاقة تخرج من الشاشة أو الرقم مقصوص`)
+        ok(/العيادة 1/.test(b.text), `${tag}: الوجهة غابت`)
+        if (kind === 'none') {
+          ok(b.name === null, `${tag}: سطر اسمٍ بلا اسم`)
+        } else {
+          ok(b.name === NAMES[kind], `${tag}: الاسم «${b.name}»`)
+          ok(b.below, `${tag}: الاسم ليس تحت الرقم`)
+          ok(b.fs >= 20, `${tag}: ★ الاسم صغُر إلى ${b.fs}px`)
+          // العاديّ والطويل كاملان (الطويل سطران أو يصغر)؛ والمفرط وحده قد يبلغ الحدّ فيُقصّ بنقاط
+          ok(b.lines >= 1 && b.lines <= 2, `${tag}: الاسم في ${b.lines} أسطر`)
+          if (kind === 'normal') ok(b.lines === 1, `${tag}: الاسم العاديّ انكسر سطرين`)
+          if (kind !== 'huge') ok(b.whole, `${tag}: ★ الاسم مقصوص (${b.fs}px)`)
+          else ok(b.whole || b.clamped, `${tag}: المفرط يفيض بلا قصٍّ بنقاط`)
+        }
+        ok(errors.length === 0, `${tag}: أخطاء صفحة: ${errors.join(' | ')}`)
+        line.push(`${w}/${kind}:${b.fs || '-'}`)
+        await ctx.close()
+      }
+    }
+    console.log(`  النداء بالاسم │ ${line.join('  ')}`)
+  }
 
   // ═══ الترويسة: «مجمع عيادات الشفاء الطبي» سطرٌ واحد، لا يُقصّ ولا يلامس الساعة ═══
   // بكلّ المقاسات المفحوصة، ملء الشاشة ومع شريط المتصفّح، بمحاكاة Chrome 66.

@@ -6,6 +6,7 @@ import { canSeeCashReport } from '../permissions.js'
 import { FlowModeTag } from '../attendance-ui.jsx'
 import RoomBadge from '../components/RoomBadge.jsx'
 import RoomPicker from '../components/RoomPicker.jsx'
+import CloseSweepDialog from '../components/CloseSweepDialog.jsx'
 import { useToast } from '../action-feedback.jsx'
 import { nowHHMM, roomOccupants } from '../room-occupancy.js'
 
@@ -345,6 +346,8 @@ export default function ClinicBoard() {
   const { role } = useRole()
   const navigate = useNavigate()
   const [busyId, setBusyId] = useState(null)
+  // الإغلاق الكانس: { session, pending } حين ردّ الخادم بمعلَّقين — انظر CloseSweepDialog
+  const [sweep, setSweep] = useState(null)
   // من يرى الصالة هو من يعرف أنّ الدكتور غادر — الاستقبال والمشرف معاً
   const canCloseSession = role === 'clinic_admin' || role === 'clinic_reception'
   // جرد الصندوق: شاشةٌ مستقلّة (الاستقبال والمشرفة والمدير) — تفتح على اليوم المختار هنا
@@ -356,7 +359,11 @@ export default function ClinicBoard() {
       if (s.manual_closed_at) await api.clinic.reopenSession(s.id)
       else await api.clinic.closeSession(s.id)
       await load()
-    } catch (ex) { setErr(ex.message) }
+    } catch (ex) {
+      // معلَّقون: لا خطأ بل سؤال — النافذة تعرض الملخّص، والإغلاق بلا معلَّقين يمرّ بلا أسئلة
+      if (ex.data && ex.data.code === 'CLOSE_PENDING' && ex.data.pending) setSweep({ session: s, pending: ex.data.pending })
+      else setErr(ex.message)
+    }
     finally { setBusyId(null) }
   }
 
@@ -477,6 +484,12 @@ export default function ClinicBoard() {
           </table>
         )}
       </div>
+
+      {sweep && (
+        <CloseSweepDialog session={sweep.session} pending={sweep.pending}
+          onClose={() => setSweep(null)}
+          onDone={() => { setSweep(null); load() }} />
+      )}
     </>
   )
 }

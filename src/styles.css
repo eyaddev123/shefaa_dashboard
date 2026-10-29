@@ -1169,12 +1169,16 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
   min-height: min-content; flex: none;
 }
 .pd-card-head > * + * { margin-top: 3px; }
-.pd-doctor {
-  font-size: var(--pd-doctor, 20px); font-weight: 800; line-height: 1.15;
+/* ═══ الاختصاص عنوان البطاقة، واسم الدكتور تحته أصغر ═══
+   المقاسان من JS (cardFonts)، و--fit درجة التصغير بعد القياس (PublicDisplay: fitStyle) —
+   calc() بمتغيّرٍ يعمل في Chrome 66، وما بقي فائضاً بعد الحدّ الأدنى يُقصّ بنقاط. */
+.pd-specialty {
+  font-size: calc(var(--pd-specialty, 20px) * var(--fit, 1)); font-weight: 800; line-height: 1.15;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.pd-specialty {
-  font-size: var(--pd-specialty, 13px); color: #b3c6c2; line-height: 1.15;
+.pd-doctor {
+  /* 1.3 لا 1.15: بخطٍّ صغير تُقصّ نقاط «ي» السفلية بحدّ overflow (داخلٌ في ميزانية cardFonts) */
+  font-size: calc(var(--pd-doctor, 13px) * var(--fit, 1)); font-weight: 600; color: #b3c6c2; line-height: 1.3;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
@@ -1358,6 +1362,8 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
   animation: pd-banner-in 0.35s ease-out;
 }
 .pd-banner-inner {
+  /* السقف يجعل الاسم الطويل يفيض داخلها فيُقاس ويصغر — بدل أن تتّسع البطاقة خارج الشاشة */
+  max-width: 92vw; box-sizing: border-box;
   text-align: center; padding: 4vh 5vw;
   border: 3px solid #14b8a6; border-radius: 3vh;
   background: #10201e;
@@ -1371,6 +1377,14 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
   font-size: 16vw; font-weight: 800; color: #14b8a6; line-height: 0.9;
 }
 .pd-banner-dest { font-size: 2.4vw; font-weight: 600; color: #b3c6c2; margin-top: 2vh; }
+/* اسم المريض تحت الرقم: يُقرأ من آخر الصالة. الطويل ينكسر سطرين بمقاسه الكامل (أقرأ من
+   البعيد من سطرٍ مصغَّر)، وما فاض عن سطرين يصغر بالقياس (--fit)، وتحت الحدّ يُقصّ بنقاط.
+   -webkit-line-clamp موجودةٌ في Chrome 66. */
+.pd-banner-name {
+  font-size: calc(4vw * var(--fit, 1)); font-weight: 800; color: #eef7f5; line-height: 1.3;
+  margin-top: 1.4vh;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+}
 .pd-banner-dest b { color: #7fd6b8; font-weight: 800; }
 /* ═══ حدود بطاقة النداء: media queries بدل clamp() — كالترويسة ═══
    clamp() غائبة في Chrome 66 فكان الرقم المنادى نفسه ينزل إلى ١٦px على التلفاز.
@@ -1382,6 +1396,8 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
 @media (min-width: 1875px)  { .pd-banner-number { font-size: 300px; } }  /* 300 ÷ 16%  */
 @media (max-width: 750px)   { .pd-banner-dest { font-size: 18px; } }     /* 18 ÷ 2.4%  */
 @media (min-width: 1917px)  { .pd-banner-dest { font-size: 46px; } }     /* 46 ÷ 2.4%  */
+@media (max-width: 600px)   { .pd-banner-name { font-size: calc(24px * var(--fit, 1)); } }  /* 24 ÷ 4% */
+@media (min-width: 1800px)  { .pd-banner-name { font-size: calc(72px * var(--fit, 1)); } }  /* 72 ÷ 4% */
 
 @keyframes pd-banner-in {
   from { opacity: 0; transform: scale(0.92); }
@@ -2168,6 +2184,9 @@ button.danger:hover:not(:disabled) { filter: brightness(1.08); }
   line-height: 1.3;
   white-space: nowrap;
 }
+/* «الدكتور لم يصل بعد» بأسلوب «انتهى الدوام» نفسه — أطول منها، فتنكسر سطرين في البطاقة الضيّقة.
+   وفي الصفّ المضغوط (العيادة بجانب الرقم) تنكسر الجملتان كلتاهما: سطرٌ واحد يُقصّ بجانب الشارة */
+.pd-closed.pd-awaiting, .pd-current-row .pd-closed { white-space: normal; max-width: 100%; }
 
 /* ═══ سطر العمل للاستقبال ═══
    المبالغ تقول «كم»، وهذا يقول «افعل»: أيّ إجراءٍ أُضيف وكم يُستوفى زيادةً.
@@ -3382,4 +3401,39 @@ button.spec-chip-btn[aria-pressed='true'] { background: var(--primary); border-c
   table.rtable > tbody > tr.earn-norule { background: var(--status-pending-bg); border-color: var(--status-pending); }
   table.rtable > tbody > tr:is(.earn-neg, .earn-norule) > td { background: none; }
   .earn-count .badge + .badge { margin-inline-start: 0; }
+/* ═══ الإغلاق الكانس — نافذة التأكيد (CloseSweepDialog) ═══
+   سطرٌ لكلّ أثر: من سيُنهى كشفه، ومن سيُعلَّم «لم يحضر»، ومن خرج مؤقتاً بخيارين صريحين.
+   الأثر نفسه بلونٍ تحذيريّ فلا يُقرأ كسطر معلومةٍ يمرّ بالعين. */
+.cs-body { display: flex; flex-direction: column; gap: 12px; }
+.cs-line { margin: 0; font-size: 14px; line-height: 1.8; }
+.cs-line > p { margin: 0; }
+.cs-effect { font-weight: 800; color: var(--status-pending); }
+.cs-num { color: var(--text-secondary); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.cs-names {
+  margin: 6px 0 0; padding: 8px 12px; list-style: none; max-height: 160px; overflow-y: auto;
+  border-radius: 10px; background: var(--page); font-size: 13px; line-height: 1.9;
+}
+.cs-changed {
+  margin: 0; padding: 8px 12px; border-radius: 10px; font-size: 13px; font-weight: 700;
+  color: var(--status-review); background: var(--status-review-bg);
+}
+.cs-return {
+  margin: 0; padding: 10px 12px 12px; border: 1.5px solid var(--status-pending);
+  border-radius: 12px; background: var(--status-pending-bg);
+}
+.cs-return-q { margin: 0 0 6px; font-size: 14px; line-height: 1.7; }
+.cs-choices { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+button.cs-choice {
+  flex: 1 1 140px; padding: 9px 14px; border-radius: 10px; font-weight: 800;
+  background: var(--surface-1); color: var(--text-primary); border: 1.5px solid var(--border);
+}
+button.cs-choice:hover:not(:disabled) { filter: none; border-color: var(--primary); }
+button.cs-choice.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+:root[data-theme='dark'] button.cs-choice.on { color: #06301b; }
+.cs-error { margin: 0; }
+.cs-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin-top: 4px; }
+@media (max-width: 767px) {
+  button.cs-choice { min-height: 44px; }
+  .cs-actions { position: sticky; bottom: -16px; padding: 10px 0 4px; background: var(--surface-1); }
+  .cs-actions > button { flex: 1 1 0; min-height: 48px; }
 }

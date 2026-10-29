@@ -4,7 +4,7 @@ import { withTitle } from '../announce.js'
 import { callAudio, loadSettings } from '../call-audio.js'
 import { roomClip, CLIP_TEXT } from '../audio-clips.js'
 // التخطيط مشتركٌ مع شاشة الدور (/order) — مصدرٌ واحد فلا تنحرف الشاشتان
-import { pickGrid, lastRowOffset, cardFonts, planChips, tierOf, chipMinPx, TIERS } from '../display-layout.js'
+import { pickGrid, lastRowOffset, cardFonts, planChips, tierOf, chipMinPx, TIERS, SPECIALTY_FIT_MIN } from '../display-layout.js'
 
 // شبكة أمان فقط: البثّ المباشر (SSE) هو مصدر التحديث الفعلي، وهذه السحبة تُصلح
 // أي فرق لو انقطع الاتصال دون أن يلاحظ المتصفح
@@ -29,9 +29,23 @@ export const waitingOf = (b) => (b.queue || []).filter((q) => q.arrived)
 // حبّاتٌ زرقاء هادئة بأرقامهم فقط — بلا وميض. والحقل يغيب عن خادمٍ أقدم، فالغياب = لا أحد.
 export const returningOf = (b) => b.returning || []
 
+// ═══ بطاقةٌ باهتة بجملة: «انتهى الدوام» أو «الدكتور لم يصل بعد» ═══
+// العلمان محسوبان في الخادم (closed · awaiting_doctor) — لا منطق جديد يصل التلفاز القديم.
+// «لم يصل» = لا نداء في الجلسة بعد؛ أوّل نداءٍ يُعيد البطاقة طبيعيةً. والغياب (خادمٌ أقدم) = وصل.
+export const dimmedOf = (b) => !!(b.closed || b.awaiting_doctor)
+
+// ═══ القياس بعد الرسم والتصغير المتدرّج ═══
+// العنوان (الاختصاص) واسم المريض في بطاقة النداء نصٌّ حرّ: «نطق وتربية خاصة» في بطاقةٍ من
+// ثمانٍ لا يتّسع بمقاسه المحسوب. كشاشة الدور (/order): نرسم، نقيس قبل أن يُرى، فإن فاض
+// العنصر (عرضاً، أو طولاً للاسم ذي السطرين) صغُر خطّه درجةً (٠٫٩) ونقيس ثانيةً — حتى يتّسع
+// أو يبلغ حدّه الأدنى (data-fit-min)، وتحته يُقصّ بنقاطٍ (CSS) فلا يدفع شيئاً.
+// الخطّ بـ calc(… * var(--fit)) — يعمل في Chrome 66.
+const FIT_RATIO = 0.9
+const fitStyle = (steps, key) => (steps[key] ? { '--fit': String(Math.pow(FIT_RATIO, steps[key])) } : undefined)
+
 // يُعاد القياس حين يظهر صفّ حبّاتٍ أو يختفي (يتغيّر توزيع البطاقة)
 const rowsKey = (d) => {
-  const open = ((d && d.board) || []).filter((b) => !b.closed)
+  const open = ((d && d.board) || []).filter((b) => !dimmedOf(b))
   return `${open.some((b) => waitingOf(b).length > 0)}|${open.some((b) => returningOf(b).length > 0)}`
 }
 
@@ -132,7 +146,12 @@ export default function PublicDisplay() {
   // مقاس الشبكة الفعلي بالبكسل — منه تُحسب الأعمدة ومقاسات الخطّ.
   // يُقاس بعد الرسم لا يُخمَّن: الترويسة واللافتات تتغيّر فيتغيّر المتاح.
   const gridRef = useRef(null)
+  const rootRef = useRef(null)
   const [gridBox, setGridBox] = useState({ w: 0, h: 0 })
+  // درجات التصغير بعد القياس: { key: مفتاح التخطيط, steps: { data-fit → درجة } } — انظر fitStyle
+  const [fit, setFit] = useState({ key: '', steps: {} })
+  // الخطوط: عرض النصّ يتغيّر حين يكتمل تحميل Cairo — فنقيس من جديد
+  const [fontTick, setFontTick] = useState(0)
 
   const bannerTimer = useRef(null)
   const flashTimers = useRef({})
@@ -236,6 +255,16 @@ export default function PublicDisplay() {
     }
     return () => { if (ro) ro.disconnect() }
   }, [viewH, data?.board?.length, !!data?.urgent_delays, audioReady, showSettings, err, rowsKey(data)])
+
+  // ── الخطوط: document.fonts موجودة في Chrome 66، ونفحصها مع ذلك ──
+  useEffect(() => {
+    const f = typeof document !== 'undefined' ? document.fonts : null
+    if (!f) return undefined
+    const bump = () => setFontTick((x) => x + 1)
+    if (f.ready && f.ready.then) f.ready.then(bump)
+    if (f.addEventListener) f.addEventListener('loadingdone', bump)
+    return () => { if (f.removeEventListener) f.removeEventListener('loadingdone', bump) }
+  }, [])
 
   // ── وميض البطاقة عند تغيّر رقمها ──
   const flashDoctor = useCallback((key) => {
@@ -391,7 +420,8 @@ export default function PublicDisplay() {
   // ═══ المستوى بعدد العيادات (١–٢ · ٣–٤ · ٥+) ═══
   // صفّا «التالي» و«بانتظار العودة» يُحجز ارتفاعهما في كل البطاقات معاً متى وُجدا في
   // إحداها: المقاسات واحدة للشبكة كلّها، فلا تختلف بطاقةٌ عن جارتها في حجم رقمها.
-  const openBoard = (data?.board || []).filter((b) => !b.closed)
+  // الباهتة (انتهى/لم يصل) بلا حبّات — فلا تحجز لها صفّاً
+  const openBoard = (data?.board || []).filter((b) => !dimmedOf(b))
   const tier = tierOf(docCount)
   // أطول رقمٍ قد يُعرض في حبّة: ثلاث خانات تحتاج حبّةً أعرض فيتّسع عددٌ أقل
   const digits = openBoard.reduce((m, b) => Math.max(m, ...waitingOf(b).concat(returningOf(b))
@@ -416,12 +446,36 @@ export default function PublicDisplay() {
     '--pd-pad-y': `${fonts.padY}px`,
   } : {}
 
+  // ═══ التصغير بالقياس: الدرجات صالحةٌ لمفتاح تخطيطٍ واحد ═══
+  // تغيّر المقاس أو البيانات أو النداء أو الخطّ ⇒ مفتاحٌ جديد ⇒ تبدأ الدرجات من الصفر.
+  // والمفتاح محفوظٌ مع الدرجات (لا تصفيرٌ في أثرٍ منفصل) فلا يقيس أثرٌ درجاتٍ بائتة.
+  const fitKey = `${gridBox.w}x${gridBox.h}|${viewW}|${fonts ? `${fonts.specialty}/${fonts.doctor}` : 0}|${
+    (data?.board || []).map((b) => `${b.specialty}/${b.doctor_name}`).join(',')}|${
+    banner ? `${banner.seq}/${banner.patient_name}` : ''}|${fontTick}`
+  const fitSteps = fit.key === fitKey ? fit.steps : {}
+  useLayoutEffect(() => {
+    if (fit.key !== fitKey) { setFit({ key: fitKey, steps: {} }); return }
+    const root = rootRef.current
+    if (!root) return
+    const grow = {}
+    Array.prototype.forEach.call(root.querySelectorAll('[data-fit]'), (el) => {
+      // الطول للمحدود بسطرين (data-fit-lines) وحده: سطرٌ واحدٌ بخطّ Cairo وارتفاع 1.15 يُبلغ
+      // دائماً عن فيضٍ عموديّ ببضع بكسلات (رؤوس الحروف) فيصغر كلّ عنوانٍ إلى حدّه بلا سبب
+      const tall = el.hasAttribute('data-fit-lines') && el.scrollHeight > el.clientHeight + 1
+      if (el.scrollWidth <= el.clientWidth + 1 && !tall) return
+      const k = el.getAttribute('data-fit')
+      const px = parseFloat(getComputedStyle(el).fontSize)
+      if (px * FIT_RATIO >= Number(el.getAttribute('data-fit-min') || 0)) grow[k] = (fit.steps[k] || 0) + 1
+    })
+    if (Object.keys(grow).length) setFit({ key: fitKey, steps: { ...fit.steps, ...grow } })
+  })
+
   const offlineLong = offlineSince && Date.now() - offlineSince > OFFLINE_ALERT_MS
   const clock = `${two(now.getHours())}:${two(now.getMinutes())}`
   const dateText = `${AR_DAYS[now.getDay()]} ${now.getDate()} ${AR_MONTHS[now.getMonth()]} ${now.getFullYear()}`
 
   return (
-    <div className="pd-root" dir="rtl" style={viewH ? { height: `${viewH}px` } : undefined}>
+    <div className="pd-root" dir="rtl" ref={rootRef} style={viewH ? { height: `${viewH}px` } : undefined}>
       {/* لافتة الصوت المقفول: كبيرة وقابلة للضغط — بدون ضغطةٍ صريحة يمنع المتصفح كل صوت */}
       {!audioReady && (
         <button type="button" className="pd-audio-gate" onClick={enableAudio}>
@@ -501,16 +555,20 @@ export default function PublicDisplay() {
               data-tier={fonts ? fonts.tier : tier}
               className={`pd-card ${flashing[b.doctor_name] ? 'pd-flash' : ''} ${
                 banner && banner.doctor_name === b.doctor_name ? 'pd-card-active' : ''} ${
-                b.closed ? 'pd-card-closed' : ''}`}
+                dimmedOf(b) ? 'pd-card-closed' : ''} ${!b.closed && b.awaiting_doctor ? 'pd-card-awaiting' : ''}`}
               /* أولى بطاقات الصفّ الأخير تُزاح لتوسيطه — الصفوف الكاملة بلا إزاحة */
               style={offset && i === docCount - (docCount - (grid.rows - 1) * grid.cols)
                 ? { gridColumnStart: offset + 1 } : undefined}
             >
               <div className="pd-card-head">
-                {/* اسم الدكتور يظهر ولا يُنطق أبداً — ولا اسم مريض هنا إطلاقاً */}
-                <div className="pd-doctor">{b.doctor_name}</div>
-                {/* المكبوس: الاسم وحده سطراً واحداً — الاختصاص يزاحم الرقم والحبّات */}
-                {fonts?.showSpecialty !== false && <div className="pd-specialty">{b.specialty || '—'}</div>}
+                {/* الاختصاص عنوانٌ بارز، واسم الدكتور تحته أصغر — يظهر ولا يُنطق أبداً.
+                    بلا اختصاصٍ مسجَّل: الاسم نفسه عنواناً. ولا اسم مريض في البطاقة إطلاقاً. */}
+                <div className="pd-specialty" data-fit={`s${i}`} data-fit-min={SPECIALTY_FIT_MIN}
+                  style={fitStyle(fitSteps, `s${i}`)}>{b.specialty || b.doctor_name}</div>
+                {b.specialty && (
+                  <div className="pd-doctor" data-fit={`d${i}`} data-fit-min="11"
+                    style={fitStyle(fitSteps, `d${i}`)}>{b.doctor_name}</div>
+                )}
               </div>
 
               {/* عند ضيق الارتفاع تُقلَّل الأسطر لا تُصغَّر الخطوط: يسقط «يُخدَم الآن»
@@ -523,6 +581,9 @@ export default function PublicDisplay() {
               <div className={`pd-current-wrap${fonts?.roomCompact ? ' pd-current-row' : ''}`}>
                 {b.closed ? (
                   <div className="pd-closed">انتهى الدوام</div>
+                ) : b.awaiting_doctor ? (
+                  // كـ«انتهى الدوام» تماماً: بطاقةٌ باهتة وجملة — وأوّل نداءٍ يُعيدها طبيعية
+                  <div className="pd-closed pd-awaiting">الدكتور لم يصل بعد</div>
                 ) : (
                   <>
                     {fonts?.showLabel !== false && <div className="pd-label">يُخدَم الآن</div>}
@@ -542,7 +603,7 @@ export default function PublicDisplay() {
               {/* ═══ المنتظرون بترتيب خدمتهم (حبّات) ═══
                   الترتيب يأتي من الخادم (الإسعافي أولاً ثمّ ترتيب الحضور)، والحاضرون
                   وحدهم: من حجز ولم يحضر ليس في الطابور بعد. */}
-              {!b.closed && fonts && (
+              {!dimmedOf(b) && fonts && (
                 <UpcomingChips
                   next={waitingOf(b).map((q) => q.queue_number)}
                   ret={returningOf(b).map((q) => q.queue_number)}
@@ -559,6 +620,12 @@ export default function PublicDisplay() {
           <div className="pd-banner-inner">
             <div className="pd-banner-label">نداء</div>
             <div className="pd-banner-number">{banner.queue_number}</div>
+            {/* اسم المريض كتابةً لحظة النداء ولا يُنطق (الصوت كما هو) — قرار صاحبة النظام.
+                يغيب عن خادمٍ أقدم فلا سطر فارغ. والبطاقة تنسحب فلا يبقى على الشاشة. */}
+            {banner.patient_name && (
+              <div className="pd-banner-name" data-fit="banner" data-fit-min="20" data-fit-lines="2"
+                style={fitStyle(fitSteps, 'banner')}>{banner.patient_name}</div>
+            )}
             <div className="pd-banner-dest">
               {banner.room
                 ? <>يرجى التوجه إلى <b>العيادة {banner.room}</b></>
