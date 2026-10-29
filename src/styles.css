@@ -3401,6 +3401,8 @@ button.spec-chip-btn[aria-pressed='true'] { background: var(--primary); border-c
   table.rtable > tbody > tr.earn-norule { background: var(--status-pending-bg); border-color: var(--status-pending); }
   table.rtable > tbody > tr:is(.earn-neg, .earn-norule) > td { background: none; }
   .earn-count .badge + .badge { margin-inline-start: 0; }
+}
+
 /* ═══ الإغلاق الكانس — نافذة التأكيد (CloseSweepDialog) ═══
    سطرٌ لكلّ أثر: من سيُنهى كشفه، ومن سيُعلَّم «لم يحضر»، ومن خرج مؤقتاً بخيارين صريحين.
    الأثر نفسه بلونٍ تحذيريّ فلا يُقرأ كسطر معلومةٍ يمرّ بالعين. */
