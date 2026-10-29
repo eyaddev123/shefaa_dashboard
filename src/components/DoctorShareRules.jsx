@@ -1,20 +1,29 @@
 import { useEffect, useState } from 'react'
-import { api, fmtMoney } from '../api.js'
+import { api, fmtMoney, toLatinDigits } from '../api.js'
+import { useDialogs } from '../dialogs.jsx'
+import { ShareRuleDialog } from './ShareRuleDialogs.jsx'
+import { ruleText, afterDeleteText } from '../share-rule.js'
 
 // ═══ حصّة الدكتور من الإجراءات ═══
 // نسبةٌ عامّة لكل إجراءاته (تُحسب **بعد** خصم المواد)، وحالاتٌ خاصّة لإجراءٍ بعينه
 // تغلبها: مبلغٌ ثابت (لا تمسّه المواد) أو نسبةٌ أخرى. وبلا قاعدةٍ تكون حصّته صفراً
 // بتحذيرٍ في صفحة المراجعة — لا منع.
 //
+// الإدارة كلّها هنا للمشرفة: النسبة العامّة، وإضافة/تعديل/حذف القواعد الخاصّة (نافذة).
+// والقاعدة الموزَّعة من صفحة الإجراءات قاعدةٌ خاصّة كغيرها، تُعدَّل وتُحذف من هنا.
+// كلّ تغييرٍ سطرٌ في «سجلّ التعديلات» أسفل البروفايل وفي تاريخ تسعيرة الإجراء.
+//
 // ★ تغيير قاعدةٍ هنا يسري على الإجراءات **القادمة** وحدها: كلُّ سطرٍ قائم يحمل
 //   لقطة القاعدة لحظة إضافته، ولا يتغيّر ولو عُدّلت موادّه لاحقاً.
-export default function DoctorShareRules({ doctor, canEdit, onSaved }) {
+const generalOf = (d) => (d.share_kind === 'percent' ? String(Number(d.share_value)) : '')
+export default function DoctorShareRules({ doctor, canEdit, onSaved, showToast }) {
+  const dlg = useDialogs()
   // قاعدةٌ عامّة «ثابتة» من التصميم السابق تُعرض كما هي حتى تُستبدل بنسبة
   const legacyFixed = doctor.share_kind === 'fixed'
-  const [value, setValue] = useState(doctor.share_kind === 'percent' ? String(Number(doctor.share_value)) : '')
+  const [value, setValue] = useState(generalOf(doctor))
   const [rules, setRules] = useState(null)
   const [catalog, setCatalog] = useState(null)
-  const [adding, setAdding] = useState({ procedure_id: '', kind: 'fixed', value: '' })
+  const [dialog, setDialog] = useState(null)   // {rule} — rule: null للإضافة
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState(null)   // {text, ok}
 
@@ -24,31 +33,46 @@ export default function DoctorShareRules({ doctor, canEdit, onSaved }) {
       .catch(() => {})
   }
   useEffect(() => { load() }, [doctor.id])
+  useEffect(() => { setValue(generalOf(doctor)) }, [doctor.share_kind, doctor.share_value])
 
-  const run = async (fn, okText) => {
+  // التحذير (ثابتٌ أعلى من السعر) يبقى ظاهراً أطول من نجاحٍ عادي
+  const notify = (text, warnings = []) => {
+    const full = warnings.length ? `${text} — ⚠ ${warnings.join('، ')}` : text
+    if (showToast) showToast(full, warnings.length ? 'warning' : 'success', warnings.length ? 8000 : 3500)
+    else setMsg({ text: full, ok: true })
+  }
+  const saveGeneral = async () => {
+    const t = value.trim()
+    if (t !== '' && (!/^\d+(\.\d{1,2})?$/.test(t) || Number(t) > 100)) {
+      setMsg({ text: /^-/.test(t) ? 'النسبة العامّة: لا يُقبل رقمٌ سالب' : 'النسبة العامّة: رقمٌ بين ٠ و١٠٠' }); return
+    }
     setBusy(true); setMsg(null)
-    try { await fn(); setMsg({ text: okText, ok: true }); load(); if (onSaved) onSaved() }
-    catch (e) { setMsg({ text: e.message }) }
+    try {
+      await api.clinic.setDoctorShare(doctor.id, t === '' ? { share_kind: null } : { share_kind: 'percent', share_value: t })
+      notify(t === '' ? 'أُزيلت النسبة العامّة — حصّته صفر حتى تُضبط' : `حُفظت النسبة العامّة ${t}٪`)
+      if (onSaved) onSaved()
+    } catch (e) { setMsg({ text: e.message }) }
     finally { setBusy(false) }
   }
-  const saveGeneral = () => run(() => api.clinic.setDoctorShare(doctor.id,
-    value.trim() === '' ? { share_kind: null } : { share_kind: 'percent', share_value: value }),
-  value.trim() === '' ? 'أُزيلت النسبة العامّة — حصّته صفر حتى تُضبط' : 'حُفظت النسبة العامّة')
-  const addSpecific = () => {
-    if (!adding.procedure_id) { setMsg({ text: 'اختر الإجراء' }); return }
-    run(async () => {
-      await api.clinic.setDoctorProcedureShare(doctor.id, adding.procedure_id,
-        { share_kind: adding.kind, share_value: adding.value })
-      setAdding({ procedure_id: '', kind: 'fixed', value: '' })
-    }, 'حُفظت الحالة الخاصّة')
+  const removeRule = async (r) => {
+    const ok = await dlg.confirm({
+      title: `حذف قاعدة «${r.procedure_name}»`,
+      body: `القاعدة الحالية: ${ruleText(r)}.\n${afterDeleteText(doctor)}.\nيسري على الإجراءات القادمة وحدها.`,
+      confirmLabel: 'حذف القاعدة', danger: true,
+    })
+    if (!ok) return
+    setBusy(true); setMsg(null)
+    try {
+      await api.clinic.removeDoctorProcedureShare(doctor.id, r.procedure_id)
+      notify(`حُذفت قاعدة «${r.procedure_name}»`)
+      load(); if (onSaved) onSaved()
+    } catch (e) { setMsg({ text: e.message }) }
+    finally { setBusy(false) }
   }
-  const removeSpecific = (r) => run(() => api.clinic.removeDoctorProcedureShare(doctor.id, r.procedure_id),
-    `أُزيلت الحالة الخاصّة لـ«${r.procedure_name}» — تُطبَّق عليه النسبة العامّة`)
 
   const generalText = !doctor.share_kind ? null
     : doctor.share_kind === 'percent' ? `${Number(doctor.share_value)}٪ بعد خصم المواد`
     : `مبلغ ثابت ${fmtMoney(doctor.share_value)} (قاعدة قديمة)`
-  const ruled = new Set((rules || []).map((r) => String(r.procedure_id)))
 
   return (
     <div className="card">
@@ -67,73 +91,61 @@ export default function DoctorShareRules({ doctor, canEdit, onSaved }) {
       )}
 
       {canEdit ? (
-        <div className="inline" style={{ alignItems: 'flex-end', gap: 8 }}>
+        <div className="share-general">
           <div className="field">
-            <label>النسبة العامّة لكل إجراءاته ٪</label>
-            <input value={value} inputMode="decimal" style={{ width: 110 }} placeholder="مثلاً 50"
-              onChange={(e) => setValue(e.target.value)} />
+            <label htmlFor={`gen-share-${doctor.id}`}>النسبة العامّة لكل إجراءاته ٪</label>
+            <input id={`gen-share-${doctor.id}`} value={value} inputMode="decimal" placeholder="مثلاً 50"
+              onChange={(e) => setValue(toLatinDigits(e.target.value))} />
           </div>
-          <button type="button" disabled={busy} onClick={saveGeneral}
-            style={{ padding: '6px 14px', fontSize: 12.5 }}>حفظ النسبة</button>
+          <button type="button" disabled={busy || value.trim() === generalOf(doctor)} onClick={saveGeneral}>حفظ النسبة</button>
         </div>
       ) : (
         <p>النسبة العامّة: <strong>{generalText || 'بلا قاعدة (صفر)'}</strong></p>
       )}
 
-      <h4 style={{ margin: '16px 0 6px' }}>حالات خاصّة لإجراءات بعينها</h4>
+      <div className="share-rules-head">
+        <h4>حالات خاصّة لإجراءات بعينها{rules ? ` (${rules.length})` : ''}</h4>
+        {canEdit && <button type="button" disabled={busy || !catalog} onClick={() => setDialog({ rule: null })}>+ إضافة قاعدة</button>}
+      </div>
       {!rules ? <p className="empty">جارٍ التحميل…</p>
         : rules.length === 0 ? <p className="empty">لا حالات خاصّة — تُطبَّق النسبة العامّة على كل إجراءاته.</p>
         : (
-          <table>
+          <table className="rtable">
             <thead><tr><th>الإجراء</th><th>سعره الحالي</th><th>القاعدة</th>{canEdit && <th></th>}</tr></thead>
             <tbody>
-              {rules.map((r) => (
-                <tr key={r.id}>
-                  <td>{r.procedure_name}</td>
-                  <td className="num">{fmtMoney(r.price)}</td>
-                  <td>{r.share_kind === 'percent'
-                    ? `${Number(r.share_value)}٪ بعد المواد`
-                    : `مبلغ ثابت ${fmtMoney(r.share_value)}`}</td>
-                  {canEdit && (
-                    <td>
-                      <button type="button" className="ghost" disabled={busy}
-                        style={{ padding: '2px 8px', fontSize: 11 }} onClick={() => removeSpecific(r)}>إزالة</button>
-                    </td>
-                  )}
-                </tr>
-              ))}
+              {rules.map((r) => {
+                const above = r.share_kind === 'fixed' && Number(r.share_value) > Number(r.price)
+                return (
+                  <tr key={r.id}>
+                    <td className="rt-title">{r.procedure_name}
+                      {!r.procedure_active && <span className="badge" style={{ marginInlineStart: 6 }}>معطَّل</span>}</td>
+                    <td className="num" data-label="سعره الحالي">{fmtMoney(r.price)}</td>
+                    <td data-label="القاعدة">{ruleText(r)}
+                      {above && <span className="badge bad" style={{ marginInlineStart: 6 }}
+                        title="المبلغ الثابت أعلى من سعر الإجراء — حصّة الشفاء سالبة">أعلى من السعر</span>}</td>
+                    {canEdit && (
+                      <td className="rt-actions share-rule-actions">
+                        <button type="button" className="ghost" disabled={busy}
+                          onClick={() => setDialog({ rule: r })}>تعديل</button>
+                        <button type="button" className="ghost danger-text" disabled={busy}
+                          onClick={() => removeRule(r)}>حذف</button>
+                      </td>
+                    )}
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         )}
-      {canEdit && (
-        <div className="inline" style={{ alignItems: 'flex-end', gap: 8, marginTop: 10 }}>
-          <div className="field">
-            <label>إجراء</label>
-            <select value={adding.procedure_id}
-              onChange={(e) => setAdding({ ...adding, procedure_id: e.target.value })}>
-              <option value="">— اختر —</option>
-              {(catalog || []).map((c) => (
-                <option key={c.id} value={c.id}>{c.name}{ruled.has(String(c.id)) ? ' (له حالة — تُستبدل)' : ''}</option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label>النوع</label>
-            <select value={adding.kind} onChange={(e) => setAdding({ ...adding, kind: e.target.value })}>
-              <option value="fixed">مبلغ ثابت</option>
-              <option value="percent">نسبة ٪ مختلفة</option>
-            </select>
-          </div>
-          <div className="field">
-            <label>{adding.kind === 'percent' ? 'النسبة ٪' : 'المبلغ'}</label>
-            <input value={adding.value} inputMode="decimal" style={{ width: 110 }}
-              onChange={(e) => setAdding({ ...adding, value: e.target.value })} />
-          </div>
-          <button type="button" className="ghost" disabled={busy} onClick={addSpecific}
-            style={{ padding: '6px 14px', fontSize: 12.5 }}>إضافة حالة خاصّة</button>
-        </div>
+      {msg && <p className={msg.ok ? 'success-text' : 'error'} style={{ marginTop: 8 }} role={msg.ok ? 'status' : 'alert'}>{msg.text}</p>}
+
+      {dialog && (
+        <ShareRuleDialog doctor={doctor} rule={dialog.rule} rules={rules} catalog={catalog}
+          onClose={() => setDialog(null)}
+          onSaved={(out, text) => {
+            setDialog(null); notify(text, out?.warnings || []); load(); if (onSaved) onSaved()
+          }} />
       )}
-      {msg && <p className={msg.ok ? 'success-text' : 'error'} style={{ marginTop: 8 }}>{msg.text}</p>}
     </div>
   )
 }
