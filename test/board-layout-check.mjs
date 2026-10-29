@@ -79,7 +79,9 @@ const run = async () => {
   const browser = await chromium.launch()
   console.log('\n═══ فحص لوحة الصالة (متصفّح حقيقي، محاكاة Chrome 66) ═══\n')
 
-  for (const [w, h0] of SIZES) {
+  // BOARD_ONLY=call: أقسام النداء و«لم يصل» وحدها (للتكرار السريع) — الجولة الكاملة بلا متغيّر
+  const ONLY = process.env.BOARD_ONLY || ''
+  for (const [w, h0] of ONLY ? [] : SIZES) {
     for (const bar of [false, true]) {
       const h = bar ? h0 - BAR : h0
       const line = []
@@ -520,7 +522,7 @@ const run = async () => {
           const lh = el ? parseFloat(getComputedStyle(el).lineHeight) : 1
           return {
             name: el ? el.textContent : null, fs: el ? parseFloat(getComputedStyle(el).fontSize) : 0,
-            whole: !!el && el.scrollWidth <= el.clientWidth + 1 && el.scrollHeight <= el.clientHeight + 1,
+            whole: !!el && el.scrollWidth <= el.clientWidth + 1 && el.scrollHeight - el.clientHeight <= lh / 2,
             lines: el ? Math.round(el.clientHeight / lh) : 0,
             clamped: !!el && getComputedStyle(el).webkitLineClamp === '2',
             below: !el || r.top >= nr.bottom - 1,
@@ -543,6 +545,9 @@ const run = async () => {
           ok(b.name === NAMES[kind], `${tag}: الاسم «${b.name}»`)
           ok(b.below, `${tag}: الاسم ليس تحت الرقم`)
           ok(b.fs >= 20, `${tag}: ★ الاسم صغُر إلى ${b.fs}px`)
+          // ★ العاديّ بمقاسه الكامل — لا يصغر بلا حاجة
+          const base = mobile && w <= 600 ? 24 : w >= 1800 ? 72 : w * 0.04
+          if (kind === 'normal') ok(Math.abs(b.fs - base) < 0.6, `${tag}: ★ الاسم العاديّ صغُر بلا حاجة ${b.fs} < ${base}`)
           // العاديّ والطويل كاملان (الطويل سطران أو يصغر)؛ والمفرط وحده قد يبلغ الحدّ فيُقصّ بنقاط
           ok(b.lines >= 1 && b.lines <= 2, `${tag}: الاسم في ${b.lines} أسطر`)
           if (kind === 'normal') ok(b.lines === 1, `${tag}: الاسم العاديّ انكسر سطرين`)

@@ -461,7 +461,9 @@ export default function PublicDisplay() {
     Array.prototype.forEach.call(root.querySelectorAll('[data-fit]'), (el) => {
       // الطول للمحدود بسطرين (data-fit-lines) وحده: سطرٌ واحدٌ بخطّ Cairo وارتفاع 1.15 يُبلغ
       // دائماً عن فيضٍ عموديّ ببضع بكسلات (رؤوس الحروف) فيصغر كلّ عنوانٍ إلى حدّه بلا سبب
-      const tall = el.hasAttribute('data-fit-lines') && el.scrollHeight > el.clientHeight + 1
+      // وحتى فيه: فيضُ سطرٍ كامل (نصف ارتفاع سطرٍ فأكثر) لا بضع بكسلات رؤوس الحروف
+      const tall = el.hasAttribute('data-fit-lines')
+        && el.scrollHeight - el.clientHeight > parseFloat(getComputedStyle(el).lineHeight) / 2
       if (el.scrollWidth <= el.clientWidth + 1 && !tall) return
       const k = el.getAttribute('data-fit')
       const px = parseFloat(getComputedStyle(el).fontSize)
