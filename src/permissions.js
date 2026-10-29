@@ -69,6 +69,10 @@ export const canEditReferral = (role) => role === 'clinic_admin' || role === 'cl
 export const canSeeCashReport = (role) =>
   role === 'clinic_admin' || role === 'clinic_reception' || role === MANAGER
 
+// مستحقات الدكاترة من الإجراءات (تبويب «المستحقات» في صفحة الإجراءات): المشرفة والمدير والمشرف
+// العام — يطابق EARNINGS_ROLES في الخادم. المجلس يرى المراجعة لكن لا هذه، والاستقبال لا شيء: 403.
+export const canSeeEarnings = (role) => role === 'clinic_admin' || role === MANAGER || role === SUPER_ADMIN
+
 // المساءلة: سجلّ الزيارة الكامل («مين عمل شو») ونشاط الموظفين — المشرفة والمدير وحدهما،
 // يطابق AUDIT_ROLES في الخادم. الاستقبال يرى الجرد بلاهما (لا يراقب الموظفون بعضهم)، والطبيب لا شيء.
 export const canSeeVisitAudit = (role) => role === 'clinic_admin' || role === MANAGER

@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { ProcedureSpecialties, specialtiesText } from '../SpecialtyPicker.jsx'
 import { useDialogs } from '../dialogs.jsx'
 import { api, fmtMoney, toLatinDigits } from '../api.js'
 import { useRole } from '../RoleContext.jsx'
 import { useToast } from '../action-feedback.jsx'
 import ProcedureReview from './ProcedureReview.jsx'
+import ProcedureEarnings from './ProcedureEarnings.jsx'
+import { canSeeEarnings } from '../permissions.js'
 import { DistributeRuleDialog, PricingHistoryDialog } from '../components/ShareRuleDialogs.jsx'
 import { doctorsCount } from '../share-rule.js'
 
@@ -21,9 +23,13 @@ const PRICING_HISTORY_READERS = ['clinic_admin', 'manager']
 // الاستقبال غائبٌ عمداً (ولا يرى الصفحة أصلاً): يُدخل الإجراء وموادّه، ولا شأن له بالتقسيم.
 // كتالوج المواد واستهلاكها ليسا هنا: صفحة «المخزون» المكان الوحيد لإدارتهما.
 const SETTLEMENT_VIEWERS = ['clinic_admin', 'board', 'super_admin', 'manager']
+// «المستحقات» تبويبٌ هنا لا صفحةٌ في القائمة: مصدرها لقطات الأسطر نفسها التي تعرضها
+// «المراجعة»، ومن يراها يرى الصفحة أصلاً. يُخفى عن المجلس (canSeeEarnings) والخادم يردّه 403.
+// التبويب في الرابط (?tab=) فيبقى بعد التحديث، ويُفتح من رابطٍ مباشر.
 const TABS = [
   { key: 'catalog', label: 'الإجراءات' },
   { key: 'review', label: 'المراجعة' },
+  { key: 'earnings', label: 'المستحقات', allow: canSeeEarnings },
 ]
 
 function NewProcedureForm({ onCreated }) {
@@ -136,9 +142,13 @@ export default function ClinicProcedures() {
   const [list, setList] = useState(null)
   const [err, setErr] = useState(null)
   const [editing, setEditing] = useState(null)
-  const [tab, setTab] = useState('catalog')
+  const [params, setParams] = useSearchParams()
   const [toast, showToast] = useToast()
   const { role } = useRole()
+  const tabs = SETTLEMENT_VIEWERS.includes(role) ? TABS.filter((t) => !t.allow || t.allow(role)) : []
+  const tab = tabs.some((t) => t.key === params.get('tab')) ? params.get('tab') : 'catalog'
+  // تبديل التبويب يمسح معاملات التبويب السابق (فترة المستحقات ودكتورها)
+  const setTab = (key) => setParams(key === 'catalog' ? {} : { tab: key }, { replace: true })
   const canEdit = role === 'clinic_admin'
   const canHistory = PRICING_HISTORY_READERS.includes(role)
   const [distributing, setDistributing] = useState(null)   // الإجراء الذي تُوزَّع قاعدته
@@ -178,9 +188,9 @@ export default function ClinicProcedures() {
       {toast}
 
       {/* الصفحة لا يراها الاستقبال أصلاً — والخادم يرفض مساراتها بـ403 لا الواجهة وحدها */}
-      {SETTLEMENT_VIEWERS.includes(role) && (
+      {tabs.length > 0 && (
         <div className="inline proc-tabs" role="tablist" style={{ gap: 8, marginBottom: 14 }}>
-          {TABS.map((t) => (
+          {tabs.map((t) => (
             <button key={t.key} type="button" role="tab" aria-selected={tab === t.key}
               className={tab === t.key ? '' : 'ghost'} style={{ padding: '6px 16px' }}
               onClick={() => setTab(t.key)}>{t.label}</button>
@@ -189,6 +199,7 @@ export default function ClinicProcedures() {
       )}
 
       {tab === 'review' ? <ProcedureReview canEdit={canEdit} showToast={showToast} />
+      : tab === 'earnings' ? <ProcedureEarnings showToast={showToast} />
       : (
       <div className="card">
         <h3>الكتالوج ({list.length} — المفعَّل {active})</h3>

@@ -209,6 +209,16 @@ export const api = {
       if (doctorId) q.set('doctor_id', String(doctorId))
       return downloadFile(`/api/clinic/procedures/export?${q}`, `حصص الإجراءات-${from}.xlsx`)
     },
+    // مستحقات الدكاترة: period (today|yesterday|week|month) أو from/to — الفترة تُحلّ في الخادم بتوقيت دمشق
+    procedureEarnings: ({ period, from, to }) => {
+      const q = new URLSearchParams(period ? { period } : { from, to: to || from })
+      return http(`/clinic/procedures/earnings?${q}`)
+    },
+    exportEarnings: ({ period, from, to, doctorId }) => {
+      const q = new URLSearchParams(period ? { period } : { from, to: to || from })
+      if (doctorId) q.set('doctor_id', String(doctorId))
+      return downloadFile(`/api/clinic/procedures/earnings/export?${q}`, 'مستحقات-الإجراءات.xlsx')
+    },
     // ── كتالوج المواد: قراءةٌ وحدها ── (الاستقبال يتسلّم المفعَّل بلا سعر — من الخادم نفسه).
     // الكتابة والاستهلاك في api.inventory: صفحة «المخزون» المكان الوحيد لإدارة المواد
     materials: () => http('/clinic/materials'),

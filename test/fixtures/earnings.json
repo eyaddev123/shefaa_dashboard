@@ -1,0 +1,1160 @@
+{
+ "me": {
+  "adm": {
+   "id": "2",
+   "username": "adm",
+   "display_name": "أسماء المشرفة",
+   "role": "clinic_admin",
+   "board_member_id": null,
+   "is_chairman": false,
+   "member_title": null
+  },
+  "mgr": {
+   "id": "3",
+   "username": "mgr",
+   "display_name": "المدير",
+   "role": "manager",
+   "board_member_id": null,
+   "is_chairman": false,
+   "member_title": null
+  },
+  "sup": {
+   "id": "4",
+   "username": "sup",
+   "display_name": "المشرف العام",
+   "role": "super_admin",
+   "board_member_id": null,
+   "is_chairman": false,
+   "member_title": null
+  },
+  "brd": {
+   "id": "5",
+   "username": "brd",
+   "display_name": "عضو المجلس",
+   "role": "board",
+   "board_member_id": null,
+   "is_chairman": false,
+   "member_title": null
+  },
+  "rec": {
+   "id": "1",
+   "username": "rec",
+   "display_name": "ولاء الاستقبال",
+   "role": "clinic_reception",
+   "board_member_id": null,
+   "is_chairman": false,
+   "member_title": null
+  }
+ },
+ "today": {
+  "from": "2026-10-29",
+  "to": "2026-10-29",
+  "period": "today",
+  "periodLabel": "اليوم",
+  "totals": {
+   "count": 5,
+   "price": 330000,
+   "materials": 19000,
+   "doctor": 141200,
+   "shifa": 169800
+  },
+  "noRule": 0,
+  "negative": 0,
+  "doctors": [
+   {
+    "doctorId": "1",
+    "doctor": "د. أمل الشامي",
+    "specialty": "عظمية",
+    "totals": {
+     "count": 3,
+     "price": 190000,
+     "materials": 18000,
+     "doctor": 85600,
+     "shifa": 86400
+    },
+    "noRule": 0,
+    "negative": 0,
+    "lines": [
+     {
+      "id": "1",
+      "appointmentId": "1",
+      "date": "2026-10-29",
+      "time": "23:18",
+      "queue": 1,
+      "booking": 1,
+      "patient": "سامي خالد الأحمد",
+      "procedure": "تجبير",
+      "price": 100000,
+      "items": [
+       {
+        "name": "جبس",
+        "unit": "علبة",
+        "qty": 2,
+        "cost": 16000
+       }
+      ],
+      "legacyMaterials": 0,
+      "materials": 16000,
+      "rule": "ثابت 30,000",
+      "ruleSource": "procedure",
+      "ruleKind": "fixed",
+      "ruleValue": 30000,
+      "doctor": 30000,
+      "shifa": 54000,
+      "noRule": false,
+      "negative": false
+     },
+     {
+      "id": "2",
+      "appointmentId": "1",
+      "date": "2026-10-29",
+      "time": "23:18",
+      "queue": 1,
+      "booking": 1,
+      "patient": "سامي خالد الأحمد",
+      "procedure": "فك جبس",
+      "price": 50000,
+      "items": [
+       {
+        "name": "شاش",
+        "unit": "قطعة",
+        "qty": 4,
+        "cost": 2000
+       }
+      ],
+      "legacyMaterials": 0,
+      "materials": 2000,
+      "rule": "نسبة 70%",
+      "ruleSource": "procedure",
+      "ruleKind": "percent",
+      "ruleValue": 70,
+      "doctor": 33600,
+      "shifa": 14400,
+      "noRule": false,
+      "negative": false
+     },
+     {
+      "id": "3",
+      "appointmentId": "2",
+      "date": "2026-10-29",
+      "time": "23:18",
+      "queue": 2,
+      "booking": 2,
+      "patient": "رنا محمد العلي",
+      "procedure": "إيكو",
+      "price": 40000,
+      "items": [],
+      "legacyMaterials": 0,
+      "materials": 0,
+      "rule": "العامة 55%",
+      "ruleSource": "doctor",
+      "ruleKind": "percent",
+      "ruleValue": 55,
+      "doctor": 22000,
+      "shifa": 18000,
+      "noRule": false,
+      "negative": false
+     }
+    ]
+   },
+   {
+    "doctorId": "2",
+    "doctor": "د. باسل حمدان",
+    "specialty": "قلبية",
+    "totals": {
+     "count": 2,
+     "price": 140000,
+     "materials": 1000,
+     "doctor": 55600,
+     "shifa": 83400
+    },
+    "noRule": 0,
+    "negative": 0,
+    "lines": [
+     {
+      "id": "5",
+      "appointmentId": "3",
+      "date": "2026-10-29",
+      "time": "23:18",
+      "queue": 1,
+      "booking": 1,
+      "patient": "خالد سعيد يوسف",
+      "procedure": "إيكو",
+      "price": 40000,
+      "items": [
+       {
+        "name": "شاش",
+        "unit": "قطعة",
+        "qty": 2,
+        "cost": 1000
+       }
+      ],
+      "legacyMaterials": 0,
+      "materials": 1000,
+      "rule": "العامة 40%",
+      "ruleSource": "doctor",
+      "ruleKind": "percent",
+      "ruleValue": 40,
+      "doctor": 15600,
+      "shifa": 23400,
+      "noRule": false,
+      "negative": false
+     },
+     {
+      "id": "6",
+      "appointmentId": "4",
+      "date": "2026-10-29",
+      "time": "23:18",
+      "queue": 2,
+      "booking": 2,
+      "patient": "هدى علي قاسم",
+      "procedure": "تجبير",
+      "price": 100000,
+      "items": [],
+      "legacyMaterials": 0,
+      "materials": 0,
+      "rule": "العامة 40%",
+      "ruleSource": "doctor",
+      "ruleKind": "percent",
+      "ruleValue": 40,
+      "doctor": 40000,
+      "shifa": 60000,
+      "noRule": false,
+      "negative": false
+     }
+    ]
+   }
+  ]
+ },
+ "yesterday": {
+  "from": "2026-10-28",
+  "to": "2026-10-28",
+  "period": "yesterday",
+  "periodLabel": "أمس",
+  "totals": {
+   "count": 1,
+   "price": 40000,
+   "materials": 0,
+   "doctor": 22000,
+   "shifa": 18000
+  },
+  "noRule": 0,
+  "negative": 0,
+  "doctors": [
+   {
+    "doctorId": "1",
+    "doctor": "د. أمل الشامي",
+    "specialty": "عظمية",
+    "totals": {
+     "count": 1,
+     "price": 40000,
+     "materials": 0,
+     "doctor": 22000,
+     "shifa": 18000
+    },
+    "noRule": 0,
+    "negative": 0,
+    "lines": [
+     {
+      "id": "7",
+      "appointmentId": "6",
+      "date": "2026-10-28",
+      "time": "00:10",
+      "queue": 1,
+      "booking": 1,
+      "patient": "مريض الأمس",
+      "procedure": "إيكو",
+      "price": 40000,
+      "items": [],
+      "legacyMaterials": 0,
+      "materials": 0,
+      "rule": "العامة 55%",
+      "ruleSource": "doctor",
+      "ruleKind": "percent",
+      "ruleValue": 55,
+      "doctor": 22000,
+      "shifa": 18000,
+      "noRule": false,
+      "negative": false
+     }
+    ]
+   }
+  ]
+ },
+ "week": {
+  "from": "2026-10-24",
+  "to": "2026-10-29",
+  "period": "week",
+  "periodLabel": "هالأسبوع",
+  "totals": {
+   "count": 6,
+   "price": 370000,
+   "materials": 19000,
+   "doctor": 163200,
+   "shifa": 187800
+  },
+  "noRule": 0,
+  "negative": 0,
+  "doctors": [
+   {
+    "doctorId": "1",
+    "doctor": "د. أمل الشامي",
+    "specialty": "عظمية",
+    "totals": {
+     "count": 4,
+     "price": 230000,
+     "materials": 18000,
+     "doctor": 107600,
+     "shifa": 104400
+    },
+    "noRule": 0,
+    "negative": 0,
+    "lines": [
+     {
+      "id": "7",
+      "appointmentId": "6",
+      "date": "2026-10-28",
+      "time": "00:10",
+      "queue": 1,
+      "booking": 1,
+      "patient": "مريض الأمس",
+      "procedure": "إيكو",
+      "price": 40000,
+      "items": [],
+      "legacyMaterials": 0,
+      "materials": 0,
+      "rule": "العامة 55%",
+      "ruleSource": "doctor",
+      "ruleKind": "percent",
+      "ruleValue": 55,
+      "doctor": 22000,
+      "shifa": 18000,
+      "noRule": false,
+      "negative": false
+     },
+     {
+      "id": "1",
+      "appointmentId": "1",
+      "date": "2026-10-29",
+      "time": "23:18",
+      "queue": 1,
+      "booking": 1,
+      "patient": "سامي خالد الأحمد",
+      "procedure": "تجبير",
+      "price": 100000,
+      "items": [
+       {
+        "name": "جبس",
+        "unit": "علبة",
+        "qty": 2,
+        "cost": 16000
+       }
+      ],
+      "legacyMaterials": 0,
+      "materials": 16000,
+      "rule": "ثابت 30,000",
+      "ruleSource": "procedure",
+      "ruleKind": "fixed",
+      "ruleValue": 30000,
+      "doctor": 30000,
+      "shifa": 54000,
+      "noRule": false,
+      "negative": false
+     },
+     {
+      "id": "2",
+      "appointmentId": "1",
+      "date": "2026-10-29",
+      "time": "23:18",
+      "queue": 1,
+      "booking": 1,
+      "patient": "سامي خالد الأحمد",
+      "procedure": "فك جبس",
+      "price": 50000,
+      "items": [
+       {
+        "name": "شاش",
+        "unit": "قطعة",
+        "qty": 4,
+        "cost": 2000
+       }
+      ],
+      "legacyMaterials": 0,
+      "materials": 2000,
+      "rule": "نسبة 70%",
+      "ruleSource": "procedure",
+      "ruleKind": "percent",
+      "ruleValue": 70,
+      "doctor": 33600,
+      "shifa": 14400,
+      "noRule": false,
+      "negative": false
+     },
+     {
+      "id": "3",
+      "appointmentId": "2",
+      "date": "2026-10-29",
+      "time": "23:18",
+      "queue": 2,
+      "booking": 2,
+      "patient": "رنا محمد العلي",
+      "procedure": "إيكو",
+      "price": 40000,
+      "items": [],
+      "legacyMaterials": 0,
+      "materials": 0,
+      "rule": "العامة 55%",
+      "ruleSource": "doctor",
+      "ruleKind": "percent",
+      "ruleValue": 55,
+      "doctor": 22000,
+      "shifa": 18000,
+      "noRule": false,
+      "negative": false
+     }
+    ]
+   },
+   {
+    "doctorId": "2",
+    "doctor": "د. باسل حمدان",
+    "specialty": "قلبية",
+    "totals": {
+     "count": 2,
+     "price": 140000,
+     "materials": 1000,
+     "doctor": 55600,
+     "shifa": 83400
+    },
+    "noRule": 0,
+    "negative": 0,
+    "lines": [
+     {
+      "id": "5",
+      "appointmentId": "3",
+      "date": "2026-10-29",
+      "time": "23:18",
+      "queue": 1,
+      "booking": 1,
+      "patient": "خالد سعيد يوسف",
+      "procedure": "إيكو",
+      "price": 40000,
+      "items": [
+       {
+        "name": "شاش",
+        "unit": "قطعة",
+        "qty": 2,
+        "cost": 1000
+       }
+      ],
+      "legacyMaterials": 0,
+      "materials": 1000,
+      "rule": "العامة 40%",
+      "ruleSource": "doctor",
+      "ruleKind": "percent",
+      "ruleValue": 40,
+      "doctor": 15600,
+      "shifa": 23400,
+      "noRule": false,
+      "negative": false
+     },
+     {
+      "id": "6",
+      "appointmentId": "4",
+      "date": "2026-10-29",
+      "time": "23:18",
+      "queue": 2,
+      "booking": 2,
+      "patient": "هدى علي قاسم",
+      "procedure": "تجبير",
+      "price": 100000,
+      "items": [],
+      "legacyMaterials": 0,
+      "materials": 0,
+      "rule": "العامة 40%",
+      "ruleSource": "doctor",
+      "ruleKind": "percent",
+      "ruleValue": 40,
+      "doctor": 40000,
+      "shifa": 60000,
+      "noRule": false,
+      "negative": false
+     }
+    ]
+   }
+  ]
+ },
+ "month": {
+  "from": "2026-10-01",
+  "to": "2026-10-29",
+  "period": "month",
+  "periodLabel": "هالشهر",
+  "totals": {
+   "count": 6,
+   "price": 370000,
+   "materials": 19000,
+   "doctor": 163200,
+   "shifa": 187800
+  },
+  "noRule": 0,
+  "negative": 0,
+  "doctors": [
+   {
+    "doctorId": "1",
+    "doctor": "د. أمل الشامي",
+    "specialty": "عظمية",
+    "totals": {
+     "count": 4,
+     "price": 230000,
+     "materials": 18000,
+     "doctor": 107600,
+     "shifa": 104400
+    },
+    "noRule": 0,
+    "negative": 0,
+    "lines": [
+     {
+      "id": "7",
+      "appointmentId": "6",
+      "date": "2026-10-28",
+      "time": "00:10",
+      "queue": 1,
+      "booking": 1,
+      "patient": "مريض الأمس",
+      "procedure": "إيكو",
+      "price": 40000,
+      "items": [],
+      "legacyMaterials": 0,
+      "materials": 0,
+      "rule": "العامة 55%",
+      "ruleSource": "doctor",
+      "ruleKind": "percent",
+      "ruleValue": 55,
+      "doctor": 22000,
+      "shifa": 18000,
+      "noRule": false,
+      "negative": false
+     },
+     {
+      "id": "1",
+      "appointmentId": "1",
+      "date": "2026-10-29",
+      "time": "23:18",
+      "queue": 1,
+      "booking": 1,
+      "patient": "سامي خالد الأحمد",
+      "procedure": "تجبير",
+      "price": 100000,
+      "items": [
+       {
+        "name": "جبس",
+        "unit": "علبة",
+        "qty": 2,
+        "cost": 16000
+       }
+      ],
+      "legacyMaterials": 0,
+      "materials": 16000,
+      "rule": "ثابت 30,000",
+      "ruleSource": "procedure",
+      "ruleKind": "fixed",
+      "ruleValue": 30000,
+      "doctor": 30000,
+      "shifa": 54000,
+      "noRule": false,
+      "negative": false
+     },
+     {
+      "id": "2",
+      "appointmentId": "1",
+      "date": "2026-10-29",
+      "time": "23:18",
+      "queue": 1,
+      "booking": 1,
+      "patient": "سامي خالد الأحمد",
+      "procedure": "فك جبس",
+      "price": 50000,
+      "items": [
+       {
+        "name": "شاش",
+        "unit": "قطعة",
+        "qty": 4,
+        "cost": 2000
+       }
+      ],
+      "legacyMaterials": 0,
+      "materials": 2000,
+      "rule": "نسبة 70%",
+      "ruleSource": "procedure",
+      "ruleKind": "percent",
+      "ruleValue": 70,
+      "doctor": 33600,
+      "shifa": 14400,
+      "noRule": false,
+      "negative": false
+     },
+     {
+      "id": "3",
+      "appointmentId": "2",
+      "date": "2026-10-29",
+      "time": "23:18",
+      "queue": 2,
+      "booking": 2,
+      "patient": "رنا محمد العلي",
+      "procedure": "إيكو",
+      "price": 40000,
+      "items": [],
+      "legacyMaterials": 0,
+      "materials": 0,
+      "rule": "العامة 55%",
+      "ruleSource": "doctor",
+      "ruleKind": "percent",
+      "ruleValue": 55,
+      "doctor": 22000,
+      "shifa": 18000,
+      "noRule": false,
+      "negative": false
+     }
+    ]
+   },
+   {
+    "doctorId": "2",
+    "doctor": "د. باسل حمدان",
+    "specialty": "قلبية",
+    "totals": {
+     "count": 2,
+     "price": 140000,
+     "materials": 1000,
+     "doctor": 55600,
+     "shifa": 83400
+    },
+    "noRule": 0,
+    "negative": 0,
+    "lines": [
+     {
+      "id": "5",
+      "appointmentId": "3",
+      "date": "2026-10-29",
+      "time": "23:18",
+      "queue": 1,
+      "booking": 1,
+      "patient": "خالد سعيد يوسف",
+      "procedure": "إيكو",
+      "price": 40000,
+      "items": [
+       {
+        "name": "شاش",
+        "unit": "قطعة",
+        "qty": 2,
+        "cost": 1000
+       }
+      ],
+      "legacyMaterials": 0,
+      "materials": 1000,
+      "rule": "العامة 40%",
+      "ruleSource": "doctor",
+      "ruleKind": "percent",
+      "ruleValue": 40,
+      "doctor": 15600,
+      "shifa": 23400,
+      "noRule": false,
+      "negative": false
+     },
+     {
+      "id": "6",
+      "appointmentId": "4",
+      "date": "2026-10-29",
+      "time": "23:18",
+      "queue": 2,
+      "booking": 2,
+      "patient": "هدى علي قاسم",
+      "procedure": "تجبير",
+      "price": 100000,
+      "items": [],
+      "legacyMaterials": 0,
+      "materials": 0,
+      "rule": "العامة 40%",
+      "ruleSource": "doctor",
+      "ruleKind": "percent",
+      "ruleValue": 40,
+      "doctor": 40000,
+      "shifa": 60000,
+      "noRule": false,
+      "negative": false
+     }
+    ]
+   }
+  ]
+ },
+ "custom": {
+  "from": "2026-10-28",
+  "to": "2026-10-29",
+  "period": "custom",
+  "periodLabel": null,
+  "totals": {
+   "count": 6,
+   "price": 370000,
+   "materials": 19000,
+   "doctor": 163200,
+   "shifa": 187800
+  },
+  "noRule": 0,
+  "negative": 0,
+  "doctors": [
+   {
+    "doctorId": "1",
+    "doctor": "د. أمل الشامي",
+    "specialty": "عظمية",
+    "totals": {
+     "count": 4,
+     "price": 230000,
+     "materials": 18000,
+     "doctor": 107600,
+     "shifa": 104400
+    },
+    "noRule": 0,
+    "negative": 0,
+    "lines": [
+     {
+      "id": "7",
+      "appointmentId": "6",
+      "date": "2026-10-28",
+      "time": "00:10",
+      "queue": 1,
+      "booking": 1,
+      "patient": "مريض الأمس",
+      "procedure": "إيكو",
+      "price": 40000,
+      "items": [],
+      "legacyMaterials": 0,
+      "materials": 0,
+      "rule": "العامة 55%",
+      "ruleSource": "doctor",
+      "ruleKind": "percent",
+      "ruleValue": 55,
+      "doctor": 22000,
+      "shifa": 18000,
+      "noRule": false,
+      "negative": false
+     },
+     {
+      "id": "1",
+      "appointmentId": "1",
+      "date": "2026-10-29",
+      "time": "23:18",
+      "queue": 1,
+      "booking": 1,
+      "patient": "سامي خالد الأحمد",
+      "procedure": "تجبير",
+      "price": 100000,
+      "items": [
+       {
+        "name": "جبس",
+        "unit": "علبة",
+        "qty": 2,
+        "cost": 16000
+       }
+      ],
+      "legacyMaterials": 0,
+      "materials": 16000,
+      "rule": "ثابت 30,000",
+      "ruleSource": "procedure",
+      "ruleKind": "fixed",
+      "ruleValue": 30000,
+      "doctor": 30000,
+      "shifa": 54000,
+      "noRule": false,
+      "negative": false
+     },
+     {
+      "id": "2",
+      "appointmentId": "1",
+      "date": "2026-10-29",
+      "time": "23:18",
+      "queue": 1,
+      "booking": 1,
+      "patient": "سامي خالد الأحمد",
+      "procedure": "فك جبس",
+      "price": 50000,
+      "items": [
+       {
+        "name": "شاش",
+        "unit": "قطعة",
+        "qty": 4,
+        "cost": 2000
+       }
+      ],
+      "legacyMaterials": 0,
+      "materials": 2000,
+      "rule": "نسبة 70%",
+      "ruleSource": "procedure",
+      "ruleKind": "percent",
+      "ruleValue": 70,
+      "doctor": 33600,
+      "shifa": 14400,
+      "noRule": false,
+      "negative": false
+     },
+     {
+      "id": "3",
+      "appointmentId": "2",
+      "date": "2026-10-29",
+      "time": "23:18",
+      "queue": 2,
+      "booking": 2,
+      "patient": "رنا محمد العلي",
+      "procedure": "إيكو",
+      "price": 40000,
+      "items": [],
+      "legacyMaterials": 0,
+      "materials": 0,
+      "rule": "العامة 55%",
+      "ruleSource": "doctor",
+      "ruleKind": "percent",
+      "ruleValue": 55,
+      "doctor": 22000,
+      "shifa": 18000,
+      "noRule": false,
+      "negative": false
+     }
+    ]
+   },
+   {
+    "doctorId": "2",
+    "doctor": "د. باسل حمدان",
+    "specialty": "قلبية",
+    "totals": {
+     "count": 2,
+     "price": 140000,
+     "materials": 1000,
+     "doctor": 55600,
+     "shifa": 83400
+    },
+    "noRule": 0,
+    "negative": 0,
+    "lines": [
+     {
+      "id": "5",
+      "appointmentId": "3",
+      "date": "2026-10-29",
+      "time": "23:18",
+      "queue": 1,
+      "booking": 1,
+      "patient": "خالد سعيد يوسف",
+      "procedure": "إيكو",
+      "price": 40000,
+      "items": [
+       {
+        "name": "شاش",
+        "unit": "قطعة",
+        "qty": 2,
+        "cost": 1000
+       }
+      ],
+      "legacyMaterials": 0,
+      "materials": 1000,
+      "rule": "العامة 40%",
+      "ruleSource": "doctor",
+      "ruleKind": "percent",
+      "ruleValue": 40,
+      "doctor": 15600,
+      "shifa": 23400,
+      "noRule": false,
+      "negative": false
+     },
+     {
+      "id": "6",
+      "appointmentId": "4",
+      "date": "2026-10-29",
+      "time": "23:18",
+      "queue": 2,
+      "booking": 2,
+      "patient": "هدى علي قاسم",
+      "procedure": "تجبير",
+      "price": 100000,
+      "items": [],
+      "legacyMaterials": 0,
+      "materials": 0,
+      "rule": "العامة 40%",
+      "ruleSource": "doctor",
+      "ruleKind": "percent",
+      "ruleValue": 40,
+      "doctor": 40000,
+      "shifa": 60000,
+      "noRule": false,
+      "negative": false
+     }
+    ]
+   }
+  ]
+ },
+ "empty": {
+  "from": "2020-01-01",
+  "to": "2020-01-01",
+  "period": "custom",
+  "periodLabel": null,
+  "totals": {
+   "count": 0,
+   "price": 0,
+   "materials": 0,
+   "doctor": 0,
+   "shifa": 0
+  },
+  "noRule": 0,
+  "negative": 0,
+  "doctors": []
+ },
+ "rich": {
+  "from": "2026-10-29",
+  "to": "2026-10-29",
+  "period": "today",
+  "periodLabel": "اليوم",
+  "totals": {
+   "count": 7,
+   "price": 410000,
+   "materials": 68500,
+   "doctor": 141200,
+   "shifa": 200300
+  },
+  "noRule": 1,
+  "negative": 1,
+  "doctors": [
+   {
+    "doctorId": "1",
+    "doctor": "د. أمل الشامي",
+    "specialty": "عظمية",
+    "totals": {
+     "count": 3,
+     "price": 190000,
+     "materials": 18000,
+     "doctor": 85600,
+     "shifa": 86400
+    },
+    "noRule": 0,
+    "negative": 0,
+    "lines": [
+     {
+      "id": "1",
+      "appointmentId": "1",
+      "date": "2026-10-29",
+      "time": "23:18",
+      "queue": 1,
+      "booking": 1,
+      "patient": "سامي خالد الأحمد",
+      "procedure": "تجبير",
+      "price": 100000,
+      "items": [
+       {
+        "name": "جبس",
+        "unit": "علبة",
+        "qty": 2,
+        "cost": 16000
+       }
+      ],
+      "legacyMaterials": 0,
+      "materials": 16000,
+      "rule": "ثابت 30,000",
+      "ruleSource": "procedure",
+      "ruleKind": "fixed",
+      "ruleValue": 30000,
+      "doctor": 30000,
+      "shifa": 54000,
+      "noRule": false,
+      "negative": false
+     },
+     {
+      "id": "2",
+      "appointmentId": "1",
+      "date": "2026-10-29",
+      "time": "23:18",
+      "queue": 1,
+      "booking": 1,
+      "patient": "سامي خالد الأحمد",
+      "procedure": "فك جبس",
+      "price": 50000,
+      "items": [
+       {
+        "name": "شاش",
+        "unit": "قطعة",
+        "qty": 4,
+        "cost": 2000
+       }
+      ],
+      "legacyMaterials": 0,
+      "materials": 2000,
+      "rule": "نسبة 70%",
+      "ruleSource": "procedure",
+      "ruleKind": "percent",
+      "ruleValue": 70,
+      "doctor": 33600,
+      "shifa": 14400,
+      "noRule": false,
+      "negative": false
+     },
+     {
+      "id": "3",
+      "appointmentId": "2",
+      "date": "2026-10-29",
+      "time": "23:18",
+      "queue": 2,
+      "booking": 2,
+      "patient": "رنا محمد العلي",
+      "procedure": "إيكو",
+      "price": 40000,
+      "items": [],
+      "legacyMaterials": 0,
+      "materials": 0,
+      "rule": "العامة 55%",
+      "ruleSource": "doctor",
+      "ruleKind": "percent",
+      "ruleValue": 55,
+      "doctor": 22000,
+      "shifa": 18000,
+      "noRule": false,
+      "negative": false
+     }
+    ]
+   },
+   {
+    "doctorId": "2",
+    "doctor": "د. باسل حمدان",
+    "specialty": "قلبية",
+    "totals": {
+     "count": 3,
+     "price": 180000,
+     "materials": 49000,
+     "doctor": 55600,
+     "shifa": 75400
+    },
+    "noRule": 0,
+    "negative": 1,
+    "lines": [
+     {
+      "id": "5",
+      "appointmentId": "3",
+      "date": "2026-10-29",
+      "time": "23:18",
+      "queue": 1,
+      "booking": 1,
+      "patient": "خالد سعيد يوسف",
+      "procedure": "إيكو",
+      "price": 40000,
+      "items": [
+       {
+        "name": "شاش",
+        "unit": "قطعة",
+        "qty": 2,
+        "cost": 1000
+       }
+      ],
+      "legacyMaterials": 0,
+      "materials": 1000,
+      "rule": "العامة 40%",
+      "ruleSource": "doctor",
+      "ruleKind": "percent",
+      "ruleValue": 40,
+      "doctor": 15600,
+      "shifa": 23400,
+      "noRule": false,
+      "negative": false
+     },
+     {
+      "id": "6",
+      "appointmentId": "4",
+      "date": "2026-10-29",
+      "time": "23:18",
+      "queue": 2,
+      "booking": 2,
+      "patient": "هدى علي قاسم",
+      "procedure": "تجبير",
+      "price": 100000,
+      "items": [],
+      "legacyMaterials": 0,
+      "materials": 0,
+      "rule": "العامة 40%",
+      "ruleSource": "doctor",
+      "ruleKind": "percent",
+      "ruleValue": 40,
+      "doctor": 40000,
+      "shifa": 60000,
+      "noRule": false,
+      "negative": false
+     },
+     {
+      "id": "9",
+      "appointmentId": "8",
+      "date": "2026-10-29",
+      "time": "23:18",
+      "queue": 3,
+      "booking": 3,
+      "patient": "عبد الرحمن فايز الحلبي",
+      "procedure": "إيكو",
+      "price": 40000,
+      "items": [
+       {
+        "name": "جبس",
+        "unit": "علبة",
+        "qty": 6,
+        "cost": 48000
+       }
+      ],
+      "legacyMaterials": 0,
+      "materials": 48000,
+      "rule": "العامة 40%",
+      "ruleSource": "doctor",
+      "ruleKind": "percent",
+      "ruleValue": 40,
+      "doctor": 0,
+      "shifa": -8000,
+      "noRule": false,
+      "negative": true
+     }
+    ]
+   },
+   {
+    "doctorId": "4",
+    "doctor": "د. ديما خوري",
+    "specialty": "",
+    "totals": {
+     "count": 1,
+     "price": 40000,
+     "materials": 1500,
+     "doctor": 0,
+     "shifa": 38500
+    },
+    "noRule": 1,
+    "negative": 0,
+    "lines": [
+     {
+      "id": "8",
+      "appointmentId": "7",
+      "date": "2026-10-29",
+      "time": "23:18",
+      "queue": 1,
+      "booking": 1,
+      "patient": "نور الهدى صالح",
+      "procedure": "إيكو",
+      "price": 40000,
+      "items": [
+       {
+        "name": "شاش",
+        "unit": "قطعة",
+        "qty": 3,
+        "cost": 1500
+       }
+      ],
+      "legacyMaterials": 0,
+      "materials": 1500,
+      "rule": "بلا قاعدة",
+      "ruleSource": "none",
+      "ruleKind": null,
+      "ruleValue": null,
+      "doctor": 0,
+      "shifa": 38500,
+      "noRule": true,
+      "negative": false
+     }
+    ]
+   }
+  ]
+ }
+}

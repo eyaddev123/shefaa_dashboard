@@ -3317,3 +3317,69 @@ button.spec-chip-btn[aria-pressed='true'] { background: var(--primary); border-c
   .share-general > button, .share-rules-head > button { min-height: 44px; }
   .proc-edit-actions > button { flex: 1 1 0; min-height: 44px; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   مستحقات الدكاترة من الإجراءات (تبويب «المستحقات» في صفحة الإجراءات)
+   الملخّص سطرٌ لكل دكتور يُكبس فيفتح تفصيله؛ وعلى الجوال بطاقات (table.rtable) بلا تمرير
+   ═══════════════════════════════════════════════════════════════════ */
+.earn-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.earn-head h3 { margin: 0; }
+.earn-export { padding: 6px 14px; }
+.earn-periods { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 4px; }
+.earn-periods .rev-flag { padding: 6px 16px; font-size: 13px; font-weight: 700; }
+.earn-custom { margin-top: 8px; }
+.earn-range { margin: 8px 0 12px; font-size: 12.5px; color: var(--text-secondary); }
+.tiles.earn-tiles { grid-template-columns: repeat(5, minmax(0, 1fr)); margin-bottom: 16px; }
+.earn-tiles .tile { min-width: 0; }
+.earn-tiles .tile:hover { transform: none; box-shadow: var(--shadow-card); }
+.earn-tiles .value { font-size: 24px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.earn-tiles .tile.earn-hero { background: var(--primary-soft); border-color: transparent; }
+.earn-tiles .tile.earn-hero::before { width: 5px; background: var(--primary); opacity: 1; }
+.earn-tiles .tile.earn-hero .label, .earn-tiles .tile.earn-hero .value { color: var(--accent-text); }
+.earn-table { margin-top: 4px; font-size: 13.5px; }
+.earn-table td { vertical-align: top; }
+.earn-table td.num { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.earn-table td.earn-doc { font-weight: 800; color: var(--accent-text); }
+.earn-row { cursor: pointer; }
+.earn-row:hover > td { background: var(--primary-soft); }
+.earn-row > td.rt-title { font-weight: 800; }
+.earn-spec { display: block; margin-top: 2px; font-size: 11.5px; font-weight: 600; color: var(--muted); }
+.earn-count { white-space: nowrap; }
+.earn-count .badge + .badge { margin-inline-start: 4px; }
+.earn-open > button { padding: 3px 12px; font-size: 12px; white-space: nowrap; }
+.earn-total > td { font-weight: 800; border-top: 2px solid var(--primary); }
+.earn-back { padding: 5px 14px; margin-bottom: 12px; }
+.earn-when { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.earn-date { display: block; font-size: 11.5px; color: var(--muted); }
+.earn-proc { font-weight: 700; }
+.earn-mats strong { display: block; }
+/* أصناف المواد بحدٍّ رفيع بينها لا «·» (تُقرأ صفراً بجانب الرقم الهندي) */
+.earn-items { display: flex; flex-wrap: wrap; gap: 2px 0; font-size: 11.5px; color: var(--muted); }
+.earn-items > span + span { border-inline-start: 1px solid var(--grid); margin-inline-start: 6px; padding-inline-start: 6px; }
+.earn-rule { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 700;
+  background: var(--primary-soft); color: var(--accent-text); white-space: nowrap; }
+.earn-rule.is-norule { background: var(--status-pending-bg); color: var(--status-pending); }
+.earn-neg > td { background: var(--status-bad-bg); }
+.earn-norule > td { background: var(--status-pending-bg); }
+.earn-note { margin: 12px 0 0; font-size: 12px; color: var(--muted); }
+@media (max-width: 1100px) {
+  .tiles.earn-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 767px) {
+  .earn-export { flex: 1 1 100%; min-height: 44px; }
+  .earn-periods .rev-flag { flex: 1 1 auto; min-height: 44px; }
+  .earn-custom > .field { flex: 1 1 0; min-width: 0; }
+  .earn-custom input { width: 100%; min-height: 44px; }
+  .earn-back { width: 100%; min-height: 44px; }
+  .tiles.earn-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .earn-tiles .tile.earn-hero { grid-column: 1 / -1; order: -1; }
+  .earn-tiles .value { font-size: 20px; }
+  .earn-tiles .tile.earn-hero .value { font-size: 28px; }
+  .earn-row:hover > td { background: none; }
+  table.rtable > tfoot > tr.earn-total { border: 2px solid var(--primary); background: var(--primary-soft); }
+  table.rtable > tfoot > tr.earn-total > td { border-top: 0; }
+  table.rtable > tbody > tr.earn-neg { background: var(--status-bad-bg); border-color: var(--status-bad); }
+  table.rtable > tbody > tr.earn-norule { background: var(--status-pending-bg); border-color: var(--status-pending); }
+  table.rtable > tbody > tr:is(.earn-neg, .earn-norule) > td { background: none; }
+  .earn-count .badge + .badge { margin-inline-start: 0; }
+}

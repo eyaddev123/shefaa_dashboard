@@ -19,7 +19,8 @@
     "test:cash": "node test/cash-report-check.mjs",
     "test:sidebar": "node test/sidebar-order-check.mjs",
     "test:rooms": "node test/room-occupancy-check.mjs",
-    "test:doctors": "node test/doctors-search-check.mjs"
+    "test:doctors": "node test/doctors-search-check.mjs",
+    "test:earnings": "node test/earnings-check.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",
