@@ -7,11 +7,16 @@ import { useToast } from '../action-feedback.jsx'
 import MaterialsCatalog from './MaterialsCatalog.jsx'
 import ProcedureReview from './ProcedureReview.jsx'
 import MaterialsConsumption from './MaterialsConsumption.jsx'
+import { DistributeRuleDialog, PricingHistoryDialog } from '../components/ShareRuleDialogs.jsx'
+import { doctorsCount } from '../share-rule.js'
 
 // ═══ العيادات — الإجراءات ═══
 // كتالوج عام لكل الدكاترة: اسم وسعر، بلا كمية. مسؤول العيادات يضيف ويعدّل ويعطّل —
 // ولا حذف (الحجوزات تشير إليه). تعديل السعر يسري على ما يُضاف بعده فقط: كل حجز
 // يحمل نسخة السعر لحظة إضافته. المجلس والمشرف العام والمدير يطالعون فقط.
+// ومن كل إجراء: «تطبيق قاعدة على دكاترة» (المشرفة) يكتب قاعدةً خاصّة عند عدّة دكاترة دفعةً
+// واحدة، و«تاريخ التسعيرة» (المشرفة والمدير) خطٌّ زمنيّ للسعر والقواعد — يطابق الخادم.
+const PRICING_HISTORY_READERS = ['clinic_admin', 'manager']
 
 // من يرى المواد بأسعارها والمراجعة والتقارير — يطابق SETTLEMENT_VIEWERS في الخادم.
 // الاستقبال غائبٌ عمداً (ولا يرى الصفحة أصلاً): يُدخل الإجراء وموادّه، ولا شأن له بالتقسيم.
@@ -72,6 +77,7 @@ function NewProcedureForm({ onCreated }) {
 // تعديل الاسم والسعر والاختصاصات في الصفّ نفسه — بنفس مكوّن الإضافة
 const specKey = (sp) => (sp.isGeneral ? 'general' : [...sp.specialtyIds].map(String).sort().join(','))
 function EditRow({ proc, onSaved, onCancel }) {
+  // onSaved(warnings): سعرٌ نزل تحت مبلغٍ ثابت عند دكتور يرجع بتحذيرٍ من الخادم
   const dlg = useDialogs()
   const [name, setName] = useState(proc.name)
   const [price, setPrice] = useState(String(Number(proc.price)))
@@ -99,25 +105,25 @@ function EditRow({ proc, onSaved, onCancel }) {
     }
     setErr(null); setBusy(true)
     try {
-      if (Object.keys(body).length) await api.clinic.updateProcedure(proc.id, body)
+      const out = Object.keys(body).length ? await api.clinic.updateProcedure(proc.id, body) : null
       // الاختصاصات بمسارها الذرّيّ (مسحٌ ثمّ إدراج في معاملةٍ واحدة)
       if (specChanged) await api.clinic.setProcedureSpecialties(proc.id,
         { is_general: spec.isGeneral, specialty_ids: spec.isGeneral ? [] : spec.specialtyIds.map(Number) })
-      onSaved()
+      onSaved(out?.warnings || [])
     } catch (ex) { setErr(ex.message) }
     finally { setBusy(false) }
   }
   return (
     <tr className="proc-editing">
-      <td><input value={name} maxLength={150} onChange={(e) => setName(e.target.value)} aria-label="اسم الإجراء" /></td>
-      <td><input value={price} inputMode="decimal" style={{ width: 130 }} aria-label="السعر"
+      <td className="rt-full"><input value={name} maxLength={150} onChange={(e) => setName(e.target.value)} aria-label="اسم الإجراء" /></td>
+      <td className="rt-full"><input value={price} inputMode="decimal" style={{ width: 130 }} aria-label="السعر"
         onChange={(e) => setPrice(toLatinDigits(e.target.value))} /></td>
-      <td className="proc-edit-spec">
+      <td className="proc-edit-spec rt-full">
         <ProcedureSpecialties id={`edit-spec-${proc.id}`} hideLabel isGeneral={spec.isGeneral}
           specialtyIds={spec.specialtyIds} canAdd onChange={setSpec} />
       </td>
-      <td colSpan={4}>
-        <div className="inline" style={{ gap: 6 }}>
+      <td colSpan={4} className="rt-full">
+        <div className="inline proc-edit-actions" style={{ gap: 6 }}>
           <button onClick={save} disabled={busy} style={{ padding: '4px 12px', fontSize: 12 }}>حفظ</button>
           <button className="ghost" onClick={onCancel} style={{ padding: '4px 12px', fontSize: 12 }}>إلغاء</button>
         </div>
@@ -136,6 +142,9 @@ export default function ClinicProcedures() {
   const [toast, showToast] = useToast()
   const { role } = useRole()
   const canEdit = role === 'clinic_admin'
+  const canHistory = PRICING_HISTORY_READERS.includes(role)
+  const [distributing, setDistributing] = useState(null)   // الإجراء الذي تُوزَّع قاعدته
+  const [historyOf, setHistoryOf] = useState(null)
 
   const load = () => api.clinic.procedures().then((r) => { setList(r); setErr(null) }).catch((e) => setErr(e.message))
   useEffect(() => { load() }, [])
@@ -189,24 +198,28 @@ export default function ClinicProcedures() {
         {canEdit
           ? <NewProcedureForm onCreated={(name) => { showToast(`أُضيف «${name}»`, 'success', 3000); load() }} />
           : <p className="subtitle" style={{ marginTop: -6 }}>للاطّلاع فقط — يديره مسؤول العيادات.</p>}
-        <table style={{ marginTop: 14 }}>
+        <table className="rtable" style={{ marginTop: 14 }}>
           <thead>
-            <tr><th>الإجراء</th><th>السعر الحالي</th><th>الاختصاصات</th><th>الحالة</th><th>استُعمل</th><th>آخر تعديل</th>{canEdit && <th></th>}</tr>
+            <tr><th>الإجراء</th><th>السعر الحالي</th><th>الاختصاصات</th><th>الحالة</th><th>استُعمل</th><th>آخر تعديل</th>{canHistory && <th></th>}</tr>
           </thead>
           <tbody>
             {list.map((p) => editing === p.id ? (
               <EditRow key={p.id} proc={p} onCancel={() => setEditing(null)}
-                onSaved={() => { setEditing(null); showToast('حُفظ التعديل', 'success', 3000); load() }} />
+                onSaved={(warnings) => {
+                  setEditing(null); load()
+                  if (warnings.length) showToast(`حُفظ التعديل — ⚠ ${warnings.join('، ')}`, 'warning', 8000)
+                  else showToast('حُفظ التعديل', 'success', 3000)
+                }} />
             ) : (
               <tr key={p.id} className={p.is_active ? undefined : 'proc-inactive'}>
-                <td>{p.name}</td>
-                <td className="num">{fmtMoney(p.price)}</td>
-                <td className="proc-spec-cell">
+                <td className="rt-title">{p.name}</td>
+                <td className="num" data-label="السعر الحالي">{fmtMoney(p.price)}</td>
+                <td className="proc-spec-cell rt-full" data-label="الاختصاصات">
                   {specialtiesText(p) === 'عام' ? <span className="badge">عام</span> : specialtiesText(p)}
                 </td>
-                <td>{p.is_active ? <span className="badge good">مفعَّل</span> : <span className="badge">معطَّل</span>}</td>
-                <td className="num">{p.times_used} حجز</td>
-                <td className="proc-meta-cell" style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                <td className="rt-badge">{p.is_active ? <span className="badge good">مفعَّل</span> : <span className="badge">معطَّل</span>}</td>
+                <td className="num" data-label="استُعمل">{p.times_used} حجز</td>
+                <td className="proc-meta-cell" data-label="آخر تعديل" style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
                   {p.updated_by_name || p.created_by_name || '—'}
                   {(p.updated_at || p.created_at) && (
                     <span dir="ltr" style={{ marginInlineStart: 6 }}>
@@ -214,23 +227,44 @@ export default function ClinicProcedures() {
                     </span>
                   )}
                 </td>
-                {canEdit && (
-                  <td className="proc-actions-cell">
+                {canHistory && (
+                  <td className="proc-actions-cell rt-actions">
+                    {canEdit && <>
+                      <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }}
+                        onClick={() => setEditing(p.id)}>تعديل</button>{' '}
+                      <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }}
+                        onClick={() => toggleActive(p)}>{p.is_active ? 'تعطيل' : 'تفعيل'}</button>{' '}
+                      {/* القاعدة الموزَّعة تُكتب لإجراءٍ مفعَّل وحده — المعطَّل لا يُضاف لحجز أصلاً */}
+                      {p.is_active && (
+                        <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }}
+                          onClick={() => setDistributing(p)}>تطبيق قاعدة على دكاترة</button>
+                      )}{' '}
+                    </>}
                     <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }}
-                      onClick={() => setEditing(p.id)}>تعديل</button>{' '}
-                    <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }}
-                      onClick={() => toggleActive(p)}>{p.is_active ? 'تعطيل' : 'تفعيل'}</button>
+                      onClick={() => setHistoryOf(p)}>تاريخ التسعيرة</button>
                   </td>
                 )}
               </tr>
             ))}
             {list.length === 0 && (
-              <tr><td colSpan={canEdit ? 7 : 6} className="empty">لا إجراءات بعد{canEdit ? ' — أضف أولها أعلاه' : ''}</td></tr>
+              <tr><td colSpan={canHistory ? 7 : 6} className="empty">لا إجراءات بعد{canEdit ? ' — أضف أولها أعلاه' : ''}</td></tr>
             )}
           </tbody>
         </table>
       </div>
       )}
+      {distributing && (
+        <DistributeRuleDialog procedure={distributing} onClose={() => setDistributing(null)}
+          onDone={(out) => {
+            setDistributing(null)
+            const parts = [out.added && `أُضيفت عند ${doctorsCount(out.added)}`, out.replaced && `استُبدلت عند ${doctorsCount(out.replaced)}`,
+              out.skipped && `تُخطّي ${doctorsCount(out.skipped)}`].filter(Boolean)
+            const text = `«${out.procedure_name}»: ${parts.join('، ') || 'لا تغيير'}`
+            if (out.warnings?.length) showToast(`${text} — ⚠ ${out.warnings.join('، ')}`, 'warning', 8000)
+            else showToast(text, 'success', 4500)
+          }} />
+      )}
+      {historyOf && <PricingHistoryDialog procedure={historyOf} onClose={() => setHistoryOf(null)} />}
     </>
   )
 }

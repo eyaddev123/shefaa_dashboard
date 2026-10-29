@@ -221,6 +221,13 @@ export const api = {
     setDoctorShare: (id, body) =>
       http(`/clinic/doctors/${id}/share`, { method: 'PATCH', body: JSON.stringify(body) }),
     doctorProcedureShares: (id) => http(`/clinic/doctors/${id}/procedure-shares`),
+    // إضافة قاعدة: 409 SHARE_RULE_EXISTS ومعه القائمة (تُعدَّل بـ setDoctorProcedureShare)
+    addDoctorProcedureShare: (id, body) =>
+      http(`/clinic/doctors/${id}/procedure-shares`, { method: 'POST', body: JSON.stringify(body) }),
+    procedureDoctorShares: (procId) => http(`/clinic/procedures/${procId}/doctor-shares`),
+    distributeRule: (procId, body) =>
+      http(`/clinic/procedures/${procId}/distribute-rule`, { method: 'POST', body: JSON.stringify(body) }),
+    procedurePricingHistory: (procId) => http(`/clinic/procedures/${procId}/pricing-history`),
     setDoctorProcedureShare: (id, procId, body) =>
       http(`/clinic/doctors/${id}/procedure-shares/${procId}`, { method: 'PUT', body: JSON.stringify(body) }),
     removeDoctorProcedureShare: (id, procId) =>

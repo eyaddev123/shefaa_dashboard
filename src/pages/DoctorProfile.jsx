@@ -4,6 +4,8 @@ import { useParams, Link } from 'react-router-dom'
 import { api, WEEKDAYS, fmtMoney, fmtTime, fmtDateTime } from '../api.js'
 import { useRole } from '../RoleContext.jsx'
 import DoctorShareRules from '../components/DoctorShareRules.jsx'
+import { useToast } from '../action-feedback.jsx'
+import { pricingText } from '../share-rule.js'
 
 // من يرى حصص الإجراءات — يطابق SETTLEMENT_VIEWERS في الخادم، ومشرف العيادات وحده يكتب
 const SHARE_VIEWERS = ['clinic_admin', 'board', 'super_admin', 'manager']
@@ -184,6 +186,7 @@ function scheduleEditText(h) {
   return `عُدِّل دوام ${schedLine(a)} — ${diffs.join('، ')}`
 }
 function changeText(h) {
+  if (h.field === 'pricing') return pricingText(h, 'doctor')
   if (h.field === 'room') return `الغرفة: ${roomLabel(h.old_value)} ← ${roomLabel(h.new_value)}`
   if (h.field === 'schedule') return scheduleEditText(h)
   const line = h.weekday == null ? 'سطر دوامٍ حُذف لاحقاً'
@@ -202,7 +205,7 @@ function ChangeLog({ doctorId, reloadKey }) {
     <div className="card">
       <h3>سجلّ التعديلات</h3>
       {rows.length === 0
-        ? <p className="empty">لا تعديلات مسجَّلة على الغرفة أو سطور الدوام بعد.</p>
+        ? <p className="empty">لا تعديلات مسجَّلة على الغرفة أو سطور الدوام أو قواعد الحصّة بعد.</p>
         : (
           <ul className="change-log">
             {rows.map((h) => (
@@ -225,6 +228,7 @@ export default function DoctorProfile() {
   const [globalBuffer, setGlobalBuffer] = useState(null)
   const [err, setErr] = useState(null)
   const [reloadKey, setReloadKey] = useState(0)
+  const [toast, showToast] = useToast()
 
   const load = () => api.clinic.doctor(id).then((d) => { setDoctor(d); setReloadKey((k) => k + 1) })
     .catch((e) => setErr(e.message))
@@ -243,6 +247,7 @@ export default function DoctorProfile() {
     <>
       <p className="subtitle"><Link to="/clinic/doctors">← كل الدكاترة</Link></p>
       <h2>{doctor.name}</h2>
+      {toast}
       <p className="subtitle">
         {doctor.specialty || 'بلا اختصاص محدد'} ·
         معاينة {fmtMoney(doctor.consultation_fee)} · مراجعة {fmtMoney(doctor.followup_fee)} ·
@@ -289,7 +294,7 @@ export default function DoctorProfile() {
       </div>
 
       {SHARE_VIEWERS.includes(role) && (
-        <DoctorShareRules doctor={doctor} canEdit={role === 'clinic_admin'} onSaved={load} />
+        <DoctorShareRules doctor={doctor} canEdit={role === 'clinic_admin'} onSaved={load} showToast={showToast} />
       )}
 
       {/* نفس من يرى «دكاترة اليوم» (APOLOGY_VIEWERS بالخادم) — والخادم يردّ غيرهم 403 */}
