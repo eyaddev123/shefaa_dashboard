@@ -3411,6 +3411,8 @@ button.spec-chip-btn[aria-pressed='true'] { background: var(--primary); border-c
 .cs-line { margin: 0; font-size: 14px; line-height: 1.8; }
 .cs-line > p { margin: 0; }
 .cs-effect { font-weight: 800; color: var(--status-pending); }
+.cs-note { margin: 0; font-size: 13px; color: var(--muted); }
+.cs-group + .cs-group { border-top: 1px solid var(--border); padding-top: 10px; }
 .cs-num { color: var(--text-secondary); font-size: 12.5px; font-variant-numeric: tabular-nums; }
 .cs-names {
   margin: 6px 0 0; padding: 8px 12px; list-style: none; max-height: 160px; overflow-y: auto;
