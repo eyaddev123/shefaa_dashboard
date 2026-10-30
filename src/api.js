@@ -378,6 +378,9 @@ export const api = {
     setLineMaterials: (appointmentId, lineId, body) =>
       http(`/clinic/appointments/${appointmentId}/procedures/${lineId}/materials`,
         { method: 'PUT', body: JSON.stringify(body) }),
+    // عدّة إجراءاتٍ بكبسةٍ واحدة: items [{procedure_id, materials}] — كلّها أو لا شيء (409 يسمّي الرافض)
+    addAppointmentProcedures: (appointmentId, items) =>
+      http(`/clinic/appointments/${appointmentId}/procedures/batch`, { method: 'POST', body: JSON.stringify({ items }) }),
     // «تمت المحاسبة»: سطرٌ أضافه الطبيب صار مقبوضاً (الاستقبال والمشرفة)
     markProcedurePaid: (appointmentId, lineId) =>
       http(`/clinic/appointments/${appointmentId}/procedures/${lineId}/mark-paid`, { method: 'POST' }),

@@ -3532,9 +3532,26 @@ button.dk-pick {
 }
 button.dk-pick:hover:not(:disabled) { filter: none; background: var(--dropzone-hover); }
 .dk-pick-tag { font-size: 11.5px; font-weight: 700; color: var(--status-good); }
-.dk-mats { margin-top: 14px; border-top: 1px solid var(--grid); padding-top: 10px; }
-button.dk-mats-toggle { min-height: 48px; width: 100%; }
+/* المختار: يتلوّن وعليه ✓ — تحديدٌ متعدد بشكل أزرار */
+button.dk-pick { position: relative; }
+button.dk-pick.is-on, button.dk-pick.is-on:hover:not(:disabled) {
+  background: var(--primary); color: #fff; border-color: var(--primary);
+}
+.dk-pick-check {
+  position: absolute; top: 6px; right: 8px; width: 22px; height: 22px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: rgba(255, 255, 255, 0.25); font-size: 13px; font-weight: 800;
+}
+button.dk-pick.is-bad { box-shadow: 0 0 0 2px var(--status-bad); }
+.dk-sheet-error { margin: 0 0 10px; }
+/* المختار تحت الشبكة: لكلّ إجراءٍ «+ مواد» خاصّةٌ به */
+.dk-sel { list-style: none; margin: 14px 0 0; padding: 10px 0 0; border-top: 1px solid var(--grid); }
+.dk-sel-item + .dk-sel-item { margin-top: 6px; }
+.dk-sel-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 48px; }
+.dk-sel-name { font-weight: 700; }
+button.dk-sel-mats { min-height: 44px; padding: 6px 14px; font-size: 13px; }
 .dk-mats-body { margin-top: 8px; }
+button.dk-confirm { width: 100%; min-height: 56px; font-size: 17px; }
 
 @media (min-width: 640px) {
   .dk-actions { grid-template-columns: repeat(4, minmax(0, 1fr)); }

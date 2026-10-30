@@ -18,8 +18,9 @@ import {
 //   • تبويبا المرضى وحدهما: «الموجودون» (الدور كما كان بكلّ أزراره) و«الحجوزات» (للاطّلاع).
 //   • المريض قيد الكشف هو النجم: بطاقته أكبر وأعلى، وأزرارها بحجم الإبهام (48px+).
 //   • «+ إجراء» على بطاقته ⇒ ورقة سفلية بإجراءات اختصاصه أزراراً كبيرة مرتّبة بالأكثر
-//     استعمالاً ⇒ لمسةٌ تضيفه فوراً. المواد قسمٌ اختياريّ داخل الورقة نفسها.
-//     من «مريض قيد الكشف» إلى «إجراء مضاف بلا مواد» = لمستان.
+//     استعمالاً ⇒ لمسةٌ تعلّم الإجراء (وأكثر) ⇒ «إضافة (n)» تضيف المختار كلّه بطلبٍ واحد.
+//     المواد «+ مواد» لكلّ إجراءٍ مختار داخل الورقة نفسها، اختيارية.
+//     من «مريض قيد الكشف» إلى «إجراء مضاف بلا مواد» = ثلاث لمسات.
 //   • «إجراءاتي اليوم» قسمٌ يُطوى تحت الدور (عمودٌ ثانٍ على الشاشة الواسعة)، ورأسه يحمل
 //     المجموعين دائماً ولو مطويّاً — «كم طلع لي اليوم» بلا لمسة.
 //   • الإضافة والحذف متفائلان: يظهران فوراً، ويتراجعان برسالة واضحة إن رفض الخادم.
@@ -53,27 +54,46 @@ function AddedProcedures({ added = [], pending = [] }) {
   )
 }
 
-// ═══ ورقة الإضافة ═══
-function AddProcedureSheet({ appt, catalog, usage, matCatalog, loadMaterials, onPick, onClose }) {
-  const [matsOpen, setMatsOpen] = useState(false)
-  const [mats, setMats] = useState([])
+// ═══ ورقة الإضافة — تحديدٌ متعدد ثمّ «إضافة (n)» ═══
+// اللمسة على الإجراء تعلّمه (يتلوّن وعليه ✓) ولا تُضيفه؛ زرّ التأكيد أسفل الورقة يحمل العدد
+// ويُضيف المختار كلّه بطلبٍ واحد (كلّها أو لا شيء). إجراءٌ واحد = السلوك نفسه: تعليم + «إضافة (1)»
+// — من «قيد الكشف» إلى «مضاف» ثلاث لمسات.
+// المواد: لكلّ إجراءٍ مختار سطرٌ تحت الشبكة بـ«+ مواد» خاصّةٍ به — داخل الورقة نفسها، اختيارية.
+// draft: { selected: [{id, name, mats, open}], errorId, error } — يبقى في الأب فيعود كما كان إن رُفض.
+function AddProcedureSheet({ appt, catalog, usage, matCatalog, loadMaterials, draft, setDraft, onConfirm, onClose }) {
   const taken = new Set((appt.procedures || []).filter((l) => !l.removed_at).map((l) => String(l.procedure_id)))
   // الأكثر استعمالاً عنده أوّلاً (آخر ٩٠ يوماً)، ثمّ أبجدياً
   const items = (catalog || []).filter((p) => p.is_active)
     .sort((a, b) => (usage[String(b.id)] || 0) - (usage[String(a.id)] || 0) || a.name.localeCompare(b.name, 'ar'))
-  const matsOk = qtyValid(mats)
+  const sel = draft.selected
+  const isOn = (id) => sel.some((x) => String(x.id) === String(id))
+  const update = (id, patch) => setDraft((d) => ({ ...d,
+    selected: d.selected.map((x) => (String(x.id) === String(id) ? { ...x, ...patch } : x)) }))
+  const toggle = (p) => setDraft((d) => ({ ...d, errorId: null, error: null,
+    selected: isOn(p.id) ? d.selected.filter((x) => String(x.id) !== String(p.id))
+      : [...d.selected, { id: p.id, name: p.name, mats: [], open: false }] }))
+  const valid = sel.length > 0 && sel.every((x) => qtyValid(x.mats))
   return (
     <BottomSheet title={`إجراء لـ ${appt.full_name}`}
-      subtitle="المس الإجراء فيُضاف فوراً — ويبقى «بانتظار المحاسبة» حتى يدفع المريض"
-      onClose={onClose}>
+      subtitle="علّم الإجراءات ثمّ «إضافة» — وتبقى «بانتظار المحاسبة» حتى يدفع المريض"
+      onClose={onClose}
+      footer={(
+        <button type="button" className="dk-confirm" disabled={!valid} onClick={onConfirm}>
+          إضافة ({sel.length.toLocaleString('ar-SY')})
+        </button>
+      )}>
+      {draft.error && <p className="error dk-sheet-error" role="alert">{draft.error}</p>}
       {catalog == null ? <p className="empty">جارٍ التحميل…</p>
         : items.length === 0 ? <p className="empty">لا إجراءات لاختصاصك في الكتالوج — راجع مشرفة العيادات.</p> : (
           <div className="dk-pick-grid">
             {items.map((p) => {
               const added = taken.has(String(p.id))
+              const on = isOn(p.id)
+              const bad = String(draft.errorId) === String(p.id)
               return (
-                <button key={p.id} type="button" className="dk-pick" disabled={added || !matsOk}
-                  onClick={() => onPick(p, toPayload(mats))}>
+                <button key={p.id} type="button" aria-pressed={on} disabled={added}
+                  className={`dk-pick${on ? ' is-on' : ''}${bad ? ' is-bad' : ''}`} onClick={() => toggle(p)}>
+                  {on && <span className="dk-pick-check" aria-hidden="true">✓</span>}
                   <span className="dk-pick-name">{p.name}</span>
                   {added && <span className="dk-pick-tag">✓ مضاف</span>}
                 </button>
@@ -81,20 +101,28 @@ function AddProcedureSheet({ appt, catalog, usage, matCatalog, loadMaterials, on
             })}
           </div>
         )}
-      <div className="dk-mats">
-        <button type="button" className="ghost dk-mats-toggle" aria-expanded={matsOpen}
-          onClick={() => { setMatsOpen((v) => !v); loadMaterials() }}>
-          {matsOpen ? '− إخفاء المواد' : `+ مواد${mats.length ? ` (${mats.length.toLocaleString('ar-SY')})` : ''}`}
-        </button>
-        {matsOpen && (
-          <div className="dk-mats-body">
-            <p className="dk-hint">اختر المواد وكمّياتها أوّلاً، ثمّ المس الإجراء فيُضاف بها.</p>
-            {matCatalog == null ? <p className="empty">جارٍ التحميل…</p>
-              : <MaterialsEditor catalog={matCatalog} value={mats} onChange={setMats} />}
-            {!matsOk && <p className="error">صحّح الكمّية (رقم أكبر من صفر).</p>}
-          </div>
-        )}
-      </div>
+      {sel.length > 0 && (
+        <ul className="dk-sel">
+          {sel.map((x) => (
+            <li key={x.id} className="dk-sel-item">
+              <div className="dk-sel-row">
+                <span className="dk-sel-name">{x.name}</span>
+                <button type="button" className="ghost dk-sel-mats" aria-expanded={x.open}
+                  onClick={() => { update(x.id, { open: !x.open }); loadMaterials() }}>
+                  {x.open ? '− المواد' : `+ مواد${x.mats.length ? ` (${x.mats.length.toLocaleString('ar-SY')})` : ''}`}
+                </button>
+              </div>
+              {x.open && (
+                <div className="dk-mats-body">
+                  {matCatalog == null ? <p className="empty">جارٍ التحميل…</p>
+                    : <MaterialsEditor catalog={matCatalog} value={x.mats} onChange={(mats) => update(x.id, { mats })} />}
+                  {!qtyValid(x.mats) && <p className="error">صحّح الكمّية (رقم أكبر من صفر).</p>}
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
     </BottomSheet>
   )
 }
@@ -160,6 +188,8 @@ export default function DoctorScreen() {
   const [adding, setAdding] = useState([])          // إضافاتٌ متفائلة: {tempId, appointment_id, name}
   const [removingIds, setRemovingIds] = useState([]) // حذفٌ متفائل
   const [sheetFor, setSheetFor] = useState(null)    // id الحجز الذي تُضاف له
+  const emptyDraft = { selected: [], errorId: null, error: null }
+  const [draft, setDraft] = useState(emptyDraft)     // المختار في الورقة — يعود كما كان إن رُفض
   const [catalog, setCatalog] = useState(null)
   const [matCatalog, setMatCatalog] = useState(null)
   const [audioOn, setAudioOn] = useState(audioReady())
@@ -234,6 +264,7 @@ export default function DoctorScreen() {
 
   // ═══ الإضافة: الورقة تُغلق فوراً، والشارة «تُضاف…» حتى يردّ الخادم ═══
   const openSheet = (appt) => {
+    if (String(sheetFor) !== String(appt.id)) setDraft(emptyDraft)
     setSheetFor(appt.id)
     if (catalog == null) api.clinic.procedures().then(setCatalog).catch((e) => { setCatalog([]); showToast(e.message) })
   }
@@ -241,19 +272,26 @@ export default function DoctorScreen() {
     if (matCatalog == null) api.clinic.materials().then((r) => setMatCatalog(r.filter((m) => m.is_active !== false)))
       .catch((e) => { setMatCatalog([]); showToast(e.message) })
   }
-  const pick = async (proc, materials) => {
+  // «إضافة (n)»: الورقة تُغلق فوراً والشارات «تُضاف…»؛ ورفضٌ ⇒ تعود الورقة بالمختار نفسه
+  // والإجراء الرافض معلَّمٌ أحمر برسالته (الطلب كلّه أو لا شيء — لم يُضَف أيٌّ منها)
+  const confirmAdd = async () => {
     const apptId = sheetFor
-    const tempId = `t${Date.now()}`
+    const chosen = draft.selected
+    const temps = chosen.map((x, i) => ({ tempId: `t${Date.now()}-${i}`, appointment_id: apptId, name: x.name }))
     setSheetFor(null)
-    setAdding((a) => [...a, { tempId, appointment_id: apptId, name: proc.name }])
+    setAdding((a) => [...a, ...temps])
     try {
-      await api.clinic.addAppointmentProcedure(apptId, proc.id, materials)
-      showToast(`أُضيف «${proc.name}» — بانتظار المحاسبة`, 'success', 3500)
+      await api.clinic.addAppointmentProcedures(apptId, chosen.map((x) => ({ procedure_id: x.id, materials: toPayload(x.mats) })))
+      setDraft(emptyDraft)
+      showToast(chosen.length === 1 ? `أُضيف «${chosen[0].name}» — بانتظار المحاسبة`
+        : `أُضيفت ${chosen.length.toLocaleString('ar-SY')} إجراءات — بانتظار المحاسبة`, 'success', 3500)
       await Promise.all([loadQueue(), loadMine()])
     } catch (ex) {
-      showToast(`لم يُضَف «${proc.name}»: ${ex.message}`)
+      setDraft((d) => ({ ...d, errorId: ex.data?.procedure_id ?? null, error: `لم يُضَف شيء: ${ex.message}` }))
+      setSheetFor(apptId)
     } finally {
-      setAdding((a) => a.filter((x) => x.tempId !== tempId))
+      const ids = new Set(temps.map((t) => t.tempId))
+      setAdding((a) => a.filter((x) => !ids.has(x.tempId)))
     }
   }
   const remove = async (line) => {
@@ -515,7 +553,7 @@ export default function DoctorScreen() {
       {sheetAppt && (
         <AddProcedureSheet appt={sheetAppt} catalog={catalog} usage={mine?.usage || {}}
           matCatalog={matCatalog} loadMaterials={loadMaterials}
-          onPick={pick} onClose={() => setSheetFor(null)} />
+          draft={draft} setDraft={setDraft} onConfirm={confirmAdd} onClose={() => setSheetFor(null)} />
       )}
     </div>
   )
