@@ -402,6 +402,7 @@ const run = async () => {
   // ═══ «الدكتور لم يصل بعد»: باهتة بجملتها كـ«انتهى الدوام»، وأوّل نداءٍ يُعيدها طبيعية ═══
   // اللقطة: ٤ (و٨) عيادات، الأولى والثالثة لم يصل دكتورهما (ومنتظروهما حاضرون)، والرابعة انتهت.
   // ثمّ نداءٌ في الأولى: الشاشة تسحب اللوحة (load) فتصلها الأولى «واصلة» — نعترض الطلب هنا.
+  // ثمّ «وصل الطبيب» في الثالثة بلا نداء (refresh من الخادم): تعود طبيعية وهي بلا قيد كشف.
   const fakeES = (snap) => {
     const orig = CSS.supports.bind(CSS)
     CSS.supports = (...a) => /container-type|aspect-ratio/.test(a.join(' ')) ? false : orig(...a)
@@ -434,8 +435,9 @@ const run = async () => {
         const page = await ctx.newPage()
         const errors = []
         page.on('pageerror', (e) => errors.push(e.message))
+        let served = after
         await page.route('**/api/public/clinic/board*', (r) => r.fulfill({
-          status: 200, contentType: 'application/json', body: JSON.stringify(after) }))
+          status: 200, contentType: 'application/json', body: JSON.stringify(served) }))
         await page.goto(`${BASE}/display?key=test`, { waitUntil: 'load' })
         await page.evaluate(() => (document.fonts ? document.fonts.ready.then(() => 0) : 0))
         await page.waitForTimeout(700)
@@ -484,6 +486,16 @@ const run = async () => {
         const b1 = await read()
         ok(!b1[0].dim && !b1[0].awaiting && b1[0].number, `${tag}: ★ بعد أوّل نداء بقيت البطاقة باهتة ${JSON.stringify(b1[0])}`)
         if (n > 1) ok(b1[2].awaiting && b1[2].dim, `${tag}: نداء الأولى أعاد غيرها`)
+        // ★ «وصل الطبيب» بلا نداء: الخادم يبثّ refresh واللوحة تصل بلا awaiting ولا قيد كشف
+        if (n > 1) {
+          served = JSON.parse(JSON.stringify(after))
+          served.board[2].awaiting_doctor = false
+          await page.evaluate(() => window.__sse.emit('refresh', { seq: 51 }))
+          await page.waitForTimeout(800)
+          const b2 = await read()
+          ok(!b2[2].dim && !b2[2].awaiting && b2[2].chips > 0, `${tag}: ★ بعد «وصل الطبيب» بلا نداء بقيت باهتة ${JSON.stringify(b2[2])}`)
+          ok(!b2[0].awaiting && b2[3].ended, `${tag}: «وصل الطبيب» غيّر بطاقةً أخرى`)
+        }
         ok(errors.length === 0, `${tag}: أخطاء صفحة: ${errors.join(' | ')}`)
         line.push(`${w}/${n}:${b0.filter((c) => c.awaiting).length}→${b1.filter((c) => c.awaiting).length}`)
         await ctx.close()
