@@ -388,6 +388,8 @@ export const api = {
     unpaidProcedures: () => http('/clinic/procedures/unpaid'),
     // شاشة الطبيب: أسطر مرضاه اليوم بحصّته، وعدد مرّات كلّ إجراء (لترتيب أزرار الإضافة)
     myProcedures: (date) => http(`/clinic/my-procedures${date ? `?date=${date}` : ''}`),
+    // «أعمالي»: period = today | week | month — المرضى والإجراءات وحصّته المقبوضة (حساب المستحقات)
+    myWork: (period) => http(`/clinic/my-work?period=${period}`),
     removeAppointmentProcedure: (appointmentId, lineId, reason) =>
       http(`/clinic/appointments/${appointmentId}/procedures/${lineId}/remove`,
         { method: 'POST', body: JSON.stringify({ reason }) }),

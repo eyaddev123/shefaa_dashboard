@@ -3403,7 +3403,7 @@ button.dk-audio.is-on:disabled { opacity: 1; cursor: default; color: var(--statu
 
 /* ── تبويبا المرضى: الوحيدان في الشاشة ── */
 .dk-tabs {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 4px; margin-bottom: 14px;
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; padding: 4px; margin-bottom: 14px;
   border-radius: 14px; background: var(--surface-1); border: 1px solid var(--border);
 }
 button.dk-tab {
@@ -3443,17 +3443,26 @@ button.dk-tab[aria-selected='true'] .dk-tab-count { background: rgba(255, 255, 2
 }
 @keyframes dk-spin { to { transform: rotate(360deg); } }
 
-.dk-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
-.dk-btn, .dk-actions > button {
-  min-height: 52px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+/* ── هرم الأزرار: أساسيٌّ واحد كبير، ثانويٌّ أصغر، وخفيفان ── */
+.dk-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+.dk-btn {
+  min-height: 48px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   padding: 10px 12px; font-size: 15px; line-height: 1.2; white-space: nowrap; width: 100%;
 }
-/* «+ إجراء» أعرض زرّ: أكثر ما يُلمس أثناء الكشف */
-.dk-btn-add { grid-column: 1 / -1; min-height: 56px; font-size: 17px; }
-.dk-btn-start { background: var(--status-good); color: #fff; }
-.dk-btn-start:hover:not(:disabled) { background: var(--status-good); }
-/* «إنهاء» آخراً وبعرضٍ كامل، بفاصلٍ مرئيّ عمّا قبله */
-.dk-btn-done { grid-column: 1 / -1; margin-top: 6px; background: var(--teal-800); }
+/* الأساسيّ: أكبر زرّ في البطاقة — «بدء الكشف» أخضر، «إنهاء الكشف» بلون النظام الداكن */
+.dk-primary { min-height: 64px; font-size: 19px; font-weight: 800; border-radius: 14px; }
+.dk-btn-start, .dk-btn-start:hover:not(:disabled) { background: var(--status-good); color: #fff; }
+.dk-btn-done { background: var(--teal-800); }
+/* الثانويّ: واضحٌ وأصغر — مُعبّأ خفيفاً لا مصمتاً */
+button.dk-secondary {
+  min-height: 52px; font-size: 16px; background: var(--primary-soft); color: var(--accent-text);
+  border: 1.5px solid var(--primary);
+}
+button.dk-secondary:hover:not(:disabled) { filter: none; background: var(--dropzone-hover); }
+/* الخفيفان (وإنهاءٌ بلا بدء): نصٌّ بإطارٍ رفيع، لا ينافس ما فوقه */
+.dk-tertiary { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; }
+button.dk-light { min-height: 48px; font-size: 13.5px; font-weight: 600; color: var(--text-secondary);
+  border: 1px solid var(--border); background: transparent; }
 
 .dk-tap { min-height: 48px; padding: 10px 18px; }
 .dk-next-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
@@ -3475,34 +3484,23 @@ button.dk-tab[aria-selected='true'] .dk-tab-count { background: rgba(255, 255, 2
 .dk-book-time { min-width: 52px; font-weight: 800; color: var(--accent-text); font-variant-numeric: tabular-nums; }
 .dk-book-ref { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
 
-/* ── «إجراءاتي اليوم»: الرأس بالمجموعين ظاهرٌ دائماً ──
-   على الجوال يلتصق بأسفل الشاشة ما دام الدور فوقه: «كم طلع لي» بلا لمسة ولا تمرير. */
-button.dk-mine-head {
-  position: sticky; bottom: 0; z-index: 5;
-  width: 100%; min-height: 56px; margin: 0 0 12px;
-  display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; text-align: start;
-  padding: 10px 14px; border-radius: var(--radius);
-  background: var(--surface-1); color: var(--text-primary); border: 1px solid var(--border);
-  box-shadow: var(--shadow-pop);
+/* ── «أعمالي»: المكان الوحيد للأرقام ── */
+.dk-chips-filter { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+button.dk-filter {
+  min-height: 48px; padding: 8px 20px; border-radius: 999px; font-size: 15px;
+  background: var(--surface-1); color: var(--text-secondary); border: 1px solid var(--border);
 }
-button.dk-mine-head:hover { filter: none; }
-.dk-mine-title { font-size: 15px; font-weight: 800; margin-inline-end: auto; }
-.dk-pill {
-  display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px;
-  font-size: 13px; font-weight: 700; white-space: nowrap;
+button.dk-filter:hover { filter: none; background: var(--primary-soft); }
+button.dk-filter.is-on { background: var(--primary); color: #fff; border-color: var(--primary); }
+.dk-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+.dk-stat {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  min-height: 110px; padding: 14px; border-radius: var(--radius);
+  background: var(--surface-1); border: 1px solid var(--border); box-shadow: var(--shadow-card);
 }
-.dk-pill b { font-weight: 800; }
-.dk-pill.is-paid { color: var(--status-good); background: var(--status-good-bg); }
-.dk-pill.is-unpaid { color: var(--status-pending); background: var(--status-pending-bg); }
-.dk-caret { color: var(--muted); font-size: 14px; }
-
-.card.dk-mine-body { padding: 14px 16px; }
-.dk-group + .dk-group { margin-top: 14px; }
-.dk-group-title {
-  display: flex; align-items: center; gap: 8px; margin: 0 0 6px; font-size: 14px;
-}
-.dk-group.is-unpaid .dk-group-title { color: var(--status-pending); }
-.dk-group.is-paid .dk-group-title { color: var(--status-good); }
+.dk-stat-n { font-size: 40px; font-weight: 800; line-height: 1.1; color: var(--primary); font-variant-numeric: tabular-nums; }
+.dk-stat-l { font-size: 15px; font-weight: 700; color: var(--text-secondary); }
+.dk-work-range { font-size: 12.5px; font-weight: 600; color: var(--muted); margin-inline-start: auto; }
 .dk-group-count {
   min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px; font-size: 12px;
   display: inline-flex; align-items: center; justify-content: center; background: var(--primary-soft);
@@ -3510,18 +3508,21 @@ button.dk-mine-head:hover { filter: none; }
 .dk-lines { list-style: none; margin: 0; padding: 0; }
 .dk-line {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-height: 52px;
-  padding: 8px 10px; border-radius: 10px; margin-top: 6px;
+  padding: 8px 12px; border-radius: 10px; margin-top: 6px;
 }
-.dk-group.is-unpaid .dk-line { background: var(--status-pending-bg); }
-.dk-group.is-paid .dk-line { background: var(--status-good-bg); }
-.dk-line.is-removing { opacity: 0.4; }
+.dk-line.is-paid { background: var(--status-good-bg); }
+.dk-line.is-unpaid { background: var(--status-pending-bg); }
 .dk-line-main { flex: 1 1 160px; min-width: 0; display: flex; flex-direction: column; }
 .dk-line-proc { font-weight: 700; }
 .dk-line-patient { font-size: 12.5px; color: var(--text-secondary); }
-.dk-line-money { display: flex; flex-direction: column; align-items: flex-end; font-variant-numeric: tabular-nums; }
-.dk-line-price { font-size: 12.5px; color: var(--text-secondary); }
-.dk-line-share { font-weight: 800; font-size: 13.5px; }
-button.dk-line-x { min-height: 44px; padding: 8px 14px; color: var(--status-bad); }
+.dk-line-share { font-weight: 800; font-size: 14.5px; font-variant-numeric: tabular-nums; }
+button.dk-line-x { min-height: 48px; padding: 8px 14px; color: var(--status-bad); }
+.dk-work-total {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin-top: 14px; padding-top: 12px; border-top: 2px solid var(--grid); font-size: 16px; font-weight: 700;
+}
+.dk-work-total strong { font-size: 22px; color: var(--primary); }
+.dk-work-pending h3 { color: var(--status-pending); }
 
 /* ── ورقة الإضافة: الإجراءات أزرارٌ كبيرة مباشرة، لا قائمة منسدلة ── */
 .dk-pick-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
@@ -3554,18 +3555,16 @@ button.dk-sel-mats { min-height: 44px; padding: 6px 14px; font-size: 13px; }
 button.dk-confirm { width: 100%; min-height: 56px; font-size: 17px; }
 
 @media (min-width: 640px) {
-  .dk-actions { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .dk-btn-add { grid-column: span 2; }
-  .dk-btn-done { grid-column: span 2; margin-top: 0; }
   .dk-pick-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  /* الأساسيّ والثانويّ جنباً إلى جنب، والأساسيّ أعرض */
+  .dk-actions { display: grid; grid-template-columns: 2fr 1fr; }
+  .dk-actions .dk-primary { grid-column: 1; grid-row: 1; }
+  .dk-actions .dk-secondary { grid-column: 2; grid-row: 1; min-height: 64px; }
+  .dk-actions .dk-tertiary { grid-column: 1 / -1; }
 }
-/* الواسع: عمودان — الدور يميناً، وإجراءاتي يساراً بلا التصاق */
+/* الواسع: عمودٌ واحد بعرضٍ مقروء — لا عمود أرقامٍ بجانب الدور بعد «أعمالي» */
 @media (min-width: 1100px) {
-  /* الصفّ الأوّل بارتفاع الرأس وحده: الدور الطويل يمتدّ في الصفّ المرن لا بين الرأس وجسمه */
-  .dk-grid { grid-template-columns: minmax(0, 1.55fr) minmax(320px, 1fr); grid-template-rows: auto 1fr; }
-  .dk-queue { grid-column: 1; grid-row: 1 / span 2; }
-  button.dk-mine-head { grid-column: 2; grid-row: 1; position: static; box-shadow: var(--shadow-card); margin-top: 0; }
-  .card.dk-mine-body { grid-column: 2; grid-row: 2; align-self: start; }
+  .dk-grid { max-width: 920px; }
 }
 
 /* ═══ الورقة السفلية (BottomSheet) — تُسحب لتحت فتُغلق ═══ */

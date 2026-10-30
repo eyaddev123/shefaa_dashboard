@@ -15,23 +15,22 @@ import {
 // شاشة الطبيب — شاشةٌ واحدة لا متاهة تبويبات
 //
 // وقت الطبيب مضغوط بين مريضين: أقلّ لمسات، وكلّ المهمّ أمام عينه بلا تنقّل.
-//   • تبويبا المرضى وحدهما: «الموجودون» (الدور كما كان بكلّ أزراره) و«الحجوزات» (للاطّلاع).
-//   • المريض قيد الكشف هو النجم: بطاقته أكبر وأعلى، وأزرارها بحجم الإبهام (48px+).
+//   • ثلاثة تبويبات: «الموجودون» (الدور بكلّ أزراره)، «الحجوزات» (للاطّلاع)، و«أعمالي» (أرقامه).
+//   • المريض قيد الكشف هو النجم، وأزراره هرم: أساسيٌّ واحد بحسب الحالة («بدء الكشف» أو «إنهاء
+//     الكشف»)، ثمّ «+ إجراء» ثانوياً، ثمّ «إعادة النداء» و«خروج مؤقت» خفيفين. كلّها ≥48px.
 //   • «+ إجراء» على بطاقته ⇒ ورقة سفلية بإجراءات اختصاصه أزراراً كبيرة مرتّبة بالأكثر
 //     استعمالاً ⇒ لمسةٌ تعلّم الإجراء (وأكثر) ⇒ «إضافة (n)» تضيف المختار كلّه بطلبٍ واحد.
 //     المواد «+ مواد» لكلّ إجراءٍ مختار داخل الورقة نفسها، اختيارية.
 //     من «مريض قيد الكشف» إلى «إجراء مضاف بلا مواد» = ثلاث لمسات.
-//   • «إجراءاتي اليوم» قسمٌ يُطوى تحت الدور (عمودٌ ثانٍ على الشاشة الواسعة)، ورأسه يحمل
-//     المجموعين دائماً ولو مطويّاً — «كم طلع لي اليوم» بلا لمسة.
+//   • «أعمالي»: اليوم/الأسبوع/الشهر، المرضى والإجراءات، والإجراءات المحاسَبة بحصّته ومجموعها.
 //   • الإضافة والحذف متفائلان: يظهران فوراً، ويتراجعان برسالة واضحة إن رفض الخادم.
 //
-// ★ لا مبالغ على بطاقة المريض ولا في ورقة الإضافة (المريض أمام الشاشة): الأسعار والحصّة في
-//   «إجراءاتي اليوم» وحده — وهي من /clinic/my-procedures (حصّته هو لأسطر مرضاه هو).
+// ★ ولا رقمٌ ماليّ في «الموجودون» و«الحجوزات» وبطاقة المريض (المريض أمام الشاشة): سطر الإجراء
+//   اسمٌ ومؤشّر لون (✓ أخضر محاسَب، ⏳ أصفر بانتظار المحاسبة). الأرقام في «أعمالي» وحده، من
+//   /clinic/my-work — حصّته هو من حساب صفحة المستحقات نفسه (live-check يفحص DOM التبويبين).
 // ★ الرنّة: حدث idle_arrival من الخادم وحده يقرّر (حضورٌ والعيادة فارغة تماماً) — انظر doctor-alert.js.
 // ═══════════════════════════════════════════════════════════════════
 
-const WIDE = '(min-width: 1100px)'
-const isWide = () => typeof window !== 'undefined' && window.matchMedia?.(WIDE).matches
 
 // شاراتُ ما أُضيف على المريض الحالي — بالأسماء وحدها، وحالة الدفع رمزاً
 function AddedProcedures({ added = [], pending = [] }) {
@@ -127,46 +126,87 @@ function AddProcedureSheet({ appt, catalog, usage, matCatalog, loadMaterials, dr
   )
 }
 
-// ═══ «إجراءاتي اليوم» — رأسٌ بالمجموعين دائماً، وجسمٌ يُطوى ═══
-function MineSummary({ totals, open, onToggle }) {
-  const t = totals || { paid_count: 0, pending_count: 0, paid_share: 0, pending_share: 0 }
-  return (
-    <button type="button" className="dk-mine-head" aria-expanded={open} aria-controls="dk-mine-body" onClick={onToggle}>
-      <span className="dk-mine-title">إجراءاتي اليوم</span>
-      <span className="dk-pill is-paid" title="تمت المحاسبة — مجموع حصّتك">
-        ✓ {t.paid_count.toLocaleString('ar-SY')} <b>{fmtMoney(t.paid_share)}</b>
-      </span>
-      <span className="dk-pill is-unpaid" title="بانتظار المحاسبة — مجموع حصّتك">
-        ⏳ {t.pending_count.toLocaleString('ar-SY')} <b>{fmtMoney(t.pending_share)}</b>
-      </span>
-      <span className="dk-caret" aria-hidden="true">{open ? '▴' : '▾'}</span>
-    </button>
-  )
-}
+// ═══ «أعمالي» — التبويب الثالث، والمكان الوحيد الذي تظهر فيه أرقام الطبيب ═══
+// اليوم / الأسبوع (من السبت) / الشهر: chips فورية بلا زرّ تطبيق. بطاقتا ملخّص (المرضى، الإجراءات)،
+// ثمّ الإجراءات المقبوضة بحصّته من لقطة السطر، ثمّ المجموع — من /clinic/my-work، أي حساب صفحة
+// المستحقات نفسه. وتحتها ما ينتظر المحاسبة بالأسماء وحدها (بلا مبالغ)، ومنه يحذف الطبيب سطره.
+const WORK_PERIODS = [['today', 'اليوم'], ['week', 'الأسبوع'], ['month', 'الشهر']]
 
-function MineLines({ title, tone, lines, onRemove }) {
-  if (lines.length === 0) return null
+function MyWork({ reloadKey, pending, onRemove }) {
+  const [period, setPeriod] = useState('today')
+  const [data, setData] = useState(null)
+  const [err, setErr] = useState(null)
+  useEffect(() => {
+    let alive = true
+    api.clinic.myWork(period).then((d) => { if (alive) { setData(d); setErr(null) } })
+      .catch((e) => { if (alive) setErr(e.message) })
+    return () => { alive = false }
+  }, [period, reloadKey])
+  const shown = data && data.period === period ? data : null
   return (
-    <div className={`dk-group is-${tone}`}>
-      <h4 className="dk-group-title">{title} <span className="dk-group-count">{lines.length.toLocaleString('ar-SY')}</span></h4>
-      <ul className="dk-lines">
-        {lines.map((l) => (
-          <li key={l.id} className={`dk-line${l.removing ? ' is-removing' : ''}`}>
-            <div className="dk-line-main">
-              <span className="dk-line-proc">{l.name}</span>
-              <span className="dk-line-patient">{l.patient_name}</span>
-            </div>
-            <div className="dk-line-money">
-              <span className="dk-line-price" title="السعر">{fmtMoney(l.price)}</span>
-              <span className="dk-line-share" title="حصّتك">حصّتك {fmtMoney(l.doctor_share)}</span>
-            </div>
-            {onRemove && !l.paid_at && l.mine && (
-              <button type="button" className="ghost dk-line-x" disabled={l.removing}
-                aria-label={`حذف ${l.name} عن ${l.patient_name}`} onClick={() => onRemove(l)}>حذف</button>
-            )}
-          </li>
+    <div className="dk-work" role="tabpanel">
+      <div className="dk-chips-filter" role="group" aria-label="الفترة">
+        {WORK_PERIODS.map(([k, label]) => (
+          <button key={k} type="button" aria-pressed={period === k}
+            className={`dk-filter${period === k ? ' is-on' : ''}`} onClick={() => setPeriod(k)}>{label}</button>
         ))}
-      </ul>
+      </div>
+      {err && <p className="error">{err}</p>}
+      {!shown ? (!err && <p className="empty">جارٍ التحميل…</p>) : (
+        <>
+          <div className="dk-stats">
+            <div className="dk-stat">
+              <span className="dk-stat-n">{shown.patients.toLocaleString('ar-SY')}</span>
+              <span className="dk-stat-l">المرضى</span>
+            </div>
+            <div className="dk-stat">
+              <span className="dk-stat-n">{shown.procedures.toLocaleString('ar-SY')}</span>
+              <span className="dk-stat-l">الإجراءات</span>
+            </div>
+          </div>
+          <div className="card dk-work-list">
+            <h3>الإجراءات المحاسَبة <span className="dk-work-range" dir="ltr">
+              {shown.from === shown.to ? shown.from : `${shown.from} — ${shown.to}`}</span></h3>
+            {shown.lines.length === 0 ? <p className="empty">لا إجراءات محاسَبة في هذه الفترة.</p> : (
+              <ul className="dk-lines">
+                {shown.lines.map((l) => (
+                  <li key={l.id} className="dk-line is-paid">
+                    <div className="dk-line-main">
+                      <span className="dk-line-proc">{l.procedure}</span>
+                      <span className="dk-line-patient">{l.patient}</span>
+                    </div>
+                    <span className="dk-line-share">{fmtMoney(l.doctor_share)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="dk-work-total">
+              <span>مجموع حصّتك</span>
+              <strong>{fmtMoney(shown.total_share)}</strong>
+            </div>
+          </div>
+        </>
+      )}
+      {pending.length > 0 && (
+        <div className="card dk-work-pending">
+          <h3>بانتظار المحاسبة <span className="dk-group-count">{pending.length.toLocaleString('ar-SY')}</span></h3>
+          <p className="dk-hint">تُحتسب لك حين تقبضها الاستقبال. تحذف ما أضفته أنت قبل ذلك.</p>
+          <ul className="dk-lines">
+            {pending.map((l) => (
+              <li key={l.id} className="dk-line is-unpaid">
+                <div className="dk-line-main">
+                  <span className="dk-line-proc">⏳ {l.name}</span>
+                  <span className="dk-line-patient">{l.patient_name}</span>
+                </div>
+                {l.mine && (
+                  <button type="button" className="ghost dk-line-x"
+                    aria-label={`حذف ${l.name} عن ${l.patient_name}`} onClick={() => onRemove(l)}>حذف</button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   )
 }
@@ -184,7 +224,7 @@ export default function DoctorScreen() {
   const [toast, showToast] = useToast()
   const [tab, setTab] = useState('present')
   const [mine, setMine] = useState(null)
-  const [mineOpen, setMineOpen] = useState(isWide)
+  const [workKey, setWorkKey] = useState(0)          // يُعيد تحميل «أعمالي» عند حدث إجراء
   const [adding, setAdding] = useState([])          // إضافاتٌ متفائلة: {tempId, appointment_id, name}
   const [removingIds, setRemovingIds] = useState([]) // حذفٌ متفائل
   const [sheetFor, setSheetFor] = useState(null)    // id الحجز الذي تُضاف له
@@ -236,7 +276,7 @@ export default function DoctorScreen() {
       timer = setTimeout(() => {
         if (document.hidden && name !== 'idle_arrival') return
         handlers.current.loadQueue()
-        if (name === 'procedure' || name === 'visit') handlers.current.loadMine()
+        if (name === 'procedure' || name === 'visit') { handlers.current.loadMine(); setWorkKey((k) => k + 1) }
       }, 250)
     })
     return () => { clearTimeout(timer); close() }
@@ -338,7 +378,6 @@ export default function DoctorScreen() {
   const pendingFor = (id) => adding.filter((p) => String(p.appointment_id) === String(id))
   const sheetAppt = sheetFor && appts.find((a) => String(a.id) === String(sheetFor))
 
-  const paidLines = mineLines.filter((l) => l.paid_at)
   const unpaidLines = mineLines.filter((l) => !l.paid_at)
 
   return (
@@ -346,7 +385,7 @@ export default function DoctorScreen() {
       <div className="dk-top">
         <div>
           <h2>شاشة الدكتور</h2>
-          <p className="subtitle">مَن عندك الآن، ومَن ينتظر، وإجراءاتك اليوم</p>
+          <p className="subtitle">مَن عندك الآن، ومَن ينتظر — وأرقامك في «أعمالي»</p>
         </div>
         <div className="dk-top-tools">
           {sessions.length > 1 && (
@@ -398,9 +437,15 @@ export default function DoctorScreen() {
                 onClick={() => setTab('bookings')}>
                 الحجوزات <span className="dk-tab-count">{bookings.length.toLocaleString('ar-SY')}</span>
               </button>
+              <button type="button" role="tab" aria-selected={tab === 'work'} className="dk-tab"
+                onClick={() => setTab('work')}>
+                أعمالي
+              </button>
             </div>
 
-            {tab === 'bookings' ? (
+            {tab === 'work' ? (
+              <MyWork reloadKey={workKey} pending={unpaidLines} onRemove={remove} />
+            ) : tab === 'bookings' ? (
               <div className="card dk-bookings" role="tabpanel">
                 {bookings.length === 0 ? <p className="empty">لا حجوزات منتظرة</p> : (
                   <ul className="dk-book-list">
@@ -431,31 +476,47 @@ export default function DoctorScreen() {
                         )}
                       </div>
                       <AddedProcedures added={current.procedures} pending={pendingFor(current.id)} />
-                      {/* ═══ أزرار العمل ═══ «+ إجراء» كبيرٌ أوّلاً — أكثر ما يُلمس أثناء الكشف.
-                          و«إنهاء» آخراً بفاصلٍ مرئيّ: الضغطة الخاطئة هنا تُنهي كشفاً. */}
-                      <div className="dk-actions">
-                        <button type="button" className="dk-btn dk-btn-add" onClick={() => openSheet(current)}>
-                          <span aria-hidden="true">＋</span> إجراء
-                        </button>
-                        {/* ★ بدء الكشف منفصل عن النداء: بين النداء ودخول المريض الغرفة دقائق لا
-                            تُحسب من الكشف. إنهاءٌ بلا بدء يُستبعد من حساب المدة — لا تخمين. */}
-                        {attendance && !current.started_at && (
-                          <button className="dk-btn dk-btn-start" disabled={busy}
-                            onClick={() => act(api.clinic.start, current.id)}>
-                            <span aria-hidden="true">▶</span> بدء الكشف
-                          </button>
-                        )}
-                        <RecallButton apptId={current.id} onError={showToast} className="ghost dk-btn" />
-                        <button className="ghost dk-btn" disabled={busy}
-                          title="المريض يخرج (قطرة، صورة…) ويعود بدوره — وتنادي التالي"
-                          onClick={() => act(api.clinic.stepOut, current.id)}>
-                          <span aria-hidden="true">⏸</span> خروج مؤقت
-                        </button>
-                        <button className="dk-btn dk-btn-done" disabled={busy}
-                          onClick={() => act(api.clinic.done, current.id)}>
-                          إنهاء الكشف
-                        </button>
-                      </div>
+                      {/* ═══ هرم الأزرار ═══ زرٌّ أساسيّ واحد بحسب الحالة: نُودي ولم يبدأ ⇒ «بدء الكشف»،
+                          كشفٌ شغّال ⇒ «إنهاء الكشف». «+ إجراء» ثانويٌّ واضح أصغر منه، و«إعادة النداء»
+                          و«خروج مؤقت» خفيفان تحتهما. كلّها ≥48px لمساً.
+                          ★ بدء الكشف منفصل عن النداء: بين النداء ودخول المريض الغرفة دقائق لا تُحسب من
+                          الكشف. ونمط الخانات بلا «بدء» — فالأساسيّ فيه «إنهاء» دائماً. */}
+                      {(() => {
+                        const needsStart = attendance && !current.started_at
+                        return (
+                          <div className="dk-actions">
+                            {needsStart ? (
+                              <button className="dk-btn dk-primary dk-btn-start" disabled={busy}
+                                onClick={() => act(api.clinic.start, current.id)}>
+                                <span aria-hidden="true">▶</span> بدء الكشف
+                              </button>
+                            ) : (
+                              <button className="dk-btn dk-primary dk-btn-done" disabled={busy}
+                                onClick={() => act(api.clinic.done, current.id)}>
+                                إنهاء الكشف
+                              </button>
+                            )}
+                            <button type="button" className="dk-btn dk-secondary dk-btn-add" onClick={() => openSheet(current)}>
+                              <span aria-hidden="true">＋</span> إجراء
+                            </button>
+                            <div className="dk-tertiary">
+                              <RecallButton apptId={current.id} onError={showToast} className="ghost dk-btn dk-light" />
+                              <button className="ghost dk-btn dk-light" disabled={busy}
+                                title="المريض يخرج (قطرة، صورة…) ويعود بدوره — وتنادي التالي"
+                                onClick={() => act(api.clinic.stepOut, current.id)}>
+                                <span aria-hidden="true">⏸</span> خروج مؤقت
+                              </button>
+                              {/* إنهاءٌ بلا بدء ممكن (يُستبعد من حساب المدة) — خفيفٌ هنا لا ينافس «بدء» */}
+                              {needsStart && (
+                                <button className="ghost dk-btn dk-light" disabled={busy}
+                                  onClick={() => act(api.clinic.done, current.id)}>
+                                  إنهاء
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })()}
                     </>
                   ) : (
                     <p className="empty">لا أحد قيد الكشف حالياً.</p>
@@ -534,19 +595,6 @@ export default function DoctorScreen() {
             )}
           </section>
 
-          {/* ═══ «إجراءاتي اليوم» — قسمٌ يُطوى، ورأسه بالمجموعين ═══ */}
-          <MineSummary totals={mine?.totals} open={mineOpen} onToggle={() => setMineOpen((v) => !v)} />
-          {mineOpen && (
-            <section id="dk-mine-body" className="card dk-mine-body" aria-label="إجراءاتي اليوم">
-              {mine == null ? <p className="empty">جارٍ التحميل…</p>
-                : mineLines.length === 0 ? <p className="empty">لا إجراءات اليوم بعد.</p> : (
-                  <>
-                    <MineLines title="بانتظار المحاسبة" tone="unpaid" lines={unpaidLines} onRemove={remove} />
-                    <MineLines title="تمت المحاسبة ✓" tone="paid" lines={paidLines} />
-                  </>
-                )}
-            </section>
-          )}
         </div>
       )}
 
