@@ -658,9 +658,10 @@ const run = async () => {
         (m[1] || m[2] || m[3]).replace(/\$\{[^}]*\}/g, ' ').split(/\s+/).filter((c) => /^[a-z][-a-z0-9]*$/.test(c)).forEach((c) => cls.add(c))
       }
       // أصنافٌ تُبنى في JS ('pd-chip-' + …) أو تُمرَّر نصّاً
-      for (const m of src.matchAll(/['"`]((?:pd|od)-[-a-z0-9]*[a-z0-9])['"`\s]/g)) cls.add(m[1])
+      // وأصنافٌ شرطيّة داخل ${…} (' pd-current-row') — فاتت الفحص فبقي margin-inline-start فيها منذ 10-17
+      for (const m of src.matchAll(/['"`\s]((?:pd|od)-[-a-z0-9]*[a-z0-9])(?![-a-z0-9])/g)) cls.add(m[1])
     }
-    ok(cls.has('pd-banner-number') && cls.has('pd-title') && cls.has('pd-offline-alert') && cls.size > 40,
+    ok(cls.has('pd-banner-number') && cls.has('pd-title') && cls.has('pd-current-row') && cls.has('pd-offline-alert') && cls.size > 40,
       `CSS الشاشة: جمع الأصناف من الشيفرة ناقص (${cls.size})`)
     const CLS = [...cls].map((c) => new RegExp(`\\.${c}(?![-a-z0-9])`))
     const isScreen = (sel) => CLS.some((re) => re.test(sel))

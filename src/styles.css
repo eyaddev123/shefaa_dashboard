@@ -1190,7 +1190,8 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
 .pd-current-wrap > * + * { margin-top: 0.4vh; }   /* بديل gap — انظر .pd-card-head */
 /* الصفّ الأفقي: الغرفة بجانب الرقم حين لا يتّسع الارتفاع لسطرَين (انظر cardFonts) */
 .pd-current-row { flex-direction: row; justify-content: center; align-items: center; }
-.pd-current-row > * + * { margin-top: 0; margin-inline-start: 0.45em; }
+/* margin-right لا margin-inline-start: Chrome 66 (التلفاز) يُسقط الأخيرة فتلتصق الغرفة بالرقم — والصفحة rtl فالبداية يمين */
+.pd-current-row > * + * { margin-top: 0; margin-right: 0.45em; }
 /* ═══ لا يُسحق أيٌّ من الثلاثة ═══
    flex الافتراضي يسمح بالانكماش (flex-shrink:1) فيصير صندوق الغرفة ٩px بينما
    خطّها ٥٨px: تُرسم خارج صندوقها فيقصّها overflow:hidden وتختفي تماماً من الشاشة.
