@@ -4,10 +4,12 @@ import { RoleProvider, useRole } from './RoleContext.jsx'
 import {
   canManageUsers, canReadAid, canSearchAid, canSeeClinicBoard, canSeeCashReport, canSeeDoctorsPage,
   canSeeDoctorScreen, canSeeSettings, canSeeProceduresPage, canSeePrinterSetup, canSeeInventory, canWriteInventory, canSeeReferralsPage, homePathFor,
+  canTakePayment,
 } from './permissions.js'
 import { ROLE_LABELS } from './api.js'
 import ThemeToggle from './components/ThemeToggle.jsx'
 import NotificationsBell from './components/NotificationsBell.jsx'
+import UnpaidBell from './components/UnpaidBell.jsx'
 import Login from './pages/Login.jsx'
 import Search from './pages/Search.jsx'
 import Dashboard from './pages/Dashboard.jsx'
@@ -190,6 +192,8 @@ function Shell() {
       {/* الحجاب يغلق الدرج باللمس خارجه — سلوك متوقَّع على الجوال */}
       <div className="drawer-scrim" onClick={() => setDrawer(false)} aria-hidden="true" />
       <Sidebar onNavigate={() => setDrawer(false)} />
+      {/* إجراءات الأطباء بانتظار المحاسبة — زرٌّ عائم حيّ في كلّ صفحة لمن يقبض */}
+      {canTakePayment(user.role) && <UnpaidBell role={user.role} />}
       <main className="main">
         <Routes>
           <Route path="/" element={<Dashboard />} />

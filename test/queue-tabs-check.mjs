@@ -258,7 +258,7 @@ const run = async () => {
   // مريضٌ ملغى عليه إجراء: يُصنع من نسخة الـ fixture (الحالة وحدها تتغيّر)
   const withCancelled = clone(FX.queues[ATT])
   const cx = withCancelled.appointments.find((a) => a.status === 'cancelled')
-  cx.procedures = [{ id: 7701, procedure_id: 1, name: 'تضميد', price: 15000, removed_at: null, materials: [] }]
+  cx.procedures = [{ id: 7701, procedure_id: 1, name: 'تضميد', price: 15000, removed_at: null, paid_at: '2026-10-25T09:00:00Z', materials: [] }]
   cx.procedures_total = 15000
   const LIST = withCancelled.appointments
   const turn = (a) => (a.arrival_number != null ? [0, a.arrival_number] : [1, a.queue_number])
