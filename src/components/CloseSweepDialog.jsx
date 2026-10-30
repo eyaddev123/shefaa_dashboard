@@ -6,6 +6,8 @@ import { Modal } from './inventory/shared.jsx'
 // الدكتور يغادر وينسى آخر مريضٍ «قيد الكشف»، والاستقبال تعلّم الباقين «لم يحضر» واحداً
 // واحداً. فـ«إغلاق العيادة» يسأل الخادم أوّلاً، وإن وجد معلَّقاً (409 CLOSE_PENDING) تُعرض
 // هذه النافذة بملخّصه، وبالتأكيد يكنسه الخادم في معاملةٍ واحدة.
+//   - قسمان للمنتظرين: «بانتظار الحضور» (محجوزٌ لم يحضر) ⇒ «لم يحضر»، و«حاضرون بانتظار الدور»
+//     ⇒ كشفٌ منتهٍ (هم في العيادة ودفعوا عند الحضور — الجرد لا يتغيّر). الأسماء حتى ٥، وإلا العدد.
 //   - الخارج مؤقتاً لا يُكنس بصمت: سطرٌ لكلٍّ منهم بخيارين، والتأكيد معطّل حتى يُختار.
 //   - التأكيد يحمل ما رآه الموظف (expected): تغيّر الوضع أثناء النافذة ⇒ ملخّصٌ جديد هنا
 //     (CLOSE_CHANGED) بدل كنس ما لم يُرَ.
@@ -14,9 +16,29 @@ import { Modal } from './inventory/shared.jsx'
 const patientsAr = (n) => n === 1 ? 'مريضٌ واحد' : n === 2 ? 'مريضان'
   : n >= 3 && n <= 10 ? `${n} مرضى` : `${n} مريضاً`
 
+const NAMES_UP_TO = 5
+
 const who = (p) => (
   <><b>{p.full_name || '—'}</b>{p.number != null && <span className="cs-num"> (الدور {p.number})</span>}</>
 )
+
+// قسمٌ من المنتظرين: العنوان والعدد والأثر، ثمّ الأسماء إن كانوا قليلين
+function Group({ list, title, effect, note, kind }) {
+  if (!list.length) return null
+  return (
+    <div className={`cs-line cs-group cs-${kind}`}>
+      <p>
+        <b>{title}</b> ({patientsAr(list.length)}) — <span className="cs-effect">{effect}</span>
+      </p>
+      {note && <p className="cs-note">{note}</p>}
+      {list.length <= NAMES_UP_TO && (
+        <ul className="cs-names">
+          {list.map((p) => <li key={p.id}>{who(p)}</li>)}
+        </ul>
+      )}
+    </div>
+  )
+}
 
 export default function CloseSweepDialog({ session, pending: initial, onDone, onClose }) {
   const [pending, setPending] = useState(initial)
@@ -25,8 +47,8 @@ export default function CloseSweepDialog({ session, pending: initial, onDone, on
   const [err, setErr] = useState(null)
   const [changed, setChanged] = useState(false)
 
-  const { in_service: inService, waiting, waiting_return: returning } = pending
-  const allIds = [...inService, ...waiting, ...returning].map((p) => p.id)
+  const { in_service: inService, arrived, not_arrived: notArrived, waiting_return: returning } = pending
+  const allIds = [...inService, ...arrived, ...notArrived, ...returning].map((p) => p.id)
   const unchosen = returning.filter((p) => !choices[p.id]).length
 
   const confirm = async () => {
@@ -62,27 +84,27 @@ export default function CloseSweepDialog({ session, pending: initial, onDone, on
           </p>
         ))}
 
-        {waiting.length > 0 && (
-          <div className="cs-line">
-            {/* «وفي الانتظار ٣ مرضى» لا «و٣ مرضى»: الواو ملاصقةً لرقمٍ لاتينيّ تنقلب «٣و» */}
-            <p>
-              {inService.length ? 'وفي' : 'في'} الانتظار {patientsAr(waiting.length)} —{' '}
-              <span className="cs-effect">{waiting.length === 1 ? 'سيُعلَّم' : 'سيُعلَّمون'} «لم يحضر».</span>
-            </p>
-            <ul className="cs-names">
-              {waiting.map((p) => <li key={p.id}>{who(p)}</li>)}
-            </ul>
-          </div>
-        )}
+        <Group list={arrived} title="حاضرون بانتظار الدور" kind="arrived"
+          effect={arrived.length === 1 ? 'سيُسجَّل كشفه منتهياً.' : 'ستُسجَّل كشوفهم منتهية.'}
+          note="حضروا ودفعوا عند الحضور — جرد الصندوق لا يتغيّر." />
+        <Group list={notArrived} title="بانتظار الحضور" kind="not-arrived"
+          effect={notArrived.length === 1 ? 'سيُعلَّم «لم يحضر».' : 'سيُعلَّمون «لم يحضر».'} />
 
         {returning.map((p) => (
           <div key={p.id} className="cs-return" role="group" aria-labelledby={`cs-q-${p.id}`}>
             <p id={`cs-q-${p.id}`} className="cs-return-q">مريضٌ بخروجٍ مؤقت: {who(p)} — ماذا نفعل به؟</p>
             <div className="cs-choices" role="radiogroup">
               {[['no_show', 'لم يحضر'], ['done', 'إنهاء كشفه']].map(([v, label]) => (
-                <button key={v} type="button" role="radio" aria-checked={choices[p.id] === v}
-                  className={`cs-choice${choices[p.id] === v ? ' on' : ''}`} disabled={busy}
-                  onClick={() => setChoices((c) => ({ ...c, [p.id]: v }))}>{label}</button>
+                <div key={v} className="cs-choice-cell">
+                  <button type="button" role="radio" aria-checked={choices[p.id] === v}
+                    aria-describedby={v === 'no_show' ? `cs-cash-${p.id}` : undefined}
+                    className={`cs-choice${choices[p.id] === v ? ' on' : ''}`} disabled={busy}
+                    onClick={() => setChoices((c) => ({ ...c, [p.id]: v }))}>{label}</button>
+                  {/* الخارج مؤقتاً حضر ودفع: «لم يحضر» يُسقط أجره من الجرد — يُقال قبل الاختيار لا بعده */}
+                  {v === 'no_show' && (
+                    <p id={`cs-cash-${p.id}`} className="cs-note cs-cash-note">حضر ودفع عند الحضور — هذا الخيار يُخرج رسمه من جرد الصندوق.</p>
+                  )}
+                </div>
               ))}
             </div>
           </div>
