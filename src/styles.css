@@ -3427,7 +3427,10 @@ button.spec-chip-btn[aria-pressed='true'] { background: var(--primary); border-c
   border-radius: 12px; background: var(--status-pending-bg);
 }
 .cs-return-q { margin: 0 0 6px; font-size: 14px; line-height: 1.7; }
-.cs-choices { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.cs-choices { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; align-items: flex-start; }
+.cs-choice-cell { flex: 1 1 140px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.cs-choice-cell > button.cs-choice { flex: none; width: 100%; }   /* flex-basis 140px يصير ارتفاعاً داخل العمود */
+.cs-cash-note { font-size: 12px; line-height: 1.6; }
 button.cs-choice {
   flex: 1 1 140px; padding: 9px 14px; border-radius: 10px; font-weight: 800;
   background: var(--surface-1); color: var(--text-primary); border: 1.5px solid var(--border);

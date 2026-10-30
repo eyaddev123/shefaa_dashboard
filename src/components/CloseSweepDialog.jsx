@@ -95,9 +95,16 @@ export default function CloseSweepDialog({ session, pending: initial, onDone, on
             <p id={`cs-q-${p.id}`} className="cs-return-q">مريضٌ بخروجٍ مؤقت: {who(p)} — ماذا نفعل به؟</p>
             <div className="cs-choices" role="radiogroup">
               {[['no_show', 'لم يحضر'], ['done', 'إنهاء كشفه']].map(([v, label]) => (
-                <button key={v} type="button" role="radio" aria-checked={choices[p.id] === v}
-                  className={`cs-choice${choices[p.id] === v ? ' on' : ''}`} disabled={busy}
-                  onClick={() => setChoices((c) => ({ ...c, [p.id]: v }))}>{label}</button>
+                <div key={v} className="cs-choice-cell">
+                  <button type="button" role="radio" aria-checked={choices[p.id] === v}
+                    aria-describedby={v === 'no_show' ? `cs-cash-${p.id}` : undefined}
+                    className={`cs-choice${choices[p.id] === v ? ' on' : ''}`} disabled={busy}
+                    onClick={() => setChoices((c) => ({ ...c, [p.id]: v }))}>{label}</button>
+                  {/* الخارج مؤقتاً حضر ودفع: «لم يحضر» يُسقط أجره من الجرد — يُقال قبل الاختيار لا بعده */}
+                  {v === 'no_show' && (
+                    <p id={`cs-cash-${p.id}`} className="cs-note cs-cash-note">حضر ودفع عند الحضور — هذا الخيار يُخرج رسمه من جرد الصندوق.</p>
+                  )}
+                </div>
               ))}
             </div>
           </div>
