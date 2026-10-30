@@ -195,7 +195,10 @@ export const api = {
     schedulePreview: (from, weeks = 6) =>
       http(`/clinic/schedules/preview?from=${from}&weeks=${weeks}`),
     dayDoctors: (date) => http(`/clinic/day-doctors?date=${date}`),
-    closeSession: (id) => http(`/clinic/sessions/${id}/close`, { method: 'POST' }),
+    // بلا body: يُغلق أو يردّ 409 CLOSE_PENDING بملخّص المعلَّق. وبالتأكيد:
+    // { confirm: true, expected: [ids], returning: { id: 'no_show'|'done' } } — انظر CloseSweepDialog
+    closeSession: (id, body) => http(`/clinic/sessions/${id}/close`,
+      { method: 'POST', ...(body ? { body: JSON.stringify(body) } : {}) }),
     // ═══ الإجراءات بالحساب الفوري: المراجعة والتقارير (مشرف العيادات ومن يطالع) ═══
     procedureReview: ({ from, to, doctorId, flag }) => {
       const q = new URLSearchParams({ from, to: to || from })
