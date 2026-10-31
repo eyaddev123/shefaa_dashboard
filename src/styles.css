@@ -3403,7 +3403,7 @@ button.dk-audio.is-on:disabled { opacity: 1; cursor: default; color: var(--statu
 
 /* ── تبويبا المرضى: الوحيدان في الشاشة ── */
 .dk-tabs {
-  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; padding: 4px; margin-bottom: 14px;
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; padding: 4px; margin-bottom: 14px;
   border-radius: 14px; background: var(--surface-1); border: 1px solid var(--border);
 }
 button.dk-tab {
