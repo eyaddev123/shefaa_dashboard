@@ -3460,7 +3460,10 @@ button.dk-secondary {
 }
 button.dk-secondary:hover:not(:disabled) { filter: none; background: var(--dropzone-hover); }
 /* الخفيفان (وإنهاءٌ بلا بدء): نصٌّ بإطارٍ رفيع، لا ينافس ما فوقه */
-.dk-tertiary { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; }
+/* زرّان في الصفّ على الجوال؛ والوحيد في صفّه («إنهاء» بلا بدء) في الوسط لا بجانب فراغ */
+.dk-tertiary { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.dk-tertiary > * { flex: 0 1 calc(50% - 4px); min-width: 0; }
+@media (min-width: 640px) { .dk-tertiary > * { flex: 1 1 0; } }
 button.dk-light { min-height: 48px; font-size: 13.5px; font-weight: 600; color: var(--text-secondary);
   border: 1px solid var(--border); background: transparent; }
 
