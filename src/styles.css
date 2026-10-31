@@ -3655,3 +3655,46 @@ button.unpaid-pay { min-height: 48px; padding: 8px 16px; background: var(--statu
 .rev-unpaid-total { margin-inline-start: auto; font-weight: 800; }
 .rev-unpaid-none { margin: 10px 0; font-size: 13px; color: var(--status-good); font-weight: 700; }
 .rev-flag.is-unpaid.is-on { background: var(--status-pending-bg); color: var(--status-pending); }
+
+/* ═══ شريط «إجراءات اليوم» — سفليٌّ ثابت فوق المحتوى، يتمدّد لفوق ═══
+   الجوال واللوحي: بعرض الشاشة. الواسع (≥1024): بعرض المحتوى، لا يغطّي القائمة الجانبية (250px يميناً).
+   المحتوى يُدفع بارتفاع الشريط المسكّر فلا يغطّي أزرار المريض الحالي. أعدادٌ وأسماء — لا مبالغ. */
+.dk { padding-bottom: 84px; }
+.dk-today {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 950;
+  background: var(--surface-1); color: var(--text-primary);
+  border-top: 1px solid var(--border); border-radius: 16px 16px 0 0;
+  box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.16);
+}
+@media (min-width: 1024px) { .dk-today { right: 250px; } }
+button.dk-today-head {
+  width: 100%; min-height: 56px; display: flex; align-items: center; gap: 10px;
+  padding: 8px 16px 10px; background: transparent; color: var(--text-primary);
+  border-radius: 16px 16px 0 0; text-align: start; position: relative; touch-action: none;
+}
+button.dk-today-head:hover { filter: none; }
+.dk-today-grip {
+  position: absolute; top: 5px; left: 50%; margin-left: -20px;
+  width: 40px; height: 4px; border-radius: 999px; background: var(--grid);
+}
+.dk-today-sum { flex: 1 1 auto; display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; font-size: 14.5px; font-weight: 700; }
+.dk-dot { display: inline-block; width: 11px; height: 11px; border-radius: 50%; }
+.dk-dot.is-paid { background: var(--status-good); }
+.dk-dot.is-unpaid { background: var(--status-pending); margin-inline-start: 8px; }
+.dk-today-caret { color: var(--muted); font-size: 15px; }
+/* التمدّد بسلاسة حتى نصف الشاشة، وتمريرٌ داخلي */
+.dk-today-body {
+  max-height: 0; overflow: hidden; transition: max-height 0.25s ease-out;
+  padding: 0 16px;
+}
+.dk-today.is-open .dk-today-body { max-height: 50vh; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: 14px; }
+.dk-today-list { list-style: none; margin: 0; padding: 0; }
+.dk-today-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 52px;
+  padding: 6px 0; border-top: 1px solid var(--grid);
+}
+.dk-today-item:first-child { border-top: none; }
+.dk-today-who { display: flex; flex-direction: column; min-width: 0; }
+.dk-today-patient { font-weight: 700; }
+.dk-today-proc { font-size: 13px; color: var(--text-secondary); }
+@media (prefers-reduced-motion: reduce) { .dk-today-body { transition: none; } }

@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { api, fmtTime, fmtMoney, todayLocal, openStaffStream } from '../api.js'
+import { api, fmtTime, todayLocal, openStaffStream } from '../api.js'
 import { AttendanceBadge, urgentRowClass, isAttendanceSession, usePolling, fmtClock, fmtTimeOfDay } from '../attendance-ui.jsx'
 import { useToast, RecallButton } from '../action-feedback.jsx'
 import { waitingReturnOf, serverOffsetOf, Elapsed } from '../waiting-return.jsx'
-import { useDialogs } from '../dialogs.jsx'
 import BottomSheet from '../components/BottomSheet.jsx'
 import MaterialsEditor, { qtyValid, toPayload } from '../components/MaterialsEditor.jsx'
 import {
@@ -15,19 +14,21 @@ import {
 // شاشة الطبيب — شاشةٌ واحدة لا متاهة تبويبات
 //
 // وقت الطبيب مضغوط بين مريضين: أقلّ لمسات، وكلّ المهمّ أمام عينه بلا تنقّل.
-//   • ثلاثة تبويبات: «الموجودون» (الدور بكلّ أزراره)، «الحجوزات» (للاطّلاع)، و«أعمالي» (أرقامه).
+//   • تبويبان: «الموجودون» (الدور بكلّ أزراره) و«الحجوزات» (للاطّلاع). الأرقام في صفحة «أعمالي»
+//     المستقلّة (القائمة الجانبية، MyWork.jsx) لا هنا.
 //   • المريض قيد الكشف هو النجم، وأزراره هرم: أساسيٌّ واحد بحسب الحالة («بدء الكشف» أو «إنهاء
 //     الكشف»)، ثمّ «+ إجراء» ثانوياً، ثمّ «إعادة النداء» و«خروج مؤقت» خفيفين. كلّها ≥48px.
 //   • «+ إجراء» على بطاقته ⇒ ورقة سفلية بإجراءات اختصاصه أزراراً كبيرة مرتّبة بالأكثر
 //     استعمالاً ⇒ لمسةٌ تعلّم الإجراء (وأكثر) ⇒ «إضافة (n)» تضيف المختار كلّه بطلبٍ واحد.
 //     المواد «+ مواد» لكلّ إجراءٍ مختار داخل الورقة نفسها، اختيارية.
 //     من «مريض قيد الكشف» إلى «إجراء مضاف بلا مواد» = ثلاث لمسات.
-//   • «أعمالي»: اليوم/الأسبوع/الشهر، المرضى والإجراءات، والإجراءات المحاسَبة بحصّته ومجموعها.
+//   • شريط «إجراءات اليوم» سفليٌّ ثابت: سطرٌ بالعددين (تمت المحاسبة / بانتظار المحاسبة)، ولمسةٌ
+//     تمدّه لقائمة اليوم (المريض، الإجراء، شارة الحالة). أعدادٌ لا مبالغ، وحيٌّ بالبثّ.
 //   • الإضافة والحذف متفائلان: يظهران فوراً، ويتراجعان برسالة واضحة إن رفض الخادم.
 //
 // ★ ولا رقمٌ ماليّ في «الموجودون» و«الحجوزات» وبطاقة المريض (المريض أمام الشاشة): سطر الإجراء
-//   اسمٌ ومؤشّر لون (✓ أخضر محاسَب، ⏳ أصفر بانتظار المحاسبة). الأرقام في «أعمالي» وحده، من
-//   /clinic/my-work — حصّته هو من حساب صفحة المستحقات نفسه (live-check يفحص DOM التبويبين).
+//   اسمٌ ومؤشّر لون (✓ أخضر محاسَب، ⏳ أصفر بانتظار المحاسبة)، ولا في الشريط السفلي بوضعيه.
+//   test:doctor-payment يفحص DOM الشاشة كلّها (التبويبين والشريط مسكّراً وممدّداً).
 // ★ الرنّة: حدث idle_arrival من الخادم وحده يقرّر (حضورٌ والعيادة فارغة تماماً) — انظر doctor-alert.js.
 // ═══════════════════════════════════════════════════════════════════
 
@@ -126,93 +127,61 @@ function AddProcedureSheet({ appt, catalog, usage, matCatalog, loadMaterials, dr
   )
 }
 
-// ═══ «أعمالي» — التبويب الثالث، والمكان الوحيد الذي تظهر فيه أرقام الطبيب ═══
-// اليوم / الأسبوع (من السبت) / الشهر: chips فورية بلا زرّ تطبيق. بطاقتا ملخّص (المرضى، الإجراءات)،
-// ثمّ الإجراءات المقبوضة بحصّته من لقطة السطر، ثمّ المجموع — من /clinic/my-work، أي حساب صفحة
-// المستحقات نفسه. وتحتها ما ينتظر المحاسبة بالأسماء وحدها (بلا مبالغ)، ومنه يحذف الطبيب سطره.
-const WORK_PERIODS = [['today', 'اليوم'], ['week', 'الأسبوع'], ['month', 'الشهر']]
-
-function MyWork({ reloadKey, pending, onRemove }) {
-  const [period, setPeriod] = useState('today')
-  const [data, setData] = useState(null)
-  const [err, setErr] = useState(null)
-  useEffect(() => {
-    let alive = true
-    api.clinic.myWork(period).then((d) => { if (alive) { setData(d); setErr(null) } })
-      .catch((e) => { if (alive) setErr(e.message) })
-    return () => { alive = false }
-  }, [period, reloadKey])
-  const shown = data && data.period === period ? data : null
+// ═══ شريط «إجراءات اليوم» — سفليٌّ ثابت، يتمدّد لفوق ═══
+// مسكّراً: سطرٌ بنقطتين ملوّنتين وعددين (أو «لا إجراءات اليوم»). لمسةٌ أو سحبةٌ لفوق تمدّه حتى
+// نصف الشاشة بتمريرٍ داخلي: المريض، الإجراء، شارة الحالة — الأحدث فوق. لمسةٌ على الرأس أو سحبةٌ
+// لتحت تُعيده سطراً. ولا رقمٌ ماليّ فيه أبداً (الأسطر من my-procedures ولا يُعرض منها مبلغ).
+const SWIPE = 30
+function TodayBar({ lines }) {
+  const [open, setOpen] = useState(false)
+  const startY = useRef(null)
+  const swiped = useRef(false)
+  const paid = lines.filter((l) => l.paid_at).length
+  const pending = lines.length - paid
+  const down = (e) => { startY.current = e.clientY; swiped.current = false }
+  const up = (e) => {
+    if (startY.current == null) return
+    const dy = e.clientY - startY.current
+    startY.current = null
+    if (dy > SWIPE && open) { setOpen(false); swiped.current = true }
+    else if (dy < -SWIPE && !open) { setOpen(true); swiped.current = true }
+  }
   return (
-    <div className="dk-work" role="tabpanel">
-      <div className="dk-chips-filter" role="group" aria-label="الفترة">
-        {WORK_PERIODS.map(([k, label]) => (
-          <button key={k} type="button" aria-pressed={period === k}
-            className={`dk-filter${period === k ? ' is-on' : ''}`} onClick={() => setPeriod(k)}>{label}</button>
-        ))}
-      </div>
-      {err && <p className="error">{err}</p>}
-      {!shown ? (!err && <p className="empty">جارٍ التحميل…</p>) : (
-        <>
-          <div className="dk-stats">
-            <div className="dk-stat">
-              <span className="dk-stat-n">{shown.patients.toLocaleString('ar-SY')}</span>
-              <span className="dk-stat-l">المرضى</span>
-            </div>
-            <div className="dk-stat">
-              <span className="dk-stat-n">{shown.procedures.toLocaleString('ar-SY')}</span>
-              <span className="dk-stat-l">الإجراءات</span>
-            </div>
-          </div>
-          <div className="card dk-work-list">
-            <h3>الإجراءات المحاسَبة <span className="dk-work-range" dir="ltr">
-              {shown.from === shown.to ? shown.from : `${shown.from} — ${shown.to}`}</span></h3>
-            {shown.lines.length === 0 ? <p className="empty">لا إجراءات محاسَبة في هذه الفترة.</p> : (
-              <ul className="dk-lines">
-                {shown.lines.map((l) => (
-                  <li key={l.id} className="dk-line is-paid">
-                    <div className="dk-line-main">
-                      <span className="dk-line-proc">{l.procedure}</span>
-                      <span className="dk-line-patient">{l.patient}</span>
-                    </div>
-                    <span className="dk-line-share">{fmtMoney(l.doctor_share)}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <div className="dk-work-total">
-              <span>مجموع حصّتك</span>
-              <strong>{fmtMoney(shown.total_share)}</strong>
-            </div>
-          </div>
-        </>
-      )}
-      {pending.length > 0 && (
-        <div className="card dk-work-pending">
-          <h3>بانتظار المحاسبة <span className="dk-group-count">{pending.length.toLocaleString('ar-SY')}</span></h3>
-          <p className="dk-hint">تُحتسب لك حين تقبضها الاستقبال. تحذف ما أضفته أنت قبل ذلك.</p>
-          <ul className="dk-lines">
-            {pending.map((l) => (
-              <li key={l.id} className="dk-line is-unpaid">
-                <div className="dk-line-main">
-                  <span className="dk-line-proc">⏳ {l.name}</span>
-                  <span className="dk-line-patient">{l.patient_name}</span>
+    <div className={`dk-today${open ? ' is-open' : ''}`}>
+      <button type="button" className="dk-today-head" aria-expanded={open} aria-controls="dk-today-body"
+        onPointerDown={down} onPointerUp={up}
+        onClick={() => { if (!swiped.current) setOpen((v) => !v); swiped.current = false }}>
+        <span className="dk-today-grip" aria-hidden="true" />
+        {lines.length === 0 ? <span className="dk-today-sum">لا إجراءات اليوم</span> : (
+          <span className="dk-today-sum">
+            <span className="dk-dot is-paid" aria-hidden="true" /> تمت المحاسبة: {paid.toLocaleString('ar-SY')}
+            <span className="dk-dot is-unpaid" aria-hidden="true" /> بانتظار المحاسبة: {pending.toLocaleString('ar-SY')}
+          </span>
+        )}
+        <span className="dk-today-caret" aria-hidden="true">{open ? '▾' : '▴'}</span>
+      </button>
+      <div id="dk-today-body" className="dk-today-body" aria-hidden={!open}>
+        {lines.length === 0 ? <p className="empty">لا إجراءات اليوم بعد.</p> : (
+          <ul className="dk-today-list">
+            {lines.map((l) => (
+              <li key={l.id} className="dk-today-item">
+                <div className="dk-today-who">
+                  <span className="dk-today-patient">{l.patient_name}</span>
+                  <span className="dk-today-proc">{l.name}</span>
                 </div>
-                {l.mine && (
-                  <button type="button" className="ghost dk-line-x"
-                    aria-label={`حذف ${l.name} عن ${l.patient_name}`} onClick={() => onRemove(l)}>حذف</button>
-                )}
+                {l.paid_at
+                  ? <span className="pay-badge is-paid">تمت المحاسبة ✓</span>
+                  : <span className="pay-badge is-unpaid">بانتظار المحاسبة ⏳</span>}
               </li>
             ))}
           </ul>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }
 
 export default function DoctorScreen() {
-  const dialogs = useDialogs()
   const [sessions, setSessions] = useState(null)
   const [sessionId, setSessionId] = useState(null)
   const [queue, setQueue] = useState(null)
@@ -224,9 +193,7 @@ export default function DoctorScreen() {
   const [toast, showToast] = useToast()
   const [tab, setTab] = useState('present')
   const [mine, setMine] = useState(null)
-  const [workKey, setWorkKey] = useState(0)          // يُعيد تحميل «أعمالي» عند حدث إجراء
   const [adding, setAdding] = useState([])          // إضافاتٌ متفائلة: {tempId, appointment_id, name}
-  const [removingIds, setRemovingIds] = useState([]) // حذفٌ متفائل
   const [sheetFor, setSheetFor] = useState(null)    // id الحجز الذي تُضاف له
   const emptyDraft = { selected: [], errorId: null, error: null }
   const [draft, setDraft] = useState(emptyDraft)     // المختار في الورقة — يعود كما كان إن رُفض
@@ -276,7 +243,7 @@ export default function DoctorScreen() {
       timer = setTimeout(() => {
         if (document.hidden && name !== 'idle_arrival') return
         handlers.current.loadQueue()
-        if (name === 'procedure' || name === 'visit') { handlers.current.loadMine(); setWorkKey((k) => k + 1) }
+        if (name === 'procedure' || name === 'visit') handlers.current.loadMine()
       }, 250)
     })
     return () => { clearTimeout(timer); close() }
@@ -334,25 +301,7 @@ export default function DoctorScreen() {
       setAdding((a) => a.filter((x) => !ids.has(x.tempId)))
     }
   }
-  const remove = async (line) => {
-    const ok = await dialogs.confirm({
-      title: 'حذف الإجراء؟', body: `«${line.name}» عن ${line.patient_name} — لم يُحاسَب بعد.`,
-      confirmLabel: 'حذف', danger: true })
-    if (!ok) return
-    setRemovingIds((r) => [...r, String(line.id)])
-    try {
-      await api.clinic.removeAppointmentProcedure(line.appointment_id, line.id, '')
-      showToast(`حُذف «${line.name}»`, 'success', 3000)
-      await Promise.all([loadMine(), loadQueue()])
-    } catch (ex) {
-      showToast(`لم يُحذف «${line.name}»: ${ex.message}`)
-    } finally {
-      setRemovingIds((r) => r.filter((x) => x !== String(line.id)))
-    }
-  }
-
-  const mineLines = useMemo(() => (mine?.lines || [])
-    .filter((l) => !removingIds.includes(String(l.id))), [mine, removingIds])
+  const todayLines = useMemo(() => mine?.lines || [], [mine])
 
   if (loadErr && !sessions) return (
     <div className="load-failed">
@@ -378,14 +327,13 @@ export default function DoctorScreen() {
   const pendingFor = (id) => adding.filter((p) => String(p.appointment_id) === String(id))
   const sheetAppt = sheetFor && appts.find((a) => String(a.id) === String(sheetFor))
 
-  const unpaidLines = mineLines.filter((l) => !l.paid_at)
 
   return (
     <div className="dk">
       <div className="dk-top">
         <div>
           <h2>شاشة الدكتور</h2>
-          <p className="subtitle">مَن عندك الآن، ومَن ينتظر — وأرقامك في «أعمالي»</p>
+          <p className="subtitle">مَن عندك الآن، ومَن ينتظر</p>
         </div>
         <div className="dk-top-tools">
           {sessions.length > 1 && (
@@ -437,15 +385,9 @@ export default function DoctorScreen() {
                 onClick={() => setTab('bookings')}>
                 الحجوزات <span className="dk-tab-count">{bookings.length.toLocaleString('ar-SY')}</span>
               </button>
-              <button type="button" role="tab" aria-selected={tab === 'work'} className="dk-tab"
-                onClick={() => setTab('work')}>
-                أعمالي
-              </button>
             </div>
 
-            {tab === 'work' ? (
-              <MyWork reloadKey={workKey} pending={unpaidLines} onRemove={remove} />
-            ) : tab === 'bookings' ? (
+            {tab === 'bookings' ? (
               <div className="card dk-bookings" role="tabpanel">
                 {bookings.length === 0 ? <p className="empty">لا حجوزات منتظرة</p> : (
                   <ul className="dk-book-list">
@@ -597,6 +539,8 @@ export default function DoctorScreen() {
 
         </div>
       )}
+
+      <TodayBar lines={todayLines} />
 
       {sheetAppt && (
         <AddProcedureSheet appt={sheetAppt} catalog={catalog} usage={mine?.usage || {}}

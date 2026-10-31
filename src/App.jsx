@@ -38,6 +38,7 @@ import Inventory from './pages/Inventory.jsx'
 import SessionQueue from './pages/SessionQueue.jsx'
 import VisitPage from './pages/VisitPage.jsx'
 import DoctorScreen from './pages/DoctorScreen.jsx'
+import MyWorkPage from './pages/MyWork.jsx'
 import PublicDisplay from './pages/PublicDisplay.jsx'
 import OrderDisplay from './pages/OrderDisplay.jsx'
 import PatientTurn from './pages/PatientTurn.jsx'
@@ -120,6 +121,8 @@ function Sidebar({ onNavigate }) {
             المخزون، والإعدادات في الذيل. الترتيب وحده — من يرى ماذا لم يتغيّر. */}
         {canSeeClinicBoard(role) && <NavLink to="/clinic/board">{I.clinic} لوحة العيادات اليومية</NavLink>}
         {canSeeDoctorScreen(role) && <NavLink to="/clinic/doctor">{I.clinic} شاشتي</NavLink>}
+        {/* أرقام الطبيب في صفحتها وحدها — الشاشة الرئيسية بلا مبالغ */}
+        {canSeeDoctorScreen(role) && <NavLink to="/clinic/my-work">{I.clinic} أعمالي</NavLink>}
         {canSeeDoctorsPage(role) && <NavLink to="/clinic/doctors">{I.clinic} العيادات — الدكاترة والدوام</NavLink>}
         {canSeeProceduresPage(role) && <NavLink to="/clinic/procedures">{I.clinic} العيادات — الإجراءات</NavLink>}
         {canSeeReferralsPage(role) && <NavLink to="/clinic/referrals">{I.clinic} العيادات — الإحالات</NavLink>}
@@ -231,6 +234,8 @@ function Shell() {
             <Guard allow={canSeeClinicBoard}><VisitPage /></Guard>} />
           <Route path="/clinic/doctor" element={
             <Guard allow={canSeeDoctorScreen}><DoctorScreen /></Guard>} />
+          <Route path="/clinic/my-work" element={
+            <Guard allow={canSeeDoctorScreen}><MyWorkPage /></Guard>} />
           <Route path="/users" element={
             <Guard allow={canManageUsers}><Users /></Guard>} />
           <Route path="/settings" element={
