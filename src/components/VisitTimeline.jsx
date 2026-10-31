@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { api, APPOINTMENT_STATUSES, VISIT_TYPES } from '../api.js'
+import { api, APPOINTMENT_STATUSES, VISIT_TYPES, ROLE_LABELS } from '../api.js'
 import { fmtClock } from '../attendance-ui.jsx'
 
 // ═══ الخط الزمني للزيارة — «مين عمل شو» من الحجز إلى الخروج ═══
@@ -47,6 +47,8 @@ export function describeEvent(e) {
       return e.new_value
         ? { title: `إضافة إجراء: ${e.new_value}`, tone: 'add', note: true }
         : { title: `حذف إجراء: ${e.old_value}`, tone: 'remove' }
+    // إجراءٌ أضافه الطبيب «بانتظار المحاسبة» ثمّ قُبض — الفاعل من قبض
+    case 'procedure_paid': return { title: `تمت المحاسبة: ${e.new_value}`, tone: 'add' }
     case 'materials': return { title: `تعديل مواد «${e.old_value}»`, detail: e.new_value }
     case 'referral':
       if (!e.old_value) return { title: `تسجيل إحالة: ${e.new_value}`, tone: 'add' }
@@ -58,10 +60,11 @@ export function describeEvent(e) {
   }
 }
 
-// بلا فاعل = النظام، وسببه جزءٌ من اسمه («النظام — إغلاق تلقائي»)
-const actorOf = (e) => (e.changed_by == null
+// بلا فاعل = النظام، وسببه جزءٌ من اسمه («النظام — إغلاق تلقائي»).
+// والموظف باسمه ودوره: «سلمى (استقبال العيادات)» — من أضاف الإجراء: الطبيب أم الاستقبال؟
+export const actorOf = (e) => (e.changed_by == null
   ? { name: e.reason ? `النظام — ${e.reason}` : 'النظام', system: true }
-  : { name: e.changed_by_name || '—' })
+  : { name: `${e.changed_by_name || '—'}${ROLE_LABELS[e.changed_by_role] ? ` (${ROLE_LABELS[e.changed_by_role]})` : ''}` })
 
 // الساعة وحدها في يوم الجلسة، وبالتاريخ لما بعده (تصحيحٌ متأخّر)
 const when = (ts, sessionDay) => {

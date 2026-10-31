@@ -153,7 +153,7 @@ const run = async () => {
     const { ctx, page } = await open(browser, { path: visitPath('new') })
     await page.waitForSelector('.visit-page')
     ok((await text(page, '.visit-procs')).includes('لا إجراءات'), 'جديد: حالة الإجراءات الفارغة')
-    ok((await text(page, '.visit-procs')).includes('بعد دخول المريض'), 'جديد: سبب غياب الإضافة')
+    ok((await text(page, '.visit-procs')).includes('بعد حضور المريض'), 'جديد: سبب غياب الإضافة')
     ok((await text(page, '.visit-refs')).includes('لا إحالة'), 'جديد: حالة الإحالات الفارغة')
     ok(await page.locator('.visit-refs button', { hasText: '+ إحالة' }).isVisible(), 'جديد: زرّ «+ إحالة»')
     ok(await page.locator('.visit-patient .badge', { hasText: 'بيانات ناقصة' }).isVisible(), 'جديد: شارة البيانات الناقصة')

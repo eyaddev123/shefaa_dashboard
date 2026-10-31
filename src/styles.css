@@ -382,30 +382,20 @@ td.num { font-variant-numeric: tabular-nums; }
 }
 .urgent-btn:hover { filter: brightness(0.92); }
 
-/* شاشة الدكتور — الطابور كامل: تمييز مَن وصل عمّن لم يصل */
-.doc-queue-legend {
-  margin-inline-start: 12px; font-size: 12px; font-weight: 600;
-  color: var(--muted); display: inline-flex; align-items: center; gap: 6px;
-}
-.doc-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-.doc-dot-here { background: var(--status-good); }
-.doc-dot-away { background: var(--muted); margin-inline-start: 8px; }
-
-/* لم يصل بعد — نخفت الصف كي يبرز الحاضرون */
-.doc-row-away td { opacity: 0.55; }
-
-/* التالي في النداء — يجب أن يُلتقط بلمحة عين */
-.doc-row-next td { background: var(--status-good-bg); font-weight: 700; }
+/* شاشة الدكتور — شارة «التالي» في قائمة الحاضرين */
 .doc-next-tag {
   margin-inline-start: 8px; font-size: 11px; font-weight: 800;
   color: var(--primary); letter-spacing: 0.02em;
 }
 
 /* ═══ نمط الحضور ═══ */
-/* الإسعافي الحاضر: صف أحمر في قائمتي الطبيب والاستقبال. بعد .doc-row-next عمداً:
+/* الإسعافي الحاضر: صف أحمر في قائمتي الطبيب والاستقبال. بعد «التالي» (.dk-wait.is-next) عمداً:
    إسعافيٌّ هو «التالي» يبقى أحمر — الحالة أهمّ من موضعها. */
 .attn-row-urgent td { background: var(--status-bad-bg); color: var(--status-bad); font-weight: 700; }
 .attn-row-urgent td:first-child { box-shadow: inset -4px 0 0 var(--status-bad); }
+/* قائمة الطبيب سطورٌ لا جدول (dk-wait) */
+li.attn-row-urgent { background: var(--status-bad-bg); color: var(--status-bad); font-weight: 700;
+  border-radius: 10px; padding-left: 10px; padding-right: 10px; box-shadow: inset -4px 0 0 var(--status-bad); }
 /* شارة نمط الجلسة في عنوان الشاشة */
 .attn-mode-tag {
   display: inline-block; margin-inline-start: 10px; padding: 2px 10px; border-radius: 999px;
@@ -2200,51 +2190,6 @@ button.danger:hover:not(:disabled) { filter: brightness(1.08); }
 /* سطر تسويةٍ حصّة الشفاء فيه سالبة — تحذيرٌ لا منع */
 .row-warn > td { background: var(--status-pending-bg); }
 
-/* ═══════════════════════════════════════════════════════════════════
-   شاشة الطبيب — أزرار العمل وقائمة الإجراءات
-   الطبيب يستعملها على الهاتف واللوحي أيضاً: الأزرار الضخمة كانت تفيض عن
-   الشاشة الضيّقة ويُكسر نصّها سطرين («إنهاء / الكشف»).
-   ═══════════════════════════════════════════════════════════════════ */
-.doc-actions {
-  display: flex; flex-wrap: wrap; gap: 8px;
-  align-items: center;
-}
-/* مقاسٌ عاديّ، والنصّ سطرٌ واحد دائماً، والأيقونة بجانبه لا فوقه */
-.doc-btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  padding: 9px 16px; font-size: 14px; line-height: 1.2;
-  white-space: nowrap;
-}
-.doc-btn-start {
-  background: var(--status-good); border-color: var(--status-good); color: #fff;
-}
-.doc-btn-start:hover:not(:disabled) { filter: brightness(1.08); background: var(--status-good); }
-/* فاصلٌ مرئيّ قبل «إنهاء الكشف»: الضغطة الخاطئة هنا تُنهي كشفاً لم يبدأ */
-.doc-btn-done { margin-inline-start: 18px; }
-
-/* ── الشاشة الضيّقة: صفّان من زرّين بعرضٍ كامل، ولا فيض ──
-   ⚠️ قاعدةٌ قائمة عند 639px تفرض على آخر أبناء .action-row صفّاً واحداً
-   بـ flex:1 لكل زرّ — فتُحشر الأربعة في سطرٍ واحد يتداخل نصّه ويُقصّ طرفاه.
-   فنُبطلها هنا بتخصيصٍ أعلى (.action-row .doc-actions) لا بـ !important. */
-@media (max-width: 639px) {
-  .action-row > .doc-actions:last-child:not(:first-child) {
-    width: 100%; display: flex; flex-wrap: wrap; gap: 8px;
-  }
-  /* `> button` في القاعدة القديمة يطابق الزرّ مباشرةً، فنرفع التخصيص بفئة
-     الزرّ نفسه لا بـ !important — وإلا بقي flex:1 يحشر الأربعة في سطر. */
-  .action-row > .doc-actions > .doc-btn,
-  .action-row > .doc-actions > * > .doc-btn,
-  .action-row > .doc-actions > button.doc-btn {
-    flex: 1 1 calc(50% - 4px); min-width: 0; width: auto;
-  }
-  .action-row > .doc-actions > * { min-width: 0; }
-  .doc-btn { width: 100%; padding: 11px 8px; font-size: 13.5px; }
-  /* الفاصل يصير عمودياً: الصفّ الثاني منفصلٌ بصرياً عن الأول */
-  .doc-btn-done { margin-inline-start: 0; }
-  /* الشارات تأخذ السطر كاملاً تحت الأزرار */
-  .action-row > .doc-actions > .doc-procs { flex: 1 1 100%; }
-}
-
 /* ═══ «بانتظار العودة» — خرجوا مؤقتاً وسيُنادَون ليُكملوا ═══
    صغيرٌ هادئ تحت «قيد الكشف»: حشوٌ أقلّ وخطٌّ أصغر، فلا يزاحم المريض الحالي.
    ألوان الثيم وحدها (متغيّرات) — يعمل في الفاتح والداكن بلا قواعد إضافية. */
@@ -2277,20 +2222,6 @@ button.danger:hover:not(:disabled) { filter: brightness(1.08); }
 .wr-inline .wr-inline-num { font-weight: 800; color: var(--status-review); margin-inline-start: 6px; }
 .wr-status { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 
-/* ── ما أُضيف على هذا المريض: أسماءٌ فقط، للاطّلاع ── */
-.doc-procs {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
-  margin-top: 10px;
-  /* سطرٌ مستقلّ أسفل الأزرار: وضعُها بينها يشقّ الصفّين على الشاشة الضيّقة */
-  flex: 1 1 100%; width: 100%;
-}
-.doc-procs-label { font-size: 12.5px; color: var(--text-secondary); font-weight: 700; }
-.doc-proc-chip {
-  display: inline-flex; align-items: center; gap: 4px;
-  padding: 3px 10px; border-radius: 999px;
-  font-size: 12.5px; font-weight: 700;
-  color: var(--status-good); background: var(--status-good-bg);
-}
 /* ═══════════════════════════════════════════════════════════════════
    نوافذ التأكيد والإدخال (dialogs.jsx) — بديل window.confirm/alert/prompt
    تلك تكتب «localhost:5173 says» وأزرارها إنكليزية ولا تعرف الثيم.
@@ -3445,3 +3376,328 @@ button.cs-choice.on { background: var(--primary); border-color: var(--primary); 
   .cs-actions { position: sticky; bottom: -16px; padding: 10px 0 4px; background: var(--surface-1); }
   .cs-actions > button { flex: 1 1 0; min-height: 48px; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   شاشة الطبيب (dk-*) — شاشةٌ واحدة، لمس أولاً
+   الجوال (390px) الأساس: كلّ شيء فوق بعضه، والأزرار بحجم الإبهام (48px+).
+   الواسع (≥1100px): الدور وإجراءاتي بعمودين جنب بعض — تمدّدٌ لا ضغط.
+   ألوان الثيم وحدها (متغيّرات) — الفاتح والداكن بلا قواعد إضافية.
+   ═══════════════════════════════════════════════════════════════════ */
+.dk-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.dk-top-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.dk-top-tools select { min-height: 44px; }
+.dk-audio { min-height: 44px; font-size: 13px; }
+button.dk-audio.is-on:disabled { opacity: 1; cursor: default; color: var(--status-good); border-color: transparent; background: var(--status-good-bg); }
+
+.dk-push {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  margin: 0 0 16px; padding: 12px 16px; border-radius: var(--radius);
+  background: var(--status-review-bg); color: var(--text-primary); border: 1px solid var(--border);
+  font-size: 14px; line-height: 1.6;
+}
+.dk-push-actions { display: flex; gap: 8px; }
+.dk-push-actions > button { min-height: 44px; }
+
+.dk-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0 20px; align-items: start; }
+.dk-queue { min-width: 0; }
+
+/* ── تبويبا المرضى: الوحيدان في الشاشة ── */
+.dk-tabs {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; padding: 4px; margin-bottom: 14px;
+  border-radius: 14px; background: var(--surface-1); border: 1px solid var(--border);
+}
+button.dk-tab {
+  min-height: 48px; display: flex; align-items: center; justify-content: center; gap: 8px;
+  background: transparent; color: var(--text-secondary); font-size: 15px; border-radius: 10px;
+}
+button.dk-tab:hover { filter: none; background: var(--primary-soft); }
+button.dk-tab[aria-selected='true'] { background: var(--primary); color: #fff; }
+.dk-tab-count {
+  min-width: 26px; height: 26px; padding: 0 7px; border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 13.5px; font-weight: 800; background: var(--primary-soft); color: var(--accent-text);
+}
+button.dk-tab[aria-selected='true'] .dk-tab-count { background: rgba(255, 255, 255, 0.22); color: #fff; }
+
+/* ── النجم: قيد الكشف ── */
+.card.dk-current { border: 2px solid var(--primary); padding: 18px; overflow: visible; }
+.card.dk-current.is-empty { border-style: dashed; border-width: 1px; }
+.dk-current-label { color: var(--accent-text); margin-bottom: 8px !important; }
+.dk-current-who { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.dk-current-num { font-size: 30px; font-weight: 800; color: var(--primary); line-height: 1.2; }
+.dk-current-name { flex: 1 1 100%; font-size: 19px; font-weight: 700; color: var(--text-primary); }
+.dk-current-note { flex: 1 1 100%; font-size: 13px; color: var(--muted); }
+
+.dk-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.dk-chip {
+  display: inline-flex; align-items: center; gap: 5px; min-height: 30px;
+  padding: 3px 12px; border-radius: 999px; font-size: 13.5px; font-weight: 700;
+}
+.dk-chip.is-paid { color: var(--status-good); background: var(--status-good-bg); }
+.dk-chip.is-unpaid { color: var(--status-pending); background: var(--status-pending-bg); }
+.dk-chip.is-adding { color: var(--text-secondary); background: var(--primary-soft); }
+.dk-spin {
+  width: 12px; height: 12px; border-radius: 50%;
+  border: 2px solid currentColor; border-right-color: transparent;
+  animation: dk-spin 0.8s linear infinite;
+}
+@keyframes dk-spin { to { transform: rotate(360deg); } }
+
+/* ── هرم الأزرار: أساسيٌّ واحد كبير، ثانويٌّ أصغر، وخفيفان ── */
+.dk-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+.dk-btn {
+  min-height: 48px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 10px 12px; font-size: 15px; line-height: 1.2; white-space: nowrap; width: 100%;
+}
+/* الأساسيّ: أكبر زرّ في البطاقة — «بدء الكشف» أخضر، «إنهاء الكشف» بلون النظام الداكن */
+.dk-primary { min-height: 64px; font-size: 19px; font-weight: 800; border-radius: 14px; }
+.dk-btn-start, .dk-btn-start:hover:not(:disabled) { background: var(--status-good); color: #fff; }
+.dk-btn-done { background: var(--teal-800); }
+/* الثانويّ: واضحٌ وأصغر — مُعبّأ خفيفاً لا مصمتاً */
+button.dk-secondary {
+  min-height: 52px; font-size: 16px; background: var(--primary-soft); color: var(--accent-text);
+  border: 1.5px solid var(--primary);
+}
+button.dk-secondary:hover:not(:disabled) { filter: none; background: var(--dropzone-hover); }
+/* الخفيفان (وإنهاءٌ بلا بدء): نصٌّ بإطارٍ رفيع، لا ينافس ما فوقه */
+/* زرّان في الصفّ على الجوال؛ والوحيد في صفّه («إنهاء» بلا بدء) في الوسط لا بجانب فراغ */
+.dk-tertiary { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.dk-tertiary > * { flex: 0 1 calc(50% - 4px); min-width: 0; }
+@media (min-width: 640px) { .dk-tertiary > * { flex: 1 1 0; } }
+button.dk-light { min-height: 48px; font-size: 13.5px; font-weight: 600; color: var(--text-secondary);
+  border: 1px solid var(--border); background: transparent; }
+
+.dk-tap { min-height: 48px; padding: 10px 18px; }
+.dk-next-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.dk-next-who { font-size: 18px; font-weight: 700; }
+.dk-next-note { color: var(--muted); font-size: 13px; }
+.dk-next-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.dk-hint { font-size: 12.5px; color: var(--muted); margin: 10px 0 0; }
+
+/* الحاضرون: أهدأ من البطاقة النجمة — قائمةٌ بسطورٍ بارتفاع لمسة */
+.dk-wait-list, .dk-book-list { list-style: none; margin: 0; padding: 0; }
+.dk-wait, .dk-book {
+  display: flex; align-items: center; gap: 12px; min-height: 48px;
+  padding: 6px 4px; border-top: 1px solid var(--grid);
+}
+.dk-wait:first-child, .dk-book:first-child { border-top: none; }
+.dk-wait.is-next { background: var(--status-good-bg); border-radius: 10px; padding: 6px 10px; }
+.dk-wait-num { min-width: 34px; font-weight: 800; color: var(--accent-text); font-variant-numeric: tabular-nums; }
+.dk-wait-name, .dk-book-name { flex: 1 1 auto; min-width: 0; }
+.dk-book-time { min-width: 52px; font-weight: 800; color: var(--accent-text); font-variant-numeric: tabular-nums; }
+.dk-book-ref { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+
+/* ── «أعمالي»: المكان الوحيد للأرقام ── */
+.dk-chips-filter { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+button.dk-filter {
+  min-height: 48px; padding: 8px 20px; border-radius: 999px; font-size: 15px;
+  background: var(--surface-1); color: var(--text-secondary); border: 1px solid var(--border);
+}
+button.dk-filter:hover { filter: none; background: var(--primary-soft); }
+button.dk-filter.is-on { background: var(--primary); color: #fff; border-color: var(--primary); }
+.dk-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+.dk-stat {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  min-height: 110px; padding: 14px; border-radius: var(--radius);
+  background: var(--surface-1); border: 1px solid var(--border); box-shadow: var(--shadow-card);
+}
+.dk-stat-n { font-size: 40px; font-weight: 800; line-height: 1.1; color: var(--primary); font-variant-numeric: tabular-nums; }
+.dk-stat-l { font-size: 15px; font-weight: 700; color: var(--text-secondary); }
+.dk-work-range { font-size: 12.5px; font-weight: 600; color: var(--muted); margin-inline-start: auto; }
+.dk-group-count {
+  min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px; font-size: 12px;
+  display: inline-flex; align-items: center; justify-content: center; background: var(--primary-soft);
+}
+.dk-lines { list-style: none; margin: 0; padding: 0; }
+.dk-line {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-height: 52px;
+  padding: 8px 12px; border-radius: 10px; margin-top: 6px;
+}
+.dk-line.is-paid { background: var(--status-good-bg); }
+.dk-line.is-unpaid { background: var(--status-pending-bg); }
+.dk-line-main { flex: 1 1 160px; min-width: 0; display: flex; flex-direction: column; }
+.dk-line-proc { font-weight: 700; }
+.dk-line-patient { font-size: 12.5px; color: var(--text-secondary); }
+.dk-line-share { font-weight: 800; font-size: 14.5px; font-variant-numeric: tabular-nums; }
+button.dk-line-x { min-height: 48px; padding: 8px 14px; color: var(--status-bad); }
+.dk-work-total {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin-top: 14px; padding-top: 12px; border-top: 2px solid var(--grid); font-size: 16px; font-weight: 700;
+}
+.dk-work-total strong { font-size: 22px; color: var(--primary); }
+.dk-work-pending h3 { color: var(--status-pending); }
+
+/* ── ورقة الإضافة: الإجراءات أزرارٌ كبيرة مباشرة، لا قائمة منسدلة ── */
+.dk-pick-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+button.dk-pick {
+  min-height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  padding: 10px 8px; font-size: 15.5px; line-height: 1.3; white-space: normal; text-align: center;
+  background: var(--primary-soft); color: var(--accent-text); border: 1px solid var(--border);
+}
+button.dk-pick:hover:not(:disabled) { filter: none; background: var(--dropzone-hover); }
+.dk-pick-tag { font-size: 11.5px; font-weight: 700; color: var(--status-good); }
+/* المختار: يتلوّن وعليه ✓ — تحديدٌ متعدد بشكل أزرار */
+button.dk-pick { position: relative; }
+button.dk-pick.is-on, button.dk-pick.is-on:hover:not(:disabled) {
+  background: var(--primary); color: #fff; border-color: var(--primary);
+}
+.dk-pick-check {
+  position: absolute; top: 6px; right: 8px; width: 22px; height: 22px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: rgba(255, 255, 255, 0.25); font-size: 13px; font-weight: 800;
+}
+button.dk-pick.is-bad { box-shadow: 0 0 0 2px var(--status-bad); }
+.dk-sheet-error { margin: 0 0 10px; }
+/* المختار تحت الشبكة: لكلّ إجراءٍ «+ مواد» خاصّةٌ به */
+.dk-sel { list-style: none; margin: 14px 0 0; padding: 10px 0 0; border-top: 1px solid var(--grid); }
+.dk-sel-item + .dk-sel-item { margin-top: 6px; }
+.dk-sel-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 48px; }
+.dk-sel-name { font-weight: 700; }
+button.dk-sel-mats { min-height: 44px; padding: 6px 14px; font-size: 13px; }
+.dk-mats-body { margin-top: 8px; }
+button.dk-confirm { width: 100%; min-height: 56px; font-size: 17px; }
+
+@media (min-width: 640px) {
+  .dk-pick-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  /* الأساسيّ والثانويّ جنباً إلى جنب، والأساسيّ أعرض */
+  .dk-actions { display: grid; grid-template-columns: 2fr 1fr; }
+  .dk-actions .dk-primary { grid-column: 1; grid-row: 1; }
+  .dk-actions .dk-secondary { grid-column: 2; grid-row: 1; min-height: 64px; }
+  .dk-actions .dk-tertiary { grid-column: 1 / -1; }
+}
+/* الواسع: عمودٌ واحد بعرضٍ مقروء — لا عمود أرقامٍ بجانب الدور بعد «أعمالي» */
+@media (min-width: 1100px) {
+  .dk-grid { max-width: 920px; }
+}
+
+/* ═══ الورقة السفلية (BottomSheet) — تُسحب لتحت فتُغلق ═══ */
+.bs-backdrop {
+  position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 1000;
+  display: flex; align-items: flex-end; justify-content: center; background: rgba(0, 0, 0, 0.45);
+}
+.bs-card {
+  width: 100%; max-width: 640px; max-height: 88vh; display: flex; flex-direction: column;
+  background: var(--surface-1); color: var(--text-primary);
+  border-radius: 20px 20px 0 0; border: 1px solid var(--border); border-bottom: none;
+  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.3);
+  transition: transform 0.18s ease-out; outline: none;
+  animation: bs-in 0.2s ease-out;
+}
+.bs-card.is-dragging { transition: none; }
+@keyframes bs-in { from { transform: translateY(40px); opacity: 0.6; } to { transform: none; opacity: 1; } }
+.bs-grab { padding: 8px 18px 0; cursor: grab; touch-action: none; }
+.bs-handle { display: block; width: 44px; height: 5px; margin: 0 auto 8px; border-radius: 999px; background: var(--grid); }
+.bs-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.bs-title { margin: 0; font-size: 17px; }
+.bs-sub { margin: 4px 0 0; font-size: 13px; color: var(--muted); line-height: 1.6; }
+button.bs-x { min-width: 44px; min-height: 44px; padding: 0; font-size: 18px; }
+.bs-body { padding: 12px 18px 18px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.bs-foot { padding: 12px 18px; border-top: 1px solid var(--grid); }
+@media (prefers-reduced-motion: reduce) { .bs-card { animation: none; transition: none; } .dk-spin { animation: none; } }
+
+/* ═══ الدفع: «بانتظار المحاسبة» / «مدفوع» ═══ */
+.pay-badge {
+  display: inline-flex; align-items: center; gap: 4px; margin-inline-start: 6px;
+  padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 800; white-space: nowrap;
+}
+.pay-badge.is-unpaid { color: var(--status-pending); background: var(--status-pending-bg); }
+.pay-badge.is-paid { color: var(--status-good); background: var(--status-good-bg); }
+button.pay-btn { min-height: 40px; padding: 6px 14px; font-size: 13px; background: var(--status-good); color: #fff; }
+
+/* ═══ الزرّ العائم: «بانتظار المحاسبة» — في كلّ صفحة للاستقبال والمشرفة ═══ */
+button.unpaid-fab {
+  position: fixed; bottom: 18px; left: 18px; z-index: 900;
+  min-height: 52px; display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px;
+  border-radius: 999px; font-size: 14.5px;
+  background: var(--status-pending); color: #fff; box-shadow: var(--shadow-pop);
+}
+.unpaid-fab-count {
+  min-width: 26px; height: 26px; padding: 0 7px; border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: rgba(255, 255, 255, 0.25); font-weight: 800;
+}
+button.unpaid-fab.is-fresh { animation: unpaid-pulse 0.8s ease-out 3; }
+@keyframes unpaid-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(180, 83, 9, 0.55); }
+  100% { box-shadow: 0 0 0 18px rgba(180, 83, 9, 0); }
+}
+.unpaid-panel { max-width: 560px; max-height: 86vh; overflow-y: auto; }
+.unpaid-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.unpaid-head h3 { margin: 0; }
+.unpaid-total { font-weight: 800; color: var(--status-pending); }
+.unpaid-sub { font-size: 12.5px; color: var(--muted); margin: 4px 0 10px; }
+.unpaid-list { list-style: none; margin: 0; padding: 0; }
+.unpaid-item {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px;
+  padding: 10px 12px; margin-top: 8px; border-radius: 12px; background: var(--status-pending-bg);
+}
+.unpaid-who { flex: 1 1 180px; min-width: 0; display: flex; flex-direction: column; }
+.unpaid-patient { font-weight: 800; }
+.unpaid-meta { font-size: 12.5px; color: var(--text-secondary); }
+.unpaid-proc { display: flex; flex-direction: column; align-items: flex-end; font-size: 13.5px; }
+button.unpaid-pay { min-height: 48px; padding: 8px 16px; background: var(--status-good); color: #fff; }
+
+/* ═══ شبكة الأمان: نداءٌ بلا «بدء كشف» منذ دقيقتين ═══ */
+.unstarted-alert {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px;
+  margin: 0 0 14px; padding: 12px 16px; border-radius: var(--radius);
+  background: var(--status-bad-bg); color: var(--status-bad); border: 1px solid var(--status-bad);
+  font-weight: 800; font-size: 15px;
+}
+.unstarted-who { font-weight: 600; font-size: 13px; color: var(--text-secondary); }
+
+/* ═══ مودال الإغلاق: قسم «بانتظار المحاسبة» (للعلم) ═══ */
+.cs-unpaid { border-inline-start: 3px solid var(--status-pending); padding-inline-start: 10px; }
+
+/* ═══ المراجعة: «غير المدفوع — كلّ الأيام» أعلى الصفحة ═══ */
+.rev-unpaid {
+  margin: 12px 0 16px; padding: 12px 14px; border-radius: 12px;
+  background: var(--status-pending-bg); border: 1px solid var(--border);
+}
+.rev-unpaid h4 { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 14.5px; color: var(--status-pending); }
+.rev-unpaid-total { margin-inline-start: auto; font-weight: 800; }
+.rev-unpaid-none { margin: 10px 0; font-size: 13px; color: var(--status-good); font-weight: 700; }
+.rev-flag.is-unpaid.is-on { background: var(--status-pending-bg); color: var(--status-pending); }
+
+/* ═══ شريط «إجراءات اليوم» — سفليٌّ ثابت فوق المحتوى، يتمدّد لفوق ═══
+   الجوال واللوحي: بعرض الشاشة. الواسع (≥1024): بعرض المحتوى، لا يغطّي القائمة الجانبية (250px يميناً).
+   المحتوى يُدفع بارتفاع الشريط المسكّر فلا يغطّي أزرار المريض الحالي. أعدادٌ وأسماء — لا مبالغ. */
+.dk { padding-bottom: 84px; }
+.dk-today {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 950;
+  background: var(--surface-1); color: var(--text-primary);
+  border-top: 1px solid var(--border); border-radius: 16px 16px 0 0;
+  box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.16);
+}
+@media (min-width: 1024px) { .dk-today { right: 250px; } }
+button.dk-today-head {
+  width: 100%; min-height: 56px; display: flex; align-items: center; gap: 10px;
+  padding: 8px 16px 10px; background: transparent; color: var(--text-primary);
+  border-radius: 16px 16px 0 0; text-align: start; position: relative; touch-action: none;
+}
+button.dk-today-head:hover { filter: none; }
+.dk-today-grip {
+  position: absolute; top: 5px; left: 50%; margin-left: -20px;
+  width: 40px; height: 4px; border-radius: 999px; background: var(--grid);
+}
+.dk-today-sum { flex: 1 1 auto; display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; font-size: 14.5px; font-weight: 700; }
+.dk-dot { display: inline-block; width: 11px; height: 11px; border-radius: 50%; }
+.dk-dot.is-paid { background: var(--status-good); }
+.dk-dot.is-unpaid { background: var(--status-pending); margin-inline-start: 8px; }
+.dk-today-caret { color: var(--muted); font-size: 15px; }
+/* التمدّد بسلاسة حتى نصف الشاشة، وتمريرٌ داخلي */
+.dk-today-body {
+  max-height: 0; overflow: hidden; transition: max-height 0.25s ease-out;
+  padding: 0 16px;
+}
+.dk-today.is-open .dk-today-body { max-height: 50vh; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: 14px; }
+.dk-today-list { list-style: none; margin: 0; padding: 0; }
+.dk-today-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 52px;
+  padding: 6px 0; border-top: 1px solid var(--grid);
+}
+.dk-today-item:first-child { border-top: none; }
+.dk-today-who { display: flex; flex-direction: column; min-width: 0; }
+.dk-today-patient { font-weight: 700; }
+.dk-today-proc { font-size: 13px; color: var(--text-secondary); }
+@media (prefers-reduced-motion: reduce) { .dk-today-body { transition: none; } }

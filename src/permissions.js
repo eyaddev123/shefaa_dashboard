@@ -34,6 +34,8 @@ export const canSeeProceduresPage = (role) =>
 
 // إضافة إجراء على حجز وإزالته — الاستقبال ومسؤول العيادات (الخادم يحصر الاستقبال بيوم الجلسة)
 export const canEditAppointmentProcedures = (role) => role === 'clinic_admin' || role === 'clinic_reception'
+// «تمت المحاسبة» على إجراءٍ أضافه الطبيب: من يقبض — مرآة PAYMENT_TAKERS في الخادم
+export const canTakePayment = (role) => role === 'clinic_admin' || role === 'clinic_reception'
 
 // صفحة إعداد الطابعة: الاستقبال يقرؤها ويُعدّ جهازه (الإعداد محلّيٌّ لا يمسّ أحداً)،
 // والمشرف يقرؤها ليساعد. ولا علاقة لها بالإعداد العام (في «الإعدادات»).

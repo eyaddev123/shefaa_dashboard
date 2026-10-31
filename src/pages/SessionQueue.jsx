@@ -1014,6 +1014,8 @@ function FeeCell({ appt }) {
   // أيّ إجراءٍ أُضيف وكم يُستوفى زيادةً — وإلا مرّ المريض بلا دفع الفرق.
   const live = (appt.procedures || []).filter((l) => !l.removed_at)
   const names = live.map((l) => l.name).join('، ')
+  // إجراءات الطبيب التي لم تُقبض بعد — «تمت المحاسبة» من صفحة الزيارة أو الزرّ العائم
+  const unpaid = live.filter((l) => !l.paid_at).length
   return (
     <span className="fee-breakdown">
       <span>{VISIT_TYPES[appt.visit_type] || 'زيارة'} {fmtMoney(appt.fee)}</span>
@@ -1032,6 +1034,7 @@ function FeeCell({ appt }) {
           إجراء: {names} — خذي {fmtMoney(r ? appt.patient_total - appt.patient_fee : appt.procedures_total)} زيادة
         </span>
       )}
+      {unpaid > 0 && <span className="pay-badge is-unpaid">⏳ بانتظار المحاسبة {unpaid.toLocaleString('ar-SY')}</span>}
     </span>
   )
 }
@@ -1193,7 +1196,7 @@ function ProceduresTable({ data, rows, all, attendance }) {
               <td className="num" data-label="الدور"><TurnCell appt={a} attendance={attendance} /></td>
               <td className="rt-title"><VisitLink appt={a} /></td>
               <td data-label="الدكتور">{data.doctor_name}</td>
-              <td className="rt-full" data-label="الإجراءات">{liveProcedures(a).map((l) => l.name).join('، ')}</td>
+              <td className="rt-full" data-label="الإجراءات">{liveProcedures(a).map((l) => (l.paid_at ? l.name : `${l.name} ⏳`)).join('، ')}</td>
               <td className="num" data-label="المبلغ" style={{ whiteSpace: 'nowrap' }}>{fmtMoney(a.procedures_total)}</td>
               <td className="rt-badge">{appointmentBadge(a.status, true)}</td>
             </ExtraRow>
@@ -1502,6 +1505,33 @@ function useRestoreScroll(sessionId, ready) {
   }, [sessionId, ready])
 }
 
+// ═══ شبكة الأمان: نداءٌ بلا «بدء كشف» منذ دقيقتين ═══
+// الرنّة عند الطبيب قد لا تُسمع (صوتٌ مكتوم، شاشةٌ مطفأة). فإن نادى النظامُ مريضاً ومرّت دقيقتان
+// بلا «بدء الكشف»، تُنبَّه الاستقبال لتتواصل معه — ويختفي التنبيه لحظة يبدأ الكشف.
+// نمط الحضور وحده: «بدء الكشف» زرٌّ فيه لا في نمط الخانات. الوقت بساعة الخادم (offset).
+export const UNSTARTED_ALERT_MS = 2 * 60 * 1000
+export const unstartedCall = (data, now = Date.now()) => {
+  if (!isAttendanceSession(data)) return null
+  const cur = (data?.appointments || []).find((a) => a.status === 'in_service')
+  if (!cur || cur.started_at || !cur.served_at) return null
+  return now + serverOffsetOf(data) - new Date(cur.served_at).getTime() >= UNSTARTED_ALERT_MS ? cur : null
+}
+function UnstartedAlert({ data }) {
+  const [, tick] = useState(0)
+  useEffect(() => {
+    const t = setInterval(() => tick((n) => n + 1), 10000)
+    return () => clearInterval(t)
+  }, [])
+  const cur = unstartedCall(data)
+  if (!cur) return null
+  return (
+    <div className="unstarted-alert" role="alert">
+      ⏰ {data.doctor_name} لم يستلم مريضه — تواصلي معه
+      <span className="unstarted-who">(الدور {cur.arrival_number ?? cur.queue_number} — {cur.full_name})</span>
+    </div>
+  )
+}
+
 export default function SessionQueue() {
   const { id } = useParams()
   const [data, setData] = useState(null)
@@ -1573,6 +1603,7 @@ export default function SessionQueue() {
       {toast}
 
       <FlowModeMismatch data={data} onChanged={load} onError={showToast} />
+      <UnstartedAlert data={data} />
 
       {attendance ? (
         <>

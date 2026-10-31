@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { api, fmtMoney, todayLocal, toLatinDigits } from '../api.js'
+import { api, fmtMoney, fmtDateTime, todayLocal, toLatinDigits, openStaffStream } from '../api.js'
 import MaterialsEditor, { qtyValid, toPayload, fmtQty, materialsSummary } from '../components/MaterialsEditor.jsx'
 
 // ═══ المراجعة: كلّ إجراءٍ بموادّه وحصّتيه ═══
@@ -9,12 +9,90 @@ import MaterialsEditor, { qtyValid, toPayload, fmtQty, materialsSummary } from '
 //   أصفر — الدكتور بلا قاعدة لحظة الإضافة، فحصّته صفر: اضبط بروفايله
 // وضبطُ القاعدة لاحقاً لا يمسّ الأسطر القائمة (لقطة) — الإشارة تقول ذلك صراحةً.
 // مشرف العيادات يصحّح مواد أيّ سطر في أيّ وقت، وكلُّ تغييرٍ له أثر.
+//
+// ★ «غير المدفوع — كلّ الأيام» أعلى الصفحة: إجراءاتٌ أضافها الأطباء ولم تُقبض. هنا لا في
+//   تبويبٍ مستقلّ: المشرفة تراجع الأسطر في هذه الصفحة أصلاً، والقائمة لا تتبع مرشِّح التاريخ —
+//   فهي الضمان ضدّ الإغلاق التلقائي الذي لا يمرّ على مودال الإغلاق. وفي جدول المدى شارة
+//   «غير مدفوع» ومرشِّحها: السطر يُعرض هنا ولا يدخل الجرد ولا المستحقات حتى يُقبض.
 
 const FLAGS = [
   { key: '', label: 'الكل' },
   { key: 'negative', label: 'الشفاء سالبة', cls: 'is-neg' },
   { key: 'no_rule', label: 'بلا قاعدة', cls: 'is-norule' },
+  { key: 'unpaid', label: 'غير مدفوع', cls: 'is-unpaid' },
 ]
+
+// ═══ غير المدفوع عبر الأيام — مع «تعليم مدفوع» و«إزالة بسبب» للمشرفة ═══
+function UnpaidAcrossDays({ canEdit, showToast, onChanged }) {
+  const [data, setData] = useState(null)
+  const [removing, setRemoving] = useState(null)
+  const [reason, setReason] = useState('')
+  const [busy, setBusy] = useState(null)
+  const load = () => api.clinic.unpaidProcedures().then(setData).catch((e) => showToast(e.message))
+  useEffect(() => {
+    load()
+    let timer = null
+    const close = openStaffStream((name) => {
+      if (name !== 'procedure') return
+      clearTimeout(timer); timer = setTimeout(load, 300)
+    })
+    return () => { clearTimeout(timer); close() }
+  }, [])
+  const done = (msg) => { showToast(msg, 'success', 3000); setRemoving(null); setReason(''); load(); onChanged() }
+  const pay = async (l) => {
+    setBusy(l.id)
+    try { await api.clinic.markProcedurePaid(l.appointment_id, l.id); done(`عُلّم «${l.name}» مدفوعاً`) }
+    catch (ex) { showToast(ex.message) } finally { setBusy(null) }
+  }
+  const remove = async (l) => {
+    if (!reason.trim()) return
+    setBusy(l.id)
+    try { await api.clinic.removeAppointmentProcedure(l.appointment_id, l.id, reason.trim()); done(`أُزيل «${l.name}»`) }
+    catch (ex) { showToast(ex.message) } finally { setBusy(null) }
+  }
+  if (!data) return null
+  if (data.lines.length === 0) return <p className="rev-unpaid-none">✓ لا إجراءات غير مدفوعة.</p>
+  return (
+    <div className="rev-unpaid" role="region" aria-labelledby="rev-unpaid-title">
+      <h4 id="rev-unpaid-title">
+        غير المدفوع — كلّ الأيام <span className="rev-flag-n">{data.lines.length}</span>
+        <span className="rev-unpaid-total">{fmtMoney(data.total)}</span>
+      </h4>
+      <table className="rev-table rtable">
+        <thead><tr><th>المريض</th><th>الدكتور</th><th>الإجراء</th><th>المبلغ</th><th>منذ</th><th></th></tr></thead>
+        <tbody>
+          {data.lines.map((l) => (
+            <tr key={l.id}>
+              <td className="rt-title">{l.patient_name}</td>
+              <td data-label="الدكتور">{l.doctor_name}</td>
+              <td data-label="الإجراء">{l.name}</td>
+              <td className="num" data-label="المبلغ">{fmtMoney(l.price)}</td>
+              <td data-label="منذ"><span dir="ltr">{fmtDateTime(l.added_at)}</span>
+                {l.session_date !== data.today && <span className="pay-badge is-unpaid">من يومٍ سابق</span>}</td>
+              <td className="rt-actions" style={{ whiteSpace: 'nowrap' }}>
+                {canEdit && removing !== l.id && (
+                  <>
+                    <button className="pay-btn" disabled={busy === l.id} onClick={() => pay(l)}>تعليم مدفوع</button>{' '}
+                    <button className="ghost" style={{ padding: '6px 12px' }} disabled={busy === l.id}
+                      onClick={() => { setRemoving(l.id); setReason('') }}>إزالة</button>
+                  </>
+                )}
+                {removing === l.id && (
+                  <span className="proc-remove-form">
+                    <input value={reason} autoFocus placeholder="سبب الإزالة (إلزامي)" aria-label="سبب الإزالة"
+                      onChange={(e) => setReason(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') remove(l) }} />
+                    <button disabled={busy === l.id || !reason.trim()} onClick={() => remove(l)}>تأكيد الإزالة</button>
+                    <button className="ghost" onClick={() => setRemoving(null)}>إلغاء</button>
+                  </span>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
 
 function History({ lineId }) {
   const [rows, setRows] = useState(null)
@@ -122,6 +200,8 @@ export default function ProcedureReview({ canEdit, showToast }) {
         </button>
       </div>
 
+      <UnpaidAcrossDays canEdit={canEdit} showToast={showToast} onChanged={load} />
+
       <div className="inline rev-filters">
         <div className="field"><label>من</label>
           <input type="date" value={from} onChange={(e) => { setFrom(e.target.value); if (e.target.value > to) setTo(e.target.value) }} /></div>
@@ -137,7 +217,8 @@ export default function ProcedureReview({ canEdit, showToast }) {
       {/* العدّادان ظاهران دائماً: ما يحتاج انتباهاً لا يختبئ خلف مرشِّح */}
       <div className="inline rev-flags">
         {FLAGS.map((f) => {
-          const n = f.key === 'negative' ? counts.negative : f.key === 'no_rule' ? counts.no_rule : counts.lines
+          const n = f.key === 'negative' ? counts.negative : f.key === 'no_rule' ? counts.no_rule
+            : f.key === 'unpaid' ? counts.unpaid : counts.lines
           return (
             <button key={f.key} type="button" aria-pressed={flag === f.key}
               className={`rev-flag ${f.cls || ''}${flag === f.key ? ' is-on' : ''}`}
@@ -177,7 +258,8 @@ export default function ProcedureReview({ canEdit, showToast }) {
                       ? `${l.arrival_number != null ? `#${l.arrival_number} · ` : ''}حجز ${l.queue_number}`
                       : `#${l.queue_number}`}</span></td>
                     <td>{l.doctor_name}</td>
-                    <td>{l.name_snapshot}</td>
+                    <td>{l.name_snapshot}
+                      {l.unpaid && <span className="pay-badge is-unpaid">غير مدفوع</span>}</td>
                     <td className="num">{fmtMoney(l.price_snapshot)}</td>
                     <td className="rev-mats">
                       <strong>{fmtMoney(l.materials_cost)}</strong>

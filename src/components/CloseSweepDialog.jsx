@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { api } from '../api.js'
+import { api, fmtMoney } from '../api.js'
 import { Modal } from './inventory/shared.jsx'
 
 // ═══ الإغلاق الكانس — نافذة التأكيد ═══
@@ -11,6 +11,9 @@ import { Modal } from './inventory/shared.jsx'
 //   - الخارج مؤقتاً لا يُكنس بصمت: سطرٌ لكلٍّ منهم بخيارين، والتأكيد معطّل حتى يُختار.
 //   - التأكيد يحمل ما رآه الموظف (expected): تغيّر الوضع أثناء النافذة ⇒ ملخّصٌ جديد هنا
 //     (CLOSE_CHANGED) بدل كنس ما لم يُرَ.
+//   - إجراءاتٌ بانتظار المحاسبة (أضافها الطبيب): قسمٌ للعلم وحده — الإغلاق لا يعلّمها مدفوعة ولا
+//     يحذفها، تبقى في الزرّ العائم وقائمة المشرفة. وتظهر النافذة لأجلها ولو لا مرضى معلَّقين.
+//   - الخارج مؤقتاً وعليه إجراءٌ مدفوع: «لم يحضر» معطَّل (الخادم يرفضه: PAID_PROCEDURE_ON_BOOKING).
 
 // «مريضٌ واحد، مريضان، ٣ مرضى، ١١ مريضاً»
 const patientsAr = (n) => n === 1 ? 'مريضٌ واحد' : n === 2 ? 'مريضان'
@@ -48,6 +51,7 @@ export default function CloseSweepDialog({ session, pending: initial, onDone, on
   const [changed, setChanged] = useState(false)
 
   const { in_service: inService, arrived, not_arrived: notArrived, waiting_return: returning } = pending
+  const unpaid = pending.unpaid_procedures || []
   const allIds = [...inService, ...arrived, ...notArrived, ...returning].map((p) => p.id)
   const unchosen = returning.filter((p) => !choices[p.id]).length
 
@@ -60,7 +64,7 @@ export default function CloseSweepDialog({ session, pending: initial, onDone, on
       })
       onDone()
     } catch (ex) {
-      if (ex.data && ex.data.pending && (ex.data.code === 'CLOSE_CHANGED' || ex.data.code === 'RETURN_CHOICE_REQUIRED')) {
+      if (ex.data && ex.data.pending && ['CLOSE_CHANGED', 'RETURN_CHOICE_REQUIRED', 'PAID_PROCEDURE_ON_BOOKING'].includes(ex.data.code)) {
         // الوضع تغيّر: الملخّص الجديد مكان القديم، والاختيارات تبقى لمن بقي
         setPending(ex.data.pending)
         setChanged(ex.data.code === 'CLOSE_CHANGED')
@@ -74,7 +78,8 @@ export default function CloseSweepDialog({ session, pending: initial, onDone, on
 
   return (
     <Modal title={`إغلاق العيادة — ${session.doctor_name}`} onClose={onClose} busy={busy} sheet
-      subtitle="في العيادة مرضى لم تُغلق زياراتهم. راجع ما سيحدث لكلٍّ منهم قبل الإغلاق:">
+      subtitle={allIds.length ? 'في العيادة مرضى لم تُغلق زياراتهم. راجع ما سيحدث لكلٍّ منهم قبل الإغلاق:'
+        : 'لا مرضى معلَّقين — لكن في العيادة إجراءات لم تُحاسَب بعد:'}>
       <div className="cs-body">
         {changed && <p className="cs-changed" role="status">تغيّر وضع العيادة منذ فُتحت النافذة — هذا الملخّص المحدَّث.</p>}
 
@@ -98,17 +103,35 @@ export default function CloseSweepDialog({ session, pending: initial, onDone, on
                 <div key={v} className="cs-choice-cell">
                   <button type="button" role="radio" aria-checked={choices[p.id] === v}
                     aria-describedby={v === 'no_show' ? `cs-cash-${p.id}` : undefined}
-                    className={`cs-choice${choices[p.id] === v ? ' on' : ''}`} disabled={busy}
+                    className={`cs-choice${choices[p.id] === v ? ' on' : ''}`}
+                    disabled={busy || (v === 'no_show' && p.has_paid_procedure)}
                     onClick={() => setChoices((c) => ({ ...c, [p.id]: v }))}>{label}</button>
                   {/* الخارج مؤقتاً حضر ودفع: «لم يحضر» يُسقط أجره من الجرد — يُقال قبل الاختيار لا بعده */}
                   {v === 'no_show' && (
-                    <p id={`cs-cash-${p.id}`} className="cs-note cs-cash-note">حضر ودفع عند الحضور — هذا الخيار يُخرج رسمه من جرد الصندوق.</p>
+                    <p id={`cs-cash-${p.id}`} className="cs-note cs-cash-note">
+                      {p.has_paid_procedure ? 'عليه إجراءٌ مدفوع — لا يُعلَّم «لم يحضر» (أزيلي الإجراء أولاً).'
+                        : 'حضر ودفع عند الحضور — هذا الخيار يُخرج رسمه من جرد الصندوق.'}
+                    </p>
                   )}
                 </div>
               ))}
             </div>
           </div>
         ))}
+
+        {unpaid.length > 0 && (
+          <div className="cs-line cs-group cs-unpaid">
+            <p>
+              <b>إجراءات بانتظار المحاسبة</b> ({unpaid.length.toLocaleString('ar-SY')}) —{' '}
+              <span className="cs-effect">للعلم: الإغلاق لا يعلّمها مدفوعة ولا يحذفها — تبقى معلّقة.</span>
+            </p>
+            <ul className="cs-names">
+              {unpaid.map((l) => (
+                <li key={l.id}>{who(l)} — {l.name} <span className="cs-num">{fmtMoney(l.price)}</span></li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {err && <p className="error cs-error">{err}</p>}
 

@@ -378,6 +378,18 @@ export const api = {
     setLineMaterials: (appointmentId, lineId, body) =>
       http(`/clinic/appointments/${appointmentId}/procedures/${lineId}/materials`,
         { method: 'PUT', body: JSON.stringify(body) }),
+    // عدّة إجراءاتٍ بكبسةٍ واحدة: items [{procedure_id, materials}] — كلّها أو لا شيء (409 يسمّي الرافض)
+    addAppointmentProcedures: (appointmentId, items) =>
+      http(`/clinic/appointments/${appointmentId}/procedures/batch`, { method: 'POST', body: JSON.stringify({ items }) }),
+    // «تمت المحاسبة»: سطرٌ أضافه الطبيب صار مقبوضاً (الاستقبال والمشرفة)
+    markProcedurePaid: (appointmentId, lineId) =>
+      http(`/clinic/appointments/${appointmentId}/procedures/${lineId}/mark-paid`, { method: 'POST' }),
+    // بانتظار المحاسبة: الاستقبال لجلسات اليوم، والمشرفة لكلّ الأيام
+    unpaidProcedures: () => http('/clinic/procedures/unpaid'),
+    // شاشة الطبيب: أسطر مرضاه اليوم بحصّته، وعدد مرّات كلّ إجراء (لترتيب أزرار الإضافة)
+    myProcedures: (date) => http(`/clinic/my-procedures${date ? `?date=${date}` : ''}`),
+    // «أعمالي»: period = today | week | month — المرضى والإجراءات وحصّته المقبوضة (حساب المستحقات)
+    myWork: (period) => http(`/clinic/my-work?period=${period}`),
     removeAppointmentProcedure: (appointmentId, lineId, reason) =>
       http(`/clinic/appointments/${appointmentId}/procedures/${lineId}/remove`,
         { method: 'POST', body: JSON.stringify({ reason }) }),
@@ -450,6 +462,12 @@ export const api = {
   },
 
   // ═══ الإشعارات داخل النظام — لكلّ مستخدمٍ ما وُجّه إليه ═══
+  // تنبيه الطبيب خارج الصفحة (Web Push) — enabled:false حين لا مفاتيح على الخادم
+  push: {
+    key: () => http('/push/key'),
+    subscribe: (sub) => http('/push/subscribe', { method: 'POST', body: JSON.stringify(sub) }),
+    unsubscribe: (endpoint) => http('/push/unsubscribe', { method: 'POST', body: JSON.stringify({ endpoint }) }),
+  },
   notifications: {
     list: () => http('/notifications'),
     read: (id) => http(`/notifications/${id}/read`, { method: 'POST' }),

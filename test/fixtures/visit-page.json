@@ -147,7 +147,9 @@
        "off_specialty": false,
        "materials": [],
        "referral_discount": 0,
-       "patient_price": 15000
+       "patient_price": 15000,
+       "paid_at": "2026-10-25T07:52:37.691224+03:00",
+       "added_source": "reception"
       }
      ],
      "procedures_total": 15000,
@@ -362,7 +364,9 @@
         }
        ],
        "referral_discount": 0,
-       "patient_price": 100000
+       "patient_price": 100000,
+       "paid_at": "2026-10-25T07:52:37.865665+03:00",
+       "added_source": "reception"
       },
       {
        "id": 6,
@@ -384,7 +388,9 @@
         }
        ],
        "referral_discount": 0,
-       "patient_price": 15000
+       "patient_price": 15000,
+       "paid_at": "2026-10-25T07:52:37.873434+03:00",
+       "added_source": "reception"
       },
       {
        "id": 7,
@@ -399,7 +405,9 @@
        "off_specialty": false,
        "materials": [],
        "referral_discount": 0,
-       "patient_price": 30000
+       "patient_price": 30000,
+       "paid_at": "2026-10-25T07:52:37.879394+03:00",
+       "added_source": "reception"
       }
      ],
      "procedures_total": 115000,
@@ -464,7 +472,9 @@
        "off_specialty": false,
        "materials": [],
        "referral_discount": 0,
-       "patient_price": 15000
+       "patient_price": 15000,
+       "paid_at": "2026-10-25T07:52:37.846341+03:00",
+       "added_source": "reception"
       }
      ],
      "procedures_total": 15000,
@@ -928,7 +938,9 @@
         }
        ],
        "referral_discount": 30000,
-       "patient_price": 0
+       "patient_price": 0,
+       "paid_at": "2026-10-25T07:52:37.787832+03:00",
+       "added_source": "reception"
       },
       {
        "id": 3,
@@ -956,7 +968,9 @@
         }
        ],
        "referral_discount": 10000,
-       "patient_price": 5000
+       "patient_price": 5000,
+       "paid_at": "2026-10-25T07:52:37.819595+03:00",
+       "added_source": "reception"
       }
      ],
      "procedures_total": 45000,
@@ -1104,7 +1118,9 @@
         }
        ],
        "referral_discount": 50000,
-       "patient_price": 50000
+       "patient_price": 50000,
+       "paid_at": "2026-10-25T07:52:38.000884+03:00",
+       "added_source": "reception"
       }
      ],
      "procedures_total": 100000,
@@ -1189,7 +1205,9 @@
    "created_by_name": "أم أسامة",
    "updated_by_name": null,
    "times_used": 0,
-   "specialties": []
+   "specialties": [],
+   "paid_at": null,
+   "added_source": "reception"
   },
   {
    "id": "1",
@@ -1205,7 +1223,9 @@
    "created_by_name": "أم أسامة",
    "updated_by_name": null,
    "times_used": 2,
-   "specialties": []
+   "specialties": [],
+   "paid_at": null,
+   "added_source": "reception"
   },
   {
    "id": "5",
@@ -1221,7 +1241,9 @@
    "created_by_name": "أم أسامة",
    "updated_by_name": null,
    "times_used": 1,
-   "specialties": []
+   "specialties": [],
+   "paid_at": null,
+   "added_source": "reception"
   },
   {
    "id": "3",
@@ -1237,7 +1259,9 @@
    "created_by_name": "أم أسامة",
    "updated_by_name": null,
    "times_used": 3,
-   "specialties": []
+   "specialties": [],
+   "paid_at": null,
+   "added_source": "reception"
   },
   {
    "id": "2",
@@ -1253,7 +1277,9 @@
    "created_by_name": "أم أسامة",
    "updated_by_name": null,
    "times_used": 1,
-   "specialties": []
+   "specialties": [],
+   "paid_at": null,
+   "added_source": "reception"
   }
  ],
  "materials": [

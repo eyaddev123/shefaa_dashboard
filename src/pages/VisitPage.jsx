@@ -13,7 +13,7 @@ import { api, APPOINTMENT_STATUSES, BOOKING_TYPES, VISIT_TYPES, PRIORITIES, fmtM
 import { isAttendanceSession, usePolling, fmtClock, turnLabel, fmtTimeOfDay } from '../attendance-ui.jsx'
 import { useRole } from '../RoleContext.jsx'
 import { useToast } from '../action-feedback.jsx'
-import { canEditAppointmentProcedures, canEditBooking, canEditReferral, canSeeVisitAudit } from '../permissions.js'
+import { canEditAppointmentProcedures, canEditBooking, canEditReferral, canSeeVisitAudit, canTakePayment } from '../permissions.js'
 import { WAITING_RETURN, serverOffsetOf, useStaffEvents } from '../waiting-return.jsx'
 import { ReferralRow, ReferralTotals, useReferralOptions } from '../components/ReferralFields.jsx'
 import { DISCOUNT_SCOPES, amountText, availableScopes, blankReferral, coverageFull, draftDiscount, draftFromReferral,
@@ -670,7 +670,7 @@ function StockWarnings({ items, isSupervisor, onClose }) {
 }
 
 function AppointmentProcedures({ appt, session, onChanged, onToast }) {
-  const { role } = useRole()
+  const { role, user } = useRole()
   const [catalog, setCatalog] = useState(null)
   const [matCatalog, setMatCatalog] = useState(null)
   const [pick, setPick] = useState('')
@@ -682,10 +682,23 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
   const [editMats, setEditMats] = useState([])
   const [stockWarns, setStockWarns] = useState([])   // من ردّ آخر حفظ — يبقى حتى «حسناً»
   const lines = appt.procedures || []
-  // «بانتظار العودة» دخل على الطبيب ثمّ خرج مؤقتاً — والقطرة نفسها إجراءٌ يُضاف وهو في الصالة
-  const entered = ['in_service', WAITING_RETURN, 'done'].includes(appt.status)
+  // «حاضر» أيضاً: الدفع المسبق قبل دخوله (المريض أمام الاستقبال يدفع الآن). و«بانتظار العودة»
+  // دخل على الطبيب ثمّ خرج مؤقتاً — والقطرة نفسها إجراءٌ يُضاف وهو في الصالة
+  const entered = ['arrived', 'in_service', WAITING_RETURN, 'done'].includes(appt.status)
   const dayOk = role === 'clinic_admin' || session.session_day === session.server_today
   const canEdit = canEditAppointmentProcedures(role) && entered && dayOk
+  // الإزالة: المشرفة كلّ سطر؛ الاستقبال ما أضافته هي في يوم الجلسة (ولو مدفوعاً — تصحيح غلطها)
+  const canRemove = (l) => role === 'clinic_admin'
+    || (role === 'clinic_reception' && dayOk && String(l.added_by) === String(user?.id))
+  const [paying, setPaying] = useState(null)
+  const markPaid = async (line) => {
+    setPaying(line.id)
+    try {
+      await api.clinic.markProcedurePaid(appt.id, line.id)
+      onToast(`تمت محاسبة «${line.name}»`, 'success'); onChanged()
+    } catch (ex) { onToast(ex.message) }
+    finally { setPaying(null) }
+  }
 
   useEffect(() => {
     if (!canEdit || catalog) return
@@ -763,9 +776,15 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
                         title="أُضيف خارج اختصاص الدكتور بقرار مشرف العيادات">خارج الاختصاص</span>
                     )}
                   </td>
-                  <td className="num rt-badge">{fmtMoney(l.price)}</td>
+                  <td className="num rt-badge">
+                    {fmtMoney(l.price)}
+                    {/* الدفع: إجراء الطبيب «بانتظار المحاسبة» حتى يُقبض */}
+                    {!l.removed_at && (l.paid_at
+                      ? <span className="pay-badge is-paid" title={`قبضه ${l.paid_by_name || '—'}`}>مدفوع ✓</span>
+                      : <span className="pay-badge is-unpaid">بانتظار المحاسبة</span>)}
+                  </td>
                   <td className="appt-procs-meta rt-full">
-                    أضافه {l.added_by_name || '—'} <span dir="ltr">{whenAt(l.added_at, session.session_day)}</span>
+                    أضافه {l.added_by_name || '—'}{l.added_source === 'doctor' && ' (الطبيب)'} <span dir="ltr">{whenAt(l.added_at, session.session_day)}</span>
                     {l.removed_at && (
                       <span className="proc-removed-why">
                         أزاله {l.removed_by_name || '—'} <span dir="ltr">{whenAt(l.removed_at, session.session_day)}</span> — {l.removed_reason}
@@ -773,12 +792,15 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
                     )}
                   </td>
                   <td className="rt-actions">
-                    {!l.removed_at && canEdit && removing !== l.id && editing !== l.id && (
+                    {!l.removed_at && !l.paid_at && canTakePayment(role) && removing !== l.id && (
+                      <button className="pay-btn" disabled={paying === l.id} onClick={() => markPaid(l)}>تمت المحاسبة</button>
+                    )}
+                    {!l.removed_at && (canEdit || canRemove(l)) && removing !== l.id && editing !== l.id && (
                       <span className="proc-line-actions">
-                        <button className="ghost" style={{ padding: '2px 10px', fontSize: 11.5 }}
-                          onClick={() => startEdit(l)}>المواد</button>
-                        <button className="ghost" style={{ padding: '2px 10px', fontSize: 11.5 }}
-                          onClick={() => { setEditing(null); setRemoving(l.id); setReason('') }}>إزالة</button>
+                        {canEdit && <button className="ghost" style={{ padding: '2px 10px', fontSize: 11.5 }}
+                          onClick={() => startEdit(l)}>المواد</button>}
+                        {canRemove(l) && <button className="ghost" style={{ padding: '2px 10px', fontSize: 11.5 }}
+                          onClick={() => { setEditing(null); setRemoving(l.id); setReason('') }}>إزالة</button>}
                       </span>
                     )}
                     {removing === l.id && (
@@ -841,7 +863,7 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
           </div>
         ) : (
           <p className="appt-procs-hint">
-            {!entered ? 'تُضاف الإجراءات بعد دخول المريض على الطبيب.'
+            {!entered ? 'تُضاف الإجراءات بعد حضور المريض.'
               : 'انتهى يوم هذه الجلسة — الإضافة والإزالة وتعديل المواد الآن لمسؤول العيادات.'}
           </p>
         )
