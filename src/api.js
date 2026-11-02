@@ -222,6 +222,16 @@ export const api = {
       if (doctorId) q.set('doctor_id', String(doctorId))
       return downloadFile(`/api/clinic/procedures/earnings/export?${q}`, 'مستحقات-الإجراءات.xlsx')
     },
+    // ── صندوق العيادات · ربح المواد · حسابات الدكاترة ── (period أو from/to كالمستحقات، والشهر YYYY-MM)
+    fund: ({ period, from, to }) => http(`/clinic/fund?${new URLSearchParams(period ? { period } : { from, to: to || from })}`),
+    addFundExpense: (body) => http('/clinic/fund/expenses', { method: 'POST', body: JSON.stringify(body) }),
+    setFundOpening: (body) => http('/clinic/fund/opening', { method: 'PUT', body: JSON.stringify(body) }),
+    fundOpeningHistory: () => http('/clinic/fund/opening/history'),
+    materialsProfit: ({ period, from, to }) =>
+      http(`/clinic/materials-profit?${new URLSearchParams(period ? { period } : { from, to: to || from })}`),
+    doctorAccounts: (month) => http(`/clinic/doctor-accounts${month ? `?month=${month}` : ''}`),
+    doctorPay: (id) => http(`/clinic/doctors/${id}/pay`),
+    setDoctorPay: (id, body) => http(`/clinic/doctors/${id}/pay`, { method: 'PUT', body: JSON.stringify(body) }),
     // ── كتالوج المواد: قراءةٌ وحدها ── (الاستقبال يتسلّم المفعَّل بلا سعر — من الخادم نفسه).
     // الكتابة والاستهلاك في api.inventory: صفحة «المخزون» المكان الوحيد لإدارة المواد
     materials: () => http('/clinic/materials'),
@@ -445,6 +455,8 @@ export const api = {
     prices: (id) => http(`/inventory/materials/${id}/prices`),
     movements: (id, page = 1, per = 20) => http(`/inventory/materials/${id}/movements?page=${page}&per=${per}`),
     purchase: (body) => http('/inventory/purchases', { method: 'POST', body: JSON.stringify(body) }),
+    // سعر الشراء يدوياً للمواد الموجودة — بلا حركة في الصندوق: [{material_id, price}]
+    setPurchasePrices: (items) => http('/inventory/purchase-prices', { method: 'POST', body: JSON.stringify({ items }) }),
     stocktakePreview: (items) => http('/inventory/stocktake/preview', { method: 'POST', body: JSON.stringify({ items }) }),
     stocktake: (items) => http('/inventory/stocktake', { method: 'POST', body: JSON.stringify({ items }) }),
     consumption: ({ from, to, group }) => http(`/inventory/reports/consumption?${new URLSearchParams({ from, to, group })}`),

@@ -3701,3 +3701,57 @@ button.dk-today-head:hover { filter: none; }
 .dk-today-patient { font-weight: 700; }
 .dk-today-proc { font-size: 13px; color: var(--text-secondary); }
 @media (prefers-reduced-motion: reduce) { .dk-today-body { transition: none; } }
+
+/* ═══════════════════════════════════════════════════════════════════
+   صندوق العيادات · ربح المواد · حسابات الدكاترة (صفحة /clinic/fund)
+   على نمط المستحقات (earn-*): الرصيد بطاقةٌ بارزة، والحركات table.rtable تصير بطاقاتٍ على الجوال.
+   الأخضر داخلٌ/ربح والأحمر خارجٌ/خسارة — اللون للمعنى لا للزينة.
+   ═══════════════════════════════════════════════════════════════════ */
+.fund-hero { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px 20px;
+  border-inline-start: 5px solid var(--primary); }
+.fund-balance { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.fund-balance .label { font-size: 13px; font-weight: 700; color: var(--text-secondary); }
+.fund-balance .value { font-size: 40px; font-weight: 800; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.fund-opening { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; font-size: 12.5px; color: var(--muted); }
+.fund-opening .cash-unit { font-size: 0.9em; }
+.fund-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.tiles.fund-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.tiles.fund-tiles.fund-tiles-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.fund-tiles .tile.fund-in::before { background: var(--status-good); }
+.fund-tiles .tile.fund-out::before { background: var(--status-bad); }
+.fund-tiles .tile.earn-hero.fund-gain { background: var(--status-good-bg); }
+.fund-tiles .tile.earn-hero.fund-gain::before { background: var(--status-good); }
+.fund-tiles .tile.earn-hero.fund-gain :is(.label, .value) { color: var(--status-good); }
+.fund-tiles .tile.earn-hero.fund-loss { background: var(--status-bad-bg); }
+.fund-tiles .tile.earn-hero.fund-loss::before { background: var(--status-bad); }
+.fund-tiles .tile.earn-hero.fund-loss :is(.label, .value) { color: var(--status-bad); }
+.fund-table td.fund-amt, .earn-table td.fund-amt { font-weight: 800; }
+td.fund-amt.is-in { color: var(--status-good); }
+td.fund-amt.is-out { color: var(--status-bad); }
+.fund-detail { display: flex; flex-direction: column; gap: 2px; }
+.fund-sub { font-size: 12px; color: var(--muted); }
+.fund-by { font-size: 12.5px; color: var(--text-secondary); white-space: nowrap; }
+.fund-flag { margin-inline-start: 6px; }
+.fund-method { margin: 4px 0 0; padding: 10px 14px; border-radius: 10px; font-size: 13px; line-height: 1.7;
+  background: var(--primary-soft); color: var(--text-primary); }
+.fund-month { display: inline-flex; align-items: center; gap: 6px; }
+.fund-month > button { padding: 4px 12px; }
+.fund-month > input { width: auto; }
+.fund-doc-table .rt-title a { font-weight: 800; }
+.fund-pay-kind { flex-wrap: wrap; }
+@media (max-width: 1100px) {
+  .tiles.fund-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 767px) {
+  .fund-hero { flex-direction: column; align-items: stretch; }
+  .fund-balance .value { font-size: 34px; }
+  .fund-actions > button { flex: 1 1 100%; min-height: 44px; }
+  .tiles.fund-tiles, .tiles.fund-tiles.fund-tiles-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .fund-tiles .tile.earn-hero { grid-column: 1 / -1; order: -1; }
+  .fund-month { width: 100%; }
+  .fund-month > input { flex: 1 1 auto; min-height: 44px; }
+  .fund-month > button { min-height: 44px; min-width: 44px; }
+  .fund-pay-kind { display: flex; width: 100%; }
+  .fund-pay-kind > label { flex: 1 1 0; justify-content: center; min-height: 44px; }
+  table.rtable > tbody > tr > td.fund-by { font-size: 12px; }
+}

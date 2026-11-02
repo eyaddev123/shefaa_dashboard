@@ -75,6 +75,12 @@ export const canSeeCashReport = (role) =>
 // العام — يطابق EARNINGS_ROLES في الخادم. المجلس يرى المراجعة لكن لا هذه، والاستقبال لا شيء: 403.
 export const canSeeEarnings = (role) => role === 'clinic_admin' || role === MANAGER || role === SUPER_ADMIN
 
+// صندوق العيادات وربح المواد وحسابات الدكاترة الشهرية (صفحة «صندوق العيادات» وبطاقة الراتب في
+// بروفايل الدكتور): المشرفة تكتب، والمدير والمشرف العام يطالعان — يطابق FUND_* في الخادم.
+// الطبيب لا يرى راتبه، والاستقبال والمجلس لا شيء: 403.
+export const canSeeClinicFunds = (role) => role === 'clinic_admin' || role === MANAGER || role === SUPER_ADMIN
+export const canWriteClinicFunds = (role) => role === 'clinic_admin'
+
 // المساءلة: سجلّ الزيارة الكامل («مين عمل شو») ونشاط الموظفين — المشرفة والمدير وحدهما،
 // يطابق AUDIT_ROLES في الخادم. الاستقبال يرى الجرد بلاهما (لا يراقب الموظفون بعضهم)، والطبيب لا شيء.
 export const canSeeVisitAudit = (role) => role === 'clinic_admin' || role === MANAGER

@@ -154,6 +154,7 @@ export function PurchaseDialog({ materials, units, initialId, onClose, onDone, o
     setErr(null)
     if (!chosen) return setErr('اختر المادة')
     if (!(q > 0)) return setErr('اكتب الكمّية')
+    if (c === null || Number.isNaN(c)) return setErr('اكتب سعر شراء القطعة — يُخصم المبلغ من صندوق العيادات')
     setBusy(true)
     try {
       const r = await api.inventory.purchase({ material_id: chosen.id, quantity: qty, unit_cost: cost, supplier, date, note })
@@ -218,10 +219,10 @@ export function PurchaseDialog({ materials, units, initialId, onClose, onDone, o
         <div className="inv-form-row">
           <div className="field"><label htmlFor="pd-qty">الكمّية{chosen ? ` (${chosen.unit})` : ''}</label>
             <input id="pd-qty" ref={qtyRef} value={qty} inputMode="decimal" placeholder="0" onChange={(e) => setQty(e.target.value)} /></div>
-          <div className="field"><label htmlFor="pd-cost">سعر شراء الوحدة {opt}</label>
+          <div className="field"><label htmlFor="pd-cost">سعر شراء القطعة</label>
             <input id="pd-cost" value={cost} inputMode="decimal" placeholder="—" onChange={(e) => setCost(e.target.value)} /></div>
         </div>
-        {total !== null && <p className="inv-total">المجموع: <strong>{fmtMoney(total)}</strong></p>}
+        {total !== null && <p className="inv-total">المجموع: <strong>{fmtMoney(total)}</strong> — يُخصم من صندوق العيادات</p>}
 
         <details className="inv-optional">
           <summary>المورّد والتاريخ والملاحظة {opt}</summary>
