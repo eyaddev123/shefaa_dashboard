@@ -3828,6 +3828,9 @@ td.fund-amt.is-out { color: var(--status-bad); }
 .hl-list li::before { content: counter(hl, arabic-indic); min-width: 14px; font-size: 12px; font-weight: 800; color: var(--muted); }
 .hl-who { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .hl-who a { font-size: 13px; font-weight: 700; overflow-wrap: anywhere; }
+/* الدكتور المفتوح في لوحته: اسمه بلا رابط ومُعلَّم */
+.hl-who .hl-name { font-size: 13px; font-weight: 800; overflow-wrap: anywhere; }
+.hl-list li.hl-me { background: var(--primary-soft); border-radius: 8px; padding-inline: 6px; }
 .hl-spec, .hl-sub { font-size: 11px; color: var(--muted); }
 .hl-val { font-size: 13px; font-weight: 800; white-space: nowrap; font-variant-numeric: tabular-nums; }
 

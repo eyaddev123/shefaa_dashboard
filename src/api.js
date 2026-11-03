@@ -233,7 +233,9 @@ export const api = {
     // لوحة تحكم الدكتور: period = week | month | custom (مع from/to)
     doctorDashboard: (id, { period = 'week', from, to } = {}) => http(`/clinic/doctors/${id}/dashboard?${
       new URLSearchParams(period === 'custom' ? { period, from, to: to || from } : { period })}`),
-    highlights: () => http('/clinic/highlights'),
+    // الأبرز لكلّ الدكاترة بفترة لوحة الدكتور نفسها
+    highlights: ({ period = 'week', from, to } = {}) => http(`/clinic/highlights?${
+      new URLSearchParams(period === 'custom' ? { period, from, to: to || from } : { period })}`),
     doctorPay: (id) => http(`/clinic/doctors/${id}/pay`),
     setDoctorPay: (id, body) => http(`/clinic/doctors/${id}/pay`, { method: 'PUT', body: JSON.stringify(body) }),
     // ── كتالوج المواد: قراءةٌ وحدها ── (الاستقبال يتسلّم المفعَّل بلا سعر — من الخادم نفسه).
