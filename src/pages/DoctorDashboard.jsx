@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { api, todayLocal } from '../api.js'
 import { PunctualityTiles, DutyCalendar, LateDays, fmtMinutes } from '../components/Punctuality.jsx'
+import Highlights from '../components/Highlights.jsx'
 
 // ═══ لوحة تحكم الدكتور ═══
 // صفحةٌ لكلّ دكتور (من قائمة الدكاترة)، للمشرفة والمدير والمشرف العام — قراءة وحدها.
 // الحساب كلّه في الخادم (GET /api/clinic/doctors/:id/dashboard): الالتزام بالدوام بتعريفاته،
 // والمال من حسابات الدكاترة الشهرية نفسها (buildDoctorAccounts) — فـ«هالشهر» هنا = تقرير الدكاترة حرفياً.
 // الفترة chips فورية: هالأسبوع (من السبت) · هالشهر · حرّ — وفي الرابط، فزرّ الرجوع يعود إليها.
+// «الأبرز» (كلّ الدكاترة) أوّل اللوحة تحت الفترة، وبالفترة نفسها — كان على اللوحة اليومية، ونُقل هنا.
 
 const PERIODS = [['week', 'هالأسبوع'], ['month', 'هالشهر'], ['custom', 'حرّ']]
 const fmtNum = (n) => Number(n || 0).toLocaleString('ar-SY', { maximumFractionDigits: 2 })
@@ -125,6 +127,8 @@ export default function DoctorDashboard() {
         </div>
       )}
       {shown && <p className="earn-range">الفترة: <span dir="ltr">{rangeText(shown)}</span></p>}
+
+      <Highlights period={period} from={from} to={to} currentId={id} search={`?${params}`} />
 
       {err ? <p className="error">{err}</p> : !shown ? <p className="empty">جارٍ التحميل…</p> : (
         <>
