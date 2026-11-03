@@ -65,9 +65,11 @@ export const canSeeInventory = (role) =>
 export const canWriteInventory = (role) => role === 'clinic_admin'
 // 'full' الأرصدة والكلفة · 'catalog' الكتالوج والاستهلاك بقيمة البيع وحدهما (المجلس)
 export const inventoryView = (role) => (role === 'board' ? 'catalog' : 'full')
-// الإحالات: إدارة الجهات وتقرير المستحقات — مشرف العيادات وحده (الخادم يردّ غيره 403).
-// وتسجيل الإحالة على زيارة للاستقبال والمشرف (نفس canEditBooking). الطبيب لا يرى شيئاً.
-export const canSeeReferralsPage = (role) => role === 'clinic_admin'
+// الإحالات: الجهات وتقرير المستحقات — المشرفة تكتب، والمشرف العام والمدير يطالعان (REFERRAL_READERS
+// في الخادم)، والمجلس والاستقبال 403. وتسجيل الإحالة على زيارة للاستقبال والمشرف (نفس canEditBooking).
+// الطبيب لا يرى شيئاً.
+export const canSeeReferralsPage = (role) => role === 'clinic_admin' || role === SUPER_ADMIN || role === MANAGER
+export const canWriteReferralSources = (role) => role === 'clinic_admin'
 export const canEditReferral = (role) => role === 'clinic_admin' || role === 'clinic_reception'
 
 // جرد الصندوق (الشاشة والملفّ): الاستقبال والمشرفة والمدير — يطابق CASH_REPORT_ROLES في الخادم.

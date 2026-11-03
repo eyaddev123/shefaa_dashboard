@@ -21,10 +21,13 @@ const CARDS = [
   { key: 'patients', icon: '🩺', title: 'الأكثر مرضى', value: (d) => fmtInt(d.patients) },
   { key: 'procedures', icon: '💉', title: 'الأكثر إجراءات', value: (d) => fmtInt(d.procedures) },
   { key: 'shifa', icon: '💰', title: 'الأعلى حصّةً للشفاء', value: (d) => fmtMoney(d.shifa) },
-  { key: 'late', icon: '⚠️', title: 'الأكثر تأخيراً وغياباً',
-    value: (d) => (d.lateMinutes ? `${fmtInt(d.lateMinutes)} د` : '—'),
-    sub: (d) => [d.lateDays && `تأخّر ${days(d.lateDays)}`, d.absent && `غاب ${days(d.absent)}`].filter(Boolean).join('، '),
-    empty: () => 'لا تأخير ولا غياب هالأسبوع' },
+  // بطاقتان منفصلتان: دقائق التأخير وحدها، وأيام الغياب وحدها
+  { key: 'late', icon: '⏰', title: 'الأكثر تأخيراً',
+    value: (d) => `${fmtInt(d.lateMinutes)} د`, sub: (d) => `تأخّر ${days(d.lateDays)}`,
+    empty: () => 'لا تأخير هالأسبوع' },
+  { key: 'absent', icon: '❌', title: 'الأكثر غياباً',
+    value: (d) => days(d.absent), sub: (d) => `من ${days(d.scheduled)} دوام`,
+    empty: () => 'لا غياب هالأسبوع' },
 ]
 
 export default function WeekHighlights() {

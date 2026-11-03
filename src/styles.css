@@ -3818,7 +3818,7 @@ td.fund-amt.is-out { color: var(--status-bad); }
 .hl-range { font-size: 12px; color: var(--muted); font-weight: 600; }
 .hl-chev { margin-inline-start: auto; color: var(--muted); }
 .hl-card > .empty, .hl-card > .error { padding: 0 20px 16px; }
-.hl-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; padding: 0 16px 16px; }
+.hl-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: 0 16px 16px; }
 .hl-box { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; min-width: 0; background: var(--page); }
 .hl-box h4 { margin: 0 0 8px; font-size: 13px; }
 .hl-empty { margin: 0; font-size: 12px; color: var(--muted); }
