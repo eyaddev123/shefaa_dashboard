@@ -1,10 +1,12 @@
-// ═══ ترتيب القائمة الجانبية لكل دور ═══
+// ═══ القائمة الجانبية لكل دور: قسمان بعنوانين ═══
 //   node test/sidebar-order-check.mjs
-// يقرأ <nav> من App.jsx كما هو، ويقيّم شرط كل رابط بدوال permissions.js الحقيقية،
-// فيخرج لكل دورٍ ما يراه بترتيبه. والمطلوب:
-//   مشرفة العيادات: لوحة القيادة، اللوحة اليومية، الدكاترة، الإجراءات، الإحالات، المخزون، صندوق العيادات، الطابعة، الإعدادات
-//   صفحات العيادات الثلاث متتالية لكل من يراها، واليوميّ قبل الإداري، والإعدادات أخيراً.
-//   وما يراه كل دور لم يتغيّر (المجموعة نفسها قبل التعديل) — إلا «صندوق العيادات» للمشرفة (رفعة clinic-funds).
+// يقرأ <nav> من App.jsx كما هو — الروابط وعناوين الأقسام والفاصل — ويقيّم شرط كلّ سطرٍ بدوال
+// permissions.js الحقيقية، فيخرج لكل دورٍ ما يراه بترتيبه. والمطلوب:
+//   «طلبات المساعدة»: صفحات المساعدات كلّها (الطلبات … الخزينة والإيرادات، الأسعار الطبية، المطابقة)
+//   «العيادات»: اللوحة اليومية، الدكاترة والدوام، الإجراءات والمستحقات، المخزون، صندوق العيادات،
+//                تقارير الدكاترة (+ شاشتي/أعمالي للطبيب، الإحالات والطابعة للمشرفة)
+//   كلّ رابطٍ تحت عنوان قسمه، ولا عنوانٌ بلا روابط، وكلّ دورٍ يرى ما له وحده.
+//   المدير (اطّلاع): كلّ صفحات العيادات المذكورة أعلاه.
 import { readFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -18,51 +20,69 @@ const check = (label, ok, info = '') => {
 
 const app = readFileSync(join(root, 'src/App.jsx'), 'utf8')
 const nav = /<nav>([\s\S]*?)<\/nav>/.exec(app)[1]
-const links = []
+const items = []
 for (const line of nav.split('\n')) {
-  const m = /^\s*(?:\{(.+?) && )?<NavLink to="([^"]+)"[^>]*>\{I\.\w+\} ([^<]+)<\/NavLink>/.exec(line)
-  if (m) links.push({ cond: m[1] || 'true', to: m[2], label: m[3].trim() })
+  let m = /^\s*(?:\{(.+?) && )?<NavLink to="([^"]+)"[^>]*>\{I\.\w+\} ([^<]+)<\/NavLink>/.exec(line)
+  if (m) { items.push({ kind: 'link', cond: m[1] || 'true', to: m[2], label: m[3].trim() }); continue }
+  m = /^\s*\{(.+?) && <div className="nav-section">([^<]+)<\/div>\}/.exec(line)
+  if (m) { items.push({ kind: 'section', cond: m[1], label: m[2].trim() }); continue }
+  m = /^\s*\{(.+?) && <div className="nav-sep" \/>\}/.exec(line)
+  if (m) items.push({ kind: 'sep', cond: m[1], label: '—' })
 }
 const names = Object.keys(perms)
-const visible = (role) => links.filter((l) => {
+const visible = (role) => items.filter((l) => {
   // eslint-disable-next-line no-new-func
   const f = new Function('role', 'aid', ...names, `return (${l.cond})`)
   return f(role, perms.canReadAid(role), ...names.map((n) => perms[n]))
-}).map((l) => l.label)
+})
+
+const SECTION_OF = (to) => to === '/' ? null
+  : to.startsWith('/clinic/') || to === '/inventory' ? 'العيادات'
+  : ['/users', '/settings'].includes(to) ? 'عام' : 'طلبات المساعدة'
 
 const ROLES = ['clinic_admin', 'clinic_reception', 'doctor', 'board', 'super_admin', 'manager', 'officer', 'accountant']
-// ما كان كل دورٍ يراه قبل التعديل (مجموعةً لا ترتيباً) — الترتيب وحده تغيّر
-const BEFORE = {
-  clinic_admin: ['لوحة القيادة', 'العيادات — الدكاترة والدوام', 'العيادات — الإجراءات', 'المخزون',
-    'العيادات — الإحالات', 'لوحة العيادات اليومية', 'صندوق العيادات', 'إعداد الطابعة', 'الإعدادات'],
-  clinic_reception: ['لوحة القيادة', 'لوحة العيادات اليومية', 'إعداد الطابعة'],
-  doctor: ['لوحة القيادة', 'شاشتي', 'أعمالي'],
+const AID = ['الطلبات', 'العائلات (الملفات)', 'مراجعة البيانات', 'سندات الصرف', 'الخزينة والإيرادات', 'الأسعار الطبية']
+const CLINIC_ALL = ['اللوحة اليومية', 'الدكاترة والدوام', 'الإجراءات والمستحقات', 'المخزون', 'صندوق العيادات', 'تقارير الدكاترة']
+// المطلوب لكلّ دورٍ حرفياً (بالترتيب، والعناوين بين [ ]). ما يراه كلّ دور هو ما كان يراه قبل
+// القسمين — بأسماءٍ أقصر تحت العنوان — زائداً «تقارير الدكاترة» لمن يرى حسابات الدكاترة.
+const WANT = {
+  clinic_admin: ['لوحة القيادة', '[العيادات]', 'اللوحة اليومية', 'الدكاترة والدوام', 'الإجراءات والمستحقات', 'الإحالات',
+    'المخزون', 'صندوق العيادات', 'تقارير الدكاترة', 'إعداد الطابعة', '—', 'الإعدادات'],
+  clinic_reception: ['لوحة القيادة', '[العيادات]', 'اللوحة اليومية', 'إعداد الطابعة'],
+  doctor: ['لوحة القيادة', '[العيادات]', 'شاشتي', 'أعمالي'],
+  manager: ['لوحة القيادة', '[طلبات المساعدة]', ...AID, '[العيادات]', ...CLINIC_ALL, '—', 'الإعدادات'],
+  super_admin: ['لوحة القيادة', '[طلبات المساعدة]', ...AID, '[العيادات]', ...CLINIC_ALL, '—', 'الموظفون والصلاحيات', 'الإعدادات'],
+  board: ['لوحة القيادة', '[طلبات المساعدة]', ...AID, '[العيادات]', 'اللوحة اليومية', 'الدكاترة والدوام', 'الإجراءات',
+    'المخزون', '—', 'الإعدادات'],
+  officer: ['لوحة القيادة', '[طلبات المساعدة]', ...AID, 'مطابقة الأمين'],
+  accountant: ['لوحة القيادة', '[طلبات المساعدة]', ...AID, 'مطابقة الأمين'],
 }
+const show = (v) => v.map((x) => (x.kind === 'section' ? `[${x.label}]` : x.label))
 
-console.log('── مشرفة العيادات: الترتيب المطلوب حرفياً ──')
-const admin = visible('clinic_admin')
-const WANT = ['لوحة القيادة', 'لوحة العيادات اليومية', 'العيادات — الدكاترة والدوام', 'العيادات — الإجراءات',
-  'العيادات — الإحالات', 'المخزون', 'صندوق العيادات', 'إعداد الطابعة', 'الإعدادات']
-check('★ الترتيب التساعيّ كما طُلب', JSON.stringify(admin) === JSON.stringify(WANT), admin.join(' ← '))
-
-console.log('\n── كل الأدوار ──')
 for (const role of ROLES) {
+  console.log(`\n── ${role} ──`)
   const v = visible(role)
-  console.log(`   ${role}: ${v.join(' ← ')}`)
-  if (BEFORE[role]) check(`${role}: المجموعة نفسها (لم يُضَف ولم يُحذف شيء)`,
-    JSON.stringify([...v].sort()) === JSON.stringify([...BEFORE[role]].sort()), v.join('، '))
-  const idx = (label) => v.indexOf(label)
-  check(`${role}: لوحة القيادة أولاً`, v[0] === 'لوحة القيادة')
-  const clinic = ['العيادات — الدكاترة والدوام', 'العيادات — الإجراءات', 'العيادات — الإحالات']
-    .map(idx).filter((i) => i >= 0)
-  if (clinic.length > 1)
-    check(`${role}: صفحات العيادات متتالية`, clinic.every((x, k) => k === 0 || x === clinic[k - 1] + 1), String(clinic))
-  if (idx('لوحة العيادات اليومية') >= 0 && clinic.length)
-    check(`${role}: اللوحة اليومية قبل صفحات الإدارة`, idx('لوحة العيادات اليومية') < clinic[0])
-  if (idx('الإعدادات') >= 0) check(`${role}: الإعدادات أخيراً`, v.at(-1) === 'الإعدادات')
-  if (idx('إعداد الطابعة') >= 0 && clinic.length)
-    check(`${role}: الطابعة بعد صفحات العيادات والمخزون`, idx('إعداد الطابعة') > Math.max(...clinic, idx('المخزون')))
+  const s = show(v)
+  console.log(`   ${s.join(' ← ')}`)
+  check(`${role}: القائمة كما طُلبت حرفياً`, JSON.stringify(s) === JSON.stringify(WANT[role]), s.join(' ← '))
+  // كلّ رابطٍ تحت عنوان قسمه، والعامّ بعد الفاصل
+  let cur = null, ok = true, bad = ''
+  for (const x of v) {
+    if (x.kind === 'section') cur = x.label
+    else if (x.kind === 'sep') cur = 'عام'
+    else if (SECTION_OF(x.to) !== cur) { ok = false; bad = `${x.label} تحت ${cur}` }
+  }
+  check(`${role}: كلّ رابطٍ تحت عنوان قسمه`, ok, bad)
+  const empty = v.filter((x, i) => x.kind !== 'link' && (i === v.length - 1 || v[i + 1].kind !== 'link'))
+  check(`${role}: لا عنوان ولا فاصل بلا روابط تحته`, empty.length === 0, show(empty).join('، '))
 }
+
+console.log('\n── المدير المسؤول (manager) ──')
+const mgr = show(visible('manager'))
+check('★ المدير يرى كلّ صفحات العيادات: اللوحة اليومية، الدكاترة والدوام، الإجراءات والمستحقات، المخزون، صندوق العيادات، تقارير الدكاترة',
+  CLINIC_ALL.every((l) => mgr.includes(l)), mgr.join('، '))
+check('★ تقارير الدكاترة لا تظهر للطبيب ولا للاستقبال ولا للمجلس',
+  ['doctor', 'clinic_reception', 'board'].every((r) => !show(visible(r)).includes('تقارير الدكاترة')))
 
 console.log(`\n${fail === 0 ? '✔' : '✘'} ${pass} نجح، ${fail} فشل`)
 process.exit(fail === 0 ? 0 : 1)

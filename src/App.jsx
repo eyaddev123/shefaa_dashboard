@@ -4,7 +4,7 @@ import { RoleProvider, useRole } from './RoleContext.jsx'
 import {
   canManageUsers, canReadAid, canSearchAid, canSeeClinicBoard, canSeeCashReport, canSeeDoctorsPage,
   canSeeDoctorScreen, canSeeSettings, canSeeProceduresPage, canSeePrinterSetup, canSeeInventory, canWriteInventory, canSeeReferralsPage, homePathFor,
-  canTakePayment, canSeeClinicFunds,
+  canTakePayment, canSeeClinicFunds, canReadClinic, canSeeEarnings, canSeeDoctorDashboard,
 } from './permissions.js'
 import { ROLE_LABELS } from './api.js'
 import ThemeToggle from './components/ThemeToggle.jsx'
@@ -36,6 +36,8 @@ import ClinicReferrals from './pages/ClinicReferrals.jsx'
 import ClinicProcedures from './pages/ClinicProcedures.jsx'
 import Inventory from './pages/Inventory.jsx'
 import ClinicFunds from './pages/ClinicFunds.jsx'
+import DoctorDashboard from './pages/DoctorDashboard.jsx'
+import DoctorReports from './pages/DoctorReports.jsx'
 import SessionQueue from './pages/SessionQueue.jsx'
 import VisitPage from './pages/VisitPage.jsx'
 import DoctorScreen from './pages/DoctorScreen.jsx'
@@ -56,6 +58,7 @@ const I = {
   clinic: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M2 12h20"/><circle cx="12" cy="12" r="10"/></svg>,
   users: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg>,
   quality: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>,
+  chart: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>,
   inventory: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/></svg>,
   settings: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
 }
@@ -109,8 +112,11 @@ function Sidebar({ onNavigate }) {
           الاستقبال يبحث عن مريضه داخل صفحة الحجز نفسها */}
       {canSearchAid(role) && <SidebarSearch />}
 
+      {/* قسمان بعنوانٍ صغير لكلٍّ: «طلبات المساعدة» و«العيادات» — كلّ دورٍ يرى ما له وحده،
+          والعنوان يظهر بظهور قسمه. لوحة القيادة فوقهما، والموظفون والإعدادات تحتهما بفاصل. */}
       <nav>
         <NavLink to="/" end>{I.home} لوحة القيادة</NavLink>
+        {aid && <div className="nav-section">طلبات المساعدة</div>}
         {aid && <NavLink to="/requests">{I.requests} الطلبات</NavLink>}
         {aid && <NavLink to="/families">{I.families} العائلات (الملفات)</NavLink>}
         {aid && <NavLink to="/data-quality">{I.quality} مراجعة البيانات</NavLink>}
@@ -118,19 +124,23 @@ function Sidebar({ onNavigate }) {
         {aid && <NavLink to="/treasury">{I.treasury} الخزينة والإيرادات</NavLink>}
         {aid && <NavLink to="/catalog">{I.catalog} الأسعار الطبية</NavLink>}
         {(role === 'officer' || role === 'accountant') && <NavLink to="/reconciliation">{I.sync} مطابقة الأمين</NavLink>}
-        {/* العيادات: اليوميّ أولاً، ثمّ الإدارة الأسبوعية (صفحاتها الثلاث متتالية)، ثمّ
-            المخزون، والإعدادات في الذيل. الترتيب وحده — من يرى ماذا لم يتغيّر. */}
-        {canSeeClinicBoard(role) && <NavLink to="/clinic/board">{I.clinic} لوحة العيادات اليومية</NavLink>}
+        {/* العيادات: اليوميّ أولاً، ثمّ الإدارة (الدكاترة، الإجراءات، الإحالات)، ثمّ المال والتقارير. */}
+        {canReadClinic(role) && <div className="nav-section">العيادات</div>}
+        {canSeeClinicBoard(role) && <NavLink to="/clinic/board">{I.clinic} اللوحة اليومية</NavLink>}
         {canSeeDoctorScreen(role) && <NavLink to="/clinic/doctor">{I.clinic} شاشتي</NavLink>}
         {/* أرقام الطبيب في صفحتها وحدها — الشاشة الرئيسية بلا مبالغ */}
         {canSeeDoctorScreen(role) && <NavLink to="/clinic/my-work">{I.clinic} أعمالي</NavLink>}
-        {canSeeDoctorsPage(role) && <NavLink to="/clinic/doctors">{I.clinic} العيادات — الدكاترة والدوام</NavLink>}
-        {canSeeProceduresPage(role) && <NavLink to="/clinic/procedures">{I.clinic} العيادات — الإجراءات</NavLink>}
-        {canSeeReferralsPage(role) && <NavLink to="/clinic/referrals">{I.clinic} العيادات — الإحالات</NavLink>}
+        {canSeeDoctorsPage(role) && <NavLink to="/clinic/doctors">{I.clinic} الدكاترة والدوام</NavLink>}
+        {/* تبويب «المستحقات» لمن يراه وحده — المجلس يرى الإجراءات بلا مستحقات */}
+        {canSeeProceduresPage(role) && canSeeEarnings(role) && <NavLink to="/clinic/procedures">{I.clinic} الإجراءات والمستحقات</NavLink>}
+        {canSeeProceduresPage(role) && !canSeeEarnings(role) && <NavLink to="/clinic/procedures">{I.clinic} الإجراءات</NavLink>}
+        {canSeeReferralsPage(role) && <NavLink to="/clinic/referrals">{I.clinic} الإحالات</NavLink>}
         {canSeeInventory(role) && <NavLink to="/inventory">{I.inventory} المخزون</NavLink>}
         {canSeeClinicFunds(role) && <NavLink to="/clinic/fund">{I.treasury} صندوق العيادات</NavLink>}
-        {canManageUsers(role) && <NavLink to="/users">{I.users} الموظفون والصلاحيات</NavLink>}
+        {canSeeDoctorDashboard(role) && <NavLink to="/clinic/doctor-reports">{I.chart} تقارير الدكاترة</NavLink>}
         {canSeePrinterSetup(role) && <NavLink to="/clinic/printer">{I.settings} إعداد الطابعة</NavLink>}
+        {(canManageUsers(role) || canSeeSettings(role)) && <div className="nav-sep" />}
+        {canManageUsers(role) && <NavLink to="/users">{I.users} الموظفون والصلاحيات</NavLink>}
         {canSeeSettings(role) && <NavLink to="/settings">{I.settings} الإعدادات</NavLink>}
       </nav>
 
@@ -219,6 +229,10 @@ function Shell() {
             <Guard allow={canSeeDoctorsPage}><ClinicDoctors /></Guard>} />
           <Route path="/clinic/doctors/:id" element={
             <Guard allow={canSeeDoctorsPage}><DoctorProfile /></Guard>} />
+          <Route path="/clinic/doctors/:id/dashboard" element={
+            <Guard allow={canSeeDoctorDashboard}><DoctorDashboard /></Guard>} />
+          <Route path="/clinic/doctor-reports" element={
+            <Guard allow={canSeeDoctorDashboard}><DoctorReports /></Guard>} />
           <Route path="/clinic/procedures" element={
             <Guard allow={canSeeProceduresPage}><ClinicProcedures /></Guard>} />
           <Route path="/inventory" element={

@@ -230,6 +230,10 @@ export const api = {
     materialsProfit: ({ period, from, to }) =>
       http(`/clinic/materials-profit?${new URLSearchParams(period ? { period } : { from, to: to || from })}`),
     doctorAccounts: (month) => http(`/clinic/doctor-accounts${month ? `?month=${month}` : ''}`),
+    // لوحة تحكم الدكتور: period = week | month | custom (مع from/to)
+    doctorDashboard: (id, { period = 'week', from, to } = {}) => http(`/clinic/doctors/${id}/dashboard?${
+      new URLSearchParams(period === 'custom' ? { period, from, to: to || from } : { period })}`),
+    highlights: () => http('/clinic/highlights'),
     doctorPay: (id) => http(`/clinic/doctors/${id}/pay`),
     setDoctorPay: (id, body) => http(`/clinic/doctors/${id}/pay`, { method: 'PUT', body: JSON.stringify(body) }),
     // ── كتالوج المواد: قراءةٌ وحدها ── (الاستقبال يتسلّم المفعَّل بلا سعر — من الخادم نفسه).
@@ -400,6 +404,7 @@ export const api = {
     myProcedures: (date) => http(`/clinic/my-procedures${date ? `?date=${date}` : ''}`),
     // «أعمالي»: period = today | week | month — المرضى والإجراءات وحصّته المقبوضة (حساب المستحقات)
     myWork: (period) => http(`/clinic/my-work?period=${period}`),
+    myPunctuality: (period) => http(`/clinic/my-punctuality?period=${period}`),
     removeAppointmentProcedure: (appointmentId, lineId, reason) =>
       http(`/clinic/appointments/${appointmentId}/procedures/${lineId}/remove`,
         { method: 'POST', body: JSON.stringify({ reason }) }),
