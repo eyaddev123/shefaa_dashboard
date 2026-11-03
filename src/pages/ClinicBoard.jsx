@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { addDays, api, dayLabel, SESSION_STATUSES, fmtTime, todayLocal } from '../api.js'
 import { useRole } from '../RoleContext.jsx'
-import { canSeeCashReport } from '../permissions.js'
+import { canSeeCashReport, canSeeDoctorDashboard } from '../permissions.js'
+import WeekHighlights from '../components/WeekHighlights.jsx'
 import { FlowModeTag } from '../attendance-ui.jsx'
 import RoomBadge from '../components/RoomBadge.jsx'
 import RoomPicker from '../components/RoomPicker.jsx'
@@ -431,6 +432,9 @@ export default function ClinicBoard() {
       </div>
 
       {err && <p className="error">{err}</p>}
+
+      {/* الأبرز هالأسبوع — المشرفة والمدير والمشرف العام؛ مطويّةٌ إن شاء صاحب الجهاز */}
+      {canSeeDoctorDashboard(role) && <WeekHighlights />}
 
       {/* الاستقبال لا يرى هذا القسم إطلاقاً — ولا الخادم يُجيبه عليه */}
       {APOLOGY_VIEWERS.includes(role) && (

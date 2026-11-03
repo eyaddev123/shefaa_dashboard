@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useDialogs } from '../dialogs.jsx'
 import { api, fmtMoney, todayLocal } from '../api.js'
 import { useToast } from '../action-feedback.jsx'
+import { useRole } from '../RoleContext.jsx'
+import { canWriteReferralSources } from '../permissions.js'
 
 // ═══ العيادات — الإحالات ═══
 // لمشرف العيادات وحده (الخادم يردّ غيره 403). تبويبان:
@@ -40,6 +42,8 @@ function NewSourceForm({ onCreated }) {
 
 function SourcesTab({ showToast, onOpenDues }) {
   const dlg = useDialogs()
+  // المشرف العام والمدير يطالعون الجهات بلا إضافة ولا تعديل ولا إيقاف ولا حذف
+  const canWrite = canWriteReferralSources(useRole().role)
   const [data, setData] = useState(null)
   const [err, setErr] = useState(null)
   const [editing, setEditing] = useState(null)   // { id, name }
@@ -80,7 +84,7 @@ function SourcesTab({ showToast, onOpenDues }) {
   return (
     <div className="card">
       <h3>الجهات المحيلة ({list.length} — الفعّالة {list.filter((s) => s.is_active).length})</h3>
-      <NewSourceForm onCreated={(n) => { showToast(`أُضيفت «${n}»`, 'success', 3000); load() }} />
+      {canWrite && <NewSourceForm onCreated={(n) => { showToast(`أُضيفت «${n}»`, 'success', 3000); load() }} />}
       <table className="rtable" style={{ marginTop: 14 }}>
         <thead>
           <tr><th>الجهة</th><th>الحالة</th><th>إحالات هذا الشهر</th><th>مستحق هذا الشهر</th><th></th></tr>
@@ -106,7 +110,7 @@ function SourcesTab({ showToast, onOpenDues }) {
                   : fmtMoney(0)}
               </td>
               <td className="proc-actions-cell rt-actions">
-                {editing?.id !== s.id && (
+                {canWrite && <>{editing?.id !== s.id && (
                   <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }}
                     onClick={() => setEditing({ id: s.id, name: s.name })}>تعديل</button>
                 )}{' '}
@@ -115,11 +119,11 @@ function SourcesTab({ showToast, onOpenDues }) {
                 {s.total_referrals === 0 && (
                   <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }}
                     onClick={() => remove(s)}>حذف</button>
-                )}
+                )}</>}
               </td>
             </tr>
           ))}
-          {list.length === 0 && <tr><td colSpan={5} className="empty">لا جهات بعد — أضف أولاها أعلاه</td></tr>}
+          {list.length === 0 && <tr><td colSpan={5} className="empty">لا جهات بعد{canWrite ? ' — أضف أولاها أعلاه' : ''}</td></tr>}
         </tbody>
       </table>
       <p className="subtitle" style={{ marginTop: 10, marginBottom: 0 }}>
@@ -235,7 +239,7 @@ export default function ClinicReferrals() {
   const [toast, showToast] = useToast()
   return (
     <>
-      <h2>العيادات — الإحالات</h2>
+      <h2>الإحالات</h2>
       <p className="subtitle">
         مريضٌ بورقة إحالة: الاستقبال يختار الجهة ويُدخل الخصم من الورقة، فيدفع المريض الباقي.
         حصّة الدكتور وحصّة الشفاء تُحسبان من <strong>السعر الأصلي</strong> كما هما، والخصم مستحقٌّ على الجهة.

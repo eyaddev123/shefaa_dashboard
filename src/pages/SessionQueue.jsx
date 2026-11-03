@@ -10,7 +10,7 @@ import { attendanceBookedMessage } from '../booking-message.js'
 import { QUEUE_TABS, DEFAULT_TAB, isTab, rowsOfTab, matchesQuery, tabCounts, tabLabel, liveProcedures, extraTotals } from '../queue-tabs.js'
 import { useRole } from '../RoleContext.jsx'
 import { useToast, RecallButton } from '../action-feedback.jsx'
-import { canStepOutAsSupervisor } from '../permissions.js'
+import { canStepOutAsSupervisor, canOperateQueue } from '../permissions.js'
 import { WAITING_RETURN, waitingReturnOf, serverOffsetOf, Elapsed, useStaffEvents } from '../waiting-return.jsx'
 import ReferralsEditor from '../components/ReferralFields.jsx'
 import { referralPayload, referralReady, referralSummary } from '../referral.js'
@@ -901,7 +901,7 @@ function AttendanceBookingForm({ sessionId, fees, open, onClose, onBooked }) {
 }
 
 // قيد الكشف الآن — مضغوط، ورقم الدور كبير يُقرأ بلمحة. فارغٌ بنفس الارتفاع (الشبكة تمدّ الثلاث).
-function AttendanceCurrentCard({ current, returning = [], recalled, onRecalled, onError }) {
+function AttendanceCurrentCard({ current, returning = [], recalled, onRecalled, onError, canAct }) {
   return (
     <div className={`card attn-compact ${current ? 'highlight' : ''}`}>
       <h3>قيد الكشف الآن</h3>
@@ -911,14 +911,14 @@ function AttendanceCurrentCard({ current, returning = [], recalled, onRecalled, 
             <div className="attn-current-num">{turnLabel(current, true)}<AttendanceBadge priority={current.priority} /></div>
             <div className="attn-current-name">{current.full_name}</div>
           </div>
-          <div className="attn-current-recall">
+          {canAct && <div className="attn-current-recall">
             <RecallButton apptId={current.id} onError={onError} onDone={onRecalled} />
             {recalled && (
               <div className="attn-compact-hint">
                 أُعيد النداء {new Date(recalled).toLocaleTimeString('ar', { hour: '2-digit', minute: '2-digit' })}
               </div>
             )}
-          </div>
+          </div>}
         </div>
       ) : <p className="attn-compact-empty">لا أحد قيد الكشف</p>}
       {/* خرجوا مؤقتاً وسيُنادَون ليُكملوا — سطرٌ صغير لا يزاحم «قيد الكشف» */}
@@ -935,7 +935,7 @@ function AttendanceCurrentCard({ current, returning = [], recalled, onRecalled, 
 }
 
 // وصول الطبيب: زرٌّ مرة واحدة، ثم الوقت مع «تصحيح» يترك أثراً يُعرض تحته
-function DoctorArrivalCard({ data, onChanged, onError }) {
+function DoctorArrivalCard({ data, onChanged, onError, canAct }) {
   const dlg = useDialogs()
   const [busy, setBusy] = useState(false)
   const run = async (fn) => {
@@ -968,14 +968,14 @@ function DoctorArrivalCard({ data, onChanged, onError }) {
         ].filter(Boolean).join('\n')}>
           <span className="attn-arrival-time" dir="ltr">{fmtClock(data.doctor_arrived_at)}</span>
           {history.length > 0 && <span className="attn-compact-hint">صُحّح {history.length === 1 ? 'مرة' : `${history.length} مرات`}</span>}
-          <button className="link-btn" disabled={busy} onClick={fix}>تصحيح</button>
+          {canAct && <button className="link-btn" disabled={busy} onClick={fix}>تصحيح</button>}
         </div>
       ) : (
         <>
           <p className="attn-compact-hint">لم يُسجَّل بعد · بداية الدوام <span dir="ltr">{fmtTime(data.start_time)}</span></p>
-          <div className="attn-compact-actions">
+          {canAct && <div className="attn-compact-actions">
             <button disabled={busy} onClick={() => run(() => api.clinic.doctorArrived(data.id))}>وصل الطبيب</button>
-          </div>
+          </div>}
         </>
       )}
     </div>
@@ -1114,6 +1114,8 @@ function AttendanceQueueTable({ data, rows, tab, actions }) {
 // «بانتظار الحضور». لا إلغاء ولا عدم حضور تلقائي: الإنسان يقرّر لكل واحد.
 function NoShowButton({ appt: a, onChanged, onError }) {
   const dlg = useDialogs()
+  const { role } = useRole()
+  if (!canOperateQueue(role)) return null
   const noShow = async () => {
     const ok = await dlg.confirm({
       title: 'تعليم «ما حضر»',
@@ -1442,7 +1444,9 @@ export function useVisitActions({ data, load, showToast }) {
 
 // أزرار الصفّ: تقديم · حضر · إلغاء · تأجيل · (المشرف: خروج مؤقت/نداء العودة) — بشروطها كما كانت
 export function VisitActions({ appt: a, data, actions, onDone, onError }) {
+  const { role } = useRole()
   const { arrive, cancel, prioritize, setPostponing } = actions
+  if (!canOperateQueue(role)) return null
   const btn = { padding: '3px 10px', fontSize: 11.5 }
   return (
     <>
@@ -1534,6 +1538,9 @@ function UnstartedAlert({ data }) {
 
 export default function SessionQueue() {
   const { id } = useParams()
+  const { role } = useRole()
+  // المطالِع (المجلس، المشرف العام، المدير) يرى الدور كما هو بلا أيّ زرّ كتابة
+  const canAct = canOperateQueue(role)
   const [data, setData] = useState(null)
   // ★ الخطأ لا يستبدل الشاشة: loadErr لأوّل تحميل فقط (ومعه «إعادة المحاولة»)، وبعده
   // إشعارٌ عابر والطابور الأخير باقٍ — انقطاعٌ في التحديث الدوري كان يُفرغ الصفحة حتى
@@ -1609,23 +1616,23 @@ export default function SessionQueue() {
         <>
           {/* صفٌّ واحد من اليمين: حجز دور · قيد الكشف الآن · وصول الطبيب.
               يتكدّس عمودياً على الشاشات الضيّقة (CSS) */}
-          <div className="attn-top-row">
-            <AttendanceBookingCard acceptsUrgent={data.accepts_urgent !== false}
-              open={bookingOpen} onOpen={setBookingOpen} />
+          <div className={`attn-top-row${canAct ? '' : ' is-view'}`}>
+            {canAct && <AttendanceBookingCard acceptsUrgent={data.accepts_urgent !== false}
+              open={bookingOpen} onOpen={setBookingOpen} />}
             <AttendanceCurrentCard current={data.appointments.find((a) => a.status === 'in_service')}
               returning={waitingReturnOf(data.appointments)}
-              recalled={recalled} onRecalled={() => setRecalled(Date.now())} onError={showToast} />
-            <DoctorArrivalCard data={data} onChanged={load} onError={showToast} />
+              recalled={recalled} onRecalled={() => setRecalled(Date.now())} onError={showToast} canAct={canAct} />
+            <DoctorArrivalCard data={data} onChanged={load} onError={showToast} canAct={canAct} />
           </div>
-          <AttendanceBookingForm
+          {canAct && <AttendanceBookingForm
             sessionId={id}
             fees={{ consultation_fee: data.consultation_fee, followup_fee: data.followup_fee }}
             open={bookingOpen}
             onClose={() => setBookingOpen(null)}
             onBooked={afterBooked}
-          />
+          />}
         </>
-      ) : (
+      ) : canAct && (
       <div className="card">
         <h3>حجز دور — خانات اليوم</h3>
         <p className="subtitle" style={{ marginTop: -6, marginBottom: 14 }}>
@@ -1655,7 +1662,7 @@ export default function SessionQueue() {
                 </div>
                 <div style={{ color: 'var(--text-secondary)' }}>{current.full_name}</div>
               </div>
-              <div style={{ textAlign: 'center' }}>
+              {canAct && <div style={{ textAlign: 'center' }}>
                 <RecallButton apptId={current.id} onError={showToast} onDone={() => setRecalled(Date.now())}
                   style={{ padding: '12px 20px', fontSize: 15 }} />
                 {recalled && (
@@ -1663,7 +1670,7 @@ export default function SessionQueue() {
                     أُعيد النداء {new Date(recalled).toLocaleTimeString('ar', { hour: '2-digit', minute: '2-digit' })}
                   </div>
                 )}
-              </div>
+              </div>}
             </div>
           </div>
         )
@@ -1696,8 +1703,8 @@ export default function SessionQueue() {
                     <td data-label="الموبايل"><bdi dir="ltr">{a.mobile}</bdi></td>
                     <td className="rt-badge">{appointmentBadge(a.status)}</td>
                     <td className="rt-actions">
-                      <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }}
-                        onClick={() => actions.setPostponing(a)}>تأجيل لموعد آخر</button>
+                      {canAct && <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }}
+                        onClick={() => actions.setPostponing(a)}>تأجيل لموعد آخر</button>}
                     </td>
                   </tr>
                 ))}

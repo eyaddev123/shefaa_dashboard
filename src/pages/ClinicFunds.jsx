@@ -349,7 +349,8 @@ const shiftMonth = (m, n) => {
 const payText = (d) => (d.payKind === 'fixed' ? 'راتب ثابت'
   : d.payKind === 'per_patient' ? `${fmtNum(d.payAmount)} للمريض` : null)
 
-function DoctorsTab({ canWrite }) {
+// linkDashboard: صفحة «تقارير الدكاترة» تفتح لوحة الدكتور من اسمه (بدل البروفايل للمشرفة هنا)
+export function DoctorsTab({ canWrite, linkDashboard = false }) {
   const [params, setParams] = useSearchParams()
   const month = /^\d{4}-\d{2}$/.test(params.get('month') || '') ? params.get('month') : null
   const [data, err] = useLoad(() => api.clinic.doctorAccounts(month), month || 'now')
@@ -385,7 +386,9 @@ function DoctorsTab({ canWrite }) {
                 {data.doctors.map((d) => (
                   <tr key={d.doctorId}>
                     <td className="rt-title">
-                      {canWrite ? <Link to={`/clinic/doctors/${d.doctorId}`}>{d.doctor}</Link> : d.doctor}
+                      {linkDashboard ? <Link to={`/clinic/doctors/${d.doctorId}/dashboard?${data.month === todayLocal().slice(0, 7)
+                        ? 'period=month' : `period=custom&from=${data.from}&to=${data.to}`}`}>{d.doctor}</Link>
+                        : canWrite ? <Link to={`/clinic/doctors/${d.doctorId}`}>{d.doctor}</Link> : d.doctor}
                       <span className="earn-spec">
                         {d.noPay ? <span className="badge warn sm">بلا نوع حساب</span> : payText(d)}
                         {!d.active && ' — موقوف'}

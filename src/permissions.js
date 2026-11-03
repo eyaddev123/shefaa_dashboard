@@ -37,6 +37,10 @@ export const canEditAppointmentProcedures = (role) => role === 'clinic_admin' ||
 // «تمت المحاسبة» على إجراءٍ أضافه الطبيب: من يقبض — مرآة PAYMENT_TAKERS في الخادم
 export const canTakePayment = (role) => role === 'clinic_admin' || role === 'clinic_reception'
 
+// تشغيل الدور (حجز، حضر، نداء، إعادة نداء، «وصل الطبيب»، ما حضر، تأجيل، تقديم): الاستقبال والمشرفة.
+// المجلس والمشرف العام والمدير يطالعون الدور بلا أزرار — والخادم يرفض كتابتهم أصلاً (المدير بطبقةٍ عامة).
+export const canOperateQueue = (role) => role === 'clinic_admin' || role === 'clinic_reception'
+
 // صفحة إعداد الطابعة: الاستقبال يقرؤها ويُعدّ جهازه (الإعداد محلّيٌّ لا يمسّ أحداً)،
 // والمشرف يقرؤها ليساعد. ولا علاقة لها بالإعداد العام (في «الإعدادات»).
 export const canSeePrinterSetup = (role) => role === 'clinic_admin' || role === 'clinic_reception'
@@ -61,9 +65,11 @@ export const canSeeInventory = (role) =>
 export const canWriteInventory = (role) => role === 'clinic_admin'
 // 'full' الأرصدة والكلفة · 'catalog' الكتالوج والاستهلاك بقيمة البيع وحدهما (المجلس)
 export const inventoryView = (role) => (role === 'board' ? 'catalog' : 'full')
-// الإحالات: إدارة الجهات وتقرير المستحقات — مشرف العيادات وحده (الخادم يردّ غيره 403).
-// وتسجيل الإحالة على زيارة للاستقبال والمشرف (نفس canEditBooking). الطبيب لا يرى شيئاً.
-export const canSeeReferralsPage = (role) => role === 'clinic_admin'
+// الإحالات: الجهات وتقرير المستحقات — المشرفة تكتب، والمشرف العام والمدير يطالعان (REFERRAL_READERS
+// في الخادم)، والمجلس والاستقبال 403. وتسجيل الإحالة على زيارة للاستقبال والمشرف (نفس canEditBooking).
+// الطبيب لا يرى شيئاً.
+export const canSeeReferralsPage = (role) => role === 'clinic_admin' || role === SUPER_ADMIN || role === MANAGER
+export const canWriteReferralSources = (role) => role === 'clinic_admin'
 export const canEditReferral = (role) => role === 'clinic_admin' || role === 'clinic_reception'
 
 // جرد الصندوق (الشاشة والملفّ): الاستقبال والمشرفة والمدير — يطابق CASH_REPORT_ROLES في الخادم.
@@ -80,6 +86,11 @@ export const canSeeEarnings = (role) => role === 'clinic_admin' || role === MANA
 // الطبيب لا يرى راتبه، والاستقبال والمجلس لا شيء: 403.
 export const canSeeClinicFunds = (role) => role === 'clinic_admin' || role === MANAGER || role === SUPER_ADMIN
 export const canWriteClinicFunds = (role) => role === 'clinic_admin'
+
+// لوحة تحكم الدكتور (الالتزام بالدوام، أرقامه، بطاقته المالية)، «الأبرز هالأسبوع» على اللوحة اليومية،
+// و«تقارير الدكاترة»: المشرفة والمدير والمشرف العام — يطابق DASHBOARD_READERS في الخادم.
+// الطبيب يرى التزامه هو وحده في «أعمالي»، ولا يصل لوحة أحدٍ ولا الأبرز (403).
+export const canSeeDoctorDashboard = (role) => role === 'clinic_admin' || role === MANAGER || role === SUPER_ADMIN
 
 // المساءلة: سجلّ الزيارة الكامل («مين عمل شو») ونشاط الموظفين — المشرفة والمدير وحدهما،
 // يطابق AUDIT_ROLES في الخادم. الاستقبال يرى الجرد بلاهما (لا يراقب الموظفون بعضهم)، والطبيب لا شيء.

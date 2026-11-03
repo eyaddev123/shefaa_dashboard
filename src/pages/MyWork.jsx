@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { api, fmtMoney, openStaffStream } from '../api.js'
 import { useDialogs } from '../dialogs.jsx'
 import { useToast } from '../action-feedback.jsx'
+import { PunctualityTiles, DutyCalendar } from '../components/Punctuality.jsx'
 
 // ═══════════════════════════════════════════════════════════════════
 // «أعمالي» — صفحة الطبيب المستقلّة في القائمة الجانبية (تحت «شاشتي»)
@@ -99,6 +100,42 @@ function MyWork({ reloadKey, pending, onRemove }) {
   )
 }
 
+// ═══ «التزامي» — أرقامه هو وحده: نسبة الالتزام ومتوسّط التأخير والتقويم الملوّن ═══
+// بتعريفات لوحة الإدارة نفسها (GET /clinic/my-punctuality) — بلا ترتيب ولا أيّ دكتورٍ آخر.
+const PUNCT_PERIODS = [['week', 'هالأسبوع'], ['month', 'هالشهر']]
+function MyPunctuality() {
+  const [period, setPeriod] = useState('week')
+  const [data, setData] = useState(null)
+  const [err, setErr] = useState(null)
+  useEffect(() => {
+    let alive = true
+    api.clinic.myPunctuality(period).then((d) => { if (alive) { setData(d); setErr(null) } })
+      .catch((e) => { if (alive) setErr(e.message) })
+    return () => { alive = false }
+  }, [period])
+  const shown = data && data.period === period ? data : null
+  return (
+    <div className="card dk-punct">
+      <h3>التزامي بالدوام</h3>
+      <div className="dk-chips-filter" role="group" aria-label="فترة الالتزام">
+        {PUNCT_PERIODS.map(([k, label]) => (
+          <button key={k} type="button" aria-pressed={period === k}
+            className={`dk-filter${period === k ? ' is-on' : ''}`} onClick={() => setPeriod(k)}>{label}</button>
+        ))}
+      </div>
+      {err && <p className="error">{err}</p>}
+      {!shown ? (!err && <p className="empty">جارٍ التحميل…</p>) : (
+        <>
+          <PunctualityTiles p={shown.punctuality} />
+          <DutyCalendar from={shown.from} to={shown.to} days={shown.days} />
+          <p className="dk-hint">بالوقت = وصلت خلال {shown.grace.toLocaleString('ar-SY')} دقائق من بداية الدوام أو قبلها، بكبسة
+            «وصل الطبيب» عند الاستقبال.</p>
+        </>
+      )}
+    </div>
+  )
+}
+
 export default function MyWorkPage() {
   const dialogs = useDialogs()
   const [toast, showToast] = useToast()
@@ -132,9 +169,10 @@ export default function MyWorkPage() {
   return (
     <div className="dk-work-page">
       <h2>أعمالي</h2>
-      <p className="subtitle">مرضاك وإجراءاتك المحاسَبة وحصّتك — لليوم أو الأسبوع أو الشهر</p>
+      <p className="subtitle">مرضاك وإجراءاتك المحاسَبة وحصّتك — لليوم أو الأسبوع أو الشهر، والتزامك بالدوام</p>
       {toast}
       <MyWork reloadKey={key} pending={pending} onRemove={remove} />
+      <MyPunctuality />
     </div>
   )
 }

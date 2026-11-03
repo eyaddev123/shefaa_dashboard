@@ -5,7 +5,7 @@ import { api, WEEKDAYS, fmtMoney, fmtTime, fmtDateTime } from '../api.js'
 import { useRole } from '../RoleContext.jsx'
 import DoctorShareRules from '../components/DoctorShareRules.jsx'
 import DoctorPayCard from '../components/DoctorPayCard.jsx'
-import { canSeeClinicFunds, canWriteClinicFunds } from '../permissions.js'
+import { canSeeClinicFunds, canWriteClinicFunds, canSeeDoctorDashboard } from '../permissions.js'
 import { useToast } from '../action-feedback.jsx'
 import { pricingText } from '../share-rule.js'
 
@@ -14,7 +14,7 @@ const SHARE_VIEWERS = ['clinic_admin', 'board', 'super_admin', 'manager']
 
 // بروفايل الدكتور: تعديل معلوماته وتسعيرتيه (معاينة/مراجعة) ومدة الكشف المتوقعة،
 // وهي التي يُقسَّم على أساسها دوامه إلى خانات زمنية.
-function ProfileForm({ doctor, globalBuffer, onSaved }) {
+function ProfileForm({ doctor, globalBuffer, onSaved, readOnly = false }) {
   const [form, setForm] = useState({
     hourly_buffer_minutes: doctor.hourly_buffer_minutes ?? '',
     name: doctor.name,
@@ -62,6 +62,8 @@ function ProfileForm({ doctor, globalBuffer, onSaved }) {
 
   return (
     <form onSubmit={submit}>
+      {/* المطالِع (المجلس، المشرف العام، المدير) يرى الحقول معطَّلة بلا زرّ حفظ */}
+      <fieldset className="ro-fieldset" disabled={readOnly}>
       <div className="inline" style={{ flexWrap: 'wrap' }}>
         <div className="field"><label>اسم الدكتور</label><input value={form.name} onChange={set('name')} required /></div>
         <SpecialtyPicker value={form.specialty_id} canAdd
@@ -138,10 +140,11 @@ function ProfileForm({ doctor, globalBuffer, onSaved }) {
         </p>
       )}
 
-      <div style={{ marginTop: 16, display: 'flex', gap: 10, alignItems: 'center' }}>
+      </fieldset>
+      {!readOnly && <div style={{ marginTop: 16, display: 'flex', gap: 10, alignItems: 'center' }}>
         <button type="submit" disabled={busy}>{busy ? 'جارٍ الحفظ…' : 'حفظ التعديلات'}</button>
         {saved && <span className="badge good">تم الحفظ</span>}
-      </div>
+      </div>}
       {err && <p className="error">{err}</p>}
     </form>
   )
@@ -247,7 +250,8 @@ export default function DoctorProfile() {
 
   return (
     <>
-      <p className="subtitle"><Link to="/clinic/doctors">← كل الدكاترة</Link></p>
+      <p className="subtitle"><Link to="/clinic/doctors">← كل الدكاترة</Link>
+        {canSeeDoctorDashboard(role) && <> · <Link to={`/clinic/doctors/${doctor.id}/dashboard`}>لوحة التحكم ←</Link></>}</p>
       <h2>{doctor.name}</h2>
       {toast}
       <p className="subtitle">
@@ -259,7 +263,7 @@ export default function DoctorProfile() {
 
       <div className="card">
         <h3>معلومات الدكتور والتسعيرة</h3>
-        <ProfileForm doctor={doctor} globalBuffer={globalBuffer} onSaved={load} />
+        <ProfileForm doctor={doctor} globalBuffer={globalBuffer} onSaved={load} readOnly={role !== 'clinic_admin'} />
       </div>
 
       <div className="card">

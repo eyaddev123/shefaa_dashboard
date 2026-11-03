@@ -6,6 +6,7 @@ import { api, WEEKDAYS, fmtMoney, fmtTime, fmtDateTime, todayLocal } from '../ap
 import { useRole } from '../RoleContext.jsx'
 import { useToast } from '../action-feedback.jsx'
 import { doctorMatches } from '../doctor-search.js'
+import { canSeeDoctorDashboard } from '../permissions.js'
 import { Modal, EmptyState } from '../components/inventory/shared.jsx'
 
 // ═══ إضافة دكتور — نافذةٌ فوق الصفحة، والحقول والتحقّق والمسار كما كانت في النموذج المضمَّن ═══
@@ -269,12 +270,15 @@ function DoctorRow({ doctor, onChanged, onSchedulesChanged }) {
         <td className="rt-actions">
           <Link to={`/clinic/doctors/${doctor.id}`} className="ghost"
             style={{ padding: '3px 10px', fontSize: 11.5, display: 'inline-block' }}>البروفايل</Link>{' '}
+          {canSeeDoctorDashboard(role) && <><Link to={`/clinic/doctors/${doctor.id}/dashboard`} className="ghost"
+            style={{ padding: '3px 10px', fontSize: 11.5, display: 'inline-block' }}>لوحة التحكم</Link>{' '}</>}
           <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }} onClick={toggle}>
             {expanded ? 'إخفاء الدوام' : 'جدول الدوام'}
           </button>{' '}
-          <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }} onClick={toggleActive}>
+          {/* المطالِع (المجلس، المشرف العام، المدير) يرى الدوام بلا أزرار كتابة */}
+          {canEdit && <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }} onClick={toggleActive}>
             {doctor.is_active ? 'إيقاف' : 'تفعيل'}
-          </button>
+          </button>}
         </td>
       </tr>
       {expanded && (
@@ -326,7 +330,7 @@ function DoctorRow({ doctor, onChanged, onSchedulesChanged }) {
                                   aria-label={`تعديل دوام ${WEEKDAYS[s.weekday]} ${fmtTime(s.start_time)}`}
                                   onClick={() => setEditingId(s.id === editingId ? null : s.id)}>تعديل</button>
                               )}
-                              <button className="ghost" style={{ padding: '2px 8px', fontSize: 11 }} onClick={() => removeSchedule(s)}>حذف</button>
+                              {canEdit && <button className="ghost" style={{ padding: '2px 8px', fontSize: 11 }} onClick={() => removeSchedule(s)}>حذف</button>}
                             </td>
                           </tr>
                         ))}
@@ -334,7 +338,7 @@ function DoctorRow({ doctor, onChanged, onSchedulesChanged }) {
                     </table>
                   )}
                 {/* التعديل يحلّ محلّ نموذج الإضافة (نفس الحقول معبّأة) حتى يُحفظ أو يُلغى */}
-                {editing
+                {!canEdit ? null : editing
                   ? <ScheduleForm key={editing.id} schedule={editing} onSaved={afterSave} onCancel={() => setEditingId(null)} />
                   : <ScheduleForm doctorId={doctor.id} onSaved={afterSave} />}
                 {/* حصّته من الإجراءات (النسبة العامّة والحالات الخاصّة) في بروفايله */}
