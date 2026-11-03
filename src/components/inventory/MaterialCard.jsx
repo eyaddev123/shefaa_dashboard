@@ -127,6 +127,7 @@ export default function MaterialCard({ id, refreshKey, canWrite, onBack, onPurch
   if (err) return <><button type="button" className="link-btn" onClick={onBack}>→ كل المواد</button><p className="error">{err}</p></>
   if (!m) return <p className="empty">جارٍ التحميل…</p>
   const st = stockStatus(m)
+  const cons = m.material_kind === 'consumable'
   return (
     <>
       <button type="button" className="link-btn inv-back" onClick={onBack}>→ كل المواد</button>
@@ -146,29 +147,37 @@ export default function MaterialCard({ id, refreshKey, canWrite, onBack, onPurch
             </div>
           )}
         </div>
+        {cons && (
+          <p className="hint inv-note">مادةٌ استهلاكية: بلا رصيد ولا سعر بيع، ولا تُختار على الإجراء — قيمتها مقدّرةٌ على نوع
+            الإجراء («المستهلكات» في صفحة الإجراءات). مشترياتها تُخصم من صندوق العيادات، وتُقارَن بالمستردّ في تقرير المستهلكات.</p>
+        )}
         <div className="inv-stats">
-          <div className="inv-stat inv-stat-main">
-            <span className="label">الرصيد الحالي</span>
-            <span className={`value${m.balance < 0 ? ' neg' : ''}`}><bdi dir="ltr">{fmtQty(m.balance)}</bdi> <small>{m.unit}</small></span>
-          </div>
-          <div className="inv-stat">
-            <span className="label">الحدّ الأدنى</span>
-            <span className="value">{m.min_quantity ? fmtQty(m.min_quantity) : '—'}</span>
-          </div>
-          <div className="inv-stat">
-            <span className="label">سعر البيع للمريض</span>
-            <span className={`value${m.selling_at_loss ? ' neg' : ''}`}>{fmtMoney(m.unit_price)}</span>
-            {canWrite && <button type="button" className="link-btn" onClick={() => onEditPrice(m)}>تعديل سعر البيع</button>}
-          </div>
+          {!cons && <>
+            <div className="inv-stat inv-stat-main">
+              <span className="label">الرصيد الحالي</span>
+              <span className={`value${m.balance < 0 ? ' neg' : ''}`}><bdi dir="ltr">{fmtQty(m.balance)}</bdi> <small>{m.unit}</small></span>
+            </div>
+            <div className="inv-stat">
+              <span className="label">الحدّ الأدنى</span>
+              <span className="value">{m.min_quantity ? fmtQty(m.min_quantity) : '—'}</span>
+            </div>
+            <div className="inv-stat">
+              <span className="label">سعر البيع للمريض</span>
+              <span className={`value${m.selling_at_loss ? ' neg' : ''}`}>{fmtMoney(m.unit_price)}</span>
+              {canWrite && <button type="button" className="link-btn" onClick={() => onEditPrice(m)}>تعديل سعر البيع</button>}
+            </div>
+          </>}
           <div className="inv-stat">
             <span className="label">آخر سعر شراء</span>
             <span className="value">{m.last_cost === null ? '—' : fmtMoney(m.last_cost)}</span>
             {m.last_cost_date && <span className="inv-sub">{fmtDay(m.last_cost_date)}</span>}
           </div>
-          <div className="inv-stat">
-            <span className="label">قيمة الرصيد</span>
-            <span className="value">{m.stock_value === null ? '—' : fmtMoney(m.stock_value)}</span>
-          </div>
+          {!cons && (
+            <div className="inv-stat">
+              <span className="label">قيمة الرصيد</span>
+              <span className="value">{m.stock_value === null ? '—' : fmtMoney(m.stock_value)}</span>
+            </div>
+          )}
         </div>
       </div>
 

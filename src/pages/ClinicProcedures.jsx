@@ -17,6 +17,8 @@ import { doctorsCount } from '../share-rule.js'
 // يحمل نسخة السعر لحظة إضافته. المجلس والمشرف العام والمدير يطالعون فقط.
 // ومن كل إجراء: «تطبيق قاعدة على دكاترة» (المشرفة) يكتب قاعدةً خاصّة عند عدّة دكاترة دفعةً
 // واحدة، و«تاريخ التسعيرة» (المشرفة والمدير) خطٌّ زمنيّ للسعر والقواعد — يطابق الخادم.
+// «المستهلكات»: قيمةٌ مقدّرة لقطنٍ وشاشٍ وبيتادين يستهلكها الإجراء كلّ مرّة (بلا رصيد ولا كمّيات) —
+// تُطرح من مبلغه لصندوق العيادات مع المواد، وتسري على ما يُضاف بعدها. الخادم لا يرسلها للاستقبال.
 const PRICING_HISTORY_READERS = ['clinic_admin', 'manager']
 
 // من يرى المراجعة (المواد بأسعارها والتقسيم) — يطابق SETTLEMENT_VIEWERS في الخادم.
@@ -33,7 +35,7 @@ const TABS = [
 ]
 
 function NewProcedureForm({ onCreated }) {
-  const [form, setForm] = useState({ name: '', price: '' })
+  const [form, setForm] = useState({ name: '', price: '', consumables: '' })
   // «عام» افتراضاً: إجراءٌ جديد يظهر للجميع حتى يُسنده المشرف — لا يختفي بصمت
   const [spec, setSpec] = useState({ isGeneral: true, specialtyIds: [] })
   const [err, setErr] = useState(null)
@@ -42,7 +44,7 @@ function NewProcedureForm({ onCreated }) {
     e.preventDefault()
     setErr(null); setBusy(true)
     try {
-      const created = await api.clinic.addProcedure({ name: form.name, price: form.price })
+      const created = await api.clinic.addProcedure({ name: form.name, price: form.price, consumables_cost: form.consumables })
       // الإنشاء يُولّد الإجراء «عامّاً» (قيمة العمود الافتراضية)، والاختصاصات
       // تُضبط بمسارها الذرّيّ. فلا نناديه إلا إن اختار المشرف غير الافتراضي —
       // وإخفاقه لا يُضيّع الإجراء: نقول إنّه أُنشئ عامّاً ليُسنده من الجدول.
@@ -54,9 +56,9 @@ function NewProcedureForm({ onCreated }) {
           setErr(`أُنشئ «${form.name.trim()}» لكن تعذّر إسناد الاختصاصات (${ex.message}) — أسنِدها من الجدول.`)
         }
       }
-      setForm({ name: '', price: '' })
+      setForm({ name: '', price: '', consumables: '' })
       setSpec({ isGeneral: true, specialtyIds: [] })
-      onCreated(form.name.trim())
+      onCreated(form.name.trim(), created?.warnings || [])
     } catch (ex) { setErr(ex.message) }
     finally { setBusy(false) }
   }
@@ -70,6 +72,10 @@ function NewProcedureForm({ onCreated }) {
       <div className="field"><label htmlFor="new-proc-price">السعر (ل.س)</label>
         <input id="new-proc-price" value={form.price} inputMode="decimal" placeholder="0"
           onChange={(e) => setForm({ ...form, price: toLatinDigits(e.target.value) })} required /></div>
+      <div className="field"><label htmlFor="new-proc-cons">المستهلكات المقدّرة (ل.س)</label>
+        <input id="new-proc-cons" value={form.consumables} inputMode="decimal" placeholder="0"
+          title="قطن وشاش وبيتادين يستهلكها الإجراء كلّ مرّة — تُطرح لصندوق العيادات"
+          onChange={(e) => setForm({ ...form, consumables: toLatinDigits(e.target.value) })} /></div>
       <ProcedureSpecialties id="new-proc-spec" isGeneral={spec.isGeneral} specialtyIds={spec.specialtyIds}
         canAdd onChange={setSpec} />
       <button type="submit" className="proc-form-btn" disabled={busy}>{busy ? 'جارٍ الإضافة…' : 'إضافة'}</button>
@@ -85,6 +91,7 @@ function EditRow({ proc, onSaved, onCancel }) {
   const dlg = useDialogs()
   const [name, setName] = useState(proc.name)
   const [price, setPrice] = useState(String(Number(proc.price)))
+  const [consumables, setConsumables] = useState(String(Number(proc.consumables_cost || 0)))
   const initialSpec = {
     isGeneral: !!proc.is_general || !(proc.specialties || []).length,
     specialtyIds: proc.is_general ? [] : (proc.specialties || []).map((x) => String(x.id)),
@@ -97,6 +104,7 @@ function EditRow({ proc, onSaved, onCancel }) {
     const body = {}
     if (name.trim() !== proc.name) body.name = name
     if (Number(price) !== Number(proc.price) || price.trim() === '') body.price = price
+    if (Number(consumables || 0) !== Number(proc.consumables_cost || 0)) body.consumables_cost = consumables || '0'
     if (Object.keys(body).length === 0 && !specChanged) return onCancel()
     if (body.price !== undefined) {
       const ok = await dlg.confirm({
@@ -104,6 +112,15 @@ function EditRow({ proc, onSaved, onCancel }) {
         body: `تغيير سعر «${proc.name}» من ${fmtMoney(proc.price)} إلى ${fmtMoney(price)}؟\n`
           + 'يسري على ما يُضاف بعد الحفظ فقط — ما أُضيف لحجوزات سابقة يبقى بسعره.',
         confirmLabel: 'غيّر السعر',
+      })
+      if (!ok) return
+    }
+    if (body.consumables_cost !== undefined) {
+      const ok = await dlg.confirm({
+        title: 'تغيير المستهلكات',
+        body: `تغيير مستهلكات «${proc.name}» من ${fmtMoney(proc.consumables_cost || 0)} إلى ${fmtMoney(consumables || 0)}؟\n`
+          + 'يسري على ما يُضاف بعد الحفظ فقط — الإجراءات المسجّلة تبقى بقيمتها.',
+        confirmLabel: 'غيّر المستهلكات',
       })
       if (!ok) return
     }
@@ -122,6 +139,8 @@ function EditRow({ proc, onSaved, onCancel }) {
       <td className="rt-full"><input value={name} maxLength={150} onChange={(e) => setName(e.target.value)} aria-label="اسم الإجراء" /></td>
       <td className="rt-full"><input value={price} inputMode="decimal" style={{ width: 130 }} aria-label="السعر"
         onChange={(e) => setPrice(toLatinDigits(e.target.value))} /></td>
+      <td className="rt-full"><input value={consumables} inputMode="decimal" style={{ width: 110 }} aria-label="المستهلكات المقدّرة"
+        onChange={(e) => setConsumables(toLatinDigits(e.target.value))} /></td>
       <td className="proc-edit-spec rt-full">
         <ProcedureSpecialties id={`edit-spec-${proc.id}`} hideLabel isGeneral={spec.isGeneral}
           specialtyIds={spec.specialtyIds} canAdd onChange={setSpec} />
@@ -151,6 +170,8 @@ export default function ClinicProcedures() {
   const setTab = (key) => setParams(key === 'catalog' ? {} : { tab: key }, { replace: true })
   const canEdit = role === 'clinic_admin'
   const canHistory = PRICING_HISTORY_READERS.includes(role)
+  // المستهلكات من التقسيم: لمن يراه وحده (والخادم لا يرسلها لغيره أصلاً)
+  const seesConsumables = SETTLEMENT_VIEWERS.includes(role)
   const [distributing, setDistributing] = useState(null)   // الإجراء الذي تُوزَّع قاعدته
   const [historyOf, setHistoryOf] = useState(null)
 
@@ -204,11 +225,15 @@ export default function ClinicProcedures() {
       <div className="card">
         <h3>الكتالوج ({list.length} — المفعَّل {active})</h3>
         {canEdit
-          ? <NewProcedureForm onCreated={(name) => { showToast(`أُضيف «${name}»`, 'success', 3000); load() }} />
+          ? <NewProcedureForm onCreated={(name, warnings) => {
+              if (warnings.length) showToast(`أُضيف «${name}» — ⚠ ${warnings.join('، ')}`, 'warning', 8000)
+              else showToast(`أُضيف «${name}»`, 'success', 3000)
+              load()
+            }} />
           : <p className="subtitle" style={{ marginTop: -6 }}>للاطّلاع فقط — يديره مسؤول العيادات.</p>}
         <table className="rtable" style={{ marginTop: 14 }}>
           <thead>
-            <tr><th>الإجراء</th><th>السعر الحالي</th><th>الاختصاصات</th><th>الحالة</th><th>استُعمل</th><th>آخر تعديل</th>{canHistory && <th></th>}</tr>
+            <tr><th>الإجراء</th><th>السعر الحالي</th>{seesConsumables && <th title="تُطرح لصندوق العيادات مع المواد">المستهلكات</th>}<th>الاختصاصات</th><th>الحالة</th><th>استُعمل</th><th>آخر تعديل</th>{canHistory && <th></th>}</tr>
           </thead>
           <tbody>
             {list.map((p) => editing === p.id ? (
@@ -222,6 +247,11 @@ export default function ClinicProcedures() {
               <tr key={p.id} className={p.is_active ? undefined : 'proc-inactive'}>
                 <td className="rt-title">{p.name}</td>
                 <td className="num" data-label="السعر الحالي">{fmtMoney(p.price)}</td>
+                {seesConsumables && (
+                  <td className="num" data-label="المستهلكات">
+                    {Number(p.consumables_cost) > 0 ? fmtMoney(p.consumables_cost) : <span className="muted">—</span>}
+                  </td>
+                )}
                 <td className="proc-spec-cell rt-full" data-label="الاختصاصات">
                   {specialtiesText(p) === 'عام' ? <span className="badge">عام</span> : specialtiesText(p)}
                 </td>
@@ -255,7 +285,7 @@ export default function ClinicProcedures() {
               </tr>
             ))}
             {list.length === 0 && (
-              <tr><td colSpan={canHistory ? 7 : 6} className="empty">لا إجراءات بعد{canEdit ? ' — أضف أولها أعلاه' : ''}</td></tr>
+              <tr><td colSpan={(canHistory ? 7 : 6) + (seesConsumables ? 1 : 0)} className="empty">لا إجراءات بعد{canEdit ? ' — أضف أولها أعلاه' : ''}</td></tr>
             )}
           </tbody>
         </table>

@@ -15,7 +15,8 @@ export default function Stocktake({ materials, onDone, onAddMaterial }) {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState(null)
 
-  const active = materials.filter((m) => m.is_active)
+  // الاستهلاكية بلا رصيد فلا تُجرد (والخادم يرفضها)
+  const active = materials.filter((m) => m.is_active && m.material_kind !== 'consumable')
   const shown = active.filter((m) => matchesAr(m.name, query))
   const filled = Object.entries(counts).filter(([, v]) => String(v).trim() !== '')
   const bad = filled.filter(([, v]) => Number.isNaN(parseNum(v)))

@@ -230,6 +230,8 @@ export const api = {
     materialsProfit: ({ period, from, to }) =>
       http(`/clinic/materials-profit?${new URLSearchParams(period ? { period } : { from, to: to || from })}`),
     doctorAccounts: (month) => http(`/clinic/doctor-accounts${month ? `?month=${month}` : ''}`),
+    // المستهلكات لشهر: مشتريات العبوات مقابل المستردّ من الإجراءات
+    consumablesReport: (month) => http(`/clinic/consumables-report${month ? `?month=${month}` : ''}`),
     // لوحة تحكم الدكتور: period = week | month | custom (مع from/to)
     doctorDashboard: (id, { period = 'week', from, to } = {}) => http(`/clinic/doctors/${id}/dashboard?${
       new URLSearchParams(period === 'custom' ? { period, from, to: to || from } : { period })}`),

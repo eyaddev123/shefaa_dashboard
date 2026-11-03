@@ -34,6 +34,8 @@ export const REASONS = [
 // حالة المخزون: كلمةٌ ونقطةٌ ملوّنة — البرتقالي للشراء، والأحمر للسالب، والباقي محايد
 export function stockStatus(m) {
   if (!m.is_active) return { cls: '', label: 'غير مفعّلة' }
+  // الاستهلاكية بلا رصيد يُعدّ: لا «سالب» ولا «تحتاج شراء» — مشترياتها تُقارَن بالمستردّ في تقرير المستهلكات
+  if (m.material_kind === 'consumable') return { cls: '', label: 'استهلاكية' }
   if (m.balance < 0) return { cls: 'bad', label: 'رصيد سالب' }
   if (m.needs_purchase) return { cls: 'warn', label: 'تحتاج شراء' }
   return { cls: '', label: 'متوفّرة' }

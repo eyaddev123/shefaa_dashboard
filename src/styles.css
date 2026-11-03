@@ -2321,13 +2321,13 @@ button.danger:hover:not(:disabled) { filter: brightness(1.08); }
    الاسم · السعر · الاختصاصات · الزرّ — بارتفاعٍ واحد وعلى خطٍّ واحد. */
 .proc-form {
   display: grid; gap: 10px 12px; align-items: end; margin-top: 14px;
-  grid-template-columns: minmax(180px, 2fr) minmax(110px, 1fr) minmax(220px, 2fr) auto;
+  grid-template-columns: minmax(180px, 2fr) minmax(110px, 1fr) minmax(110px, 1fr) minmax(220px, 2fr) auto;
 }
 .proc-form > .field { min-width: 0; }
 .proc-form input { box-sizing: border-box; height: var(--field-h); width: 100%; }
 .proc-form-btn { box-sizing: border-box; height: var(--field-h); padding: 0 22px; white-space: nowrap; }
 .proc-form-err { grid-column: 1 / -1; margin: 0; }
-/* الضيّق: الاسم والسعر، ثمّ الاختصاصات والزرّ */
+/* الضيّق: الاسم والسعر والمستهلكات (المستهلكات تنزل تحت السعر)، ثمّ الاختصاصات والزرّ */
 @media (max-width: 760px) {
   .proc-form { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); }
   .proc-form-btn { width: 100%; }
@@ -2564,6 +2564,31 @@ td.inv-balance { font-size: 15.5px; font-weight: 800; }
 .inv-hint-bad { color: var(--status-bad) !important; font-weight: 600; }
 .inv-total { font-size: 13px; color: var(--text-secondary); margin-top: -4px; }
 .inv-optional { border: 1px solid var(--grid); border-radius: 10px; padding: 10px 14px; }
+/* ملخّص توزيع آخر إضافة (المشرفة) ورفض الإضافة في صفحة الزيارة */
+.split-summary { border: 1px solid var(--grid); border-radius: 10px; padding: 10px 14px; margin-bottom: 10px;
+  background: var(--primary-soft); }
+.split-summary dl { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 8px 0; }
+.split-summary dl > div { display: flex; gap: 6px; align-items: baseline; }
+.split-summary dt { color: var(--text-secondary); font-size: 12.5px; }
+.split-summary dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+.proc-add-error { margin-top: 8px; }
+.proc-add-error p { margin: 0 0 6px; font-weight: 600; }
+.proc-add-error a { display: inline-block; margin-inline-end: 12px; }
+.proc-add-consumables { margin: 6px 0 0; font-size: 12.5px; color: var(--text-secondary); }
+/* المراجعة: حقل المستهلكات وسببه تحت محرّر المواد */
+.rev-consumables { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 8px; font-size: 13px; }
+.rev-consumables input { margin-inline-start: 6px; }
+/* تقرير المستهلكات: جدولا المشتريات والمستردّ متجاوران على العريض */
+.fund-cons-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); margin-top: 12px; }
+.fund-cons-grid h4 { margin: 0 0 6px; }
+/* نوع المادة: خياران متجاوران، والمختار بإطار — على الضيّق تحت بعضهما */
+.inv-kind { display: flex; gap: 8px; flex-wrap: wrap; }
+.inv-kind > label { flex: 1 1 200px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px;
+  border: 1px solid var(--grid); border-radius: 10px; padding: 8px 10px; cursor: pointer; font-weight: 500; }
+.inv-kind > label.is-on { border-color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary); }
+.inv-kind > label .hint { flex-basis: 100%; font-weight: 400; }
+.inv-kind input[type=radio] { width: auto; height: auto; min-height: 0; margin: 0; padding: 0; box-shadow: none; flex: none; }
+.kind-badge { font-size: 11px; }
 .inv-optional > summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--text-secondary); }
 .inv-optional[open] > summary { margin-bottom: 12px; }
 .inv-optional > .field, .inv-optional > .inv-form-row { margin-bottom: 10px; }

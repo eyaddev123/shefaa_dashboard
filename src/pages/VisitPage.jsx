@@ -5,7 +5,7 @@
 // إعادة تنظيمٍ للعرض لا للمنطق: البيانات من مسار الطابور نفسه (/queue) فلا حقل جديد ولا
 // صلاحية جديدة، والأقسام هي مكوّنات اللوحة القديمة كما هي.
 import { Fragment, useEffect, useState } from 'react'
-import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useDialogs } from '../dialogs.jsx'
 import { loadPrinter, printTicket, ticketFrom, MAX_COPIES } from '../ticket-print.js'
 import { printViaHelper } from '../print-helper.js'
@@ -669,6 +669,40 @@ function StockWarnings({ items, isSupervisor, onClose }) {
   )
 }
 
+// ═══ رفض الإضافة: يبقى ظاهراً حتى تُغيَّر المحاولة (لا toast يفوت) ═══
+// «بلا قاعدة» أهمّها: الخادم يرفض إجراءً لدكتورٍ بلا قاعدة حصص، والمشرفة تُدعى لتسجيلها من بروفايله.
+function AddError({ err, doctorId, isSupervisor, onClose }) {
+  return (
+    <div className="warn-box proc-add-error" role="alert">
+      <p>{err.message}</p>
+      {err.code === 'DOCTOR_NO_SHARE_RULE' && isSupervisor && doctorId && (
+        <Link to={`/clinic/doctors/${doctorId}`}>سجّلي قاعدة الدكتور من بروفايله ←</Link>
+      )}
+      <button type="button" className="ghost" onClick={onClose}>حسناً</button>
+    </div>
+  )
+}
+
+// ═══ ملخّص توزيع آخر إضافة — للمشرفة وحدها (الخادم لا يرسل التقسيم لغيرها) ═══
+// المستهلكات بندٌ للقراءة من قيمة نوع الإجراء؛ تعديلها الاستثنائي من «المراجعة» بسبب.
+function SplitSummary({ s, onClose }) {
+  const counted = Number(s.materials_cost) - Number(s.consumables_cost || 0)
+  return (
+    <div className="split-summary" role="status">
+      <strong>«{s.name}» — التوزيع</strong>
+      <dl>
+        <div><dt>السعر</dt><dd>{fmtMoney(s.price)}</dd></div>
+        <div><dt>المواد</dt><dd>{fmtMoney(counted)}</dd></div>
+        <div><dt>المستهلكات</dt><dd>{fmtMoney(s.consumables_cost || 0)}</dd></div>
+        <div><dt>الدكتور</dt><dd>{fmtMoney(s.doctor_share)}</dd></div>
+        <div><dt>الشفاء</dt><dd>{fmtMoney(s.shifa_share)}</dd></div>
+      </dl>
+      {(s.warnings || []).length > 0 && <p className="share-warn">⚠ {s.warnings.join(' · ')}</p>}
+      <button type="button" className="ghost" onClick={onClose}>إغلاق</button>
+    </div>
+  )
+}
+
 function AppointmentProcedures({ appt, session, onChanged, onToast }) {
   const { clinicRole: role, user } = useRole()
   const [catalog, setCatalog] = useState(null)
@@ -681,6 +715,9 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
   const [editing, setEditing] = useState(null)     // id السطر الجاري تعديل موادّه
   const [editMats, setEditMats] = useState([])
   const [stockWarns, setStockWarns] = useState([])   // من ردّ آخر حفظ — يبقى حتى «حسناً»
+  const [addErr, setAddErr] = useState(null)          // {message, code} — رفض الإضافة، يبقى حتى «حسناً»
+  const [split, setSplit] = useState(null)            // ملخّص توزيع آخر حفظ (للمشرفة)
+  const isSupervisor = role === 'clinic_admin'
   const lines = appt.procedures || []
   // «حاضر» أيضاً: الدفع المسبق قبل دخوله (المريض أمام الاستقبال يدفع الآن). و«بانتظار العودة»
   // دخل على الطبيب ثمّ خرج مؤقتاً — والقطرة نفسها إجراءٌ يُضاف وهو في الصالة
@@ -709,8 +746,9 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
     const forDoctor = role === 'clinic_admin' ? null : session.doctor_id
     api.clinic.procedures(forDoctor).then((r) => setCatalog(r.filter((p) => p.is_active)))
       .catch((e) => onToast(e.message))
-    // كتالوج المواد كاملاً، المفعَّل وحده (المعطَّلة تختفي من البحث)
-    api.clinic.materials().then((r) => setMatCatalog(r.filter((m) => m.is_active !== false)))
+    // كتالوج المواد كاملاً، المفعَّل المعدود وحده (المعطَّلة والاستهلاكية تختفيان من البحث —
+    // الخادم يرشّحهما للاستقبال، والمشرفة تتسلّم الكتالوج كلّه بنوعه)
+    api.clinic.materials().then((r) => setMatCatalog(r.filter((m) => m.is_active !== false && m.material_kind !== 'consumable')))
       .catch((e) => onToast(e.message))
   }, [canEdit])
 
@@ -720,14 +758,15 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
 
   const add = async () => {
     if (!chosen || !qtyValid(newMats)) return
-    setBusy(true)
+    setBusy(true); setAddErr(null)
     try {
       const r = await api.clinic.addAppointmentProcedure(appt.id, chosen.id, toPayload(newMats))
       setStockWarns(r.stock_warnings || [])
+      setSplit(r.doctor_share !== undefined ? { ...r, name: chosen.name, price: chosen.price } : null)
       const withMats = newMats.length ? ` + ${newMats.length} ${newMats.length === 1 ? 'مادة' : 'مواد'}` : ''
       onToast(`أُضيف «${chosen.name}» — ${fmtMoney(chosen.price)}${withMats}`, 'success')
       setPick(''); setNewMats([]); onChanged()
-    } catch (ex) { onToast(ex.message) }
+    } catch (ex) { setAddErr({ message: ex.message, code: ex.data?.code }) }
     finally { setBusy(false) }
   }
   const remove = async (line) => {
@@ -749,6 +788,7 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
     try {
       const r = await api.clinic.setLineMaterials(appt.id, line.id, { materials: toPayload(editMats) })
       setStockWarns(r.stock_warnings || [])
+      if (r.doctor_share !== undefined && !r.unchanged) setSplit({ ...r, name: line.name, price: line.price })
       onToast(r.unchanged ? 'لا تغيير في المواد' : `حُدّثت مواد «${line.name}»`, 'success')
       setEditing(null); onChanged()
     } catch (ex) { onToast(ex.message) }
@@ -760,6 +800,7 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
       {stockWarns.length > 0 && (
         <StockWarnings items={stockWarns} isSupervisor={role === 'clinic_admin'} onClose={() => setStockWarns([])} />
       )}
+      {split && <SplitSummary s={split} onClose={() => setSplit(null)} />}
       {lines.length === 0 ? (
         <p className="visit-empty">{canEdit ? 'لا إجراءات بعد — اختر الإجراء من القائمة وأضفه.' : 'لا إجراءات على هذه الزيارة.'}</p>
       ) : (
@@ -845,7 +886,7 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
         canEdit ? (
           <div className="proc-add-box">
             <div className="proc-add">
-              <select value={pick} onChange={(e) => setPick(e.target.value)} aria-label="الإجراء">
+              <select value={pick} onChange={(e) => { setPick(e.target.value); setAddErr(null) }} aria-label="الإجراء">
                 <option value="">{catalog === null ? 'جارٍ التحميل…' : choices.length ? '— اختر إجراءً —' : 'لا إجراءات متاحة'}</option>
                 {choices.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
@@ -853,6 +894,14 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
               <span className="proc-add-price">{chosen ? fmtMoney(chosen.price) : '—'}</span>
               <button disabled={!chosen || busy || !qtyValid(newMats)} onClick={add}>+ إجراء</button>
             </div>
+            {/* المستهلكات المقدّرة لنوع الإجراء — للمشرفة وحدها (الخادم لا يرسلها للاستقبال): قراءةٌ فقط */}
+            {chosen && isSupervisor && Number(chosen.consumables_cost) > 0 && (
+              <p className="proc-add-consumables">
+                المستهلكات المقدّرة لـ«{chosen.name}»: <strong>{fmtMoney(chosen.consumables_cost)}</strong> — تُطرح لصندوق العيادات
+                مع المواد قبل حصّة الدكتور. (تعديلها على سطرٍ بعينه من «المراجعة»، بسبب.)
+              </p>
+            )}
+            {addErr && <AddError err={addErr} doctorId={session.doctor_id} isSupervisor={isSupervisor} onClose={() => setAddErr(null)} />}
             {/* المواد بعد اختيار الإجراء: اختيارية — إجراءٌ بلا مواد يُضاف كما هو */}
             {chosen && (
               <div className="proc-add-mats">

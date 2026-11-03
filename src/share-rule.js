@@ -10,10 +10,12 @@ export function ruleText(r) {
   if (!r) return 'بلا'
   const kind = r.kind ?? r.share_kind
   const value = Number(r.value ?? r.share_value)
+  if (kind === 'percent' && value === 0) return '0٪ — كامل المبلغ للشفاء'
   return kind === 'percent' ? `${value}٪ بعد المواد` : `مبلغ ثابت ${fmtMoney(value)}`
 }
 
-export const FIXED_ABOVE_PRICE = 'المبلغ الثابت أعلى من سعر الإجراء — حصّة الشفاء ستطلع سالبة في هذا الإجراء'
+// لا حصّة سالبة: المبلغ الثابت فوق الباقي يُسقَّف به (يطابق FIXED_ABOVE_PRICE_WARNING في الخادم)
+export const FIXED_ABOVE_PRICE = 'المبلغ الثابت أعلى من سعر الإجراء — سيأخذ الدكتور كلّ ما يبقى بعد المواد والمستهلكات، وحصّة الشفاء صفر'
 
 /**
  * @returns {{error: string|null, warning: string|null, value: number|null}}
@@ -34,14 +36,15 @@ export function checkRule(kind, raw, price) {
 export function afterDeleteText(doctor) {
   if (doctor.share_kind === 'percent') return `بعد الحذف سيُحسب له حسب النسبة العامّة ${Number(doctor.share_value)}٪`
   if (doctor.share_kind === 'fixed') return `بعد الحذف سيُحسب له حسب قاعدته العامّة: مبلغ ثابت ${fmtMoney(doctor.share_value)}`
-  return 'بعد الحذف ستكون حصّته من هذا الإجراء صفراً — لا نسبة عامّة له'
+  return 'بعد الحذف لن يُقبل إجراءٌ من هذا النوع له — لا نسبة عامّة له'
 }
 
 // ═══ نصّ سطر تاريخ التسعيرة — من جهة الإجراء (اسم الدكتور) أو من جهة الدكتور (اسم الإجراء) ═══
 // القيم JSON من الخادم: القاعدة {kind, value}، والسعر {price}.
 export const doctorsCount = (n) => (n === 1 ? 'دكتور واحد' : n === 2 ? 'دكتورَين'
   : n <= 10 ? `${n} دكاترة` : `${n} دكتوراً`)
-const pct = (r) => (!r ? 'بلا نسبة' : r.kind === 'percent' ? `${r.value}٪` : `مبلغ ثابت ${fmtMoney(r.value)} (قديمة)`)
+const pct = (r) => (!r ? 'بلا نسبة' : r.kind === 'percent'
+  ? (Number(r.value) === 0 ? '0٪ (كامل المبلغ للشفاء)' : `${r.value}٪`) : `مبلغ ثابت ${fmtMoney(r.value)} (قديمة)`)
 
 /** @param {'procedure'|'doctor'} side */
 export function pricingText(h, side) {
@@ -50,6 +53,8 @@ export function pricingText(h, side) {
   const batch = side === 'doctor' && h.in_batch ? ' (بتوزيعٍ من صفحة الإجراءات)' : ''
   switch (h.action) {
     case 'price': return o ? `السعر: ${fmtMoney(o.price)} ← ${fmtMoney(n.price)}` : `أُنشئ الإجراء بسعر ${fmtMoney(n.price)}`
+    case 'consumables': return o ? `المستهلكات: ${fmtMoney(o.consumables_cost)} ← ${fmtMoney(n.consumables_cost)}`
+      : `المستهلكات: ${fmtMoney(n.consumables_cost)}`
     case 'general_share': return `النسبة العامّة: ${pct(o)} ← ${pct(n)}`
     case 'rule_add': return `${who}أُضيفت قاعدة ${ruleText(n)}${batch}`
     case 'rule_edit': return `${who}${ruleText(o)} ← ${ruleText(n)}${batch}`

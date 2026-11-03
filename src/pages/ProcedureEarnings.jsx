@@ -100,17 +100,19 @@ export function ruleText(l) {
   if (l.ruleSource === 'none') return 'بلا قاعدة'
   if (l.ruleSource === 'manual') return 'تجاوز يدوي'
   const v = fmtNum(l.ruleValue)
+  if (l.ruleKind === 'percent' && Number(l.ruleValue) === 0) return '٠٪ — للشفاء'
   if (l.ruleKind === 'fixed') return l.ruleSource === 'doctor' ? `العامة ثابت ${v}` : `ثابت ${v}`
   return l.ruleSource === 'doctor' ? `العامة ${v}٪` : `نسبة ${v}٪`
 }
 
 const qty = (q) => Number(q).toLocaleString('ar-SY', { maximumFractionDigits: 2 })
 function Items({ l }) {
-  if (l.items.length === 0 && !l.legacyMaterials) return <span className="muted">بلا مواد</span>
+  if (l.items.length === 0 && !l.legacyMaterials && !l.consumables) return <span className="muted">بلا مواد</span>
   return (
     <span className="earn-items">
       {l.items.map((m, i) => <span key={i}>{m.name} ×{qty(m.qty)} {m.unit}</span>)}
       {l.legacyMaterials > 0 && <span>مواد سابقة (إجمالي)</span>}
+      {l.consumables > 0 && <span>مستهلكات {fmtNum(l.consumables)}</span>}
     </span>
   )
 }
