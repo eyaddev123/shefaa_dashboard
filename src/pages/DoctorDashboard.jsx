@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { api, todayLocal } from '../api.js'
-import { PunctualityTiles, DutyCalendar, LateDays } from '../components/Punctuality.jsx'
+import { PunctualityTiles, DutyCalendar, LateDays, fmtMinutes } from '../components/Punctuality.jsx'
 
 // ═══ لوحة تحكم الدكتور ═══
 // صفحةٌ لكلّ دكتور (من قائمة الدكاترة)، للمشرفة والمدير والمشرف العام — قراءة وحدها.
@@ -149,7 +149,7 @@ export default function DoctorDashboard() {
           </div>
 
           <div className="card">
-            <h3>أيام التأخير <span className="pn-grace">بعد {fmtNum(shown.grace)} دقائق من بداية الدوام</span></h3>
+            <h3>أيام التأخير <span className="pn-grace">بعد {fmtMinutes(shown.grace)} من بداية الدوام</span></h3>
             <LateDays days={shown.days} />
           </div>
         </>

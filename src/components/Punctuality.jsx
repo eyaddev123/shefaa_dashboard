@@ -7,6 +7,8 @@ export const DAY_LABELS = {
   on_time: 'بالوقت', late: 'متأخّر', absent: 'غائب', estimated: 'تقديري', pending: 'لم يُحسم بعد',
 }
 const fmtInt = (n) => Number(n || 0).toLocaleString('ar-SY')
+// السماح من الخادم (LATE_GRACE_MINUTES): «١٥ دقيقة»، «١٠ دقائق»
+export const fmtMinutes = (n) => `${Number(n).toLocaleString('ar-SY')} ${n >= 3 && n <= 10 ? 'دقائق' : 'دقيقة'}`
 export const fmtPct = (c) => (c === null || c === undefined ? '—' : `${Math.round(c * 100).toLocaleString('ar-SY')}٪`)
 const minutes = (n) => `${fmtInt(n)} د`
 

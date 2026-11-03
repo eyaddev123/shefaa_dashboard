@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { api, fmtMoney, openStaffStream } from '../api.js'
 import { useDialogs } from '../dialogs.jsx'
 import { useToast } from '../action-feedback.jsx'
-import { PunctualityTiles, DutyCalendar } from '../components/Punctuality.jsx'
+import { PunctualityTiles, DutyCalendar, fmtMinutes } from '../components/Punctuality.jsx'
 
 // ═══════════════════════════════════════════════════════════════════
 // «أعمالي» — صفحة الطبيب المستقلّة في القائمة الجانبية (تحت «شاشتي»)
@@ -128,7 +128,7 @@ function MyPunctuality() {
         <>
           <PunctualityTiles p={shown.punctuality} />
           <DutyCalendar from={shown.from} to={shown.to} days={shown.days} />
-          <p className="dk-hint">بالوقت = وصلت خلال {shown.grace.toLocaleString('ar-SY')} دقائق من بداية الدوام أو قبلها، بكبسة
+          <p className="dk-hint">بالوقت = وصلت خلال {fmtMinutes(shown.grace)} من بداية الدوام أو قبلها، بكبسة
             «وصل الطبيب» عند الاستقبال.</p>
         </>
       )}
