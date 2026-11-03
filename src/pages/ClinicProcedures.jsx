@@ -144,7 +144,7 @@ export default function ClinicProcedures() {
   const [editing, setEditing] = useState(null)
   const [params, setParams] = useSearchParams()
   const [toast, showToast] = useToast()
-  const { role } = useRole()
+  const { clinicRole: role } = useRole()
   const tabs = SETTLEMENT_VIEWERS.includes(role) ? TABS.filter((t) => !t.allow || t.allow(role)) : []
   const tab = tabs.some((t) => t.key === params.get('tab')) ? params.get('tab') : 'catalog'
   // تبديل التبويب يمسح معاملات التبويب السابق (فترة المستحقات ودكتورها)

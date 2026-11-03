@@ -43,7 +43,7 @@ function NewSourceForm({ onCreated }) {
 function SourcesTab({ showToast, onOpenDues }) {
   const dlg = useDialogs()
   // المشرف العام والمدير يطالعون الجهات بلا إضافة ولا تعديل ولا إيقاف ولا حذف
-  const canWrite = canWriteReferralSources(useRole().role)
+  const canWrite = canWriteReferralSources(useRole().clinicRole)
   const [data, setData] = useState(null)
   const [err, setErr] = useState(null)
   const [editing, setEditing] = useState(null)   // { id, name }

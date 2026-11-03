@@ -83,7 +83,7 @@ function SidebarSearch() {
 }
 
 function Sidebar({ onNavigate }) {
-  const { user, role, isChairman, logout } = useRole()
+  const { user, role, clinicRole, isChairman, logout } = useRole()
   const aid = canReadAid(role)
   return (
     <aside className="sidebar" onClick={(e) => {
@@ -125,20 +125,20 @@ function Sidebar({ onNavigate }) {
         {aid && <NavLink to="/catalog">{I.catalog} الأسعار الطبية</NavLink>}
         {(role === 'officer' || role === 'accountant') && <NavLink to="/reconciliation">{I.sync} مطابقة الأمين</NavLink>}
         {/* العيادات: اليوميّ أولاً، ثمّ الإدارة (الدكاترة، الإجراءات، الإحالات)، ثمّ المال والتقارير. */}
-        {canReadClinic(role) && <div className="nav-section">العيادات</div>}
-        {canSeeClinicBoard(role) && <NavLink to="/clinic/board">{I.clinic} اللوحة اليومية</NavLink>}
-        {canSeeDoctorScreen(role) && <NavLink to="/clinic/doctor">{I.clinic} شاشتي</NavLink>}
+        {canReadClinic(clinicRole) && <div className="nav-section">العيادات</div>}
+        {canSeeClinicBoard(clinicRole) && <NavLink to="/clinic/board">{I.clinic} اللوحة اليومية</NavLink>}
+        {canSeeDoctorScreen(clinicRole) && <NavLink to="/clinic/doctor">{I.clinic} شاشتي</NavLink>}
         {/* أرقام الطبيب في صفحتها وحدها — الشاشة الرئيسية بلا مبالغ */}
-        {canSeeDoctorScreen(role) && <NavLink to="/clinic/my-work">{I.clinic} أعمالي</NavLink>}
-        {canSeeDoctorsPage(role) && <NavLink to="/clinic/doctors">{I.clinic} الدكاترة والدوام</NavLink>}
+        {canSeeDoctorScreen(clinicRole) && <NavLink to="/clinic/my-work">{I.clinic} أعمالي</NavLink>}
+        {canSeeDoctorsPage(clinicRole) && <NavLink to="/clinic/doctors">{I.clinic} الدكاترة والدوام</NavLink>}
         {/* تبويب «المستحقات» لمن يراه وحده — المجلس يرى الإجراءات بلا مستحقات */}
-        {canSeeProceduresPage(role) && canSeeEarnings(role) && <NavLink to="/clinic/procedures">{I.clinic} الإجراءات والمستحقات</NavLink>}
-        {canSeeProceduresPage(role) && !canSeeEarnings(role) && <NavLink to="/clinic/procedures">{I.clinic} الإجراءات</NavLink>}
-        {canSeeReferralsPage(role) && <NavLink to="/clinic/referrals">{I.clinic} الإحالات</NavLink>}
-        {canSeeInventory(role) && <NavLink to="/inventory">{I.inventory} المخزون</NavLink>}
-        {canSeeClinicFunds(role) && <NavLink to="/clinic/fund">{I.treasury} صندوق العيادات</NavLink>}
-        {canSeeDoctorDashboard(role) && <NavLink to="/clinic/doctor-reports">{I.chart} تقارير الدكاترة</NavLink>}
-        {canSeePrinterSetup(role) && <NavLink to="/clinic/printer">{I.settings} إعداد الطابعة</NavLink>}
+        {canSeeProceduresPage(clinicRole) && canSeeEarnings(clinicRole) && <NavLink to="/clinic/procedures">{I.clinic} الإجراءات والمستحقات</NavLink>}
+        {canSeeProceduresPage(clinicRole) && !canSeeEarnings(clinicRole) && <NavLink to="/clinic/procedures">{I.clinic} الإجراءات</NavLink>}
+        {canSeeReferralsPage(clinicRole) && <NavLink to="/clinic/referrals">{I.clinic} الإحالات</NavLink>}
+        {canSeeInventory(clinicRole) && <NavLink to="/inventory">{I.inventory} المخزون</NavLink>}
+        {canSeeClinicFunds(clinicRole) && <NavLink to="/clinic/fund">{I.treasury} صندوق العيادات</NavLink>}
+        {canSeeDoctorDashboard(clinicRole) && <NavLink to="/clinic/doctor-reports">{I.chart} تقارير الدكاترة</NavLink>}
+        {canSeePrinterSetup(clinicRole) && <NavLink to="/clinic/printer">{I.settings} إعداد الطابعة</NavLink>}
         {(canManageUsers(role) || canSeeSettings(role)) && <div className="nav-sep" />}
         {canManageUsers(role) && <NavLink to="/users">{I.users} الموظفون والصلاحيات</NavLink>}
         {canSeeSettings(role) && <NavLink to="/settings">{I.settings} الإعدادات</NavLink>}
@@ -154,9 +154,10 @@ function Sidebar({ onNavigate }) {
 }
 
 // حارس المسار: يعيد التوجيه لأول صفحة مسموحة بدل عرض صفحة ممنوعة أو بيضاء
+// المدير المسؤول يمرّ إلى صفحات العيادات بدوره فيها (clinicRole = manager) وإلى المساعدات بدوره board
 function Guard({ allow, children }) {
-  const { role } = useRole()
-  if (!allow(role)) return <Navigate to={homePathFor(role)} replace />
+  const { role, clinicRole } = useRole()
+  if (!allow(role) && !allow(clinicRole)) return <Navigate to={homePathFor(role)} replace />
   return children
 }
 

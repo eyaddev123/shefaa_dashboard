@@ -344,7 +344,7 @@ export default function ClinicBoard() {
   const [sessions, setSessions] = useState(null)
   const [err, setErr] = useState(null)
   const [busy, setBusy] = useState(false)
-  const { role } = useRole()
+  const { clinicRole: role } = useRole()
   const navigate = useNavigate()
   const [busyId, setBusyId] = useState(null)
   // الإغلاق الكانس: { session, pending } حين ردّ الخادم بمعلَّقين — انظر CloseSweepDialog

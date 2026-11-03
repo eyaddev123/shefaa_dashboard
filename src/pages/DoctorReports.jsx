@@ -7,7 +7,7 @@ import { DoctorsTab } from './ClinicFunds.jsx'
 // القائمة، واسم كلّ دكتور يفتح لوحة تحكمه على الشهر ذاته — فأرقام البطاقة المالية هناك = هذا الجدول.
 // المشرفة والمدير والمشرف العام (قراءة وحدها؛ إعداد الراتب من بروفايل الدكتور).
 export default function DoctorReports() {
-  const { role } = useRole()
+  const { clinicRole: role } = useRole()
   return (
     <>
       <h2>تقارير الدكاترة</h2>
