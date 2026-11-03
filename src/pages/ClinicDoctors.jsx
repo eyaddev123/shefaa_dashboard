@@ -196,7 +196,7 @@ function ScheduleForm({ doctorId, schedule, onSaved, onCancel }) {
 
 function DoctorRow({ doctor, onChanged, onSchedulesChanged }) {
   const dlg = useDialogs()
-  const { role } = useRole()
+  const { clinicRole: role } = useRole()
   const canEdit = role === 'clinic_admin'
   const [expanded, setExpanded] = useState(false)
   const [schedules, setSchedules] = useState(null)
@@ -418,7 +418,7 @@ function SchedulePreview({ version }) {
 }
 
 export default function ClinicDoctors() {
-  const { role } = useRole()
+  const { clinicRole: role } = useRole()
   const [doctors, setDoctors] = useState(null)
   const [err, setErr] = useState(null)
   const [query, setQuery] = useState('')

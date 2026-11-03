@@ -175,7 +175,7 @@ function CatalogTable({ list }) {
 }
 
 export default function Inventory() {
-  const { role } = useRole()
+  const { clinicRole: role } = useRole()
   const canWrite = canWriteInventory(role)
   const view = inventoryView(role)
   if (view === 'catalog') return <InventoryCatalogView />

@@ -228,7 +228,7 @@ function ChangeLog({ doctorId, reloadKey }) {
 
 export default function DoctorProfile() {
   const { id } = useParams()
-  const { role } = useRole()
+  const { clinicRole: role } = useRole()
   const [doctor, setDoctor] = useState(null)
   const [globalBuffer, setGlobalBuffer] = useState(null)
   const [err, setErr] = useState(null)

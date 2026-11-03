@@ -31,17 +31,20 @@ for (const line of nav.split('\n')) {
   if (m) items.push({ kind: 'sep', cond: m[1], label: '—' })
 }
 const names = Object.keys(perms)
-const visible = (role) => items.filter((l) => {
+// «board_chairman» = عضو مجلس بـ is_chairman (المدير المسؤول): role = board، وclinicRole = manager
+const userOf = (r) => (r === 'board_chairman' ? { role: 'board', is_chairman: true } : { role: r })
+const visible = (r) => items.filter((l) => {
+  const u = userOf(r), role = u.role, clinicRole = perms.clinicRoleOf(u)
   // eslint-disable-next-line no-new-func
-  const f = new Function('role', 'aid', ...names, `return (${l.cond})`)
-  return f(role, perms.canReadAid(role), ...names.map((n) => perms[n]))
+  const f = new Function('role', 'clinicRole', 'aid', ...names, `return (${l.cond})`)
+  return f(role, clinicRole, perms.canReadAid(role), ...names.map((n) => perms[n]))
 })
 
 const SECTION_OF = (to) => to === '/' ? null
   : to.startsWith('/clinic/') || to === '/inventory' ? 'العيادات'
   : ['/users', '/settings'].includes(to) ? 'عام' : 'طلبات المساعدة'
 
-const ROLES = ['clinic_admin', 'clinic_reception', 'doctor', 'board', 'super_admin', 'manager', 'officer', 'accountant']
+const ROLES = ['clinic_admin', 'clinic_reception', 'doctor', 'board', 'board_chairman', 'super_admin', 'manager', 'officer', 'accountant']
 const AID = ['الطلبات', 'العائلات (الملفات)', 'مراجعة البيانات', 'سندات الصرف', 'الخزينة والإيرادات', 'الأسعار الطبية']
 const CLINIC_ALL = ['اللوحة اليومية', 'الدكاترة والدوام', 'الإجراءات والمستحقات', 'الإحالات', 'المخزون', 'صندوق العيادات',
   'تقارير الدكاترة']
@@ -56,6 +59,8 @@ const WANT = {
   super_admin: ['لوحة القيادة', '[طلبات المساعدة]', ...AID, '[العيادات]', ...CLINIC_ALL, '—', 'الموظفون والصلاحيات', 'الإعدادات'],
   board: ['لوحة القيادة', '[طلبات المساعدة]', ...AID, '[العيادات]', 'اللوحة اليومية', 'الدكاترة والدوام', 'الإجراءات',
     'المخزون', '—', 'الإعدادات'],
+  // المدير المسؤول: المساعدات كعضو مجلس، والعيادات كالمدير حرفياً (قرار المستخدم 2026-11-03)
+  board_chairman: ['لوحة القيادة', '[طلبات المساعدة]', ...AID, '[العيادات]', ...CLINIC_ALL, '—', 'الإعدادات'],
   officer: ['لوحة القيادة', '[طلبات المساعدة]', ...AID, 'مطابقة الأمين'],
   accountant: ['لوحة القيادة', '[طلبات المساعدة]', ...AID, 'مطابقة الأمين'],
 }
@@ -85,6 +90,12 @@ check('★ المدير يرى كلّ صفحات العيادات: اللوحة 
   CLINIC_ALL.every((l) => mgr.includes(l)), mgr.join('، '))
 check('★ تقارير الدكاترة والإحالات لا تظهر للطبيب ولا للاستقبال ولا للمجلس',
   ['doctor', 'clinic_reception', 'board'].every((r) => !['تقارير الدكاترة', 'الإحالات'].some((l) => show(visible(r)).includes(l))))
+
+const sect = (r) => { const v = show(visible(r)); return v.slice(v.indexOf('[العيادات]'), v.indexOf('—')) }
+check('★ المدير المسؤول يرى قسم العيادات نفسه حرفياً كالمدير', JSON.stringify(sect('board_chairman')) === JSON.stringify(sect('manager')),
+  sect('board_chairman').join('، '))
+check('★ عضو المجلس العادي لا يرى الصندوق ولا التقارير ولا الإحالات',
+  !['صندوق العيادات', 'تقارير الدكاترة', 'الإحالات'].some((l) => show(visible('board')).includes(l)))
 
 console.log(`\n${fail === 0 ? '✔' : '✘'} ${pass} نجح، ${fail} فشل`)
 process.exit(fail === 0 ? 0 : 1)

@@ -59,7 +59,7 @@ function VisitHeader({ appt, data, actions, onBack, onDone, onError }) {
 // كلّه من الخادم (patient_total بعد خصم الإحالات) — لا حساب في الواجهة.
 // للعرض وحده: لا شيء يُكتب في الخزينة.
 function PaymentCard({ appt, session, onToast }) {
-  const { role } = useRole()
+  const { clinicRole: role } = useRole()
   const live = (appt.procedures || []).filter((l) => !l.removed_at)
   const refs = appt.referrals || []
   const final = appt.patient_total ?? appt.total ?? appt.fee
@@ -151,7 +151,7 @@ function ReprintButton({ appt, session, onToast }) {
 const GENDERS = { male: 'ذكر', female: 'أنثى' }
 function PatientCard({ appt, session, onChanged, onToast, onArrived }) {
   const dlg = useDialogs()
-  const { role } = useRole()
+  const { clinicRole: role } = useRole()
   const [busy, setBusy] = useState(false)
   const [editingForm, setEditingForm] = useState(false)
   const [swap, setSwap] = useState(false)
@@ -337,7 +337,7 @@ function PatientCard({ appt, session, onChanged, onToast, onArrived }) {
 // المشرفة والمدير: الخط الزمني الكامل (من سجّل وعلّم حاضراً وأضاف…) بالصيغة نفسها التي
 // في لوحة الجرد. والاستقبال سجلّ التعديلات كما كان — لا يراقب الموظفون بعضهم.
 function HistoryCard({ appt, session, onToast }) {
-  const { role } = useRole()
+  const { clinicRole: role } = useRole()
   const full = canSeeVisitAudit(role)
   const [open, setOpen] = useState(false)
   return (
@@ -439,7 +439,7 @@ export default function VisitPage() {
 // و«+ إحالة» يختفي حين تكتمل التغطية. الاستقبال في يوم الجلسة، والمشرف أي وقت (الخادم هو
 // الحارس). كل حفظٍ يُعيد الخادمُ به الحساب — والطابور يُحدَّث من ردّه لا من حساب الواجهة.
 function ReferralSection({ appt, session, onChanged, onToast }) {
-  const { role } = useRole()
+  const { clinicRole: role } = useRole()
   const dlg = useDialogs()
   const list = appt.referrals || []
   const [editing, setEditing] = useState(null)   // مسوّدة: جديدة (بلا id) أو تعديل إحالةٍ قائمة
@@ -670,7 +670,7 @@ function StockWarnings({ items, isSupervisor, onClose }) {
 }
 
 function AppointmentProcedures({ appt, session, onChanged, onToast }) {
-  const { role, user } = useRole()
+  const { clinicRole: role, user } = useRole()
   const [catalog, setCatalog] = useState(null)
   const [matCatalog, setMatCatalog] = useState(null)
   const [pick, setPick] = useState('')

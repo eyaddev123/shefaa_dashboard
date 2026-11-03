@@ -269,7 +269,7 @@ export default function CashReport() {
   const [err, setErr] = useState(null)
   const [open, setOpen] = useState({})
   const [downloading, setDownloading] = useState(false)
-  const { role } = useRole()
+  const { clinicRole: role } = useRole()
   const audit = canSeeVisitAudit(role)
   const [logOf, setLogOf] = useState(null)   // { line, doctor } — اللوحة الجانبية مفتوحة عليه
 

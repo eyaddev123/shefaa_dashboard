@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { api, getToken } from './api.js'
+import { clinicRoleOf } from './permissions.js'
 
 // المصادقة الحقيقية: الدور وهوية عضو المجلس يأتيان من حساب الدخول
 const AuthContext = createContext(null)
@@ -38,6 +39,9 @@ export function RoleProvider({ children }) {
       ? { id: user.board_member_id, name: user.display_name, title: user.member_title }
       : null,
     isChairman: !!user?.is_chairman,
+    // الدور في صفحات العيادات: المدير المسؤول (عضو مجلس بـ is_chairman) يطالعها كالمدير —
+    // مرآة طبقة الخادم على /api/clinic. صفحات المساعدات تبقى على role.
+    clinicRole: clinicRoleOf(user),
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

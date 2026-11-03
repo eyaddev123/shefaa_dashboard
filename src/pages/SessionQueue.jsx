@@ -78,7 +78,7 @@ export function StatusCell({ appt, offset }) {
 // الطبيب يفعلها من شاشته؛ وهنا للمشرف وحده (طبيبٌ غادر ومريضه «خارج»). والعودة
 // يرفضها الخادم والطبيب في منتصف كشف مريضٍ آخر — والرسالة تقول ماذا يُفعل.
 export function SupervisorReturnActions({ appt, onDone, onError }) {
-  const { role } = useRole()
+  const { clinicRole: role } = useRole()
   const [busy, setBusy] = useState(false)
   if (!canStepOutAsSupervisor(role)) return null
   const run = async (fn, okMsg) => {
@@ -499,7 +499,7 @@ function PostponeDialog({ appt, currentSessionId, showTicket, attendance = false
   const [sessions, setSessions] = useState(null)
   // تاريخٌ بلا جلسات أخرى: لماذا؟ { kind: 'only_current' | 'not_generated' | 'no_schedule', doctors }
   const [emptyWhy, setEmptyWhy] = useState(null)
-  const { role } = useRole()
+  const { clinicRole: role } = useRole()
   const [targetId, setTargetId] = useState('')
   const [reason, setReason] = useState('')
   const [err, setErr] = useState(null)
@@ -826,7 +826,7 @@ function PriorityPicker({ appt, attendance, onClose, onDone, onArrived }) {
 // الفارغة وحدها — الخادم هو الحارس (403 لغيره، 409 لجلسة فيها حجز)، والإخفاء تجميل.
 function FlowModeMismatch({ data, onChanged, onError }) {
   const dlg = useDialogs()
-  const { role } = useRole()
+  const { clinicRole: role } = useRole()
   const [busy, setBusy] = useState(false)
   if (!data.flow_mode_setting || data.flow_mode_setting === data.flow_mode) return null
   const born = FLOW_MODE_LABELS[data.flow_mode], now = FLOW_MODE_LABELS[data.flow_mode_setting]
@@ -1114,7 +1114,7 @@ function AttendanceQueueTable({ data, rows, tab, actions }) {
 // «بانتظار الحضور». لا إلغاء ولا عدم حضور تلقائي: الإنسان يقرّر لكل واحد.
 function NoShowButton({ appt: a, onChanged, onError }) {
   const dlg = useDialogs()
-  const { role } = useRole()
+  const { clinicRole: role } = useRole()
   if (!canOperateQueue(role)) return null
   const noShow = async () => {
     const ok = await dlg.confirm({
@@ -1444,7 +1444,7 @@ export function useVisitActions({ data, load, showToast }) {
 
 // أزرار الصفّ: تقديم · حضر · إلغاء · تأجيل · (المشرف: خروج مؤقت/نداء العودة) — بشروطها كما كانت
 export function VisitActions({ appt: a, data, actions, onDone, onError }) {
-  const { role } = useRole()
+  const { clinicRole: role } = useRole()
   const { arrive, cancel, prioritize, setPostponing } = actions
   if (!canOperateQueue(role)) return null
   const btn = { padding: '3px 10px', fontSize: 11.5 }
@@ -1538,7 +1538,7 @@ function UnstartedAlert({ data }) {
 
 export default function SessionQueue() {
   const { id } = useParams()
-  const { role } = useRole()
+  const { clinicRole: role } = useRole()
   // المطالِع (المجلس، المشرف العام، المدير) يرى الدور كما هو بلا أيّ زرّ كتابة
   const canAct = canOperateQueue(role)
   const [data, setData] = useState(null)

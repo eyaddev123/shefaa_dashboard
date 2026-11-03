@@ -432,7 +432,7 @@ export function DoctorsTab({ canWrite, linkDashboard = false }) {
 }
 
 export default function ClinicFunds() {
-  const { role } = useRole()
+  const { clinicRole: role } = useRole()
   const canWrite = canWriteClinicFunds(role)
   const [params, setParams] = useSearchParams()
   const tab = TABS.some(([k]) => k === params.get('tab')) ? params.get('tab') : 'fund'

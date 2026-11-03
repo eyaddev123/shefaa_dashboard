@@ -9,6 +9,11 @@ export const MANAGER = 'manager'
 export const AID_ROLES = ['officer', 'accountant', 'board', SUPER_ADMIN, MANAGER]
 export const CLINIC_ROLES = ['clinic_admin', 'clinic_reception', 'doctor', 'board', SUPER_ADMIN, MANAGER]
 
+// المدير المسؤول (عضو مجلس بـ is_chairman) في العيادات = المدير (اطّلاع فقط) — قرار المستخدم 2026-11-03.
+// مرآة clinicActsAsManager في الخادم؛ صلاحياته في المساعدات (القرار النهائي) على دوره board كما هي.
+export const clinicRoleOf = (user) =>
+  (user?.role === 'board' && user.is_chairman ? MANAGER : user?.role || null)
+
 // هل هذا الدور للاطّلاع فقط؟ تُستعمل لإخفاء أزرار الإضافة/التعديل/القرار في الواجهة.
 export const isReadOnly = (role) => role === MANAGER || role === SUPER_ADMIN
 
