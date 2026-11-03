@@ -4,6 +4,8 @@ import { useParams, Link } from 'react-router-dom'
 import { api, WEEKDAYS, fmtMoney, fmtTime, fmtDateTime } from '../api.js'
 import { useRole } from '../RoleContext.jsx'
 import DoctorShareRules from '../components/DoctorShareRules.jsx'
+import DoctorPayCard from '../components/DoctorPayCard.jsx'
+import { canSeeClinicFunds, canWriteClinicFunds } from '../permissions.js'
 import { useToast } from '../action-feedback.jsx'
 import { pricingText } from '../share-rule.js'
 
@@ -295,6 +297,11 @@ export default function DoctorProfile() {
 
       {SHARE_VIEWERS.includes(role) && (
         <DoctorShareRules doctor={doctor} canEdit={role === 'clinic_admin'} onSaved={load} showToast={showToast} />
+      )}
+
+      {/* الراتب: المشرفة والمدير والمشرف العام وحدهم (FUND_* بالخادم) — لا المجلس ولا الطبيب */}
+      {canSeeClinicFunds(role) && (
+        <DoctorPayCard doctorId={doctor.id} canEdit={canWriteClinicFunds(role)} showToast={showToast} />
       )}
 
       {/* نفس من يرى «دكاترة اليوم» (APOLOGY_VIEWERS بالخادم) — والخادم يردّ غيرهم 403 */}

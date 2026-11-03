@@ -12,6 +12,7 @@ import {
 import MaterialCard from '../components/inventory/MaterialCard.jsx'
 import Stocktake from '../components/inventory/Stocktake.jsx'
 import Reports from '../components/inventory/Reports.jsx'
+import PurchasePrices from '../components/inventory/PurchasePrices.jsx'
 
 // ═══ المخزون — دفتر حركات المواد، والمكان الوحيد لإدارة الكتالوج ═══
 // الرصيد مجموع الحركات: الشراء يُدخل، ومواد الإجراءات تُخرج تلقائياً، والجرد يصحّح.
@@ -21,7 +22,7 @@ import Reports from '../components/inventory/Reports.jsx'
 // · المجلس: الكتالوج بأسعاره (بلا أرصدة) وتقرير الاستهلاك بقيمة البيع — ما كان يراه في
 //   تبويبَي «المواد» و«استهلاك المواد» بصفحة الإجراءات قبل نقلهما إلى هنا.
 
-const TABS = [['materials', 'المواد'], ['stocktake', 'تسوية جرد'], ['reports', 'التقارير']]
+const TABS = [['materials', 'المواد'], ['costs', 'أسعار الشراء'], ['stocktake', 'تسوية جرد'], ['reports', 'التقارير']]
 const FILTERS = [['all', 'الكل'], ['low', 'تحتاج شراء'], ['inactive', 'غير مفعّلة']]
 
 function MaterialsTable({ data, canWrite, onOpen, onPurchase, onEdit, onAdd, onImport, onBuyAny }) {
@@ -198,7 +199,7 @@ function InventoryCatalogView() {
       </p>
       {toast}
       <div className="inline proc-tabs inv-tabs" role="tablist">
-        {TABS.filter(([k]) => k !== 'stocktake').map(([k, label]) => (
+        {TABS.filter(([k]) => k !== 'stocktake' && k !== 'costs').map(([k, label]) => (
           <button key={k} type="button" role="tab" aria-selected={tab === k}
             className={tab === k ? '' : 'ghost'} onClick={() => setTab(k)}>{label}</button>
         ))}
@@ -275,6 +276,10 @@ function InventoryFull({ canWrite }) {
       {tab === 'stocktake' && canWrite && (
         <Stocktake materials={data.materials} onAddMaterial={() => setDialog({ kind: 'add' })}
           onDone={(r) => { refresh(); showToast(`سُجّلت ${r.count === 1 ? 'تسويةٌ واحدة' : r.count === 2 ? 'تسويتان' : `${r.count.toLocaleString('ar-SY')} تسويات`} — الأرصدة صارت العدد الفعلي`, 'success', 5000) }} />
+      )}
+      {tab === 'costs' && (
+        <PurchasePrices materials={data.materials} canWrite={canWrite}
+          onSaved={(r) => { refresh(); showToast(r.changed ? `حُفظ سعر شراء ${materialsCount(r.changed)}` : 'لا تغيير', 'success', 4000) }} />
       )}
       {tab === 'reports' && <Reports showToast={showToast} withCost />}
 
