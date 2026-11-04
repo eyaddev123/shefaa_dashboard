@@ -9,6 +9,7 @@ import RoomPicker from '../components/RoomPicker.jsx'
 import CloseSweepDialog from '../components/CloseSweepDialog.jsx'
 import { useToast } from '../action-feedback.jsx'
 import { nowHHMM, roomOccupants } from '../room-occupancy.js'
+import { generateLabel, generateSummary } from '../generate-summary.js'
 
 // من يرى قسم «دكاترة اليوم» والاعتذارات — يطابق APOLOGY_VIEWERS في الخادم.
 // الاستقبال غائبٌ عمداً: المعتذر لا وجود له عنده ذلك اليوم.
@@ -142,7 +143,7 @@ function ConfirmDialog({ title, body, confirmLabel, onConfirm, onClose, busy }) 
 //
 // والاستقبال لا يراها إطلاقاً: المعتذر ببساطة غير موجود ذلك اليوم، لا سطرَ
 // معلومةٍ ولا سبب. القرار قرار المشرف.
-function DayDoctors({ date, canEdit, onChanged, allRooms, onRoomChanged }) {
+function DayDoctors({ date, generation, canEdit, onChanged, allRooms, onRoomChanged }) {
   const [data, setData] = useState(null)
   const [err, setErr] = useState(null)
   const [busy, setBusy] = useState(null)
@@ -155,6 +156,8 @@ function DayDoctors({ date, canEdit, onChanged, allRooms, onRoomChanged }) {
 
   const load = () => api.clinic.dayDoctors(date).then(setData).catch((e) => setErr(e.message))
   useEffect(() => { setData(null); setErr(null); load() }, [date])
+  // بعد التوليد: وإلا بقي السطر «لم تُولَّد بعد» وجلسته أمام العين في الجدول تحته
+  useEffect(() => { if (generation) load() }, [generation])
 
   const afterApology = async () => {
     setApologizing(null); await load(); onChanged()
@@ -348,6 +351,8 @@ export default function ClinicBoard() {
   const [busyId, setBusyId] = useState(null)
   // الإغلاق الكانس: { session, pending } حين ردّ الخادم بمعلَّقين — انظر CloseSweepDialog
   const [sweep, setSweep] = useState(null)
+  const [toastNode, showToast] = useToast()
+  const [generation, setGeneration] = useState(0)   // يزيد مع كل توليد ناجح — لقائمة «دكاترة اليوم»
   // من يرى الصالة هو من يعرف أنّ الدكتور غادر — الاستقبال والمشرف معاً
   const canCloseSession = role === 'clinic_admin' || role === 'clinic_reception'
   // جرد الصندوق: شاشةٌ مستقلّة (الاستقبال والمشرفة والمدير) — تفتح على اليوم المختار هنا
@@ -380,7 +385,12 @@ export default function ClinicBoard() {
 
   const generate = async () => {
     setBusy(true); setErr(null)
-    try { await api.clinic.generateSessions(date); await load() }
+    try {
+      const r = await api.clinic.generateSessions(date)
+      await load()
+      setGeneration((g) => g + 1)
+      showToast(generateSummary(date, r), r.created?.length ? 'success' : 'info')
+    }
     catch (ex) { setErr(ex.message) }
     finally { setBusy(false) }
   }
@@ -400,7 +410,7 @@ export default function ClinicBoard() {
                 { state: { from: 'board' } })}>جرد الصندوق</button>
           )}
           {role === 'clinic_admin' && (
-            <button onClick={generate} disabled={busy}>{busy ? 'جارٍ التوليد…' : 'توليد جلسات هذا اليوم'}</button>
+            <button style={{ whiteSpace: 'nowrap' }} onClick={generate} disabled={busy || !date}>{busy ? 'جارٍ التوليد…' : generateLabel(date)}</button>
           )}
         </div>
       </div>
@@ -434,7 +444,7 @@ export default function ClinicBoard() {
 
       {/* الاستقبال لا يرى هذا القسم إطلاقاً — ولا الخادم يُجيبه عليه */}
       {APOLOGY_VIEWERS.includes(role) && (
-        <DayDoctors date={date} canEdit={role === 'clinic_admin'} onChanged={load}
+        <DayDoctors date={date} generation={generation} canEdit={role === 'clinic_admin'} onChanged={load}
           allRooms={rooms ? Object.values(rooms) : []} onRoomChanged={loadRooms} />
       )}
 
@@ -444,7 +454,7 @@ export default function ClinicBoard() {
         ) : sessions.length === 0 ? (
           <p className="empty">
             لا جلسات في هذا اليوم.
-            {role === 'clinic_admin' && ' اضغط «توليد جلسات هذا اليوم» إن وُجد دوام مطابق في جداول الدكاترة.'}
+            {role === 'clinic_admin' && ` اضغط «${generateLabel(date)}» إن وُجد دوام مطابق في جداول الدكاترة.`}
           </p>
         ) : (
           <table className="rtable">
@@ -488,6 +498,7 @@ export default function ClinicBoard() {
         )}
       </div>
 
+      {toastNode}
       {sweep && (
         <CloseSweepDialog session={sweep.session} pending={sweep.pending}
           onClose={() => setSweep(null)}
