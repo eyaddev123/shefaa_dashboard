@@ -9,6 +9,12 @@ export const DAY_LABELS = {
 const fmtInt = (n) => Number(n || 0).toLocaleString('ar-SY')
 // السماح من الخادم (LATE_GRACE_MINUTES): «١٥ دقيقة»، «١٠ دقائق»
 export const fmtMinutes = (n) => `${Number(n).toLocaleString('ar-SY')} ${n >= 3 && n <= 10 ? 'دقائق' : 'دقيقة'}`
+// مدّة الدوام: «٣ س ١٥ د» · «٤٥ د» — للانصراف والساعات
+export const fmtDuration = (m) => {
+  const h = Math.floor((m || 0) / 60), r = (m || 0) % 60
+  const n = (x) => Number(x).toLocaleString('ar-SY')
+  return h ? `${n(h)} س${r ? ` ${n(r)} د` : ''}` : `${n(r)} د`
+}
 export const fmtPct = (c) => (c === null || c === undefined ? '—' : `${Math.round(c * 100).toLocaleString('ar-SY')}٪`)
 const minutes = (n) => `${fmtInt(n)} د`
 
