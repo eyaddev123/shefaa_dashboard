@@ -453,14 +453,17 @@ export default function ClinicBoard() {
             </thead>
             <tbody>
               {sessions.map((s) => (
-                <tr key={s.id} className="clickable" onClick={() => navigate(`/clinic/session/${s.id}`)}>
+                <tr key={s.id} className={`clickable ${s.apologized ? 'row-faded' : ''}`} onClick={() => navigate(`/clinic/session/${s.id}`)}>
                   <td className="rt-title">{s.doctor_name}{rooms && <RoomBadge room={rooms[s.doctor_id]} />}</td>
                   <td data-label="الاختصاص">{s.specialty || '—'}</td>
                   <td className="num" data-label="الوقت"><bdi dir="ltr">{fmtTime(s.start_time)} – {fmtTime(s.end_time)}</bdi></td>
                   {/* نمط الجلسة يُثبَّت عند توليدها — يُعرض كي لا يُفاجأ أحد يوم التبديل */}
                   <td data-label="النمط"><FlowModeTag mode={s.flow_mode} /></td>
                   <td className="rt-badge">
-                    {sessionBadge(s.status)}
+                    {/* معتذرٌ عليه حجوزات: لا «مفتوحة» — الخادم لا يُرسل جلسة المعتذر إلا لأجلها */}
+                    {s.apologized
+                      ? <span className="badge bad" title="الدكتور معتذر — الحجز ممنوع، وحجوزاته القائمة تنتظر الاتصال بأصحابها">معتذر</span>
+                      : sessionBadge(s.status)}
                     {/* «مغلقة» حالةٌ محسوبة تعلو حالة الجلسة المخزّنة:
                         انتهى الدوام فعلاً وإن بقيت الجلسة «مفتوحة» في القاعدة */}
                     {s.closed && <span className="badge" style={{ marginInlineStart: 5 }}>مغلقة</span>}
