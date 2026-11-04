@@ -340,36 +340,125 @@ function ProfitTab() {
   )
 }
 
-// ═══════ ٣) حسابات الدكاترة الشهرية ═══════
+// ═══════ ٣) حسابات الدكاترة — لشهر أو يوم أو فترة ═══════
+// الشهر كما كان (?month=)، و«يوم» لمن تحاسبه المشرفة آخر يومه، و«فترة» حرّة (?from=&to=).
+// يومية + ساعة: أيام الحضور × اليومية + الساعات × سعر الساعة، ويومٌ بلا انصراف يُنبَّه عليه.
 const shiftMonth = (m, n) => {
   const [y, mm] = m.split('-').map(Number)
   const d = new Date(Date.UTC(y, mm - 1 + n, 1))
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`
 }
-const payText = (d) => (d.payKind === 'fixed' ? 'راتب ثابت'
+const shiftDay = (day, n) => {
+  const [y, m, d] = day.split('-').map(Number)
+  const x = new Date(Date.UTC(y, m - 1, d + n))
+  return `${x.getUTCFullYear()}-${String(x.getUTCMonth() + 1).padStart(2, '0')}-${String(x.getUTCDate()).padStart(2, '0')}`
+}
+const isDay = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v || '')
+const payText = (d) => (d.payKind === 'daily_hourly' ? 'يومية + ساعة'
+  : d.payKind === 'fixed' ? 'راتب ثابت'
   : d.payKind === 'per_patient' ? `${fmtNum(d.payAmount)} للمريض` : null)
+const hoursText = (h) => `${fmtNum(h)} س`
+// «يوم واحد» · «يومان» · «٥ أيام» — ولا «·» بجانب رقمٍ هنديّ (يُقرأ صفراً)
+const daysText = (n) => (n === 1 ? 'يوم واحد' : n === 2 ? 'يومان' : `${fmtNum(n)} ${n >= 3 && n <= 10 ? 'أيام' : 'يوماً'}`)
+const ACC_MODES = [['month', 'شهر'], ['day', 'يوم'], ['custom', 'فترة']]
+
+function AttendanceCell({ d }) {
+  const a = d.attendance
+  if (!a.days) return <span className="muted">—</span>
+  return (
+    <>
+      {daysText(a.days)}، {hoursText(a.hours)}
+      {a.noDeparture > 0 && <span className="badge warn sm acc-nodep" title="يوميته محسوبة وساعاته لا — حتى يُصحَّح الانصراف">
+        انصراف غير مسجَّل ×{fmtNum(a.noDeparture)}</span>}
+      {a.onDuty > 0 && <span className="badge sm acc-nodep">لم ينصرف اليوم بعد</span>}
+    </>
+  )
+}
+function SalaryCell({ d }) {
+  if (d.salary === null) return <span title="راتبٌ شهريّ قديم — يُحسب للشهر الكامل وحده">— <small className="muted">للشهر الكامل</small></span>
+  return (
+    <>
+      {fmtNum(d.salary)}
+      {d.payKind === 'daily_hourly' && (
+        <span className="acc-split">
+          {fmtNum(d.attendance.days)} × {fmtNum(d.dailyRate)} = {fmtNum(d.salaryDays)}
+          <br />{hoursText(d.attendance.hours)} × {fmtNum(d.hourlyRate)} = {fmtNum(d.salaryHours)}
+        </span>
+      )}
+    </>
+  )
+}
 
 // linkDashboard: صفحة «تقارير الدكاترة» تفتح لوحة الدكتور من اسمه (بدل البروفايل للمشرفة هنا)
 export function DoctorsTab({ canWrite, linkDashboard = false }) {
   const [params, setParams] = useSearchParams()
   const month = /^\d{4}-\d{2}$/.test(params.get('month') || '') ? params.get('month') : null
-  const [data, err] = useLoad(() => api.clinic.doctorAccounts(month), month || 'now')
-  const go = (m) => { const next = new URLSearchParams(params); next.set('month', m); setParams(next, { replace: true }) }
+  const day = isDay(params.get('day')) ? params.get('day') : null
+  const from = isDay(params.get('from')) ? params.get('from') : null
+  const to = isDay(params.get('to')) ? params.get('to') : from
+  const mode = from ? 'custom' : day ? 'day' : 'month'
+  const query = mode === 'custom' ? { from, to } : mode === 'day' ? { from: day, to: day } : { month }
+  const [data, err] = useLoad(() => api.clinic.doctorAccounts(query), JSON.stringify(query))
+  const set = (patch) => {
+    const next = new URLSearchParams(params)
+    for (const k of ['month', 'day', 'from', 'to']) next.delete(k)
+    for (const [k, v] of Object.entries(patch)) if (v) next.set(k, v)
+    setParams(next, { replace: true })
+  }
+  const pickMode = (m) => set(m === 'day' ? { day: data?.today || todayLocal() }
+    : m === 'custom' ? { from: data?.from || todayLocal(), to: data?.to || todayLocal() } : {})
   const cur = data?.month || month
+  const curDay = day || data?.from
+  const title = mode === 'day' ? 'حسابات الدكاترة — يوم' : mode === 'custom' ? 'حسابات الدكاترة — فترة' : 'حسابات الدكاترة الشهرية'
+  const dashQuery = (d) => (mode === 'month' && data.month === todayLocal().slice(0, 7)
+    ? 'period=month' : `period=custom&from=${d.from}&to=${d.to}`)
 
   return (
     <div className="card earn-card">
       <div className="earn-head">
-        <h3>حسابات الدكاترة الشهرية</h3>
-        <div className="fund-month" role="group" aria-label="الشهر">
-          <button type="button" className="ghost" disabled={!cur} onClick={() => go(shiftMonth(cur, -1))} aria-label="الشهر السابق">→</button>
-          <input type="month" value={cur || ''} aria-label="الشهر" onChange={(e) => e.target.value && go(e.target.value)} />
-          <button type="button" className="ghost" disabled={!cur} onClick={() => go(shiftMonth(cur, 1))} aria-label="الشهر التالي">←</button>
+        <h3>{title}</h3>
+        <div className="earn-periods acc-modes" role="group" aria-label="الفترة">
+          {ACC_MODES.map(([k, label]) => (
+            <button key={k} type="button" aria-pressed={mode === k}
+              className={`rev-flag${mode === k ? ' is-on' : ''}`} onClick={() => pickMode(k)}>{label}</button>
+          ))}
         </div>
+        {mode === 'month' && (
+          <div className="fund-month" role="group" aria-label="الشهر">
+            <button type="button" className="ghost" disabled={!cur} onClick={() => set({ month: shiftMonth(cur, -1) })} aria-label="الشهر السابق">→</button>
+            <input type="month" value={cur || ''} aria-label="الشهر" onChange={(e) => e.target.value && set({ month: e.target.value })} />
+            <button type="button" className="ghost" disabled={!cur} onClick={() => set({ month: shiftMonth(cur, 1) })} aria-label="الشهر التالي">←</button>
+          </div>
+        )}
+        {mode === 'day' && (
+          <div className="fund-month" role="group" aria-label="اليوم">
+            <button type="button" className="ghost" disabled={!curDay} onClick={() => set({ day: shiftDay(curDay, -1) })} aria-label="اليوم السابق">→</button>
+            <input type="date" value={curDay || ''} aria-label="اليوم" onChange={(e) => e.target.value && set({ day: e.target.value })} />
+            <button type="button" className="ghost" disabled={!curDay} onClick={() => set({ day: shiftDay(curDay, 1) })} aria-label="اليوم التالي">←</button>
+          </div>
+        )}
       </div>
+      {mode === 'custom' && (
+        <div className="inline rev-filters earn-custom">
+          <div className="field"><label htmlFor="acc-from">من</label>
+            <input id="acc-from" type="date" value={from}
+              onChange={(e) => e.target.value && set({ from: e.target.value, to: e.target.value > to ? e.target.value : to })} /></div>
+          <div className="field"><label htmlFor="acc-to">إلى</label>
+            <input id="acc-to" type="date" value={to} min={from}
+              onChange={(e) => e.target.value && set({ from, to: e.target.value })} /></div>
+        </div>
+      )}
+      {data && mode !== 'month' && <p className="earn-range">الفترة: <span dir="ltr">{rangeText(data)}</span></p>}
       {err ? <p className="error">{err}</p> : !data ? <p className="empty">جارٍ التحميل…</p>
-        : data.doctors.length === 0 ? <p className="empty">لا دكاترة في هذا الشهر.</p> : (
+        : data.doctors.length === 0 ? <p className="empty">لا دكاترة في هذه الفترة.</p> : (
           <>
+            {data.noDeparture > 0 && (
+              <p className="share-warn acc-warn" role="alert">
+                ⚠ {data.noDeparture === 1 ? 'دكتورٌ واحد' : `${fmtNum(data.noDeparture)} دكاترة`} على «يومية + ساعة» عندهم أيام
+                «انصراف غير مسجَّل» في الفترة: يوميتها محسوبة وساعاتها لا — فالمجموع أقلّ من المستحقّ حتى يُصحَّح الانصراف
+                {canWrite ? ' (لوحة الدكتور ← الحضور والانصراف).' : '.'}
+              </p>
+            )}
             <div className="tiles earn-tiles fund-tiles fund-tiles-3">
               <div className="tile"><div className="label">الرواتب المستحقة</div><div className="value"><Money value={data.totals.salary} /></div></div>
               <div className="tile"><div className="label">مجموع حصّة الشفاء</div><div className="value"><Money value={data.totals.shifa} /></div></div>
@@ -379,28 +468,30 @@ export function DoctorsTab({ canWrite, linkDashboard = false }) {
             </div>
             <table className="rtable earn-table fund-doc-table">
               <thead>
-                <tr><th>الدكتور</th><th>المرضى</th><th>الراتب</th><th>الشفاء من الكشوف</th><th>الشفاء من الإجراءات</th>
+                <tr><th>الدكتور</th><th>المرضى</th><th>الحضور</th><th>الراتب</th><th>الشفاء من الكشوف</th><th>الشفاء من الإجراءات</th>
                   <th>مجموع الشفاء</th><th>الفرق</th></tr>
               </thead>
               <tbody>
                 {data.doctors.map((d) => (
                   <tr key={d.doctorId}>
                     <td className="rt-title">
-                      {linkDashboard ? <Link to={`/clinic/doctors/${d.doctorId}/dashboard?${data.month === todayLocal().slice(0, 7)
-                        ? 'period=month' : `period=custom&from=${data.from}&to=${data.to}`}`}>{d.doctor}</Link>
+                      {linkDashboard ? <Link to={`/clinic/doctors/${d.doctorId}/dashboard?${dashQuery(data)}`}>{d.doctor}</Link>
                         : canWrite ? <Link to={`/clinic/doctors/${d.doctorId}`}>{d.doctor}</Link> : d.doctor}
                       <span className="earn-spec">
                         {d.noPay ? <span className="badge warn sm">بلا نوع حساب</span> : payText(d)}
+                        {d.settleCycle && <span className={`badge sm acc-cycle${d.settleCycle === 'daily' ? ' is-daily' : ''}`}>
+                          تحاسبه: {d.settleCycle === 'daily' ? 'يومي' : 'شهري'}</span>}
                         {!d.active && ' — موقوف'}
                       </span>
                     </td>
                     <td className="num" data-label="المرضى (كشوف منتهية)">{fmtNum(d.patients)}</td>
-                    <td className="num earn-doc" data-label="الراتب">{fmtNum(d.salary)}</td>
+                    <td className="acc-att" data-label="الحضور (أيام · ساعات)"><AttendanceCell d={d} /></td>
+                    <td className="num earn-doc" data-label="الراتب"><SalaryCell d={d} /></td>
                     <td className="num" data-label="الشفاء من الكشوف">{fmtNum(d.visitShifa)}</td>
                     <td className="num" data-label="الشفاء من الإجراءات">{fmtNum(d.procShifa)}</td>
                     <td className="num" data-label="مجموع الشفاء">{fmtNum(d.shifa)}</td>
                     <td className={`num fund-amt${d.diff < 0 ? ' is-out' : ' is-in'}`} data-label={d.diff < 0 ? 'خسارة' : 'ربح'}>
-                      {signed(d.diff)}</td>
+                      {d.diff === null ? '—' : signed(d.diff)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -408,6 +499,7 @@ export function DoctorsTab({ canWrite, linkDashboard = false }) {
                 <tr className="earn-total">
                   <td className="rt-title">كل الدكاترة</td>
                   <td className="num" data-label="المرضى">{fmtNum(data.totals.patients)}</td>
+                  <td data-label="الحضور" />
                   <td className="num earn-doc" data-label="الرواتب">{fmtNum(data.totals.salary)}</td>
                   <td className="num" data-label="الشفاء من الكشوف">{fmtNum(data.totals.visitShifa)}</td>
                   <td className="num" data-label="الشفاء من الإجراءات">{fmtNum(data.totals.procShifa)}</td>
@@ -420,10 +512,15 @@ export function DoctorsTab({ canWrite, linkDashboard = false }) {
               <p className="share-warn">⚠ {data.noPay === 1 ? 'دكتورٌ واحد' : `${fmtNum(data.noPay)} دكاترة`} بلا نوع حساب — راتبه صفر هنا.
                 {canWrite && ' اضبطه من بروفايل الدكتور.'}</p>
             )}
+            {data.fixedPartial > 0 && (
+              <p className="share-warn">⚠ {data.fixedPartial === 1 ? 'دكتورٌ واحد' : `${fmtNum(data.fixedPartial)} دكاترة`} على «راتب شهري ثابت» القديم —
+                يُحسب للشهر الكامل وحده، فهو خارج مجموع هذه الفترة.{canWrite && ' للانتقال: «يومية + ساعة» من بروفايل الدكتور.'}</p>
+            )}
             <p className="earn-note">
-              المرضى = الكشوف المنتهية في جلسات الشهر (لا الإجراءات). حصّة الشفاء من الكشوف = رسم كلّ زيارةٍ حضرت
-              (كما في الجرد)، ومن الإجراءات = حصّتها في كلّ إجراءٍ قُبض في الشهر. الراتب بإعداد الدكتور الحالي، يُحسب
-              ويُعرض فقط: لا يُسحب من إيرادات الشفاء ولا يمسّ الجرد ولا الصندوق.
+              المرضى = الكشوف المنتهية في جلسات الفترة (لا الإجراءات). الحضور = أيامٌ فيها وصولٌ مسجَّل، والساعات من الوصول
+              إلى الانصراف. يومية + ساعة = الأيام × اليومية + الساعات × سعر الساعة (لحظيّاً من الحضور: تصحيح وقتٍ يغيّر فترته).
+              حصّة الشفاء من الكشوف = رسم كلّ زيارةٍ حضرت (كما في الجرد)، ومن الإجراءات = حصّتها في كلّ إجراءٍ قُبض في الفترة.
+              الراتب بإعداد الدكتور الحالي، يُحسب ويُعرض فقط: لا يُسحب من إيرادات الشفاء ولا يمسّ الجرد ولا الصندوق.
             </p>
           </>
         )}
