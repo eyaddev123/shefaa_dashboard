@@ -23,7 +23,8 @@ import PurchasePrices from '../components/inventory/PurchasePrices.jsx'
 //   تبويبَي «المواد» و«استهلاك المواد» بصفحة الإجراءات قبل نقلهما إلى هنا.
 
 const TABS = [['materials', 'المواد'], ['costs', 'أسعار الشراء'], ['stocktake', 'تسوية جرد'], ['reports', 'التقارير']]
-const FILTERS = [['all', 'الكل'], ['low', 'تحتاج شراء'], ['inactive', 'غير مفعّلة']]
+const FILTERS = [['all', 'الكل'], ['low', 'تحتاج شراء'], ['consumable', 'استهلاكية'], ['inactive', 'غير مفعّلة']]
+const isConsumable = (m) => m.material_kind === 'consumable'
 
 function MaterialsTable({ data, canWrite, onOpen, onPurchase, onEdit, onAdd, onImport, onBuyAny }) {
   const [query, setQuery] = useState('')
@@ -31,7 +32,7 @@ function MaterialsTable({ data, canWrite, onOpen, onPurchase, onEdit, onAdd, onI
   const { materials, summary } = data
 
   const shown = materials.filter((m) => matchesAr(m.name, query)
-    && (filter === 'all' || (filter === 'low' ? m.needs_purchase : !m.is_active)))
+    && (filter === 'all' || (filter === 'low' ? m.needs_purchase : filter === 'consumable' ? isConsumable(m) : !m.is_active)))
 
   return (
     <div className="card">
@@ -76,26 +77,30 @@ function MaterialsTable({ data, canWrite, onOpen, onPurchase, onEdit, onAdd, onI
         </EmptyState>
       ) : <EmptyState text="لا مواد بعد." hint="تعرّفها مشرفة العيادات من هذه الصفحة." />
       ) : shown.length === 0 ? (
-        <EmptyState text={filter === 'low' ? 'لا مادة تحتاج شراء الآن.' : filter === 'inactive' ? 'لا مواد غير مفعّلة.' : 'لا مادة بهذا الاسم.'}>
+        <EmptyState text={filter === 'low' ? 'لا مادة تحتاج شراء الآن.' : filter === 'inactive' ? 'لا مواد غير مفعّلة.'
+          : filter === 'consumable' ? 'لا مواد استهلاكية — عرّفها من «+ مادة» باختيار «استهلاكية».' : 'لا مادة بهذا الاسم.'}>
           <button type="button" className="ghost" onClick={() => { setQuery(''); setFilter('all') }}>عرض الكل</button>
         </EmptyState>
       ) : (
         <table className="inv-table inv-materials rtable">
           <thead><tr>
-            <th>المادة</th><th>الوحدة</th><th>الرصيد</th><th>القيمة</th><th>سعر البيع</th><th>الحدّ الأدنى</th><th>الحالة</th><th></th>
+            <th>المادة</th><th>النوع</th><th>الوحدة</th><th>الرصيد</th><th>القيمة</th><th>سعر البيع</th><th>الحدّ الأدنى</th><th>الحالة</th><th></th>
           </tr></thead>
           <tbody>
             {shown.map((m) => {
               const st = stockStatus(m)
+              const cons = isConsumable(m)
               return (
                 <tr key={m.id} className={`clickable${m.is_active ? '' : ' proc-inactive'}`} onClick={() => onOpen(m.id)}>
                   <td className="inv-name rt-title">{m.name}</td>
+                  <td data-label="النوع">{cons ? <span className="badge sm kind-badge">استهلاكية</span> : 'معدودة'}</td>
                   <td data-label="الوحدة">{m.unit}</td>
-                  <td className={`num inv-balance${m.balance < 0 ? ' neg' : ''}`} data-label="الرصيد">
-                    <bdi dir="ltr">{fmtQty(m.balance)}</bdi></td>
+                  {/* الاستهلاكية بلا رصيد ولا سعر بيع ولا حدّ — مشترياتها في الدفتر وحده */}
+                  <td className={`num inv-balance${!cons && m.balance < 0 ? ' neg' : ''}`} data-label="الرصيد">
+                    {cons ? '—' : <bdi dir="ltr">{fmtQty(m.balance)}</bdi>}</td>
                   <td className="num" data-label="القيمة">{m.stock_value === null ? '—' : fmtMoney(m.stock_value)}</td>
-                  <td className="num" data-label="سعر البيع">{fmtMoney(m.unit_price)}</td>
-                  <td className="num" data-label="الحدّ الأدنى">{m.min_quantity ? fmtQty(m.min_quantity) : '—'}</td>
+                  <td className="num" data-label="سعر البيع">{cons ? '—' : fmtMoney(m.unit_price)}</td>
+                  <td className="num" data-label="الحدّ الأدنى">{!cons && m.min_quantity ? fmtQty(m.min_quantity) : '—'}</td>
                   <td className="rt-badge">
                     <div className="inv-status">
                       <span className={`badge sm ${st.cls}`}>{st.label}</span>
@@ -150,7 +155,8 @@ function CatalogTable({ list }) {
             <tbody>
               {shown.map((m) => (
                 <tr key={m.id} className={m.is_active ? undefined : 'proc-inactive'}>
-                  <td className="inv-name rt-title">{m.name}</td>
+                  <td className="inv-name rt-title">{m.name}
+                    {isConsumable(m) && <span className="badge sm kind-badge" style={{ marginInlineStart: 6 }}>استهلاكية</span>}</td>
                   <td data-label="الوحدة">{m.unit}</td>
                   <td className="num" data-label="سعر الوحدة">{fmtMoney(m.unit_price)}</td>
                   <td className="rt-badge">

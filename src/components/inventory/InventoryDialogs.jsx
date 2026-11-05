@@ -11,6 +11,8 @@ const opt = <span className="opt">(اختياري)</span>
 // ═══════════════════════════════════════════════════════════════════
 // مادة جديدة / تعديل مادة
 // سعر البيع يُكتب عند التعريف فقط؛ تعديله بعدها من «تعديل سعر البيع» ليُحفظ في السجلّ.
+// النوع: «معدودة» (لها رصيد وتُختار على الإجراء بكمّيتها) أو «استهلاكية» (قطن، شاش، بيتادين —
+// بلا رصيد ولا سعر بيع؛ قيمتها مقدّرةٌ على نوع الإجراء، ومشترياتها «شراء» يُخصم من الصندوق).
 // ═══════════════════════════════════════════════════════════════════
 export function MaterialDialog({ material, units, onClose, onSaved }) {
   const dlg = useDialogs()
@@ -20,6 +22,8 @@ export function MaterialDialog({ material, units, onClose, onSaved }) {
   const [price, setPrice] = useState('')
   const [min, setMin] = useState(material && material.min_quantity ? String(material.min_quantity) : '')
   const [active, setActive] = useState(material ? material.is_active : true)
+  const [kind, setKind] = useState(material?.material_kind || 'counted')
+  const consumable = kind === 'consumable'
   const [qty, setQty] = useState('')
   const [cost, setCost] = useState('')
   const [supplier, setSupplier] = useState('')
@@ -40,17 +44,27 @@ export function MaterialDialog({ material, units, onClose, onSaved }) {
       })
       if (!ok) return
     }
+    if (editing && kind !== (material.material_kind || 'counted')) {
+      const ok = await dlg.confirm({
+        title: 'تغيير نوع المادة',
+        body: consumable
+          ? `«${material.name}» استهلاكية؟\nتختفي من قائمة مواد الإجراء (قيمتها تُقدَّر على نوع الإجراء)، ولا رصيد لها ولا تنبيه. ما سُجّل منها على إجراءاتٍ سابقة يبقى كما هو.`
+          : `«${material.name}» معدودة؟\nتعود لقائمة مواد الإجراء ويُحسب رصيدها من حركاتها — راجعي الرصيد بتسوية جرد إن اشتريتِها وهي استهلاكية.`,
+        confirmLabel: 'غيّر النوع',
+      })
+      if (!ok) return
+    }
     setBusy(true)
     try {
       let saved
       if (editing) {
-        const body = { name, min_quantity: min, is_active: active }
+        const body = { name, min_quantity: min, is_active: active, material_kind: kind }
         if (!unitLocked && String(unit.unit_id) !== String(material.unit_id)) Object.assign(body, unitPayload(unit))
         saved = await api.inventory.updateMaterial(material.id, body)
       } else {
         saved = await api.inventory.addMaterial({
-          name, ...unitPayload(unit), unit_price: price, min_quantity: min,
-          opening_quantity: qty, opening_unit_cost: cost, supplier,
+          name, ...unitPayload(unit), material_kind: kind,
+          ...(consumable ? {} : { unit_price: price, min_quantity: min, opening_quantity: qty, opening_unit_cost: cost, supplier }),
         })
       }
       onSaved(saved, editing)
@@ -63,6 +77,19 @@ export function MaterialDialog({ material, units, onClose, onSaved }) {
         <div className="field"><label htmlFor="md-name">اسم المادة</label>
           <input id="md-name" value={name} maxLength={150} autoFocus placeholder="مثال: شاش معقّم"
             onChange={(e) => setName(e.target.value)} /></div>
+        <div className="field" role="radiogroup" aria-label="نوع المادة">
+          <label>نوع المادة</label>
+          <div className="inv-kind">
+            <label className={kind === 'counted' ? 'is-on' : undefined}>
+              <input type="radio" name="md-kind" value="counted" checked={!consumable} onChange={() => setKind('counted')} />
+              معدودة <span className="hint">لها رصيد، وتُختار على الإجراء بكمّيتها</span>
+            </label>
+            <label className={consumable ? 'is-on' : undefined}>
+              <input type="radio" name="md-kind" value="consumable" checked={consumable} onChange={() => setKind('consumable')} />
+              استهلاكية <span className="hint">قطن، شاش، بيتادين — بلا رصيد، قيمتها مقدّرة على نوع الإجراء</span>
+            </label>
+          </div>
+        </div>
         <div className="inv-form-row">
           <div className="field"><label htmlFor="md-unit">الوحدة</label>
             {unitLocked
@@ -70,22 +97,27 @@ export function MaterialDialog({ material, units, onClose, onSaved }) {
                   <span className="hint">للمادة حركات بهذه الوحدة — لا تُغيَّر.</span></>
               : <UnitSelect id="md-unit" units={units} value={unit} onChange={setUnit} disabled={busy} />}
           </div>
-          {!editing && (
+          {!editing && !consumable && (
             <div className="field"><label htmlFor="md-price">سعر البيع للمريض (ل.س)</label>
               <input id="md-price" value={price} inputMode="decimal" placeholder="0"
                 onChange={(e) => setPrice(e.target.value)} /></div>
           )}
         </div>
-        <div className="field"><label htmlFor="md-min">الحدّ الأدنى {opt}</label>
-          <input id="md-min" value={min} inputMode="decimal" placeholder="بلا تنبيه"
-            onChange={(e) => setMin(e.target.value)} />
-          <span className="hint">حين يصل الرصيد إليه أو دونه تظهر المادة «تحتاج شراء» ويصلك إشعار.</span></div>
+        {consumable ? (
+          <p className="hint inv-note">بلا رصيد ولا حدّ أدنى: مشترياتها تُسجَّل من «تسجيل شراء» فتُخصم من صندوق العيادات،
+            ويقابلها «المستردّ» من الإجراءات في تقرير المستهلكات (صندوق العيادات).</p>
+        ) : (
+          <div className="field"><label htmlFor="md-min">الحدّ الأدنى {opt}</label>
+            <input id="md-min" value={min} inputMode="decimal" placeholder="بلا تنبيه"
+              onChange={(e) => setMin(e.target.value)} />
+            <span className="hint">حين يصل الرصيد إليه أو دونه تظهر المادة «تحتاج شراء» ويصلك إشعار.</span></div>
+        )}
         {editing && (
           <div className="field-check"><label>
             <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> مفعّلة
           </label><span className="hint">المعطّلة لا تظهر للاستقبال، ورصيدها باقٍ.</span></div>
         )}
-        {!editing && (
+        {!editing && !consumable && (
           <details className="inv-optional">
             <summary>كمّية موجودة الآن {opt}</summary>
             <div className="inv-form-row">
@@ -99,7 +131,7 @@ export function MaterialDialog({ material, units, onClose, onSaved }) {
             <span className="hint">تُسجَّل رصيداً افتتاحياً للمادة.</span>
           </details>
         )}
-        {editing && <p className="hint inv-note">سعر البيع يُعدَّل من كرت المادة («تعديل سعر البيع») ليُحفظ في سجلّ الأسعار.</p>}
+        {editing && !consumable && <p className="hint inv-note">سعر البيع يُعدَّل من كرت المادة («تعديل سعر البيع») ليُحفظ في سجلّ الأسعار.</p>}
         {err && <p className="error">{err}</p>}
         <div className="bf-actions inv-actions">
           <button type="button" className="ghost" disabled={busy} onClick={onClose}>إلغاء</button>

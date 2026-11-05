@@ -14,7 +14,7 @@ import { Modal, fmtDay, parseNum } from '../components/inventory/shared.jsx'
 // والمصاريف. والراتب في تبويب الدكاترة عرضٌ لا يُسحب من أيّ صندوق.
 // التبويب والفترة في الرابط: زرّ الرجوع في الجوال يعود إلى ما كان.
 
-const TABS = [['fund', 'الصندوق'], ['profit', 'ربح المواد'], ['doctors', 'حسابات الدكاترة']]
+const TABS = [['fund', 'الصندوق'], ['profit', 'ربح المواد'], ['consumables', 'المستهلكات'], ['doctors', 'حسابات الدكاترة']]
 const PERIODS = [
   { key: 'today', label: 'اليوم' },
   { key: 'week', label: 'هالأسبوع' },
@@ -431,6 +431,91 @@ export function DoctorsTab({ canWrite, linkDashboard = false }) {
   )
 }
 
+// ═══ المستهلكات لشهر: هل تقديرات أم أسامة مضبوطة؟ ═══
+// المشتريات = «شراء مواد» لموادّ استهلاكية من الصندوق · المستردّ = ما طُرح فعلاً للمستهلكات من
+// الإجراءات المقبوضة في الشهر · الفرق موجبٌ = التقدير يغطّي، سالبٌ = أقلّ من الكلفة.
+function ConsumablesTab() {
+  const [params, setParams] = useSearchParams()
+  const month = /^\d{4}-\d{2}$/.test(params.get('month') || '') ? params.get('month') : null
+  const [data, err] = useLoad(() => api.clinic.consumablesReport(month), month || 'now')
+  const go = (m) => { const next = new URLSearchParams(params); next.set('month', m); setParams(next, { replace: true }) }
+  const cur = data?.month || month
+  const t = data?.totals
+
+  return (
+    <div className="card earn-card">
+      <div className="earn-head">
+        <h3>المستهلكات — المشتريات مقابل المستردّ</h3>
+        <div className="fund-month" role="group" aria-label="الشهر">
+          <button type="button" className="ghost" disabled={!cur} onClick={() => go(shiftMonth(cur, -1))} aria-label="الشهر السابق">→</button>
+          <input type="month" value={cur || ''} aria-label="الشهر" onChange={(e) => e.target.value && go(e.target.value)} />
+          <button type="button" className="ghost" disabled={!cur} onClick={() => go(shiftMonth(cur, 1))} aria-label="الشهر التالي">←</button>
+        </div>
+      </div>
+      {err ? <p className="error">{err}</p> : !data ? <p className="empty">جارٍ التحميل…</p> : (
+        <>
+          <div className="tiles earn-tiles fund-tiles fund-tiles-3">
+            <div className="tile"><div className="label">مشتريات الاستهلاكيات</div><div className="value"><Money value={t.purchases} /></div></div>
+            <div className="tile"><div className="label">المستردّ من الإجراءات</div><div className="value"><Money value={t.recovered} /></div></div>
+            <div className={`tile earn-hero ${t.diff < 0 ? 'fund-loss' : 'fund-gain'}`}>
+              <div className="label">{t.diff < 0 ? 'التقدير أقلّ من الكلفة' : 'التقدير يغطّي'}</div>
+              <div className="value">{signed(t.diff)}</div></div>
+          </div>
+          {data.purchases.length === 0 && data.recovered.length === 0 ? (
+            <p className="empty">لا مشتريات استهلاكيات ولا إجراءات بمستهلكات في هذا الشهر.</p>
+          ) : (
+            <div className="fund-cons-grid">
+              <div>
+                <h4>المشتريات</h4>
+                {data.purchases.length === 0 ? <p className="empty">لا مشتريات استهلاكيات.</p> : (
+                  <table className="rtable earn-table">
+                    <thead><tr><th>المادة</th><th>الكمية</th><th>المبلغ</th></tr></thead>
+                    <tbody>
+                      {data.purchases.map((p) => (
+                        <tr key={p.materialId}>
+                          <td className="rt-title">{p.material}</td>
+                          <td className="num" data-label="الكمية">{fmtNum(p.qty)} {p.unit}</td>
+                          <td className="num" data-label="المبلغ">{fmtNum(p.amount)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+              <div>
+                <h4>المستردّ من الإجراءات</h4>
+                {data.recovered.length === 0 ? <p className="empty">لا إجراءات بمستهلكات.</p> : (
+                  <table className="rtable earn-table">
+                    <thead><tr><th>الإجراء</th><th>المرّات</th><th>المستردّ</th></tr></thead>
+                    <tbody>
+                      {data.recovered.map((r) => (
+                        <tr key={r.procedureId}>
+                          <td className="rt-title">{r.procedure}</td>
+                          <td className="num" data-label="المرّات">{fmtNum(r.times)}</td>
+                          <td className="num" data-label="المستردّ">{fmtNum(r.amount)}
+                            {r.estimate > r.amount && <span className="earn-spec">من تقدير {fmtNum(r.estimate)}</span>}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          )}
+          {t.capped > 0 && (
+            <p className="share-warn">⚠ {fmtNum(t.capped)} ل.س من التقدير لم تُطرح: المواد المعدودة على بعض الإجراءات لم تُبقِ لها من السعر.</p>
+          )}
+          <p className="earn-note">
+            المشتريات = كلّ «شراء مواد» من الصندوق لمادةٍ استهلاكية في الشهر (بتاريخ الشراء). المستردّ = قيمة المستهلكات
+            المطروحة من الإجراءات المقبوضة في الشهر (بيوم القبض، والمُزال لا يُعدّ). فرقٌ سالبٌ متكرّر يعني أنّ قيمة
+            المستهلكات على أنواع الإجراءات أقلّ من كلفتها الفعلية — تُعدَّل من صفحة الإجراءات وتسري على ما بعدها.
+          </p>
+        </>
+      )}
+    </div>
+  )
+}
+
 export default function ClinicFunds() {
   const { clinicRole: role } = useRole()
   const canWrite = canWriteClinicFunds(role)
@@ -456,6 +541,7 @@ export default function ClinicFunds() {
       </div>
       {tab === 'fund' && <FundTab canWrite={canWrite} showToast={showToast} />}
       {tab === 'profit' && <ProfitTab />}
+      {tab === 'consumables' && <ConsumablesTab />}
       {tab === 'doctors' && <DoctorsTab canWrite={canWrite} />}
     </>
   )

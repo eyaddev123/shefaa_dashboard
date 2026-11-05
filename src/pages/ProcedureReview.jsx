@@ -6,7 +6,9 @@ import MaterialsEditor, { qtyValid, toPayload, fmtQty, materialsSummary } from '
 // ═══ المراجعة: كلّ إجراءٍ بموادّه وحصّتيه ═══
 // لا شيء ينتظر هنا: كلّ سطرٍ حُسب لحظة إضافته. الصفحة للاطّلاع والتصحيح:
 //   أحمر — الشفاء سالبة على السطر (المواد + الدكتور فاقا السعر)
-//   أصفر — الدكتور بلا قاعدة لحظة الإضافة، فحصّته صفر: اضبط بروفايله
+//   أصفر — الدكتور بلا قاعدة لحظة الإضافة، فحصّته صفر (أسطر ما قبل الإصدار 2 وحدها — الآن تُرفض الإضافة)
+//   «المواد فوق السعر» — الإصدار 2: المواد المعدودة تجاوزت السعر فطُرح كلّه، والدكتور والشفاء صفر
+// والمواد على السطر تشمل «المستهلكات» (قيمة نوع الإجراء) — تُفصَّل تحتها، وتعديلها هنا للمشرفة بسبب.
 // وضبطُ القاعدة لاحقاً لا يمسّ الأسطر القائمة (لقطة) — الإشارة تقول ذلك صراحةً.
 // مشرف العيادات يصحّح مواد أيّ سطر في أيّ وقت، وكلُّ تغييرٍ له أثر.
 //
@@ -20,6 +22,7 @@ const FLAGS = [
   { key: 'negative', label: 'الشفاء سالبة', cls: 'is-neg' },
   { key: 'no_rule', label: 'بلا قاعدة', cls: 'is-norule' },
   { key: 'unpaid', label: 'غير مدفوع', cls: 'is-unpaid' },
+  { key: 'over_price', label: 'المواد فوق السعر', cls: 'is-neg' },
 ]
 
 // ═══ غير المدفوع عبر الأيام — مع «تعليم مدفوع» و«إزالة بسبب» للمشرفة ═══
@@ -124,16 +127,24 @@ function History({ lineId }) {
   )
 }
 
+// ★ المستهلكات (الإصدار 2 وحده): قيمة نوع الإجراء لقطةً على السطر — تُعدَّل هنا استثناءً بسببٍ إلزاميّ
+//   (يطابق الخادم: المشرفة وحدها، وسطرٌ قبل المستهلكات يبقى بحسابه القديم).
 function EditLine({ line, catalog, onSaved, onCancel, showToast }) {
   const [mats, setMats] = useState(() => line.materials.map((m) => ({ ...m, qty: fmtQty(m.qty) })))
   const legacyStart = Number(line.legacy_materials || 0)
   const [legacy, setLegacy] = useState(String(legacyStart))
+  const v2 = Number(line.distribution_version) === 2
+  const consStart = Number(line.consumables_estimate || 0)
+  const [cons, setCons] = useState(String(consStart))
+  const consChanged = v2 && Number(cons || 0) !== consStart
+  const [reason, setReason] = useState('')
   const [busy, setBusy] = useState(false)
   const save = async () => {
     setBusy(true)
     try {
       const body = { materials: toPayload(mats) }
       if (legacyStart > 0 && Number(legacy || 0) !== legacyStart) body.legacy_materials = legacy || '0'
+      if (consChanged) { body.consumables_estimate = cons || '0'; body.reason = reason.trim() }
       const r = await api.clinic.setLineMaterials(line.appointment_id, line.id, body)
       if (r.unchanged) showToast('لا تغيير', 'success', 2500)
       else if (r.warnings && r.warnings.length) showToast(`حُفظ — ⚠ ${r.warnings[0]}`, 'warn', 7000)
@@ -152,8 +163,21 @@ function EditLine({ line, catalog, onSaved, onCancel, showToast }) {
             onChange={(e) => setLegacy(toLatinDigits(e.target.value))} />
         </label>
       )}
+      {v2 && (
+        <div className="rev-consumables">
+          <label>المستهلكات (تقدير نوع الإجراء):
+            <input value={cons} inputMode="decimal" style={{ width: 110 }}
+              onChange={(e) => setCons(toLatinDigits(e.target.value))} />
+          </label>
+          {consChanged && (
+            <label>السبب (إلزامي):
+              <input value={reason} maxLength={300} placeholder="مثلاً: ضماد إضافي" onChange={(e) => setReason(e.target.value)} />
+            </label>
+          )}
+        </div>
+      )}
       <div className="mat-actions">
-        <button disabled={busy || !qtyValid(mats)} onClick={save}>حفظ وإعادة الحساب</button>
+        <button disabled={busy || !qtyValid(mats) || (consChanged && !reason.trim())} onClick={save}>حفظ وإعادة الحساب</button>
         <button className="ghost" disabled={busy} onClick={onCancel}>إلغاء</button>
       </div>
     </div>
@@ -177,7 +201,8 @@ export default function ProcedureReview({ canEdit, showToast }) {
   useEffect(() => { setData(null); load() }, [from, to, doctorId, flag])
   useEffect(() => { api.clinic.doctors().then(setDoctors).catch(() => {}) }, [])
   useEffect(() => {
-    if (canEdit) api.clinic.materials().then((r) => setCatalog(r.filter((m) => m.is_active))).catch(() => {})
+    // المعدودة وحدها تُختار على السطر (الاستهلاكية قيمتها على نوع الإجراء، والخادم يرفضها)
+    if (canEdit) api.clinic.materials().then((r) => setCatalog(r.filter((m) => m.is_active && m.material_kind !== 'consumable'))).catch(() => {})
   }, [canEdit])
 
   const toggle = (id, what) => setOpen((o) => ({ ...o, [id]: o[id] === what ? null : what }))
@@ -218,7 +243,7 @@ export default function ProcedureReview({ canEdit, showToast }) {
       <div className="inline rev-flags">
         {FLAGS.map((f) => {
           const n = f.key === 'negative' ? counts.negative : f.key === 'no_rule' ? counts.no_rule
-            : f.key === 'unpaid' ? counts.unpaid : counts.lines
+            : f.key === 'unpaid' ? counts.unpaid : f.key === 'over_price' ? counts.over_price : counts.lines
           return (
             <button key={f.key} type="button" aria-pressed={flag === f.key}
               className={`rev-flag ${f.cls || ''}${flag === f.key ? ' is-on' : ''}`}
@@ -232,7 +257,8 @@ export default function ProcedureReview({ canEdit, showToast }) {
       {t && counts.lines > 0 && (
         <div className="rev-totals">
           <span>الأسعار <strong>{fmtMoney(t.price)}</strong></span>
-          <span>المواد <strong>{fmtMoney(t.materials)}</strong></span>
+          <span>المواد <strong>{fmtMoney(t.materials)}</strong>
+            {t.consumables > 0 && <small> (منها مستهلكات {fmtMoney(t.consumables)})</small>}</span>
           <span>حصص الدكاترة <strong>{fmtMoney(t.doctor)}</strong></span>
           <span>حصّة الشفاء <strong className={t.shifa < 0 ? 'neg' : undefined}>{fmtMoney(t.shifa)}</strong></span>
         </div>
@@ -264,9 +290,11 @@ export default function ProcedureReview({ canEdit, showToast }) {
                     <td className="rev-mats">
                       <strong>{fmtMoney(l.materials_cost)}</strong>
                       <span className="rev-mats-list">
-                        {l.materials.length ? materialsSummary(l.materials) : (Number(l.legacy_materials) ? '' : 'بلا مواد')}
+                        {l.materials.length ? materialsSummary(l.materials) : (Number(l.legacy_materials) || Number(l.consumables_cost) ? '' : 'بلا مواد')}
                         {Number(l.legacy_materials) > 0 && `${l.materials.length ? '، ' : ''}مواد سابقة ${fmtMoney(l.legacy_materials)}`}
                       </span>
+                      {Number(l.consumables_cost) > 0 && <span className="rev-mats-list">منها مستهلكات {fmtMoney(l.consumables_cost)}</span>}
+                      {l.over_price && <span className="rev-note">المواد فوق السعر — طُرح السعر كلّه</span>}
                     </td>
                     <td className="rev-rule">
                       {l.rule_label}

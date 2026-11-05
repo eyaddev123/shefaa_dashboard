@@ -51,8 +51,10 @@ export function RuleFields({ kind, value, price, onChange, showErrors, autoFocus
       {!chk.error && chk.warning && <p className="share-warn rule-msg" role="status">⚠ {chk.warning}</p>}
       <p className="hint rule-msg">
         {kind === 'percent'
-          ? 'تُحسب بعد خصم المواد: (السعر − المواد) × النسبة.'
-          : 'المبلغ كما هو للدكتور، لا تمسّه المواد.'}
+          ? (value.trim() !== '' && Number(value) === 0 && !chk.error
+            ? '0٪ — كامل المبلغ للشفاء (قاعدةٌ مسجّلة مقصودة).'
+            : 'تُحسب بعد خصم المواد والمستهلكات: (السعر − المواد − المستهلكات) × النسبة، مقرّبةً لفوق لأقرب 5,000.')
+          : 'المبلغ كما هو للدكتور، لا تمسّه المواد ولا يُقرَّب — بما لا يتجاوز ما يبقى من السعر.'}
         {price != null && <> سعر الإجراء الحالي {fmtMoney(price)}.</>}
       </p>
     </div>
