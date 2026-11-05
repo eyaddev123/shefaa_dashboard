@@ -15,6 +15,7 @@ import { WAITING_RETURN, waitingReturnOf, serverOffsetOf, Elapsed, useStaffEvent
 import ReferralsEditor from '../components/ReferralFields.jsx'
 import { referralPayload, referralReady, referralSummary } from '../referral.js'
 import RoomBadge from '../components/RoomBadge.jsx'
+import { fmtDuration } from '../components/Punctuality.jsx'
 
 // شارة الأولوية — تُبرز من يتقدّم الطابور وسببه
 export function priorityBadge(priority) {
@@ -934,7 +935,8 @@ function AttendanceCurrentCard({ current, returning = [], recalled, onRecalled, 
   )
 }
 
-// وصول الطبيب: زرٌّ مرة واحدة، ثم الوقت مع «تصحيح» يترك أثراً يُعرض تحته
+// حضور الطبيب: «وصل الطبيب» مرّة واحدة ثم الوقت مع «تصحيح» يترك أثراً، وبعده «تسجيل انصراف»
+// مرّة واحدة بوقت الضغطة (أساس ساعات الراتب). تصحيح الانصراف عند المشرفة من لوحة الدكتور.
 function DoctorArrivalCard({ data, onChanged, onError, canAct }) {
   const dlg = useDialogs()
   const [busy, setBusy] = useState(false)
@@ -952,24 +954,57 @@ function DoctorArrivalCard({ data, onChanged, onError, canAct }) {
     })
     if (t) run(() => api.clinic.fixDoctorArrival(data.id, toLatinDigits(t).trim()))
   }
+  const depart = async () => {
+    // المرضى الذين ما زالوا عند الطبيب أو ينتظرونه: تنبيهٌ لا منع — الانصراف وقتٌ يُسجَّل
+    const left = (data.appointments || []).filter((a) => ['arrived', 'in_service', 'waiting_return'].includes(a.status)).length
+    const ok = await dlg.confirm({
+      title: 'تسجيل انصراف الطبيب',
+      body: `يُسجَّل الانصراف الآن (${fmtClock(new Date())}) مرّةً واحدة — وتصحيحه بعدها عند المشرفة.${
+        left ? `\nما زال ${left === 1 ? 'مريضٌ واحد' : `${left} مرضى`} بالانتظار أو عند الطبيب.` : ''}`,
+      confirmLabel: 'سجّل الانصراف',
+    })
+    if (ok) run(() => api.clinic.doctorDeparted(data.id))
+  }
   const history = data.doctor_arrival_history || []
+  const depHistory = data.doctor_departure_history || []
   // الأثر لا يضيع حين تنطوي البطاقة: كل تصحيح بقيمته السابقة ومن صحّحه ومتى — في تلميح السطر
-  const trail = history.map((h) =>
-    `صُحّح من ${fmtClock(h.previous_value)} إلى ${fmtClock(h.new_value)} — ${h.changed_by_name || '—'} عند ${fmtClock(h.changed_at)}`).join('\n')
+  const trailOf = (list) => list.map((h) =>
+    `صُحّح من ${fmtClock(h.previous_value)} إلى ${fmtClock(h.new_value)} — ${h.changed_by_name || '—'} عند ${fmtClock(h.changed_at)}${
+      h.reason ? ` (${h.reason})` : ''}`).join('\n')
+  const minutes = data.doctor_departed_at
+    ? Math.floor((new Date(data.doctor_departed_at) - new Date(data.doctor_arrived_at)) / 60000) : null
   return (
     <div className="card attn-compact">
-      <h3>وصول الطبيب</h3>
+      <h3>حضور الطبيب</h3>
       {data.doctor_arrived_at ? (
-        // بعد التسجيل: سطرٌ واحد — الوقت ورابط «تصحيح»
-        <div className="attn-arrival-line" title={[
-          `بداية الدوام ${fmtTime(data.start_time)}`,
-          data.doctor_arrived_by_name && `سجّله ${data.doctor_arrived_by_name}`,
-          trail,
-        ].filter(Boolean).join('\n')}>
-          <span className="attn-arrival-time" dir="ltr">{fmtClock(data.doctor_arrived_at)}</span>
-          {history.length > 0 && <span className="attn-compact-hint">صُحّح {history.length === 1 ? 'مرة' : `${history.length} مرات`}</span>}
-          {canAct && <button className="link-btn" disabled={busy} onClick={fix}>تصحيح</button>}
-        </div>
+        <>
+          {/* بعد التسجيل: سطرٌ واحد — الوقت ورابط «تصحيح» */}
+          <div className="attn-arrival-line" title={[
+            `بداية الدوام ${fmtTime(data.start_time)}`,
+            data.doctor_arrived_by_name && `سجّله ${data.doctor_arrived_by_name}`,
+            trailOf(history),
+          ].filter(Boolean).join('\n')}>
+            <span className="attn-compact-hint">وصل</span>
+            <span className="attn-arrival-time" dir="ltr">{fmtClock(data.doctor_arrived_at)}</span>
+            {history.length > 0 && <span className="attn-compact-hint">صُحّح {history.length === 1 ? 'مرة' : `${history.length} مرات`}</span>}
+            {canAct && <button className="link-btn" disabled={busy} onClick={fix}>تصحيح</button>}
+          </div>
+          {data.doctor_departed_at ? (
+            <div className="attn-arrival-line attn-departure-line" title={[
+              data.doctor_departed_by_name && `سجّله ${data.doctor_departed_by_name}`,
+              trailOf(depHistory),
+            ].filter(Boolean).join('\n')}>
+              <span className="attn-compact-hint">انصرف</span>
+              <span className="attn-arrival-time" dir="ltr">{fmtClock(data.doctor_departed_at)}</span>
+              <span className="badge sm">دوام {fmtDuration(minutes)}</span>
+              {depHistory.length > 0 && <span className="attn-compact-hint">صُحّح</span>}
+            </div>
+          ) : canAct ? (
+            <div className="attn-compact-actions">
+              <button className="ghost attn-depart-btn" disabled={busy} onClick={depart}>تسجيل انصراف</button>
+            </div>
+          ) : <p className="attn-compact-hint">لم يُسجَّل انصرافه بعد</p>}
+        </>
       ) : (
         <>
           <p className="attn-compact-hint">لم يُسجَّل بعد · بداية الدوام <span dir="ltr">{fmtTime(data.start_time)}</span></p>

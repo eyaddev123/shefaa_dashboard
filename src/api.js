@@ -229,7 +229,9 @@ export const api = {
     fundOpeningHistory: () => http('/clinic/fund/opening/history'),
     materialsProfit: ({ period, from, to }) =>
       http(`/clinic/materials-profit?${new URLSearchParams(period ? { period } : { from, to: to || from })}`),
-    doctorAccounts: (month) => http(`/clinic/doctor-accounts${month ? `?month=${month}` : ''}`),
+    // حسابات الدكاترة: { month } شهرٌ (بلاه الحالي) أو { from, to } يومٌ أو فترة
+    doctorAccounts: ({ month, from, to } = {}) => http(`/clinic/doctor-accounts${
+      from ? `?${new URLSearchParams({ from, to: to || from })}` : month ? `?month=${month}` : ''}`),
     // المستهلكات لشهر: مشتريات العبوات مقابل المستردّ من الإجراءات
     consumablesReport: (month) => http(`/clinic/consumables-report${month ? `?month=${month}` : ''}`),
     // لوحة تحكم الدكتور: period = week | month | custom (مع from/to)
@@ -240,6 +242,11 @@ export const api = {
       new URLSearchParams(period === 'custom' ? { period, from, to: to || from } : { period })}`),
     doctorPay: (id) => http(`/clinic/doctors/${id}/pay`),
     setDoctorPay: (id, body) => http(`/clinic/doctors/${id}/pay`, { method: 'PUT', body: JSON.stringify(body) }),
+    // سجلّ حضور الدكتور وانصرافه بفترة لوحته، وتصحيح المشرفة بسببٍ إلزاميّ: { arrival?, departure?, reason }
+    doctorAttendance: (id, { period = 'week', from, to } = {}) => http(`/clinic/doctors/${id}/attendance?${
+      new URLSearchParams(period === 'custom' ? { period, from, to: to || from } : { period })}`),
+    fixDoctorTimes: (sessionId, body) =>
+      http(`/clinic/sessions/${sessionId}/doctor-times`, { method: 'PUT', body: JSON.stringify(body) }),
     // ── كتالوج المواد: قراءةٌ وحدها ── (الاستقبال يتسلّم المفعَّل بلا سعر — من الخادم نفسه).
     // الكتابة والاستهلاك في api.inventory: صفحة «المخزون» المكان الوحيد لإدارة المواد
     materials: () => http('/clinic/materials'),
@@ -370,6 +377,8 @@ export const api = {
     doctorArrived: (sessionId) => http(`/clinic/sessions/${sessionId}/doctor-arrived`, { method: 'POST' }),
     fixDoctorArrival: (sessionId, time) =>
       http(`/clinic/sessions/${sessionId}/doctor-arrived`, { method: 'PATCH', body: JSON.stringify({ time }) }),
+    // انصراف الطبيب: مرّة واحدة لجلسة اليوم بعد وصوله — وتصحيحه عند المشرفة (fixDoctorTimes)
+    doctorDeparted: (sessionId) => http(`/clinic/sessions/${sessionId}/doctor-departed`, { method: 'POST' }),
     // تحويل نمط جلسة مولَّدة — لمشرف العيادات، وللجلسة الفارغة فقط (الخادم يرفض غيرها بـ 409)
     switchSessionMode: (sessionId, flowMode) =>
       http(`/clinic/sessions/${sessionId}/flow-mode`, { method: 'PATCH', body: JSON.stringify({ flow_mode: flowMode }) }),

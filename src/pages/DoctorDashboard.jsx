@@ -3,6 +3,8 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { api, todayLocal } from '../api.js'
 import { PunctualityTiles, DutyCalendar, LateDays, fmtMinutes } from '../components/Punctuality.jsx'
 import Highlights from '../components/Highlights.jsx'
+import DoctorTimesCard from '../components/DoctorTimesCard.jsx'
+import { useRole } from '../RoleContext.jsx'
 
 // ═══ لوحة تحكم الدكتور ═══
 // صفحةٌ لكلّ دكتور (من قائمة الدكاترة)، للمشرفة والمدير والمشرف العام — قراءة وحدها.
@@ -21,12 +23,23 @@ const signed = (n) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${fmtNum(Math.abs(n))}
 const rangeText = (d) => (d.from === d.to ? d.from : `${d.from} ← ${d.to}`)
 
 function FinanceCard({ f }) {
+  const a = f.attendance
   const salaryNote = f.noPay ? 'بلا نوع حساب — الراتب صفر'
+    : f.payKind === 'daily_hourly' ? <>
+        {fmtNum(a.days)} {a.days >= 3 && a.days <= 10 ? 'أيام' : 'يوم'} × {fmtNum(f.dailyRate)} = {fmtNum(f.salaryDays)}
+        <br />{fmtNum(a.hours)} س × {fmtNum(f.hourlyRate)} = {fmtNum(f.salaryHours)}
+      </>
     : f.payKind === 'per_patient' ? `${fmtNum(f.payAmount)} للمريض × ${fmtNum(f.patients)}`
     : f.salary === null ? `راتب شهري ثابت ${fmtNum(f.payAmount)} — يُحسب للشهر الكامل` : 'راتب شهري ثابت'
   return (
     <div className="card earn-card">
-      <h3>المال</h3>
+      <h3>المال {f.settleCycle && <span className="pn-grace">تحاسبه: {f.settleCycle === 'daily' ? 'يومي' : 'شهري'}</span>}</h3>
+      {f.payKind === 'daily_hourly' && a.noDeparture > 0 && (
+        <p className="share-warn acc-warn" role="alert">
+          ⚠ {fmtNum(a.noDeparture)} {a.noDeparture === 1 ? 'يوم' : 'أيام'} «انصراف غير مسجَّل» في الفترة: اليومية محسوبة والساعات لا —
+          فالراتب أقلّ من المستحقّ حتى يُصحَّح (بطاقة «الحضور والانصراف» تحت).
+        </p>
+      )}
       <div className="tiles earn-tiles fund-tiles pn-fin">
         <div className="tile"><div className="label">الشفاء من الكشوف</div><div className="value"><Money value={f.visitShifa} /></div></div>
         <div className="tile"><div className="label">الشفاء من الإجراءات</div><div className="value"><Money value={f.procShifa} /></div></div>
@@ -38,7 +51,7 @@ function FinanceCard({ f }) {
         </div>
         {f.diff === null ? (
           <div className="tile"><div className="label">الربح / الخسارة</div><div className="value">—</div>
-            <div className="pn-sub">اختر «هالشهر» لحسابه</div></div>
+            <div className="pn-sub">{f.payKind === 'fixed' ? 'اختر «هالشهر» لحسابه' : '—'}</div></div>
         ) : (
           <div className={`tile earn-hero ${f.diff < 0 ? 'fund-loss' : 'fund-gain'}`}>
             <div className="label">{f.diff < 0 ? 'خسارة' : 'ربح'}</div>
@@ -72,12 +85,14 @@ function TopProcedures({ list }) {
 
 export default function DoctorDashboard() {
   const { id } = useParams()
+  const { clinicRole: role } = useRole()
   const [params, setParams] = useSearchParams()
   const period = PERIODS.some(([k]) => k === params.get('period')) ? params.get('period') : 'week'
   const from = params.get('from') || todayLocal()
   const to = params.get('to') || from
   const [data, setData] = useState(null)
   const [err, setErr] = useState(null)
+  const [reload, setReload] = useState(0)
   const key = `${id}|${period}|${period === 'custom' ? `${from}|${to}` : ''}`
 
   useEffect(() => {
@@ -87,7 +102,7 @@ export default function DoctorDashboard() {
       .then((d) => { if (alive) setData({ key, ...d }) })
       .catch((e) => { if (alive) setErr(e.message) })
     return () => { alive = false }
-  }, [key])
+  }, [key, reload])
 
   const update = (patch) => {
     const next = new URLSearchParams(params)
@@ -140,6 +155,9 @@ export default function DoctorDashboard() {
           </>} />
 
           <FinanceCard f={shown.finance} />
+
+          <DoctorTimesCard doctorId={id} period={period} from={from} to={to} canFix={role === 'clinic_admin'}
+            onChanged={() => setReload((n) => n + 1)} />
 
           <div className="pn-grid">
             <div className="card">
