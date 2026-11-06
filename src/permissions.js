@@ -28,6 +28,15 @@ export const canManageUsers = (role) => role === SUPER_ADMIN
 export const canSeeDoctorsPage = (role) =>
   role === 'clinic_admin' || role === 'board' || role === SUPER_ADMIN || role === MANAGER
 
+// لوحة القيادة — العيادات: يطابق COMMAND_READERS في الخادم. المجلس (غير المدير المسؤول) والطبيب لا.
+export const canSeeClinicCommand = (role) =>
+  role === 'clinic_admin' || role === 'clinic_reception' || role === SUPER_ADMIN || role === MANAGER
+// من له قسمان: لوحته في المساعدات تبقى، ويتنقّل بينهما بتبويب (الموظف المتفرّغ للعيادات بلا تبويب)
+export const hasClinicAndAidDashboards = (role, clinicRole) =>
+  canSeeClinicCommand(clinicRole) && canReadAid(role)
+// توليد جلسات اليوم — مرآة حارس POST /clinic/sessions/generate
+export const canGenerateSessions = (role) => role === 'clinic_admin'
+
 // لوحة العيادات اليومية والطابور
 export const canSeeClinicBoard = (role) =>
   role === 'clinic_admin' || role === 'clinic_reception' || role === 'board' || role === SUPER_ADMIN || role === MANAGER
