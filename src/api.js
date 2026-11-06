@@ -238,6 +238,7 @@ export const api = {
     doctorDashboard: (id, { period = 'week', from, to } = {}) => http(`/clinic/doctors/${id}/dashboard?${
       new URLSearchParams(period === 'custom' ? { period, from, to: to || from } : { period })}`),
     // الأبرز لكلّ الدكاترة بفترة لوحة الدكتور نفسها
+    command: () => http('/clinic/command'),
     highlights: ({ period = 'week', from, to } = {}) => http(`/clinic/highlights?${
       new URLSearchParams(period === 'custom' ? { period, from, to: to || from } : { period })}`),
     doctorPay: (id) => http(`/clinic/doctors/${id}/pay`),

@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom'
 import { api, AID_TYPES, INCOME_KINDS, SESSION_STATUSES, STATUSES, fmtDate, fmtMoney, fmtTime } from '../api.js'
 import { useRole } from '../RoleContext.jsx'
 import FinanceBar from '../components/FinanceBar.jsx'
+import ClinicCommand from '../components/ClinicCommand.jsx'
+import { canSeeClinicCommand, hasClinicAndAidDashboards } from '../permissions.js'
 
 function TreasuryTiles({ treasury }) {
   return (
@@ -76,7 +78,7 @@ function RequestRows({ rows, extra }) {
   )
 }
 
-export default function Dashboard() {
+function AidDashboard() {
   const [d, setD] = useState(null)
   const [err, setErr] = useState(null)
   const { user, isChairman } = useRole()
@@ -158,41 +160,6 @@ export default function Dashboard() {
             </table>
           </div>
           <StatusChart byStatus={d.byStatus} />
-        </div>
-      </>
-    )
-  }
-
-  // ═══ لوحة إدارة/استقبال العيادات ═══
-  if (d.view === 'clinic_admin') {
-    return (
-      <>
-        <h2>لوحة القيادة — العيادات</h2>
-        <p className="subtitle">أهلاً {user.display_name}</p>
-        <div className="tiles">
-          <div className="tile"><div className="label">الدكاترة الفعّالون</div><div className="value">{d.doctorsCount}</div></div>
-          <div className="tile">
-            <div className="label">جلسات اليوم</div>
-            <div className="value">{d.todaySessions.length}</div>
-            <div className="hint"><Link className="plain" to="/clinic/board">لوحة العيادات اليومية</Link></div>
-          </div>
-        </div>
-        <div className="card">
-          <h3>جلسات اليوم</h3>
-          <table>
-            <thead><tr><th>الوقت</th><th>الدكتور</th><th>الحالة</th><th>على الدور الآن</th></tr></thead>
-            <tbody>
-              {d.todaySessions.map((s) => (
-                <tr key={s.id}>
-                  <td className="num">{fmtTime(s.start_time)}</td>
-                  <td>{s.doctor_name}</td>
-                  <td><span className="badge">{SESSION_STATUSES[s.status] || s.status}</span></td>
-                  <td className="num">{s.active_count}</td>
-                </tr>
-              ))}
-              {d.todaySessions.length === 0 && <tr><td colSpan={4} className="empty">لا جلسات اليوم بعد</td></tr>}
-            </tbody>
-          </table>
         </div>
       </>
     )
@@ -321,4 +288,40 @@ export default function Dashboard() {
       <StatusChart byStatus={d.byStatus} />
     </>
   )
+}
+
+// ═══ أيّ لوحة تفتح ═══
+// موظف العيادات: لوحة القيادة وحدها، بلا طلب /dashboard (عدّادات المساعدات لا تعنيه).
+// من له قسمان (المدير، المشرف العام، المدير المسؤول): تبويبان — لوحته في المساعدات لا تضيع، وتُجلب
+// حين تُفتح. المدير والمشرف العام يبدآن بالعيادات، والمدير المسؤول بالمساعدات: فيها ما ينتظر قراره.
+const SECTION_KEY = 'dashboard-section'
+const readSection = () => { try { return localStorage.getItem(SECTION_KEY) } catch { return null } }
+
+function DualDashboard({ initial }) {
+  const [section, setSection] = useState(() => {
+    const saved = readSection()
+    return saved === 'clinic' || saved === 'aid' ? saved : initial
+  })
+  const pick = (s) => {
+    setSection(s)
+    try { localStorage.setItem(SECTION_KEY, s) } catch { /* تخزينٌ محجوب: الاختيار لهذه الجلسة فقط */ }
+  }
+  return (
+    <>
+      <div className="cc-switch" role="tablist" aria-label="قسم اللوحة">
+        {[['clinic', 'العيادات'], ['aid', 'المساعدات']].map(([k, label]) => (
+          <button key={k} type="button" role="tab" aria-selected={section === k}
+            className={section === k ? 'active' : ''} onClick={() => pick(k)}>{label}</button>
+        ))}
+      </div>
+      {section === 'clinic' ? <ClinicCommand /> : <AidDashboard />}
+    </>
+  )
+}
+
+export default function Dashboard() {
+  const { role, clinicRole, isChairman } = useRole()
+  if (hasClinicAndAidDashboards(role, clinicRole)) return <DualDashboard initial={isChairman ? 'aid' : 'clinic'} />
+  if (canSeeClinicCommand(clinicRole)) return <ClinicCommand />
+  return <AidDashboard />
 }
