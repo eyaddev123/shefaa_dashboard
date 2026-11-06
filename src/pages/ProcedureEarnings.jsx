@@ -34,7 +34,7 @@ const TILES = [
   { key: 'shifa', label: 'حصّة الشفاء', money: true },
 ]
 
-function Tiles({ totals, doctorLabel }) {
+function Tiles({ totals, doctorLabel, iron, grand }) {
   return (
     <div className="tiles earn-tiles">
       {TILES.map((t) => (
@@ -45,16 +45,30 @@ function Tiles({ totals, doctorLabel }) {
           </div>
         </div>
       ))}
+      {/* الحديد مميَّز عن الإجراءات: بطاقتان تظهران لمن له جلسات وحده */}
+      {iron?.count > 0 && (
+        <>
+          <div className="tile iron-tile">
+            <div className="label">حصّة الحديد ({fmtNum(iron.count)} {iron.count === 1 ? 'جلسة' : 'جلسات'})</div>
+            <div className="value"><Money value={iron.share} /></div>
+          </div>
+          <div className="tile earn-hero">
+            <div className="label">مجموع المستحق مع الحديد</div>
+            <div className="value"><Money value={grand} /></div>
+          </div>
+        </>
+      )}
     </div>
   )
 }
 
 function Summary({ data, onOpen }) {
+  const hasIron = data.iron?.count > 0
   return (
     <table className="rtable earn-table">
       <thead>
         <tr><th>الدكتور</th><th>الإجراءات</th><th>إجمالي القيمة</th><th>تكلفة المواد</th>
-          <th>حصّة الدكتور</th><th>حصّة الشفاء</th><th></th></tr>
+          <th>حصّة الدكتور</th><th>حصّة الشفاء</th>{hasIron && <th>حصّة الحديد</th>}{hasIron && <th>مجموع المستحق</th>}<th></th></tr>
       </thead>
       <tbody>
         {data.doctors.map((d) => (
@@ -72,6 +86,8 @@ function Summary({ data, onOpen }) {
             <td className="num" data-label="تكلفة المواد">{fmtNum(d.totals.materials)}</td>
             <td className="num earn-doc" data-label="حصّة الدكتور">{fmtNum(d.totals.doctor)}</td>
             <td className={`num${d.totals.shifa < 0 ? ' neg' : ''}`} data-label="حصّة الشفاء">{fmtNum(d.totals.shifa)}</td>
+            {hasIron && <td className="num iron-cell" data-label="حصّة الحديد">{d.iron.count > 0 ? fmtNum(d.iron.share) : <span className="muted">—</span>}</td>}
+            {hasIron && <td className="num earn-doc" data-label="مجموع المستحق">{fmtNum(d.grand)}</td>}
             <td className="rt-actions earn-open">
               <button type="button" className="ghost" aria-label={`تفصيل ${d.doctor}`}
                 onClick={(e) => { e.stopPropagation(); onOpen(d.doctorId) }}>التفصيل ←</button>
@@ -87,6 +103,8 @@ function Summary({ data, onOpen }) {
           <td className="num" data-label="تكلفة المواد">{fmtNum(data.totals.materials)}</td>
           <td className="num earn-doc" data-label="حصص الدكاترة">{fmtNum(data.totals.doctor)}</td>
           <td className={`num${data.totals.shifa < 0 ? ' neg' : ''}`} data-label="حصّة الشفاء">{fmtNum(data.totals.shifa)}</td>
+          {hasIron && <td className="num iron-cell" data-label="حصّة الحديد">{fmtNum(data.iron.share)}</td>}
+          {hasIron && <td className="num earn-doc" data-label="مجموع المستحق">{fmtNum(data.grand)}</td>}
           <td className="rt-actions"></td>
         </tr>
       </tfoot>
@@ -155,6 +173,29 @@ function Detail({ doctor, multiDay }) {
   )
 }
 
+function IronDetail({ iron, multiDay }) {
+  return (
+    <>
+      <h4 className="iron-sub"><span className="badge sm iron-badge">حديد</span> جلسات الحديد</h4>
+      <table className="rtable earn-table">
+        <thead><tr><th>الوقت</th><th>المريض</th><th>النوع</th><th>الممرضة</th><th>السعر</th><th>حصّته</th></tr></thead>
+        <tbody>
+          {iron.lines.map((l) => (
+            <tr key={l.id}>
+              <td className="rt-badge earn-when" dir="ltr">{multiDay && <span className="earn-date">{l.date}</span>}<span>{l.time}</span></td>
+              <td className="rt-title">{l.patient}</td>
+              <td data-label="النوع">{l.withDrug ? 'مع دوا' : 'بلا دوا'}</td>
+              <td data-label="الممرضة">{l.nurse}</td>
+              <td className="num" data-label="السعر">{fmtNum(l.price)}</td>
+              <td className="num earn-doc" data-label="حصّته">{fmtNum(l.share)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </>
+  )
+}
+
 export default function ProcedureEarnings({ showToast }) {
   const [params, setParams] = useSearchParams()
   const period = PERIODS.some((p) => p.key === params.get('period')) ? params.get('period') : 'today'
@@ -204,7 +245,7 @@ export default function ProcedureEarnings({ showToast }) {
   return (
     <div className="card earn-card">
       <div className="earn-head">
-        <h3>{doctor ? doctor.doctor : 'مستحقات الدكاترة من الإجراءات'}</h3>
+        <h3>{doctor ? doctor.doctor : data?.iron?.count > 0 ? 'مستحقات الدكاترة من الإجراءات والحديد' : 'مستحقات الدكاترة من الإجراءات'}</h3>
         <button type="button" className="ghost earn-export" disabled={exporting || !data || data.doctors.length === 0}
           onClick={doExport}>
           {exporting ? 'جارٍ التصدير…' : doctor ? 'إكسل هذا الدكتور' : 'إكسل الملخّص والتفصيل'}
@@ -242,18 +283,20 @@ export default function ProcedureEarnings({ showToast }) {
           ) : (
             <>
               <button type="button" className="ghost earn-back" onClick={() => update({ doctor: null })}>→ كل الدكاترة</button>
-              <Tiles totals={doctor.totals} doctorLabel="حصّة الدكتور" />
-              <Detail doctor={doctor} multiDay={multiDay} />
+              <Tiles totals={doctor.totals} doctorLabel="حصّة الدكتور" iron={doctor.iron} grand={doctor.grand} />
+              {doctor.lines.length > 0 && <Detail doctor={doctor} multiDay={multiDay} />}
+              {doctor.iron?.count > 0 && <IronDetail iron={doctor.iron} multiDay={multiDay} />}
             </>
           )
         )
         : data.doctors.length === 0 ? <p className="empty">لا إجراءات في هذه الفترة.</p>
         : (
           <>
-            <Tiles totals={data.totals} />
+            <Tiles totals={data.totals} iron={data.iron} grand={data.grand} />
             <Summary data={data} onOpen={open} />
             <p className="earn-note">
               الأرقام من لقطة كلّ سطر لحظة تسجيله — تغيير قاعدةٍ أو سعرٍ لاحقاً لا يمسّها. والإجراء المُزال لا يُحسب.
+              {data.iron?.count > 0 && ' وأعمدة الإجراءات لا تشمل الحديد: حصّته في عمودها، والمجموع هو ما يُدفع للدكتور.'}
             </p>
           </>
         )}

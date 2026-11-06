@@ -185,15 +185,22 @@ export async function renderTicketPng(data, width = 80, doc = document, { copy =
       else ORG_NAME_PARTS.forEach((part, i) => line(part, { size: 'org', weight: 700, gap: i === 0 ? 2 : 4 }))
     }
     rule()
-    line('رقم الدور', { size: 'label', gap: 2 })
-    line(data.queue_number, { size: 'queue', weight: 700, gap: 12 })
+    const receipt = data.receipt || null
+    if (receipt) line(receipt.title, { size: 'room', weight: 700, gap: 8 })
+    else {
+      line('رقم الدور', { size: 'label', gap: 2 })
+      line(data.queue_number, { size: 'queue', weight: 700, gap: 12 })
+    }
     line(data.full_name, { size: 'name', weight: 700, gap: 6 })
     const age = ageFromYear(data.birth_year)
     if (age != null) line(`العمر: ${age} سنة`, { size: 'age', gap: 6 })
     rule()
-    if (data.room) line(`العيادة ${data.room}`, { size: 'room', weight: 700, gap: 4 })
-    if (data.doctor_name) line(data.doctor_name, { size: 'doctor', gap: 4 })
-    line(data.visit_type === 'followup' ? 'مراجعة' : 'معاينة', { size: 'type', gap: 8 })
+    if (receipt) (receipt.lines || []).forEach((l) => line(l, { size: 'doctor', gap: 4 }))
+    else {
+      if (data.room) line(`العيادة ${data.room}`, { size: 'room', weight: 700, gap: 4 })
+      if (data.doctor_name) line(data.doctor_name, { size: 'doctor', gap: 4 })
+      line(data.visit_type === 'followup' ? 'مراجعة' : 'معاينة', { size: 'type', gap: 8 })
+    }
 
     const procs = (data.procedures || []).filter((p) => !p.removed_at)
     const fee = Number(data.fee || 0)
@@ -207,7 +214,7 @@ export async function renderTicketPng(data, width = 80, doc = document, { copy =
         { size: 'total', weight: 700 })
     } else {
       rule(false)
-      row('المبلغ للدفع', money(fee), { size: 'total', weight: 700 })
+      row(receipt ? 'المبلغ المقبوض' : 'المبلغ للدفع', money(fee), { size: 'total', weight: 700 })
     }
 
     y += g(10)

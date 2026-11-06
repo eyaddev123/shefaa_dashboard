@@ -23,6 +23,7 @@ const PERIODS = [
 ]
 const KIND_BADGE = {
   opening: 'blue', material_sale: 'good', material_edit: '', material_reversal: 'bad', purchase: 'warn', expense: 'bad',
+  iron_drug: 'good', iron_surplus: 'good', iron_drug_rev: 'bad', iron_surplus_rev: 'bad',
 }
 
 const fmtNum = (n) => Number(n || 0).toLocaleString('ar-SY', { maximumFractionDigits: 2 })
@@ -34,9 +35,9 @@ const signed = (n) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${fmtNum(Math.abs(n))}
 const rangeText = (d) => (d.from === d.to ? d.from : `${d.from} ← ${d.to}`)
 
 // ═══ الفترة: أزرارٌ وحقلا تاريخ، والحالة في الرابط ═══
-function usePeriod() {
+export function usePeriod(dflt = 'month') {
   const [params, setParams] = useSearchParams()
-  const period = PERIODS.some((p) => p.key === params.get('period')) ? params.get('period') : 'month'
+  const period = PERIODS.some((p) => p.key === params.get('period')) ? params.get('period') : dflt
   const from = params.get('from') || todayLocal()
   const to = params.get('to') || from
   const query = period === 'custom' ? { from, to } : { period }
@@ -48,7 +49,7 @@ function usePeriod() {
   return { period, from, to, query, key: JSON.stringify(query), set }
 }
 
-function PeriodPicker({ p, data }) {
+export function PeriodPicker({ p, data }) {
   const pick = (key) => p.set(key === 'custom'
     ? { period: 'custom', from: data?.from || todayLocal(), to: data?.to || todayLocal() }
     : { period: key, from: null, to: null })
@@ -76,7 +77,7 @@ function PeriodPicker({ p, data }) {
 }
 
 // تحميلٌ مرتبطٌ بمفتاحه: ردّ فترةٍ سابقة لا يُعرض تحت الفترة الجديدة
-function useLoad(fn, key, reload = 0) {
+export function useLoad(fn, key, reload = 0) {
   const [loaded, setLoaded] = useState(null)
   const [err, setErr] = useState(null)
   useEffect(() => {
@@ -106,6 +107,18 @@ function MovementDetail({ m }) {
           الكمية {fmtNum(m.purchase.qty)} {m.purchase.unit}، سعر القطعة {fmtNum(m.purchase.unitCost)}
           {m.purchase.supplier && ` — ${m.purchase.supplier}`}
         </span>
+      </span>
+    )
+  }
+  if (m.iron) {
+    return (
+      <span className="fund-detail">
+        <strong>{m.iron.patient}</strong>
+        <span className="fund-sub">
+          {m.iron.withDrug ? 'مع دوا' : 'بلا دوا'}، سعر الجلسة {fmtNum(m.iron.price)} — الممرضة {m.iron.nurse}
+          {m.iron.doctor && ` — ${m.iron.doctor}`}
+        </span>
+        {m.kind.endsWith('_rev') && m.iron.cancelReason && <span className="fund-sub">سبب الإلغاء: {m.iron.cancelReason}</span>}
       </span>
     )
   }
@@ -262,7 +275,7 @@ function FundTab({ canWrite, showToast }) {
               </table>
             )}
             <p className="earn-note">
-              يدخل تلقائياً ثمن المواد في كلّ إجراءٍ مقبوض (بيوم القبض)، ويخرج تلقائياً كلّ شراء مواد (الكمية × سعر القطعة).
+              يدخل تلقائياً ثمن المواد في كلّ إجراءٍ مقبوض (بيوم القبض) واسترداد دواء الحديد وفاضل كلّ جلسة حديد، ويخرج تلقائياً كلّ شراء مواد (الكمية × سعر القطعة).
               حذف إجراءٍ مقبوض يكتب حركةً عكسية. هذا الصندوق منفصلٌ عن إيرادات الشفاء (الكشوف وحصّتها من الإجراءات).
             </p>
           </>
@@ -508,6 +521,12 @@ export function DoctorsTab({ canWrite, linkDashboard = false }) {
                 </tr>
               </tfoot>
             </table>
+            {data.iron?.count > 0 && (
+              <p className="iron-revenue">
+                <span>حصّة الشفاء من جلسات الحديد (<bdi>{fmtNum(data.iron.count)}</bdi>): <strong><Money value={data.iron.shifa} /></strong></span>
+                <span>إجمالي إيرادات الشفاء مع الحديد: <strong><Money value={data.revenue} /></strong></span>
+              </p>
+            )}
             {data.noPay > 0 && (
               <p className="share-warn">⚠ {data.noPay === 1 ? 'دكتورٌ واحد' : `${fmtNum(data.noPay)} دكاترة`} بلا نوع حساب — راتبه صفر هنا.
                 {canWrite && ' اضبطه من بروفايل الدكتور.'}</p>
@@ -521,6 +540,7 @@ export function DoctorsTab({ canWrite, linkDashboard = false }) {
               إلى الانصراف. يومية + ساعة = الأيام × اليومية + الساعات × سعر الساعة (لحظيّاً من الحضور: تصحيح وقتٍ يغيّر فترته).
               حصّة الشفاء من الكشوف = رسم كلّ زيارةٍ حضرت (كما في الجرد)، ومن الإجراءات = حصّتها في كلّ إجراءٍ قُبض في الفترة.
               الراتب بإعداد الدكتور الحالي، يُحسب ويُعرض فقط: لا يُسحب من إيرادات الشفاء ولا يمسّ الجرد ولا الصندوق.
+              وحصّة الشفاء من جلسات الحديد مستقلّة عن حساب كلّ دكتور: لا تدخل عمود الفرق.
             </p>
           </>
         )}
@@ -626,7 +646,7 @@ export default function ClinicFunds() {
     <>
       <h2>صندوق العيادات</h2>
       <p className="subtitle">
-        ثمن المواد المباعة يدخل، وشراء المواد والمصاريف تخرج — منفصلٌ عن إيرادات الشفاء.
+        ثمن المواد المباعة ونصيب الصندوق من جلسات الحديد يدخلان، وشراء المواد والمصاريف تخرج — منفصلٌ عن إيرادات الشفاء.
         {!canWrite && ' للاطّلاع فقط — تديره مشرفة العيادات.'}
       </p>
       {toast}

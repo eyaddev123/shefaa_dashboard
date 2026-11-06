@@ -6,11 +6,12 @@ const PER = 20
 
 // تفاصيل الحركة بحسب نوعها: الاستهلاك ⇐ الدكتور والإجراء · الشراء ⇐ المورّد والسعر · التسوية ⇐ السبب
 function MovementDetail({ m }) {
-  if (m.type === 'consumption') {
+  if (m.type === 'consumption' || m.type === 'iron_return') {
     return (
       <>
         <span>{m.procedure_name || 'إجراء'}{m.doctor_name && <span className="inv-muted"> — {m.doctor_name}</span>}</span>
         {m.patient_name && <span className="inv-sub">{m.patient_name}</span>}
+        {m.type === 'iron_return' && m.note && <span className="inv-sub">{m.note}</span>}
       </>
     )
   }

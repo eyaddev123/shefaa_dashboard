@@ -4,7 +4,7 @@ import { RoleProvider, useRole } from './RoleContext.jsx'
 import {
   canManageUsers, canReadAid, canSearchAid, canSeeClinicBoard, canSeeCashReport, canSeeDoctorsPage,
   canSeeDoctorScreen, canSeeSettings, canSeeProceduresPage, canSeePrinterSetup, canSeeInventory, canWriteInventory, canSeeReferralsPage, homePathFor,
-  canTakePayment, canSeeClinicFunds, canReadClinic, canSeeEarnings, canSeeDoctorDashboard,
+  canTakePayment, canSeeClinicFunds, canReadClinic, canSeeEarnings, canSeeDoctorDashboard, canSeeIronLog,
 } from './permissions.js'
 import { ROLE_LABELS } from './api.js'
 import ThemeToggle from './components/ThemeToggle.jsx'
@@ -36,6 +36,7 @@ import ClinicReferrals from './pages/ClinicReferrals.jsx'
 import ClinicProcedures from './pages/ClinicProcedures.jsx'
 import Inventory from './pages/Inventory.jsx'
 import ClinicFunds from './pages/ClinicFunds.jsx'
+import IronSessions from './pages/IronSessions.jsx'
 import DoctorDashboard from './pages/DoctorDashboard.jsx'
 import DoctorReports from './pages/DoctorReports.jsx'
 import SessionQueue from './pages/SessionQueue.jsx'
@@ -127,6 +128,7 @@ function Sidebar({ onNavigate }) {
         {/* العيادات: اليوميّ أولاً، ثمّ الإدارة (الدكاترة، الإجراءات، الإحالات)، ثمّ المال والتقارير. */}
         {canReadClinic(clinicRole) && <div className="nav-section">العيادات</div>}
         {canSeeClinicBoard(clinicRole) && <NavLink to="/clinic/board">{I.clinic} اللوحة اليومية</NavLink>}
+        {canSeeIronLog(clinicRole) && <NavLink to="/clinic/iron">{I.clinic} جلسات الحديد</NavLink>}
         {canSeeDoctorScreen(clinicRole) && <NavLink to="/clinic/doctor">{I.clinic} شاشتي</NavLink>}
         {/* أرقام الطبيب في صفحتها وحدها — الشاشة الرئيسية بلا مبالغ */}
         {canSeeDoctorScreen(clinicRole) && <NavLink to="/clinic/my-work">{I.clinic} أعمالي</NavLink>}
@@ -238,6 +240,8 @@ function Shell() {
             <Guard allow={canSeeProceduresPage}><ClinicProcedures /></Guard>} />
           <Route path="/inventory" element={
             <Guard allow={canSeeInventory}><Inventory /></Guard>} />
+          <Route path="/clinic/iron" element={
+            <Guard allow={canSeeIronLog}><IronSessions /></Guard>} />
           <Route path="/clinic/fund" element={
             <Guard allow={canSeeClinicFunds}><ClinicFunds /></Guard>} />
           <Route path="/clinic/referrals" element={

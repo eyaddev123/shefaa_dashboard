@@ -222,6 +222,16 @@ export const api = {
       if (doctorId) q.set('doctor_id', String(doctorId))
       return downloadFile(`/api/clinic/procedures/earnings/export?${q}`, 'مستحقات-الإجراءات.xlsx')
     },
+    // ── خدمة الحديد ── (period أو from/to كالمستحقات)
+    ironOptions: () => http('/clinic/iron/options'),
+    addIronSession: (body) => http('/clinic/iron/sessions', { method: 'POST', body: JSON.stringify(body) }),
+    cancelIronSession: (id, reason) => http(`/clinic/iron/sessions/${id}/cancel`, { method: 'POST', body: JSON.stringify({ reason }) }),
+    ironSessions: ({ period, from, to }) => http(`/clinic/iron/sessions?${new URLSearchParams(period ? { period } : { from, to: to || from })}`),
+    ironDues: ({ period, from, to }) => http(`/clinic/iron/dues?${new URLSearchParams(period ? { period } : { from, to: to || from })}`),
+    ironSettings: () => http('/clinic/iron/settings'),
+    setIronSettings: (body) => http('/clinic/iron/settings', { method: 'PUT', body: JSON.stringify(body) }),
+    addNurse: (body) => http('/clinic/iron/nurses', { method: 'POST', body: JSON.stringify(body) }),
+    updateNurse: (id, body) => http(`/clinic/iron/nurses/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
     // ── صندوق العيادات · ربح المواد · حسابات الدكاترة ── (period أو from/to كالمستحقات، والشهر YYYY-MM)
     fund: ({ period, from, to }) => http(`/clinic/fund?${new URLSearchParams(period ? { period } : { from, to: to || from })}`),
     addFundExpense: (body) => http('/clinic/fund/expenses', { method: 'POST', body: JSON.stringify(body) }),
