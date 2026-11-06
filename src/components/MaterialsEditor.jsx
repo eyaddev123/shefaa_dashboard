@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { matchesAr } from '../arabic-search.js'
 import { toLatinDigits } from '../api.js'
+import { ComboAdd } from './Combobox.jsx'
 
 // ═══ محرّر مواد سطر إجراء ═══
 // بحثٌ في كتالوج المواد **كاملاً** (لا ربط بين الإجراء وموادّه: الإجراء نفسه
@@ -9,6 +10,7 @@ import { toLatinDigits } from '../api.js'
 //
 // value: [{material_id, name, unit, qty}] — qty نصٌّ كما كُتب، يُتحقَّق منه بـ qtyValid.
 // والمادّة المعطَّلة القائمة على سطرٍ تبقى في value وإن غابت عن البحث.
+// combo: الكبسة تفتح القائمة كاملةً بدل البحث وحده (ComboAdd)، ومعها الرصيد إن وصل مع الكتالوج.
 
 const MAX_RESULTS = 8
 
@@ -24,7 +26,14 @@ export const fmtQty = (q) => String(Number(q))
 export const materialsSummary = (items) =>
   (items || []).map((m) => `${m.name} ×${fmtQty(m.qty)} ${m.unit}`).join('، ')
 
-export default function MaterialsEditor({ catalog, value, onChange, disabled }) {
+const fmtBalance = (n) => Number(n).toLocaleString('ar-SY', { maximumFractionDigits: 2 })
+const materialOption = (m) => ({
+  value: String(m.id), label: m.name, m,
+  meta: m.balance === undefined ? m.unit : `${m.unit} — الرصيد ${fmtBalance(m.balance)}`,
+  warn: m.balance !== undefined && Number(m.balance) <= 0,
+})
+
+export default function MaterialsEditor({ catalog, value, onChange, disabled, combo }) {
   const [query, setQuery] = useState('')
   const chosen = new Set(value.map((m) => String(m.material_id)))
   const results = query.trim() === '' ? [] : (catalog || [])
@@ -59,6 +68,14 @@ export default function MaterialsEditor({ catalog, value, onChange, disabled }) 
           })}
         </ul>
       )}
+      {combo ? (
+        <div className="mat-search">
+          <ComboAdd id="mat-combo" ariaLabel="ابحث عن مادة" disabled={disabled || !catalog}
+            placeholder={catalog ? 'اكبسي لعرض المواد، أو اكتبي للفلترة…' : 'جارٍ تحميل المواد…'}
+            options={(catalog || []).filter((m) => !chosen.has(String(m.id))).map(materialOption)}
+            emptyText="لا مواد متاحة" onPick={(o) => add(o.m)} />
+        </div>
+      ) : (
       <div className="mat-search">
         <input type="search" value={query} disabled={disabled || !catalog}
           placeholder={catalog ? 'ابحث عن مادة لإضافتها… (شاش، جبس…)' : 'جارٍ تحميل المواد…'}
@@ -83,6 +100,7 @@ export default function MaterialsEditor({ catalog, value, onChange, disabled }) 
           </ul>
         )}
       </div>
+      )}
     </div>
   )
 }

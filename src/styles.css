@@ -4053,11 +4053,9 @@ a.cc-stat:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px
 .iron-choice:disabled { opacity: .55; }
 .iron-choice-label { font-weight: 600; font-size: 13.5px; }
 .iron-choice-price { font-size: 20px; font-weight: 700; }
-.iron-choice-price small, .iron-done-amount small { font-size: 12px; font-weight: 500; color: var(--muted); }
+.iron-choice-price small { font-size: 12px; font-weight: 500; color: var(--muted); }
 .iron-hint { margin: 0; font-size: 12.5px; color: var(--muted); }
 .iron-actions { gap: 10px; margin-top: 4px; flex-wrap: wrap; }
-.iron-done-amount { margin: 6px 0 2px; font-size: 30px; font-weight: 700; color: var(--primary); text-align: center; }
-.iron-done-who { margin: 0 0 12px; text-align: center; color: var(--text-secondary); }
 .iron-split { display: inline-flex; flex-wrap: wrap; gap: 2px 10px; font-size: 12.5px; color: var(--text-secondary); }
 .iron-split > span:not(:last-child) { border-inline-end: 1px solid var(--border); padding-inline-end: 10px; }
 .iron-line td { font-size: 12.5px; background: var(--page); }
@@ -4076,7 +4074,7 @@ a.cc-stat:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px
 .iron-badge { background: var(--primary-soft); color: var(--primary); }
 .iron-cash-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; padding: 16px 18px 6px; }
 .iron-print { white-space: nowrap; padding-inline: 12px; }
-button.ghost.iron-cancel-btn { color: var(--status-bad); margin-inline-start: 6px; }
+button.ghost.iron-cancel-btn { color: var(--status-bad); }
 .iron-cancelled td { color: var(--muted); }
 .iron-cancelled .num { text-decoration: line-through; }
 .iron-cancel-badge { margin-inline-start: 8px; }
@@ -4087,8 +4085,173 @@ button.ghost.iron-cancel-btn { color: var(--status-bad); margin-inline-start: 6p
 .iron-override-open { align-self: flex-start; }
 .iron-over-count { color: var(--status-bad); }
 .iron-edit-note { display: block; margin-top: 4px; font-size: 12px; font-weight: 400; color: var(--text-secondary); }
-button.ghost.iron-edit-btn { margin-inline-start: 6px; }
 .iron-cancel-note { display: block; margin-top: 4px; font-size: 12px; font-weight: 400; color: var(--status-bad); }
 @media (max-width: 640px) {
   .iron-form .bf-row { grid-template-columns: 1fr; }
+}
+/* النموذج: عرضٌ يسع الحقلين جنباً إلى جنب بلا قصّ «بلا دكتور…» */
+.modal-card:has(> .iron-form) { max-width: 680px; }
+.iron-sec { display: flex; flex-direction: column; gap: 10px; padding-bottom: 14px; border-bottom: 1px solid var(--border); min-width: 0; }
+.iron-sec-head { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 14px; font-weight: 700; }
+.iron-sec-head .opt { font-size: 12px; font-weight: 500; color: var(--muted); }
+.iron-sec-n {
+  display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; flex: none;
+  border-radius: 50%; background: var(--primary-soft); color: var(--primary); font-size: 13px; font-weight: 700;
+}
+.iron-err { display: block; margin-top: 2px; font-size: 12.5px; font-weight: 600; line-height: 1.5; color: var(--status-bad); }
+.iron-form [aria-invalid='true'] { border-color: var(--status-bad); }
+.iron-form .iron-choice { min-height: 88px; justify-content: center; }
+.iron-form .iron-choice-label { font-size: 16px; font-weight: 700; }
+.iron-form .iron-sec:has(> .iron-err) .iron-choice:not(.is-on) { border-color: var(--status-bad); }
+.iron-materials .mat-editor { gap: 10px; }
+.iron-materials .mat-search { order: -1; max-width: none; }
+.iron-materials .mat-search input { font-size: 14px; padding: 9px 12px; }
+.iron-materials .mat-chosen { gap: 0; border: 1px solid var(--border); border-radius: 10px; }
+.iron-materials .mat-chosen li { padding: 8px 12px; border-bottom: 1px solid var(--border); }
+.iron-materials .mat-chosen li:last-child { border-bottom: 0; }
+.iron-materials .mat-name { flex: 1 1 auto; min-width: 0; font-size: 14px; }
+.iron-materials .mat-name::after { content: ' ×'; color: var(--muted); font-weight: 500; }
+.iron-materials .mat-qty { flex: none; }
+.iron-materials .mat-unit { flex: none; }
+.iron-materials .mat-x { flex: none; width: 36px; height: 36px; font-size: 18px; }
+.iron-materials > .iron-err, .iron-materials > .hint { margin-top: 6px; }
+.iron-materials > .hint { display: block; font-size: 11.5px; color: var(--muted); }
+/* شريط الحفظ يبقى ظاهراً مهما طال النموذج: المبلغ بجانب الزرّ دائماً */
+.iron-paybar {
+  position: sticky; bottom: -22px; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  margin: 0 -24px -22px; padding: 12px 24px; background: var(--surface-1); border-top: 1px solid var(--border);
+}
+.iron-pay { flex: 1 1 170px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.iron-pay-label { font-size: 12px; color: var(--text-secondary); }
+.iron-pay-amount { font-size: 24px; font-weight: 700; color: var(--primary); line-height: 1.2; }
+.iron-pay-amount small { font-size: 13px; font-weight: 500; color: var(--muted); }
+.iron-pay-none { font-size: 14px; font-weight: 600; color: var(--muted); line-height: 1.8; }
+button.iron-save { min-height: 48px; padding-inline: 34px; font-size: 16px; }
+button.iron-close { min-height: 48px; }
+/* قائمة منسدلة بثيم النظام (Combobox.jsx): الزرّ بشكل الحقل، واللوحة فوق النافذة وتحت نوافذ التأكيد */
+.combo { position: relative; min-width: 0; }
+.combo-add input { width: 100%; }
+button.combo-trigger {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%;
+  padding: 9px 12px; background: var(--surface-1); color: var(--text-primary); border: 1.5px solid var(--grid);
+  border-radius: 10px; font: inherit; font-size: 13.5px; font-weight: 400; line-height: inherit; text-align: start; cursor: pointer; box-shadow: none; transform: none;
+}
+button.combo-trigger:hover:not(:disabled) { background: var(--surface-1); color: var(--text-primary); border-color: var(--teal-500); box-shadow: none; transform: none; filter: none; }
+button.combo-trigger:focus-visible, button.combo-trigger[aria-expanded='true'] { outline: none; border-color: var(--teal-500); box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.15); }
+.combo-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.combo-value.is-empty { color: var(--muted); }
+.combo-chevron { flex: none; width: 8px; height: 8px; margin-inline-end: 2px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: translateY(-2px) rotate(45deg); }
+.combo-panel {
+  position: fixed; z-index: 1050; display: flex; flex-direction: column; overflow: hidden; padding: 6px; gap: 6px;
+  background: var(--surface-1); color: var(--text-primary); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-pop);
+}
+:root[data-theme='dark'] .combo-panel { border-color: var(--grid); }
+.combo-filter { flex: none; width: 100%; box-sizing: border-box; }
+.combobox-list.combo-list { position: static; flex: 1 1 auto; min-height: 0; max-height: none; padding: 0; background: transparent; border: 0; border-radius: 0; box-shadow: none; }
+.combo-list li { min-height: 40px; box-sizing: border-box; }
+.combo-list .cb-main { flex: 1 1 auto; min-width: 0; }
+.combo-meta { font-size: 12px; font-weight: 500; color: var(--text-secondary); white-space: nowrap; }
+.combo-meta.is-warn { color: var(--status-bad); font-weight: 700; }
+.combo-check { flex: none; color: var(--primary); font-weight: 700; }
+@media (max-width: 767px) {
+  button.combo-trigger { min-height: 44px; font-size: 16px; padding: 11px 12px; }
+  .combo-list li { min-height: 44px; }
+}
+/* «قاعدة حصّتي» في صفحة الطبيب */
+.dk-rule h3 { margin: 0 0 10px; }
+.dk-rule-general, .dk-rule-list li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; font-size: 14px; }
+.dk-rule-general { margin: 0; }
+.dk-rule-note { margin: 10px 0 6px; font-size: 12.5px; color: var(--text-secondary); }
+.dk-rule-list { list-style: none; margin: 0; padding: 0; }
+.dk-rule-list li { padding: 7px 0; border-top: 1px solid var(--border); }
+/* نافذة تعديل الحصص */
+.iron-ed-rows { display: flex; flex-direction: column; gap: 10px; }
+.iron-ed-row { display: grid; grid-template-columns: 1fr 1fr 1fr; align-items: center; gap: 10px; padding: 10px 12px; background: var(--page); border-radius: 10px; }
+.iron-ed-label { font-weight: 700; font-size: 13.5px; }
+.iron-ed-now { display: flex; flex-direction: column; gap: 5px; }
+.iron-ed-now small { font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+.iron-ed-now strong { font-size: 16px; line-height: 2; }
+.iron-effect { padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; }
+.iron-effect-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.iron-effect-table th, .iron-effect-table td { padding: 4px 6px; text-align: start; font-weight: 500; }
+.iron-effect-table th { font-size: 12px; color: var(--text-secondary); }
+.iron-effect-table .num { text-align: end; font-variant-numeric: tabular-nums; }
+.iron-effect-fund td { border-top: 1px solid var(--border); font-weight: 700; }
+.iron-effect-line { margin: 8px 0 0; font-size: 13.5px; font-weight: 600; }
+.iron-effect-line:first-child { margin-top: 0; }
+.iron-fund-delta { color: var(--primary); white-space: nowrap; }
+.iron-effect .share-warn { margin: 8px 0 0; }
+.iron-required { color: var(--status-bad); font-weight: 600; }
+/* تفاصيل جلسة */
+.modal-card:has(> .iron-details) { max-width: 720px; }
+.iron-details { display: flex; flex-direction: column; gap: 16px; }
+.iron-details-head { margin: 0 0 8px; font-size: 14px; font-weight: 700; }
+.iron-details .empty { padding: 4px 0; margin: 0; text-align: start; }
+.iron-details .earn-note { margin: 6px 0 0; }
+.iron-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px 16px; margin: 0; padding: 12px 14px; background: var(--page); border-radius: 10px; }
+.iron-facts dt { font-size: 12px; color: var(--text-secondary); }
+.iron-facts dd { margin: 2px 0 0; font-weight: 600; font-size: 13.5px; }
+.iron-facts-price dd { font-size: 16px; font-weight: 700; color: var(--primary); }
+.iron-mat-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.iron-mat-table th, .iron-mat-table td { padding: 7px 8px; text-align: start; border-bottom: 1px solid var(--border); }
+.iron-mat-table th { font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+.iron-mat-table .num { text-align: end; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.iron-mat-table small { color: var(--muted); }
+.iron-mat-table tfoot td { font-weight: 700; border-bottom: 0; }
+.iron-dist { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 8px; }
+.iron-dist-cell { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; min-width: 0; }
+.iron-dist-cell span { font-size: 12px; color: var(--text-secondary); }
+.iron-dist-cell strong { font-size: 16px; font-weight: 700; }
+.iron-flags { list-style: none; display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; font-size: 13px; line-height: 1.7; }
+button.ghost.iron-details-btn { white-space: nowrap; padding-inline: 12px; }
+/* أزرار سطر السجلّ على الحاسوب: عمودٌ مصطفّ بعرضٍ واحد وفراغٍ ثابت */
+@media (min-width: 1181px) {
+  .iron-table td.rt-actions > button { display: block; width: 100%; min-height: 32px; padding: 4px 12px; font-size: 12.5px; line-height: 1.4; }
+  .iron-table td.rt-actions > button + button { margin-top: 6px; }
+}
+/* سجلّ الحديد بعد الجوال وحتى 1180 (أوّل عرضٍ يتّسع فيه جدول المشرفة): تسعة أعمدة لا تسعها الشاشة، فيبقى بطاقاتٍ كنمط table.rtable (تحت 768)
+   بدل تمريرٍ أفقيّ يُخرج الأزرار من الشاشة. القواعد هنا نسخة ما يلزم لهذا الجدول وحده: البقية يبقى جدولها. */
+@media (min-width: 768px) and (max-width: 1180px) {
+  table.rtable.iron-table { display: block; width: 100%; min-width: 0; }
+  table.rtable.iron-table > thead { display: none; }
+  table.rtable.iron-table > tbody { display: block; }
+  table.rtable.iron-table > tbody > tr {
+    display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px 12px;
+    padding: 12px 14px; margin-bottom: 10px;
+    border: 1px solid var(--grid); border-radius: 12px; background: var(--surface-1);
+  }
+  table.rtable.iron-table > tbody > tr > td {
+    display: block; flex: 1 1 calc(50% - 6px); min-width: 0; max-width: none;
+    padding: 0; border: 0; white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere;
+  }
+  table.rtable.iron-table > tbody > tr > td[data-label]::before {
+    content: attr(data-label); display: block; margin-bottom: 2px;
+    font-size: 11px; font-weight: 700; color: var(--muted);
+  }
+  table.rtable.iron-table > tbody > tr > td.rt-title { order: -2; flex: 1 1 0; min-width: 50%; align-self: center; font-size: 15px; font-weight: 800; }
+  table.rtable.iron-table > tbody > tr > td.rt-badge {
+    order: -1; flex: 0 1 auto; max-width: calc(50% - 12px); align-self: center;
+    display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end;
+  }
+  table.rtable.iron-table > tbody > tr > td.rt-full { flex-basis: 100%; }
+  table.rtable.iron-table > tbody > tr > td.rt-actions {
+    order: 1; flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 8px; padding-top: 10px; border-top: 1px solid var(--grid);
+  }
+  table.rtable.iron-table > tbody > tr > td.rt-actions > button {
+    min-height: 44px; flex: 1 1 auto; display: inline-flex; align-items: center; justify-content: center;
+    padding: 8px 14px !important; font-size: 13px !important; margin: 0 !important;
+  }
+  table.rtable.iron-table > tbody > tr > td.rt-actions:empty { display: none; }
+}
+@media (max-width: 767px) {
+  .iron-paybar { bottom: calc(-16px - env(safe-area-inset-bottom)); margin: 0 -16px calc(-16px - env(safe-area-inset-bottom)); padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); }
+  .iron-pay { flex-basis: 100%; flex-direction: row; align-items: baseline; justify-content: space-between; gap: 8px; }
+  button.iron-save { flex: 1 1 0; }
+  .iron-form :is(input:not(.mat-qty), select) { min-height: 44px; }
+  .iron-materials .mat-x { width: 40px; height: 40px; }
+  .iron-details .iron-actions > button { min-height: 44px; }
+}
+@media (max-width: 480px) {
+  .iron-ed-row { grid-template-columns: 1fr 1fr; }
+  .iron-ed-label { grid-column: 1 / -1; }
 }

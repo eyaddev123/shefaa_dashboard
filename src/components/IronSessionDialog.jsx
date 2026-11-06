@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { api, toLatinDigits } from '../api.js'
-import { Modal, fmtQty } from './inventory/shared.jsx'
-import MaterialsEditor, { materialsSummary, qtyValid, toPayload } from './MaterialsEditor.jsx'
+import { Modal } from './inventory/shared.jsx'
+import Combobox, { byNameAr } from './Combobox.jsx'
+import { readAmountInput } from '../iron-shares.js'
+import MaterialsEditor, { qtyValid, toPayload } from './MaterialsEditor.jsx'
 import { useDialogs } from '../dialogs.jsx'
 import { useRole } from '../RoleContext.jsx'
-import { canWriteIronSettings } from '../permissions.js'
+import { canSeeInventory, canWriteIronSettings } from '../permissions.js'
 import { ironReceiptFrom, loadPrinter, printTicket } from '../ticket-print.js'
 import { printViaHelper } from '../print-helper.js'
 
@@ -15,9 +17,20 @@ import { printViaHelper } from '../print-helper.js'
 // المواد بمحرّر نافذة الإجراء نفسه وبلا أسعار. وتنبيه «مع دوا بلا أمبولة» من الخادم: العتبة بأسعارٍ لا
 // يراها الاستقبال، فيعود الطلب بسؤالٍ يُعاد إرساله بعد التأكيد.
 // المريض بآلية الحجز نفسها: البحث فور ثلاث كلمات أو بالموبايل، والاختيار صريحٌ وله تراجع.
+// ★ الترتيب مجموعاتٌ بالتسلسل: المريض ⇐ الطاقم ⇐ النوع ⇐ المواد ⇐ الحفظ، والمبلغ ظاهرٌ بجانب الزرّ.
+// الحفظ لا يُعطَّل بنقصٍ: الضغط يبيّن الناقص تحت حقله. والنجاح يغلق النافذة (الرسالة والطباعة عند الصفحة)،
+// والخطأ أو سؤال التأكيد يُبقيها مفتوحة.
 
 const fmtNum = (n) => Number(n || 0).toLocaleString('ar-SY')
 const NO_DOCTOR = 'بلا دكتور / محوّل من خارج الجمعية'
+// الإغلاق لا يسبق هذه المدّة: ثانية ضغطتين سريعتين لا تقع على زرٍّ في السجلّ تحت النافذة
+const MIN_CLOSE_MS = 300
+const isThreePart = (v) => v.trim().split(/\s+/).filter(Boolean).length >= 3
+// حقول الخادم (field في ردّ الخطأ) بأسماء النموذج
+const SERVER_FIELDS = { full_name: 'name', nurse_id: 'nurse', doctor_id: 'doctor', with_drug: 'with_drug', reason: 'ov_reason', doctor_share: 'ov_doctor', nurse_share: 'ov_nurse' }
+// بترتيب ظهورها: التركيز ينزل لأوّل ناقص
+const FOCUS_ORDER = [['name', '#iron-name'], ['nurse', '#iron-nurse'], ['doctor', '#iron-doctor'], ['with_drug', '.iron-choice'],
+  ['materials', '.mat-qty.is-bad'], ['ov_doctor', '#iron-ov-doctor'], ['ov_nurse', '#iron-ov-nurse'], ['ov_reason', '#iron-ov-reason']]
 
 async function printReceipt(session, copies) {
   const printer = loadPrinter()
@@ -28,6 +41,19 @@ async function printReceipt(session, copies) {
 }
 
 export { printReceipt as printIronReceipt }
+
+function FieldError({ id, msg }) {
+  return msg ? <small id={id} className="iron-err" role="alert">{msg}</small> : null
+}
+
+function Section({ n, title, note, children }) {
+  return (
+    <section className="iron-sec" aria-label={title}>
+      <h4 className="iron-sec-head"><span className="iron-sec-n" aria-hidden="true">{n}</span>{title}{note && <span className="opt">{note}</span>}</h4>
+      {children}
+    </section>
+  )
+}
 
 function DrugChoice({ value, prices, onPick }) {
   const opt = (v, label, price) => (
@@ -62,17 +88,19 @@ export default function IronSessionDialog({ onClose, onSaved }) {
   const [lookup, setLookup] = useState(null)        // null | 'checking' | 'new'
   const [candidates, setCandidates] = useState(null)
   const [picked, setPicked] = useState(null)
+  const [tried, setTried] = useState(false)         // ضُغط الحفظ: الأخطاء تظهر وتختفي مع التصحيح
+  const [serverField, setServerField] = useState(null) // {field, msg}: خطأٌ من الخادم له حقل
   const [err, setErr] = useState(null)
   const [busy, setBusy] = useState(false)
-  const [done, setDone] = useState(null)            // ردّ التسجيل
-  const [printNote, setPrintNote] = useState(null)
   // ضغطتان سريعتان تسبقان رسم الزرّ معطّلاً: جلستان ومالٌ مرّتين. القفل مرجعٌ لا حالة.
   const sending = useRef(false)
 
   const load = () => api.clinic.ironOptions().then(setOpts).catch((e) => setLoadErr(e.message))
   useEffect(() => {
     load()
-    api.clinic.materials().then((r) => setCatalog(r.filter((m) => m.is_active !== false && m.material_kind !== 'consumable'))).catch((e) => setLoadErr(e.message))
+    // المشرفة من المخزون، والاستقبال من قائمة الاختيار (مسار المخزون 403 له): الاثنان بالرصيد، والاستقبال بلا سعر
+    const read = canSeeInventory(role) ? api.inventory.materials().then((d) => d.materials) : api.clinic.materials()
+    read.then((r) => setCatalog(r.filter((m) => m.is_active !== false && m.material_kind !== 'consumable').sort(byNameAr))).catch((e) => setLoadErr(e.message))
   }, [])
 
   const pick = (p) => {
@@ -98,19 +126,50 @@ export default function IronSessionDialog({ onClose, onSaved }) {
   const undoPick = () => { setPicked(null); setName(''); setMobile(''); setLookup(null) }
 
   const price = opts && withDrug !== null ? (withDrug ? opts.prices.with_drug : opts.prices.without_drug) : null
-  const overrideOk = !override || (override.reason.trim() && (override.nurse_share.trim() || (doctorId && override.doctor_share.trim())))
-  const ready = withDrug !== null && nurseId && (picked || name.trim()) && qtyValid(items) && overrideOk
 
-  const printNow = async (s, copies) => {
-    const r = await printReceipt(s, copies)
-    setPrintNote(r.ok ? null : `تعذّرت طباعة الإيصال${r.reason ? ` (${r.reason})` : ''} — الجلسة مسجَّلة`)
+  const validate = () => {
+    const e = {}
+    if (!picked && !name.trim()) e.name = 'اكتبي اسم المريض'
+    else if (!picked && !isThreePart(name)) e.name = 'الاسم الثلاثي مطلوب: الاسم واسم الأب والكنية'
+    if (!nurseId) e.nurse = 'اختاري الممرضة'
+    if (withDrug === null) e.with_drug = 'اختاري النوع: مع دوا أو بلا دوا — منه يتحدّد المبلغ'
+    if (!qtyValid(items)) e.materials = 'صحّحي الكمّية المعلَّمة: رقمٌ أكبر من صفر'
+    if (override) {
+      const d = doctorId ? readAmountInput(override.doctor_share) : { empty: true }
+      const n = readAmountInput(override.nurse_share)
+      if (d.error) e.ov_doctor = 'مبلغٌ غير صالح'
+      if (n.error) e.ov_nurse = 'مبلغٌ غير صالح'
+      if (d.empty && n.empty) e[doctorId ? 'ov_doctor' : 'ov_nurse'] = 'اكتبي الحصّة المعدَّلة'
+      if (!override.reason.trim()) e.ov_reason = 'سبب تعديل الحصّة مطلوب'
+    }
+    return e
   }
+  const errors = {
+    ...(tried ? validate() : {}),
+    ...(serverField ? { [serverField.field]: serverField.msg } : {}),
+  }
+  const invalidProps = (key) => (errors[key] ? { 'aria-invalid': true, 'aria-describedby': `iron-err-${key}` } : {})
+  const focusFirst = (errs) => {
+    const hit = FOCUS_ORDER.find(([k]) => errs[k])
+    const el = hit && document.querySelector(`.iron-form ${hit[1]}`)
+    if (el) { el.focus({ preventScroll: true }); el.scrollIntoView({ block: 'center' }) }
+  }
+
+  const confirmLow = (message) => dialogs.confirm({
+    title: 'تأكيد قبل الحفظ',
+    body: `${message}\n\nإن أكّدتِ: تُحفظ الجلسة ويُقبض ${fmtNum(price)} ل.س، ${items.length === 0 ? 'ولا يُخصم شيء من المخزون' : 'ولا يُخصم من المخزون إلا ما أضفتِه'}، وتراها مشرفة العيادات معلَّمة «مع دوا بمواد قليلة — مؤكَّدة».\nإن رجعتِ: لا يُحفظ شيء، ويبقى ما كتبتِه لتعديله.`,
+    confirmLabel: 'تأكيد وحفظ', cancelLabel: 'رجوع للتعديل',
+  })
 
   const submit = async (e) => {
     e.preventDefault()
-    if (!ready || sending.current) return
+    if (sending.current) return
+    setTried(true); setServerField(null); setErr(null)
+    const invalid = validate()
+    if (Object.keys(invalid).length > 0) { focusFirst(invalid); return }
     sending.current = true
-    setBusy(true); setErr(null)
+    setBusy(true)
+    const startedAt = Date.now()
     const body = {
       with_drug: withDrug, nurse_id: nurseId, doctor_id: doctorId || null, materials: toPayload(items),
       ...(override ? { share_override: { ...override, doctor_share: doctorId ? override.doctor_share : '' } } : {}),
@@ -121,127 +180,115 @@ export default function IronSessionDialog({ onClose, onSaved }) {
       try { s = await api.clinic.addIronSession(body) } catch (ex) {
         if (ex.data?.code !== 'IRON_LOW_MATERIALS') throw ex
         // تحذيرٌ لا منع: لا شيء كُتب، والتأكيد يعيد الإرسال
-        const yes = await dialogs.confirm({ title: 'تأكيد قبل الحفظ', body: ex.message, confirmLabel: 'نعم، احفظ', cancelLabel: 'رجوع' })
-        if (!yes) return
+        if (!await confirmLow(ex.message)) return
         s = await api.clinic.addIronSession({ ...body, confirm_low_materials: true })
       }
-      setDone(s)
-      onSaved?.(s)
-      // الجلسة سُجّلت قبل هذا السطر: فشل الطباعة رسالةٌ لا تراجع
-      const printer = loadPrinter()
-      if (printer.enabled) printNow(s, printer.copies)
+      const wait = MIN_CLOSE_MS - (Date.now() - startedAt)
+      if (wait > 0) await new Promise((r) => setTimeout(r, wait))
+      onSaved(s)
     } catch (ex) {
-      setErr(ex.message)
-      if (ex.data?.field === 'nurse_id') load()
+      const field = SERVER_FIELDS[ex.data?.field]
+      if (field) {
+        setServerField({ field, msg: ex.message })
+        focusFirst({ [field]: true })
+      } else setErr(ex.message)
+      // ممرضةٌ أُوقفت بعد فتح النافذة: تختفي من القائمة فلا تبقى مختارةً خفيةً
+      if (ex.data?.field === 'nurse_id') { setNurseId(''); load() }
     } finally { sending.current = false; setBusy(false) }
   }
-
-  const again = () => {
-    setDone(null); setPrintNote(null); setErr(null); setWithDrug(null); setNurseId(''); setDoctorId(''); setItems([]); setOverride(null)
-    setName(''); setMobile(''); setPicked(null); setCandidates(null); setLookup(null)
-    load()
-  }
-
-  if (done) {
-    return (
-      <Modal title="سُجّلت الجلسة وقُبض المبلغ" onClose={onClose} sheet>
-        <p className="iron-done-amount">{fmtNum(done.price)} <small>ل.س</small></p>
-        <p className="iron-done-who">{done.patient} — {done.with_drug ? 'مع دوا' : 'بلا دوا'} — الممرضة {done.nurse}</p>
-        {done.materials?.length > 0 && <p className="iron-done-who">المواد: {materialsSummary(done.materials)}</p>}
-        {done.overPrice && <p className="share-warn" role="alert">⚠ المواد فوق ما بقي بعد الحصص: سُقّفت والشفاء صفر — الجلسة معلَّمة في السجلّ.</p>}
-        {done.stock_warnings?.map((w) => (
-          <p key={w.material_id} className="share-warn" role="alert">
-            ⚠ رصيد «{w.name}» صار {fmtQty(w.after)} {w.unit} — أبلغي مشرفة العيادات.
-          </p>
-        ))}
-        {printNote && <p className="share-warn" role="alert">⚠ {printNote}</p>}
-        <div className="inline iron-actions">
-          <button type="button" onClick={again}>جلسة جديدة</button>
-          <button type="button" className="ghost" onClick={() => printNow(done, 1)}>🖨 طباعة الإيصال</button>
-          <button type="button" className="ghost" onClick={onClose}>إغلاق</button>
-        </div>
-      </Modal>
-    )
-  }
+  // Enter في حقل نصّ لا يقبض مالاً: الحفظ بالزرّ وحده (وبحث المواد له Enter خاصّ به)
+  const noEnterSubmit = (e) => { if (e.key === 'Enter' && e.target.tagName === 'INPUT') e.preventDefault() }
 
   return (
-    <Modal title="جلسة حديد جديدة" subtitle="تُسجَّل وتُقبض فوراً — بلا دور ولا عيادة" onClose={onClose} busy={busy} sheet>
+    <Modal title="جلسة حديد جديدة" subtitle="تُسجَّل وتُقبض فوراً — بلا دور ولا عيادة" onClose={onClose} busy={busy} wide sheet>
       {loadErr ? <p className="error">{loadErr}</p> : !opts ? <p className="empty">جارٍ التحميل…</p> : (
-        <form onSubmit={submit} className="iron-form">
-          <DrugChoice value={withDrug} prices={opts.prices} onPick={setWithDrug} />
-
-          <div className="bf-row">
-            <div className="field">
-              <label htmlFor="iron-nurse">الممرضة</label>
-              <select id="iron-nurse" value={nurseId} required onChange={(e) => setNurseId(e.target.value)}>
-                <option value="">— اختاري الممرضة —</option>
-                {opts.nurses.map((n) => <option key={n.id} value={n.id}>{n.name}</option>)}
-              </select>
-              {opts.nurses.length === 0 && <small className="hint warn-hint">لا ممرضات فعّالات — تضيفهنّ مشرفة العيادات من إعدادات الحديد</small>}
-            </div>
-            <div className="field">
-              <label htmlFor="iron-doctor">الدكتور <span className="opt">(اختياري)</span></label>
-              <select id="iron-doctor" value={doctorId} onChange={(e) => setDoctorId(e.target.value)}>
-                <option value="">{NO_DOCTOR}</option>
-                {opts.doctors.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-              </select>
-            </div>
-          </div>
-
-          <div className="bf-row">
-            <div className="field">
-              <label htmlFor="iron-name">اسم المريض الثلاثي</label>
-              <input id="iron-name" value={name} disabled={!!picked} placeholder="الاسم واسم الأب والكنية"
-                onChange={(e) => { setName(e.target.value); checkName(e.target.value) }} />
-              <small className="hint">
-                {lookup === 'checking' ? 'جارٍ البحث…' : lookup === 'new' ? 'مريض جديد' : 'ثلاث كلمات على الأقل — نبحث بها عن المريض السابق'}
-              </small>
-            </div>
-            <div className="field">
-              <label htmlFor="iron-mobile">الموبايل <span className="opt">(اختياري)</span></label>
-              <input id="iron-mobile" value={mobile} disabled={!!picked} dir="ltr" inputMode="numeric" placeholder="09XXXXXXXX"
-                onChange={(e) => { const v = toLatinDigits(e.target.value); setMobile(v); checkMobile(v) }} />
-            </div>
-          </div>
-
-          {picked && (
-            <div className="picked-box">
-              <div>
-                <strong>اختير المريض:</strong> {picked.full_name}
-                <span className="candidate-meta">
-                  {picked.mobile ? <span dir="ltr">{picked.mobile}</span> : 'بلا موبايل'}
-                  {picked.visits_count > 0 && ` · ${picked.visits_count} زيارة`}
-                </span>
+        <form onSubmit={submit} onKeyDown={noEnterSubmit} onChange={() => setServerField(null)} className="iron-form" noValidate>
+          <Section n="١" title="المريض">
+            <div className="bf-row">
+              <div className="field">
+                <label htmlFor="iron-name">اسم المريض الثلاثي</label>
+                <input id="iron-name" value={name} disabled={!!picked} placeholder="الاسم واسم الأب والكنية" {...invalidProps('name')}
+                  onChange={(e) => { setName(e.target.value); checkName(e.target.value) }} />
+                {errors.name ? <FieldError id="iron-err-name" msg={errors.name} /> : (
+                  <small className="hint">
+                    {lookup === 'checking' ? 'جارٍ البحث…' : lookup === 'new' ? 'مريض جديد' : 'ثلاث كلمات على الأقل — نبحث بها عن المريض السابق'}
+                  </small>
+                )}
               </div>
-              <button type="button" className="ghost" onClick={undoPick}>تراجع — ليس هو</button>
+              <div className="field">
+                <label htmlFor="iron-mobile">الموبايل <span className="opt">(اختياري)</span></label>
+                <input id="iron-mobile" value={mobile} disabled={!!picked} dir="ltr" inputMode="numeric" placeholder="09XXXXXXXX"
+                  onChange={(e) => { const v = toLatinDigits(e.target.value); setMobile(v); checkMobile(v) }} />
+              </div>
             </div>
-          )}
-          {candidates?.length > 0 && (
-            <div className="candidates-box">
-              <div className="candidates-title">وُجد مرضى بهذا الاسم — اختر الصحيح أو تابع كمريض جديد</div>
-              {candidates.map((c) => (
-                <div key={c.id} className="candidate-row">
-                  <div>
-                    <strong>{c.full_name}</strong>
-                    <span className="candidate-meta">
-                      {c.mobile ? <span dir="ltr">{c.mobile}</span> : 'بلا موبايل'}
-                      {c.visits_count > 0 && ` · ${c.visits_count} زيارة`}
-                      {c.last_visit && ` · آخرها ${c.last_visit}`}
-                    </span>
-                  </div>
-                  <button type="button" className="ghost" onClick={() => pick(c)}>هو نفسه</button>
-                </div>
-              ))}
-              <button type="button" className="ghost candidate-new" onClick={() => { setCandidates(null); setLookup('new') }}>
-                لا — مريض جديد
-              </button>
-            </div>
-          )}
 
-          <div className="field iron-materials">
-            <label>المواد <span className="opt">(أمبولة، قسطرة، محلول…)</span></label>
-            <MaterialsEditor catalog={catalog} value={items} onChange={setItems} disabled={busy} />
-          </div>
+            {picked && (
+              <div className="picked-box">
+                <div>
+                  <strong>اختير المريض:</strong> {picked.full_name}
+                  <span className="candidate-meta">
+                    {picked.mobile ? <span dir="ltr">{picked.mobile}</span> : 'بلا موبايل'}
+                    {picked.visits_count > 0 && ` · ${picked.visits_count} زيارة`}
+                  </span>
+                </div>
+                <button type="button" className="ghost" onClick={undoPick}>تراجع — ليس هو</button>
+              </div>
+            )}
+            {candidates?.length > 0 && (
+              <div className="candidates-box">
+                <div className="candidates-title">وُجد مرضى بهذا الاسم — اختر الصحيح أو تابع كمريض جديد</div>
+                {candidates.map((c) => (
+                  <div key={c.id} className="candidate-row">
+                    <div>
+                      <strong>{c.full_name}</strong>
+                      <span className="candidate-meta">
+                        {c.mobile ? <span dir="ltr">{c.mobile}</span> : 'بلا موبايل'}
+                        {c.visits_count > 0 && ` · ${c.visits_count} زيارة`}
+                        {c.last_visit && ` · آخرها ${c.last_visit}`}
+                      </span>
+                    </div>
+                    <button type="button" className="ghost" onClick={() => pick(c)}>هو نفسه</button>
+                  </div>
+                ))}
+                <button type="button" className="ghost candidate-new" onClick={() => { setCandidates(null); setLookup('new') }}>
+                  لا — مريض جديد
+                </button>
+              </div>
+            )}
+          </Section>
+
+          <Section n="٢" title="الطاقم">
+            <div className="bf-row">
+              <div className="field">
+                <label htmlFor="iron-nurse">الممرضة</label>
+                <Combobox id="iron-nurse" value={nurseId} onChange={(v) => { setNurseId(v); setServerField(null) }} placeholder="— اختاري الممرضة —"
+                  options={[...opts.nurses].sort(byNameAr).map((n) => ({ value: n.id, label: n.name }))}
+                  emptyText="ما في ممرضات — تُضاف من الإعدادات" invalid={!!errors.nurse} describedBy={errors.nurse ? 'iron-err-nurse' : undefined} />
+                <FieldError id="iron-err-nurse" msg={errors.nurse} />
+                {opts.nurses.length === 0 && <small className="hint warn-hint">ما في ممرضات — تُضاف من الإعدادات</small>}
+              </div>
+              <div className="field">
+                <label htmlFor="iron-doctor">الدكتور <span className="opt">(اختياري)</span></label>
+                <Combobox id="iron-doctor" value={doctorId} onChange={(v) => { setDoctorId(v); setServerField(null) }}
+                  options={[{ value: '', label: NO_DOCTOR }, ...[...opts.doctors].sort(byNameAr).map((d) => ({ value: d.id, label: d.name }))]}
+                  invalid={!!errors.doctor} describedBy={errors.doctor ? 'iron-err-doctor' : undefined} />
+                <FieldError id="iron-err-doctor" msg={errors.doctor} />
+              </div>
+            </div>
+          </Section>
+
+          <Section n="٣" title="النوع" note="يحدّد المبلغ">
+            <DrugChoice value={withDrug} prices={opts.prices} onPick={setWithDrug} />
+            <FieldError id="iron-err-with_drug" msg={errors.with_drug} />
+          </Section>
+
+          <Section n="٤" title="المواد" note="أمبولة، قسطرة، محلول…">
+            <div className="iron-materials">
+              <MaterialsEditor combo catalog={catalog} value={items} onChange={setItems} disabled={busy} />
+              {items.length === 0 && <small className="hint">لم تُضف مواد بعد.</small>}
+              <FieldError id="iron-err-materials" msg={errors.materials} />
+            </div>
+          </Section>
 
           {canOverride && (override === null ? (
             <button type="button" className="ghost iron-override-open" onClick={() => setOverride({ doctor_share: '', nurse_share: '', reason: '' })}>
@@ -252,22 +299,29 @@ export default function IronSessionDialog({ onClose, onSaved }) {
               <legend>تعديل الحصّة لهذه الجلسة وحدها</legend>
               <div className="bf-row">
                 {doctorId && <div className="field"><label htmlFor="iron-ov-doctor">حصّة الدكتور</label>
-                  <input id="iron-ov-doctor" inputMode="decimal" value={override.doctor_share} onChange={(e) => setOverride((o) => ({ ...o, doctor_share: e.target.value }))} /></div>}
+                  <input id="iron-ov-doctor" inputMode="decimal" value={override.doctor_share} {...invalidProps('ov_doctor')} onChange={(e) => setOverride((o) => ({ ...o, doctor_share: e.target.value }))} />
+                  <FieldError id="iron-err-ov_doctor" msg={errors.ov_doctor} /></div>}
                 <div className="field"><label htmlFor="iron-ov-nurse">حصّة الممرضة</label>
-                  <input id="iron-ov-nurse" inputMode="decimal" value={override.nurse_share} onChange={(e) => setOverride((o) => ({ ...o, nurse_share: e.target.value }))} /></div>
+                  <input id="iron-ov-nurse" inputMode="decimal" value={override.nurse_share} {...invalidProps('ov_nurse')} onChange={(e) => setOverride((o) => ({ ...o, nurse_share: e.target.value }))} />
+                  <FieldError id="iron-err-ov_nurse" msg={errors.ov_nurse} /></div>
               </div>
               <div className="field"><label htmlFor="iron-ov-reason">السبب</label>
-                <input id="iron-ov-reason" value={override.reason} onChange={(e) => setOverride((o) => ({ ...o, reason: e.target.value }))} /></div>
+                <input id="iron-ov-reason" value={override.reason} {...invalidProps('ov_reason')} onChange={(e) => setOverride((o) => ({ ...o, reason: e.target.value }))} />
+                <FieldError id="iron-err-ov_reason" msg={errors.ov_reason} /></div>
               <button type="button" className="ghost" onClick={() => setOverride(null)}>بلا تعديل</button>
             </fieldset>
           ))}
 
           {err && <p className="error" role="alert">{err}</p>}
-          <div className="inline iron-actions">
-            <button type="submit" disabled={!ready || busy}>
-              {busy ? 'جارٍ التسجيل…' : price === null ? 'سجّل واقبض' : `سجّل واقبض ${fmtNum(price)} ل.س`}
-            </button>
-            <button type="button" className="ghost" disabled={busy} onClick={onClose}>إلغاء</button>
+          <div className="iron-paybar">
+            <div className="iron-pay">
+              <span className="iron-pay-label">المبلغ الذي سيُقبض</span>
+              {price === null
+                ? <span className="iron-pay-none">اختاري النوع أولاً</span>
+                : <strong className="iron-pay-amount">{fmtNum(price)} <small>ل.س</small></strong>}
+            </div>
+            <button type="submit" className="iron-save" disabled={busy}>{busy ? 'جارٍ التسجيل…' : 'سجّل واقبض'}</button>
+            <button type="button" className="ghost iron-close" disabled={busy} onClick={onClose}>إغلاق</button>
           </div>
         </form>
       )}
