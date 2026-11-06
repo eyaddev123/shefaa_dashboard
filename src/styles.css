@@ -2629,6 +2629,15 @@ tr.inv-imp-new > td:first-child { box-shadow: inset -3px 0 0 var(--status-good);
 tr.inv-imp-buy > td:first-child { box-shadow: inset -3px 0 0 var(--status-review); }
 tr.inv-imp-skip > td { color: var(--text-secondary); }
 .inv-imp-opening { margin-bottom: 12px; }
+/* الجوال: بطاقات rtable — النتيجة تحت الاسم مباشرة، والشريط اللوني على البطاقة لا على أوّل خلية */
+@media (max-width: 767px) {
+  .inv-imp-table { padding: 10px 10px 0; }
+  .inv-imp-table table.rtable > tbody > tr > td { box-shadow: none; background: none; }
+  .inv-imp-table table.rtable > tbody > tr > td.inv-imp-result { order: -1; }
+  .inv-imp-table table.rtable > tbody > tr.inv-imp-new { border-inline-start: 3px solid var(--status-good); }
+  .inv-imp-table table.rtable > tbody > tr.inv-imp-buy { border-inline-start: 3px solid var(--status-review); }
+  .inv-imp-table table.rtable > tbody > tr.inv-imp-bad { border-inline-start: 3px solid var(--status-bad); background: var(--status-bad-bg); }
+}
 tr.inv-imp-bad > td { background: var(--status-bad-bg); }
 tr.inv-imp-bad > td:first-child { box-shadow: inset -3px 0 0 var(--status-bad); }
 .inv-imp-reason { display: block; margin-top: 4px; font-size: 11.5px; font-weight: 700; color: var(--status-bad); }

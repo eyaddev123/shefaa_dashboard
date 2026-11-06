@@ -9,6 +9,7 @@
 //   ٣) التأكيد يُرسل بصمة آخر معاينة وخيارها — وفشل التبديل يُعيد المربّع لما هو معروض
 //   ٤) كلّ حالات السطر وعمود النوع وأثره على الصندوق، وتنبيه القالب القديم
 //   ٥) معاينة قديمة (409) تُعرض ولا تُنفَّذ · RTL وبلا تمرير أفقي × 1366 و390 × فاتح/داكن
+//   ٦) تحت 768 بطاقات: «النتيجة» داخل الشاشة تحت الاسم بلا تمرير أفقي، ومن 768 جدول
 // ═══════════════════════════════════════════════════════════════════
 import { chromium } from 'playwright'
 import { spawn } from 'node:child_process'
@@ -168,8 +169,35 @@ for (const w of [1366, 390]) for (const theme of ['light', 'dark']) {
   await startPreview(page)
   ok(await page.evaluate(() => document.documentElement.dir) === 'rtl', `${w} ${theme}: RTL`)
   ok(await noHScroll(page), `${w} ${theme}: بلا تمرير أفقي للصفحة`)
-  ok(await page.$eval('.inv-imp-table', (e) => getComputedStyle(e).overflowX) === 'auto', `${w} ${theme}: الجدول يُمرَّر داخل إطاره`)
+  if (w >= 768) ok(await page.$eval('.inv-imp-table', (e) => getComputedStyle(e).overflowX) === 'auto', `${w} ${theme}: الجدول يُمرَّر داخل إطاره`)
   ok(errors.length === 0, `${w} ${theme}: أخطاء ${errors}`)
+  await ctx.close()
+}
+
+console.log('\n── ٦) بطاقات تحت 768 ──')
+for (const w of [390, 767, 768]) {
+  const { ctx, page } = await open(browser, { w, theme: 'dark' })
+  await startPreview(page)
+  const m = await page.evaluate(() => {
+    const box = document.querySelector('.inv-imp-table'), f = box.getBoundingClientRect()
+    const cards = [...box.querySelectorAll('tbody > tr')].map((tr) => {
+      const q = (s) => tr.querySelector(s).getBoundingClientRect()
+      const name = q('.rt-title'), res = q('.inv-imp-result')
+      return { resIn: res.left >= f.left - 1 && res.right <= f.right + 1, under: res.top >= name.bottom - 1, direct: res.top - name.bottom,
+        display: getComputedStyle(tr).display, border: getComputedStyle(tr).borderInlineStartWidth }
+    })
+    return { sw: box.scrollWidth, cw: box.clientWidth, thead: getComputedStyle(box.querySelector('thead')).display, cards,
+      labels: [...box.querySelector('tbody > tr').querySelectorAll('td[data-label]')].map((td) => td.dataset.label) }
+  })
+  if (w < 768) {
+    ok(m.sw <= m.cw, `${w}: بلا تمرير أفقي داخل الإطار (${m.sw}>${m.cw})`)
+    ok(m.thead === 'none' && m.cards.every((c) => c.display === 'flex'), `${w}: كلّ سطر بطاقة`)
+    ok(m.cards.every((c) => c.resIn), `${w}: «النتيجة» داخل الشاشة بكلّ بطاقة`)
+    ok(m.cards.every((c) => c.under && c.direct < 30), `${w}: «النتيجة» تحت الاسم مباشرة ${JSON.stringify(m.cards.map((c) => c.direct))}`)
+    ok(['النوع', 'الكمّية', 'سعر الشراء'].every((l) => m.labels.includes(l)), `${w}: عناوين الخلايا ${m.labels}`)
+    ok(await noHScroll(page), `${w}: بلا تمرير أفقي للصفحة`)
+    ok(m.cards.filter((c) => parseFloat(c.border) >= 3).length === 4, `${w}: الشريط اللوني على البطاقات (إلا التخطّي)`)
+  } else ok(m.thead !== 'none' && m.cards.every((c) => c.display === 'table-row'), `${w}: جدول`)
   await ctx.close()
 }
 

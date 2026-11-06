@@ -444,7 +444,7 @@ export function ImportDialog({ onClose, onDone, showToast }) {
             <p className="inv-modal-sub">الملف بالقالب القديم بلا عمود «نوع المادة» — كلّ المواد الجديدة تُضاف معدودة.</p>
           )}
           <div className="inv-imp-table">
-            <table>
+            <table className="rtable">
               <thead><tr><th>السطر</th><th>المادة</th><th>الوحدة</th><th>النوع</th><th>سعر البيع</th><th>الكمّية</th>
                 <th>سعر الشراء</th><th>النتيجة</th></tr></thead>
               <tbody>
@@ -453,14 +453,14 @@ export function ImportDialog({ onClose, onDone, showToast }) {
                   const effect = importEffect(r)
                   return (
                     <tr key={r.row} className={st.row}>
-                      <td className="num">{r.row.toLocaleString('ar-SY')}</td>
-                      <td>{r.name || <span className="inv-muted">—</span>}</td>
-                      <td>{r.unit || '—'}</td>
-                      <td>{IMPORT_KINDS[r.kind] || '—'}</td>
-                      <td className="num">{r.sale_price === null ? '—' : fmtQty(r.sale_price)}</td>
-                      <td className="num">{r.qty === null ? '—' : fmtQty(r.qty)}</td>
-                      <td className="num">{r.unit_cost === null ? '—' : fmtQty(r.unit_cost)}</td>
-                      <td>
+                      <td className="num" data-label="السطر">{r.row.toLocaleString('ar-SY')}</td>
+                      <td className="rt-title">{r.name || <span className="inv-muted">—</span>}</td>
+                      <td data-label="الوحدة">{r.unit || '—'}</td>
+                      <td data-label="النوع">{IMPORT_KINDS[r.kind] || '—'}</td>
+                      <td className="num" data-label="سعر البيع">{r.sale_price === null ? '—' : fmtQty(r.sale_price)}</td>
+                      <td className="num" data-label="الكمّية">{r.qty === null ? '—' : fmtQty(r.qty)}</td>
+                      <td className="num" data-label="سعر الشراء">{r.unit_cost === null ? '—' : fmtQty(r.unit_cost)}</td>
+                      <td className="rt-full inv-imp-result">
                         <span className={`badge sm ${st.cls}`}>{st.label}</span>
                         {effect && <span className="inv-imp-note">{effect}</span>}
                         {r.reasons.map((x) => <span key={x} className="inv-imp-reason">{x}</span>)}
