@@ -36,7 +36,8 @@ const BOARD = { view: 'board', families: 1, persons: 1, requests: 1, byStatus: [
 
 async function open(browser, { role = 'doc', path = '/clinic/my-work', w = 1366, h = 800, theme = 'light', salary = FULL, sessions = [SESSION({})], dashboard = BOARD } = {}) {
   const ctx = await browser.newContext({ viewport: { width: w, height: h }, locale: 'ar' })
-  await ctx.addInitScript((t) => { localStorage.setItem('token', 'test'); localStorage.setItem('theme', t) }, theme)
+  // العنوان المفحوص في لوحة المساعدات — ومن له قسمان (لوحة القيادة) يبدأ بها بهذا الاختيار
+  await ctx.addInitScript((t) => { localStorage.setItem('token', 'test'); localStorage.setItem('theme', t); localStorage.setItem('dashboard-section', 'aid') }, theme)
   const page = await ctx.newPage()
   const errors = []; page.on('pageerror', (e) => errors.push(e.message))
   const calls = []
