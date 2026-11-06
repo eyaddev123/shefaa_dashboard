@@ -419,6 +419,7 @@ export const api = {
     // «أعمالي»: period = today | week | month — المرضى والإجراءات وحصّته المقبوضة (حساب المستحقات)
     myWork: (period) => http(`/clinic/my-work?period=${period}`),
     myPunctuality: (period) => http(`/clinic/my-punctuality?period=${period}`),
+    mySalary: (month) => http(`/clinic/my-salary${month ? `?month=${month}` : ''}`),
     removeAppointmentProcedure: (appointmentId, lineId, reason) =>
       http(`/clinic/appointments/${appointmentId}/procedures/${lineId}/remove`,
         { method: 'POST', body: JSON.stringify({ reason }) }),

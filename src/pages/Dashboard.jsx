@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { api, AID_TYPES, INCOME_KINDS, SESSION_STATUSES, STATUSES, fmtDate, fmtMoney, fmtTime } from '../api.js'
+import { api, AID_TYPES, INCOME_KINDS, ROLE_LABELS, SESSION_STATUSES, STATUSES, fmtDate, fmtMoney, fmtTime } from '../api.js'
 import { useRole } from '../RoleContext.jsx'
 import FinanceBar from '../components/FinanceBar.jsx'
 import ClinicCommand from '../components/ClinicCommand.jsx'
@@ -81,7 +81,7 @@ function RequestRows({ rows, extra }) {
 function AidDashboard() {
   const [d, setD] = useState(null)
   const [err, setErr] = useState(null)
-  const { user, isChairman } = useRole()
+  const { user, role, isChairman } = useRole()
 
   useEffect(() => { api.dashboard().then(setD).catch((e) => setErr(e.message)) }, [])
 
@@ -178,7 +178,8 @@ function AidDashboard() {
               {d.mySessions.map((s) => (
                 <tr key={s.id}>
                   <td className="num">{fmtTime(s.start_time)} – {fmtTime(s.end_time)}</td>
-                  <td><span className="badge">{SESSION_STATUSES[s.status] || s.status}</span></td>
+                  <td>{s.apologized ? <span className="badge bad">معتذر</span>
+                    : <span className="badge">{SESSION_STATUSES[s.status] || s.status}</span>}</td>
                   <td className="num">{s.active_count}</td>
                 </tr>
               ))}
@@ -247,7 +248,7 @@ function AidDashboard() {
   // ═══ لوحة عضو المجلس / المدير المسؤول ═══
   return (
     <>
-      <h2>لوحة القيادة — {isChairman ? 'المدير المسؤول' : 'عضو مجلس الإدارة'}</h2>
+      <h2>لوحة القيادة — {isChairman ? 'المدير المسؤول' : ROLE_LABELS[role]}</h2>
       <p className="subtitle">أهلاً {user.display_name} — سجّلت حتى الآن {d.myReviewsCount} مراجعة</p>
       <Tiles d={d} />
       {d.treasury && <TreasuryTiles treasury={d.treasury} />}
