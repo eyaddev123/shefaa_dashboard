@@ -503,9 +503,12 @@ export const api = {
     exportPurchases: ({ from, to }) => downloadFile(
       `/api/inventory/reports/purchases?${new URLSearchParams({ from, to, format: 'xlsx' })}`, `المشتريات-${from}.xlsx`),
     template: () => downloadFile('/api/inventory/import/template', 'قالب استيراد المواد.xlsx'),
-    importPreview: (file) => { const f = new FormData(); f.append('file', file); return postForm('/inventory/import/preview', f) },
-    importCommit: (file, fingerprint) => {
-      const f = new FormData(); f.append('fingerprint', fingerprint); f.append('file', file)
+    importPreview: (file, asOpening) => {
+      const f = new FormData(); f.append('as_opening', asOpening ? '1' : '0'); f.append('file', file)
+      return postForm('/inventory/import/preview', f)
+    },
+    importCommit: (file, fingerprint, asOpening) => {
+      const f = new FormData(); f.append('fingerprint', fingerprint); f.append('as_opening', asOpening ? '1' : '0'); f.append('file', file)
       return postForm('/inventory/import/commit', f)
     },
   },
