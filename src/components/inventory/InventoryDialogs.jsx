@@ -344,13 +344,27 @@ export function LossDialog({ name, unit, warning, onEditPrice, onLater }) {
 // ═══════════════════════════════════════════════════════════════════
 const ROW_STATUS = {
   new: { cls: 'good', row: 'inv-imp-new', label: 'تُضاف' },
+  consumable: { cls: 'good', row: 'inv-imp-new', label: 'استهلاكية — تُضاف بلا رصيد' },
   purchase: { cls: 'blue', row: 'inv-imp-buy', label: 'موجودة — شراء' },
+  opening: { cls: 'blue', row: 'inv-imp-buy', label: 'موجودة — رصيد افتتاحي' },
+  skipped: { cls: '', row: 'inv-imp-skip', label: 'تخطٍّ' },
   rejected: { cls: 'bad', row: 'inv-imp-bad', label: 'لن تُستورد' },
+}
+
+const IMPORT_KINDS = { counted: 'معدودة', consumable: 'استهلاكية' }
+
+// أثر السطر على الرصيد والصندوق: ما سيحدث بالضبط إن أُكّد
+function importEffect(r) {
+  if (r.status === 'purchase') return `يُخصم ${fmtMoney(r.fund_deduction)} من الصندوق`
+  if (r.status === 'opening' || (r.status === 'new' && r.qty !== null)) return 'رصيد افتتاحي — بلا خصم من الصندوق'
+  return null
 }
 
 export function ImportDialog({ onClose, onDone, showToast }) {
   const [file, setFile] = useState(null)
   const [preview, setPreview] = useState(null)
+  // جرد قائم مشترى من زمان هو الاستخدام الأساسي — فالافتراضي بلا خصم
+  const [asOpening, setAsOpening] = useState(true)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState(null)
   const [drag, setDrag] = useState(false)
@@ -359,12 +373,18 @@ export function ImportDialog({ onClose, onDone, showToast }) {
   const load = async (f) => {
     if (!f) return
     setFile(f); setErr(null); setPreview(null); setBusy(true)
-    try { setPreview(await api.inventory.importPreview(f)) }
+    try { setPreview(await api.inventory.importPreview(f, asOpening)) }
     catch (ex) { setErr(ex.message) } finally { setBusy(false) }
+  }
+  // الخيار يغيّر تصنيف الأسطر وبصمتها: معاينةٌ جديدة، فلا يُؤكَّد إلا ما عُرض
+  const toggleOpening = async (checked) => {
+    setAsOpening(checked); setErr(null); setBusy(true)
+    try { setPreview(await api.inventory.importPreview(file, checked)) }
+    catch (ex) { setAsOpening(preview.as_opening); setErr(ex.message) } finally { setBusy(false) }
   }
   const commit = async () => {
     setErr(null); setBusy(true)
-    try { onDone(await api.inventory.importCommit(file, preview.fingerprint)) }
+    try { onDone(await api.inventory.importCommit(file, preview.fingerprint, preview.as_opening)) }
     catch (ex) {
       // المعاينة قديمة: الجديدة تأتي مع الخطأ — تُعرض لتُراجَع ثمّ يُؤكَّد ثانيةً
       if (ex.data?.code === 'PREVIEW_STALE' && ex.data.rows) setPreview(ex.data)
@@ -376,16 +396,16 @@ export function ImportDialog({ onClose, onDone, showToast }) {
   }
 
   const s = preview?.summary
-  const doable = s ? s.new + s.purchase : 0
+  const doable = s ? s.new + s.consumable + s.purchase + s.opening : 0
   return (
     <Modal title="استيراد المواد من Excel" onClose={onClose} busy={busy} wide={!!preview}>
       {!preview && (
         <>
           <p className="inv-modal-sub">
-            سطرٌ لكل مادة: الاسم والوحدة وسعر البيع، والكمّية الموجودة إن وُجدت. المادة الموجودة لا تُضاف مرّتين —
-            كمّيتها تُسجَّل شراءً عليها.
+            سطرٌ لكل مادة: الاسم والوحدة وسعر البيع ونوعها، والكمّية الموجودة إن وُجدت. المادة الموجودة لا تُضاف
+            مرّتين — وتختار في المعاينة: كمّيتها رصيدٌ افتتاحيّ أو شراءٌ يُخصم من الصندوق.
           </p>
-          <button type="button" className="ghost" onClick={template}>⬇ تحميل القالب</button>
+          <button type="button" className="ghost" onClick={template}>⬇ تنزيل القالب</button>
           <div className={`dropzone inv-drop${drag ? ' drag' : ''}`} role="button" tabIndex={0}
             onClick={() => inputRef.current?.click()}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') inputRef.current?.click() }}
@@ -403,27 +423,46 @@ export function ImportDialog({ onClose, onDone, showToast }) {
           <p className="inv-modal-sub">{file?.name} — معاينة فقط، لم يُكتب شيء بعد.</p>
           <div className="inv-imp-summary">
             <span className="badge good">{materialsCount(s.new)} جديدة</span>
-            <span className="badge blue">{s.purchase.toLocaleString('ar-SY')} شراء على موجودة</span>
+            {s.consumable > 0 && <span className="badge good">{s.consumable.toLocaleString('ar-SY')} استهلاكية</span>}
+            {preview.as_opening
+              ? <span className="badge blue">{s.opening.toLocaleString('ar-SY')} رصيد على موجودة</span>
+              : <span className="badge blue">{s.purchase.toLocaleString('ar-SY')} شراء على موجودة</span>}
+            {s.skipped > 0 && <span className="badge">{s.skipped.toLocaleString('ar-SY')} تخطٍّ</span>}
             <span className={`badge${s.rejected ? ' bad' : ''}`}>{s.rejected.toLocaleString('ar-SY')} مرفوضة</span>
             {s.new_units > 0 && <span className="inv-muted">· {s.new_units.toLocaleString('ar-SY')} وحدة جديدة</span>}
           </div>
+          <div className="field-check inv-imp-opening"><label>
+            <input type="checkbox" checked={asOpening} disabled={busy} onChange={(e) => toggleOpening(e.target.checked)} />
+            تسجيل الكميات كرصيد افتتاحي (بلا خصم من صندوق العيادات)
+          </label>
+            <span className="hint">
+              {preview.as_opening ? 'لا حركة خصم من الصندوق لأيّ سطر — جردٌ قائم مشترى من قبل.'
+                : `كمّية المادة الموجودة شراءٌ يُخصم من الصندوق — المجموع ${fmtMoney(s.fund_deduction)}.`}
+            </span>
+          </div>
+          {!preview.kind_column && (
+            <p className="inv-modal-sub">الملف بالقالب القديم بلا عمود «نوع المادة» — كلّ المواد الجديدة تُضاف معدودة.</p>
+          )}
           <div className="inv-imp-table">
-            <table>
-              <thead><tr><th>السطر</th><th>المادة</th><th>الوحدة</th><th>سعر البيع</th><th>الكمّية</th>
+            <table className="rtable">
+              <thead><tr><th>السطر</th><th>المادة</th><th>الوحدة</th><th>النوع</th><th>سعر البيع</th><th>الكمّية</th>
                 <th>سعر الشراء</th><th>النتيجة</th></tr></thead>
               <tbody>
                 {preview.rows.map((r) => {
                   const st = ROW_STATUS[r.status]
+                  const effect = importEffect(r)
                   return (
                     <tr key={r.row} className={st.row}>
-                      <td className="num">{r.row.toLocaleString('ar-SY')}</td>
-                      <td>{r.name || <span className="inv-muted">—</span>}</td>
-                      <td>{r.unit || '—'}</td>
-                      <td className="num">{r.sale_price === null ? '—' : fmtQty(r.sale_price)}</td>
-                      <td className="num">{r.qty === null ? '—' : fmtQty(r.qty)}</td>
-                      <td className="num">{r.unit_cost === null ? '—' : fmtQty(r.unit_cost)}</td>
-                      <td>
+                      <td className="num" data-label="السطر">{r.row.toLocaleString('ar-SY')}</td>
+                      <td className="rt-title">{r.name || <span className="inv-muted">—</span>}</td>
+                      <td data-label="الوحدة">{r.unit || '—'}</td>
+                      <td data-label="النوع">{IMPORT_KINDS[r.kind] || '—'}</td>
+                      <td className="num" data-label="سعر البيع">{r.sale_price === null ? '—' : fmtQty(r.sale_price)}</td>
+                      <td className="num" data-label="الكمّية">{r.qty === null ? '—' : fmtQty(r.qty)}</td>
+                      <td className="num" data-label="سعر الشراء">{r.unit_cost === null ? '—' : fmtQty(r.unit_cost)}</td>
+                      <td className="rt-full inv-imp-result">
                         <span className={`badge sm ${st.cls}`}>{st.label}</span>
+                        {effect && <span className="inv-imp-note">{effect}</span>}
                         {r.reasons.map((x) => <span key={x} className="inv-imp-reason">{x}</span>)}
                         {r.notes.map((x) => <span key={x} className="inv-imp-note">{x}</span>)}
                       </td>
@@ -439,7 +478,7 @@ export function ImportDialog({ onClose, onDone, showToast }) {
       {err && <p className="error">{err}</p>}
       <div className="bf-actions inv-actions">
         {preview && <button type="button" className="ghost" disabled={busy}
-          onClick={() => { setPreview(null); setFile(null); setErr(null) }}>ملف آخر</button>}
+          onClick={() => { setPreview(null); setFile(null); setErr(null); setAsOpening(true) }}>ملف آخر</button>}
         <button type="button" className="ghost" disabled={busy} onClick={onClose}>إلغاء</button>
         {preview && (
           <button type="button" disabled={busy || doable === 0} onClick={commit}>

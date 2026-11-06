@@ -26,7 +26,7 @@ const TABS = [['materials', 'المواد'], ['costs', 'أسعار الشراء'
 const FILTERS = [['all', 'الكل'], ['low', 'تحتاج شراء'], ['consumable', 'استهلاكية'], ['inactive', 'غير مفعّلة']]
 const isConsumable = (m) => m.material_kind === 'consumable'
 
-function MaterialsTable({ data, canWrite, onOpen, onPurchase, onEdit, onAdd, onImport, onBuyAny }) {
+function MaterialsTable({ data, canWrite, onOpen, onPurchase, onEdit, onAdd, onImport, onTemplate, onBuyAny }) {
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState('all')
   const { materials, summary } = data
@@ -42,6 +42,7 @@ function MaterialsTable({ data, canWrite, onOpen, onPurchase, onEdit, onAdd, onI
             <button type="button" onClick={onBuyAny}>تسجيل شراء</button>
             <button type="button" className="ghost" onClick={onAdd}>+ مادة</button>
             <button type="button" className="ghost" onClick={onImport}>استيراد Excel</button>
+            <button type="button" className="ghost" onClick={onTemplate}>⬇ تنزيل القالب</button>
           </div>
         )}
         {materials.length > 0 && (
@@ -277,7 +278,8 @@ function InventoryFull({ canWrite }) {
           onBuyAny={() => setDialog({ kind: 'purchase' })}
           onEdit={(m) => setDialog({ kind: 'edit', material: m })}
           onAdd={() => setDialog({ kind: 'add' })}
-          onImport={() => setDialog({ kind: 'import' })} />
+          onImport={() => setDialog({ kind: 'import' })}
+          onTemplate={() => api.inventory.template().catch((ex) => showToast(ex.message))} />
       ))}
       {tab === 'stocktake' && canWrite && (
         <Stocktake materials={data.materials} onAddMaterial={() => setDialog({ kind: 'add' })}
@@ -317,7 +319,12 @@ function InventoryFull({ canWrite }) {
         <ImportDialog onClose={close} showToast={showToast}
           onDone={(r) => {
             close(); refresh()
-            showToast(`تمّ الاستيراد: ${materialsCount(r.new)} جديدة و${r.purchase.toLocaleString('ar-SY')} شراء`
+            const n = (v) => v.toLocaleString('ar-SY')
+            showToast(`تمّ الاستيراد: ${materialsCount(r.new)} جديدة`
+              + (r.consumable ? ` و${n(r.consumable)} استهلاكية` : '')
+              + (r.opening ? ` و${n(r.opening)} رصيد افتتاحي على موجودة` : '')
+              + (r.purchase ? ` و${n(r.purchase)} شراء` : '')
+              + (r.skipped ? ` — تخطٍّ: ${n(r.skipped)}` : '')
               + (r.rejected ? ` — وتُجوهل ${r.rejected.toLocaleString('ar-SY')} سطراً مرفوضاً` : ''), 'success', 6000)
           }} />
       )}
