@@ -1564,6 +1564,12 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
 .bf-note-urgent { color: var(--status-bad); font-weight: 700; }
 .bf-note-warn { color: var(--status-pending); }
 .bf-note-ok { color: var(--status-good); }
+.bf-kind { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: 2px 0 10px; }
+/* الراديو المخفيّ يرث width:100% من حقول النموذج: بلا مرجعٍ موضعيّ يمدّ الصفحة أفقياً */
+.bf-kind .seg > label { position: relative; }
+.bf-kind .seg > label > input { width: 1px; height: 1px; }
+.proc-only-badge { margin-inline-start: 6px; }
+td > .proc-only-badge:first-child { margin-inline-start: 0; }
 
 .bf-followup { display: flex; flex-direction: column; gap: 8px; }
 

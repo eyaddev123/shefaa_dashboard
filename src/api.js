@@ -206,6 +206,11 @@ export const api = {
       if (flag) q.set('flag', flag)
       return http(`/clinic/procedures/review?${q}`)
     },
+    emptyProcedureVisits: ({ from, to, doctorId }) => {
+      const q = new URLSearchParams({ from, to: to || from })
+      if (doctorId) q.set('doctor_id', String(doctorId))
+      return http(`/clinic/procedures/empty-visits?${q}`)
+    },
     procedureHistory: (lineId) => http(`/clinic/procedures/${lineId}/history`),
     exportProcedures: ({ from, to, doctorId }) => {
       const q = new URLSearchParams({ from, to: to || from })
@@ -663,7 +668,10 @@ export const APPOINTMENT_STATUSES = {
 export const BOOKING_TYPES = { walk_in: 'حضر شخصياً', phone: 'اتصال هاتفي' }
 
 // نوع الزيارة — لكلٍّ سعره في بروفايل الدكتور
-export const VISIT_TYPES = { consultation: 'معاينة', followup: 'مراجعة' }
+export const REGULAR_VISIT_TYPES = { consultation: 'معاينة', followup: 'مراجعة' }
+// «إجراء فقط»: جاء للإجراء وحده فلا كشفية، وكلّ ما عدا ذلك كالزيارة العادية
+export const PROCEDURE_ONLY = 'procedure_only'
+export const VISIT_TYPES = { ...REGULAR_VISIT_TYPES, [PROCEDURE_ONLY]: 'إجراء فقط' }
 
 // الأولوية — كل ما عدا 'normal' يتقدّم الطابور ويزيح مواعيد من بعده
 export const PRIORITIES = {
