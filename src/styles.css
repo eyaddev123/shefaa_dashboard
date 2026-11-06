@@ -3903,4 +3903,4 @@ td.fund-amt.is-out { color: var(--status-bad); }
 .dk-sal-calc li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; font-size: 13.5px; border-top: 1px solid var(--border); }
 .dk-sal-calc li:first-child { border-top: 0; }
 .dk-sal-line { margin: 0 0 12px; font-size: 13.5px; color: var(--text-secondary); }
-.dk-apology { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 10px 0 0; padding: 10px 14px; font-size: 13.5px; font-weight: 600; background: var(--status-bad-bg); border-radius: 10px; }
+.dk-apology { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 10px 0 14px; padding: 10px 14px; font-size: 13.5px; font-weight: 600; background: var(--status-bad-bg); border-radius: 10px; }

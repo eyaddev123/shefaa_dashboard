@@ -355,7 +355,7 @@ export default function DoctorScreen() {
       {/* الاعتذار ليوم الجلسة: تبقى الجلسة ظاهرة لصاحبها، ولا تبدو جلسةً عادية */}
       {sessions.find((s) => String(s.id) === String(sessionId))?.apologized && (
         <p className="dk-apology" role="status">
-          <span className="badge bad">معتذر</span> أنت معتذر عن هذه الجلسة: الحجز عليها ممنوع، وحجوزاتها القائمة تتواصل معها المشرفة.
+          <span className="badge bad">معتذر</span> هذه الجلسة عليها اعتذار: الحجز عليها ممنوع، وحجوزاتها القائمة تتواصل معها المشرفة.
         </p>
       )}
 
