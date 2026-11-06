@@ -4070,6 +4070,11 @@ a.cc-stat:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px
 .iron-badge { background: var(--primary-soft); color: var(--primary); }
 .iron-cash-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; padding: 16px 18px 6px; }
 .iron-print { white-space: nowrap; padding-inline: 12px; }
+.iron-cancel-btn { color: var(--status-bad); margin-inline-start: 6px; }
+.iron-cancelled td { color: var(--muted); }
+.iron-cancelled .num { text-decoration: line-through; }
+.iron-cancel-badge { margin-inline-start: 8px; }
+.iron-cancel-note { display: block; margin-top: 4px; font-size: 12px; font-weight: 400; color: var(--status-bad); }
 @media (max-width: 640px) {
   .iron-form .bf-row { grid-template-columns: 1fr; }
 }

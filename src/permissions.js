@@ -98,6 +98,7 @@ export const canCollectIron = (role) => role === 'clinic_admin' || role === 'cli
 export const canSeeIronLog = (role) => canCollectIron(role) || role === MANAGER || role === SUPER_ADMIN
 export const canSeeIronSplit = (role) => role === 'clinic_admin' || role === MANAGER || role === SUPER_ADMIN
 export const canWriteIronSettings = (role) => role === 'clinic_admin'
+export const canCancelIron = (role) => role === 'clinic_admin'
 
 // مستحقات الدكاترة من الإجراءات (تبويب «المستحقات» في صفحة الإجراءات): المشرفة والمدير والمشرف
 // العام — يطابق EARNINGS_ROLES في الخادم. المجلس يرى المراجعة لكن لا هذه، والاستقبال لا شيء: 403.

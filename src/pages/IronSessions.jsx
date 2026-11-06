@@ -4,7 +4,7 @@ import { api, fmtDateTime } from '../api.js'
 import { useRole } from '../RoleContext.jsx'
 import { useToast } from '../action-feedback.jsx'
 import { useDialogs } from '../dialogs.jsx'
-import { canCollectIron, canSeeIronSplit, canWriteIronSettings } from '../permissions.js'
+import { canCancelIron, canCollectIron, canSeeIronSplit, canWriteIronSettings } from '../permissions.js'
 import IronSessionDialog, { printIronReceipt } from '../components/IronSessionDialog.jsx'
 import { usePeriod, PeriodPicker, useLoad } from './ClinicFunds.jsx'
 
@@ -32,9 +32,24 @@ function SplitChips({ s }) {
 }
 
 // ═══════ السجلّ ═══════
-function LogTab({ split, canPrint, reload, showToast }) {
+function LogTab({ split, canPrint, canCancel, reload, showToast }) {
   const p = usePeriod('today')
-  const [data, err] = useLoad(() => api.clinic.ironSessions(p.query), p.key, reload)
+  const dialogs = useDialogs()
+  const [cancelled, setCancelled] = useState(0)
+  const [data, err] = useLoad(() => api.clinic.ironSessions(p.query), p.key, reload + cancelled)
+  const cancel = async (r) => {
+    const reason = await dialogs.prompt({
+      title: `إلغاء جلسة ${r.patient}`,
+      body: `تُعكس حركات الصندوق${r.withDrug ? ' وترجع الأمبولة للمخزون' : ''}، وتنزل المستحقات وحصّة الشفاء. الإلغاء لا رجعة عنه، والجلسة تبقى في السجلّ معلَّمة.`,
+      placeholder: 'سبب الإلغاء', confirmLabel: 'إلغاء الجلسة', cancelLabel: 'رجوع', required: true, danger: true,
+    })
+    if (reason == null) return
+    try {
+      await api.clinic.cancelIronSession(r.id, reason)
+      showToast('أُلغيت الجلسة وعُكست حركاتها', 'success', 3500)
+      setCancelled((n) => n + 1)
+    } catch (ex) { showToast(ex.message) }
+  }
   const multiDay = data && data.from !== data.to
   const print = async (r) => {
     const out = await printIronReceipt(r, 1)
@@ -49,7 +64,7 @@ function LogTab({ split, canPrint, reload, showToast }) {
         <>
           <div className="tiles earn-tiles">
             <div className="tile"><div className="label">عدد الجلسات</div><div className="value">{fmtNum(data.totals.count)}</div>
-              <div className="hint">مع دوا: {fmtNum(data.totals.withDrug)}</div></div>
+              <div className="hint">مع دوا: {fmtNum(data.totals.withDrug)}{data.totals.cancelled > 0 && ` — ملغاة خارج المجموع: ${fmtNum(data.totals.cancelled)}`}</div></div>
             <div className="tile earn-hero"><div className="label">مجموع المقبوض</div><div className="value"><Money value={data.totals.price} /></div></div>
             {split && (
               <div className="tile"><div className="label">حصّة الشفاء</div><div className="value"><Money value={data.totals.split.shifa} /></div></div>
@@ -58,20 +73,31 @@ function LogTab({ split, canPrint, reload, showToast }) {
           <table className="rtable earn-table iron-table">
             <thead>
               <tr><th>الوقت</th><th>المريض</th><th>الممرضة</th><th>الدكتور</th><th>النوع</th><th>المبلغ</th><th>القابضة</th>
-                {split && <th>التوزيع</th>}{canPrint && <th />}</tr>
+                {split && <th>التوزيع</th>}{(canPrint || canCancel) && <th />}</tr>
             </thead>
             <tbody>
               {data.rows.map((r) => (
-                <tr key={r.id}>
+                <tr key={r.id} className={r.cancelled ? 'iron-cancelled' : undefined}>
                   <td className="rt-badge earn-when" dir="ltr">{multiDay && <span className="earn-date">{r.date}</span>}<span>{r.time}</span></td>
-                  <td className="rt-title">{r.patient}</td>
+                  <td className="rt-title">
+                    {r.patient}
+                    {r.cancelled && <span className="badge bad sm iron-cancel-badge">ملغاة</span>}
+                    {r.cancelled && (
+                      <span className="iron-cancel-note">{r.cancelled.reason} — {r.cancelled.by} — {fmtDateTime(r.cancelled.at)}</span>
+                    )}
+                  </td>
                   <td data-label="الممرضة">{r.nurse}</td>
                   <td data-label="الدكتور">{r.doctor || <span className="muted">بلا دكتور</span>}</td>
                   <td data-label="النوع">{r.withDrug ? 'مع دوا' : 'بلا دوا'}</td>
                   <td className="num earn-doc" data-label="المبلغ">{fmtNum(r.price)}</td>
                   <td data-label="القابضة">{r.by}</td>
                   {split && <td className="rt-full" data-label="التوزيع"><SplitChips s={r.split} /></td>}
-                  {canPrint && <td className="rt-actions"><button type="button" className="ghost iron-print" onClick={() => print(r)}>🖨 إيصال</button></td>}
+                  {(canPrint || canCancel) && (
+                    <td className="rt-actions">
+                      {!r.cancelled && canPrint && <button type="button" className="ghost iron-print" onClick={() => print(r)}>🖨 إيصال</button>}
+                      {!r.cancelled && canCancel && <button type="button" className="ghost iron-print iron-cancel-btn" onClick={() => cancel(r)}>إلغاء</button>}
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -349,7 +375,7 @@ export default function IronSessions() {
           ))}
         </div>
       )}
-      {tab === 'log' && <LogTab split={split} canPrint={canCollectIron(role)} reload={reload} showToast={showToast} />}
+      {tab === 'log' && <LogTab split={split} canPrint={canCollectIron(role)} canCancel={canCancelIron(role)} reload={reload} showToast={showToast} />}
       {tab === 'dues' && <DuesTab />}
       {tab === 'settings' && <SettingsTab canWrite={canWriteIronSettings(role)} showToast={showToast} />}
       {adding && <IronSessionDialog onClose={() => setAdding(false)} onSaved={() => setReload((n) => n + 1)} />}

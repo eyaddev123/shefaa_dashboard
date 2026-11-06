@@ -23,7 +23,7 @@ const PERIODS = [
 ]
 const KIND_BADGE = {
   opening: 'blue', material_sale: 'good', material_edit: '', material_reversal: 'bad', purchase: 'warn', expense: 'bad',
-  iron_drug: 'good', iron_surplus: 'good',
+  iron_drug: 'good', iron_surplus: 'good', iron_drug_rev: 'bad', iron_surplus_rev: 'bad',
 }
 
 const fmtNum = (n) => Number(n || 0).toLocaleString('ar-SY', { maximumFractionDigits: 2 })
@@ -118,6 +118,7 @@ function MovementDetail({ m }) {
           {m.iron.withDrug ? 'مع دوا' : 'بلا دوا'}، سعر الجلسة {fmtNum(m.iron.price)} — الممرضة {m.iron.nurse}
           {m.iron.doctor && ` — ${m.iron.doctor}`}
         </span>
+        {m.kind.endsWith('_rev') && m.iron.cancelReason && <span className="fund-sub">سبب الإلغاء: {m.iron.cancelReason}</span>}
       </span>
     )
   }

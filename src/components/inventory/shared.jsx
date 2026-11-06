@@ -24,9 +24,9 @@ export function materialsCount(n) {
   return n >= 3 && n <= 10 ? `${k} مواد` : `${k} مادة`
 }
 
-export const TYPE_LABELS = { purchase: 'شراء', consumption: 'استهلاك', adjustment: 'تسوية', opening: 'افتتاحي' }
+export const TYPE_LABELS = { purchase: 'شراء', consumption: 'استهلاك', iron_return: 'ترجيع', adjustment: 'تسوية', opening: 'افتتاحي' }
 // الشراء والافتتاحي دخولٌ (أزرق هادئ)، والباقي محايد — الألوان للحالات لا للزينة
-export const TYPE_BADGE = { purchase: 'blue', opening: 'blue', consumption: '', adjustment: '' }
+export const TYPE_BADGE = { purchase: 'blue', opening: 'blue', iron_return: 'blue', consumption: '', adjustment: '' }
 export const REASONS = [
   ['damaged', 'تالف'], ['expired', 'منتهي الصلاحية'], ['lost', 'ضائع'], ['entry_error', 'غلط تسجيل'], ['other', 'أخرى'],
 ]
