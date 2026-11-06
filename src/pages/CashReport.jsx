@@ -227,6 +227,37 @@ function DoctorBlock({ d, open, onToggle, onLog }) {
   )
 }
 
+// جلسات الحديد: كتلةٌ مستقلّة بلا دكتورٍ تُنسب إليه — مبلغها داخل المجموع الكلي
+function IronBlock({ iron }) {
+  return (
+    <section className="card cash-doc is-open iron-cash">
+      <div className="iron-cash-head">
+        <strong>جلسات الحديد</strong>
+        <span className="cash-doc-count">{fmtNum(iron.totals.count)} {iron.totals.count === 1 ? 'جلسة' : 'جلسات'}</span>
+        <span className="cash-doc-total"><Money value={iron.totals.total} /></span>
+      </div>
+      <div className="cash-doc-body">
+        <table className="rtable earn-table">
+          <thead><tr><th>الوقت</th><th>المريض</th><th>النوع</th><th>الممرضة</th><th>الدكتور</th><th>القابضة</th><th>المقبوض</th></tr></thead>
+          <tbody>
+            {iron.rows.map((r) => (
+              <tr key={r.id}>
+                <td className="rt-badge" dir="ltr">{r.time}</td>
+                <td className="rt-title">{r.name}</td>
+                <td data-label="النوع">{r.kind}</td>
+                <td data-label="الممرضة">{r.nurse}</td>
+                <td data-label="الدكتور">{r.doctor || <span className="muted">بلا دكتور</span>}</td>
+                <td data-label="القابضة">{r.by}</td>
+                <td className="num cash-due" data-label="المقبوض">{fmtNum(r.total)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  )
+}
+
 function GrandTotal({ data }) {
   const { totals, check } = data
   const patientsOff = check.independentPatients !== totals.patients
@@ -240,6 +271,7 @@ function GrandTotal({ data }) {
             <span>{patientsText(totals.patients)}</span>
             <span>كشوف <bdi>{fmtNum(totals.fee)}</bdi></span>
             <span>إجراءات <bdi>{fmtNum(totals.procTotal)}</bdi></span>
+            {totals.iron > 0 && <span>جلسات الحديد <bdi>{fmtNum(totals.iron)}</bdi></span>}
             {totals.discount > 0 && <span>خصومات الإحالات <bdi dir="rtl">− {fmtNum(totals.discount)}</bdi></span>}
           </div>
         </div>
@@ -308,7 +340,7 @@ export default function CashReport() {
         <div>
           <h2>جرد الصندوق</h2>
           <p className="subtitle">
-            ما دخل الصندوق {date === today ? 'اليوم' : <>يوم <bdi dir="ltr">{date}</bdi></>} — دكتوراً دكتوراً، من حضر وحده
+            ما دخل الصندوق {date === today ? 'اليوم' : <>يوم <bdi dir="ltr">{date}</bdi></>} — دكتوراً دكتوراً، من حضر وحده، ومعه جلسات الحديد
           </p>
         </div>
         <div className="cash-head-actions">
@@ -323,7 +355,7 @@ export default function CashReport() {
 
       {err ? <p className="error">{err}</p>
         : !data ? <p className="empty">جارٍ التحميل…</p>
-        : docs.length === 0 ? (
+        : docs.length === 0 && !data.iron ? (
           <div className="card cash-empty">
             <span className="cash-empty-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
@@ -345,18 +377,19 @@ export default function CashReport() {
           <>
             <SummaryTiles totals={data.totals} />
             {audit && <StaffActivity date={date} />}
-            <div className="cash-docs-head">
+            {docs.length > 0 && <div className="cash-docs-head">
               <h3>دكاترة {date === today ? 'اليوم' : 'اليوم المحدّد'} <span className="muted">({fmtNum(docs.length)})</span></h3>
               {data.flagged > 0 && <span className="badge warn">{fmtNum(data.flagged)} سطر للمراجعة</span>}
               <button type="button" className="link-btn" onClick={() => setAll(!allOpen)}>
                 {allOpen ? 'طيّ الكل' : 'فتح الكل'}
               </button>
-            </div>
+            </div>}
             {docs.map((d) => (
               <DoctorBlock key={d.key} d={d} open={!!open[d.key]}
                 onToggle={() => setOpen((o) => ({ ...o, [d.key]: !o[d.key] }))}
                 onLog={audit ? (line) => setLogOf({ line, doctor: d.doctor }) : null} />
             ))}
+            {data.iron && <IronBlock iron={data.iron} />}
             <GrandTotal data={data} />
           </>
         )}

@@ -80,6 +80,7 @@ function DayStats({ d }) {
           {d.procedures.unpaid > 0
             ? <span className="is-warn">بانتظار المحاسبة <b>{fmtNum(d.procedures.unpaid)}</b></span>
             : <span className="is-zero">{d.procedures.total ? 'كلّها محاسَبة' : 'لا إجراءات بعد'}</span>}
+          {d.iron?.count > 0 && <span className="is-strong">جلسات الحديد <b>{fmtNum(d.iron.count)}</b></span>}
         </div>
       </Stat>
       {ap && (
