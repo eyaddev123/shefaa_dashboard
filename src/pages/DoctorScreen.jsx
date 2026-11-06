@@ -339,7 +339,7 @@ export default function DoctorScreen() {
           {sessions.length > 1 && (
             <select aria-label="الجلسة" value={sessionId || ''} onChange={(e) => setSessionId(e.target.value)}>
               {sessions.map((s) => (
-                <option key={s.id} value={s.id}>{fmtTime(s.start_time)} – {fmtTime(s.end_time)}</option>
+                <option key={s.id} value={s.id}>{fmtTime(s.start_time)} – {fmtTime(s.end_time)}{s.apologized ? ' (معتذر)' : ''}</option>
               ))}
             </select>
           )}
@@ -351,6 +351,13 @@ export default function DoctorScreen() {
           </button>
         </div>
       </div>
+
+      {/* الاعتذار ليوم الجلسة: تبقى الجلسة ظاهرة لصاحبها، ولا تبدو جلسةً عادية */}
+      {sessions.find((s) => String(s.id) === String(sessionId))?.apologized && (
+        <p className="dk-apology" role="status">
+          <span className="badge bad">معتذر</span> أنت معتذر عن هذه الجلسة: الحجز عليها ممنوع، وحجوزاتها القائمة تتواصل معها المشرفة.
+        </p>
+      )}
 
       {pushOffer && (
         <div className="dk-push" role="region" aria-label="التنبيهات">
