@@ -184,6 +184,35 @@ function EditLine({ line, catalog, onSaved, onCancel, showToast }) {
   )
 }
 
+// ═══ «إجراء فقط» انتهت بلا ولا إجراء — صفر مقبوضات، فلا سطر لها في الجدول تحت ═══
+function EmptyProcedureVisits({ from, to, doctorId, showToast }) {
+  const [visits, setVisits] = useState(null)
+  useEffect(() => {
+    api.clinic.emptyProcedureVisits({ from, to, doctorId }).then((r) => setVisits(r.visits)).catch((e) => showToast(e.message))
+  }, [from, to, doctorId])
+  if (!visits || visits.length === 0) return null
+  return (
+    <div className="rev-unpaid" role="region" aria-labelledby="rev-empty-title">
+      <h4 id="rev-empty-title">
+        «إجراء فقط» انتهت بلا إجراء <span className="rev-flag-n">{visits.length}</span>
+      </h4>
+      <p className="muted" style={{ margin: '0 0 8px', fontSize: 12.5 }}>بلا كشفية وبلا إجراءات: لم يُقبض منها شيء. هل نُسي تسجيل الإجراء؟</p>
+      <table className="rev-table rtable">
+        <thead><tr><th>التاريخ</th><th>المريض</th><th>الدكتور</th></tr></thead>
+        <tbody>
+          {visits.map((v) => (
+            <tr key={v.id}>
+              <td data-label="التاريخ" dir="ltr">{v.session_date}</td>
+              <td className="rt-title"><Link to={`/clinic/session/${v.session_id}/visit/${v.id}`}>{v.patient_name}</Link></td>
+              <td data-label="الدكتور">{v.doctor_name}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 export default function ProcedureReview({ canEdit, showToast }) {
   const [from, setFrom] = useState(() => todayLocal())
   const [to, setTo] = useState(() => todayLocal())
@@ -238,6 +267,8 @@ export default function ProcedureReview({ canEdit, showToast }) {
             {doctors.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
           </select></div>
       </div>
+
+      <EmptyProcedureVisits from={from} to={to} doctorId={doctorId} showToast={showToast} />
 
       {/* العدّادان ظاهران دائماً: ما يحتاج انتباهاً لا يختبئ خلف مرشِّح */}
       <div className="inline rev-flags">

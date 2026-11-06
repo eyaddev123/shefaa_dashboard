@@ -3,7 +3,7 @@ import { useDialogs } from '../dialogs.jsx'
 import { loadPrinter, ticketFrom } from '../ticket-print.js'
 import { printViaHelper } from '../print-helper.js'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { api, APPOINTMENT_STATUSES, BOOKING_TYPES, VISIT_TYPES, PRIORITIES, DELAY_CAUSES, WEEKDAYS, addDays, todayLocal, fmtMoney, fmtTime, toLatinDigits } from '../api.js'
+import { api, APPOINTMENT_STATUSES, BOOKING_TYPES, VISIT_TYPES, REGULAR_VISIT_TYPES, PROCEDURE_ONLY, PRIORITIES, DELAY_CAUSES, WEEKDAYS, addDays, todayLocal, fmtMoney, fmtTime, toLatinDigits } from '../api.js'
 import { AttendanceBadge, urgentRowClass, isAttendanceSession, usePolling, fmtClock, FlowModeTag, FLOW_MODE_LABELS,
   AttendanceNumber, turnLabel, fmtTimeOfDay } from '../attendance-ui.jsx'
 import { attendanceBookedMessage } from '../booking-message.js'
@@ -15,6 +15,7 @@ import { WAITING_RETURN, waitingReturnOf, serverOffsetOf, Elapsed, useStaffEvent
 import ReferralsEditor from '../components/ReferralFields.jsx'
 import { referralPayload, referralReady, referralSummary } from '../referral.js'
 import RoomBadge from '../components/RoomBadge.jsx'
+import { ProcedureOnlyBadge, isProcedureOnly } from '../components/ProcedureOnly.jsx'
 import { fmtDuration } from '../components/Punctuality.jsx'
 
 // شارة الأولوية — تُبرز من يتقدّم الطابور وسببه
@@ -246,7 +247,9 @@ function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel, urgent = f
     finally { setBusy(false) }
   }
 
-  const fee = isFollowup ? fees?.followup_fee : fees?.consultation_fee
+  const procedureOnly = form.visit_type === PROCEDURE_ONLY
+  const fee = procedureOnly ? 0 : isFollowup ? fees?.followup_fee : fees?.consultation_fee
+  const setKind = (visit_type) => () => setForm((f) => ({ ...f, visit_type }))
 
   return (
     <form className="booking-form" onSubmit={submit}>
@@ -343,13 +346,15 @@ function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel, urgent = f
             </select>
           </div>
         )}
-        <div className="field">
-          <label>نوع الزيارة</label>
-          <select value={form.visit_type} onChange={set('visit_type')}>
-            {Object.entries(VISIT_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-          </select>
-          {fee != null && <small className="hint">السعر: {fmtMoney(fee)}</small>}
-        </div>
+        {!procedureOnly && (
+          <div className="field">
+            <label>نوع الزيارة</label>
+            <select value={form.visit_type} onChange={set('visit_type')}>
+              {Object.entries(REGULAR_VISIT_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            </select>
+            {fee != null && <small className="hint">السعر: {fmtMoney(fee)}</small>}
+          </div>
+        )}
         <div className="field">
           <label>الأولوية</label>
           <select value={form.priority} onChange={set('priority')}>
@@ -360,6 +365,23 @@ function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel, urgent = f
           <label>ملاحظة الحجز <span className="opt">(اختيارية)</span></label>
           <input value={form.reason} onChange={set('reason')} />
         </div>
+      </div>
+
+      {/* الاستقبال تحدّد من أوّل لحظة: المريض يقول شو جاي يعمل */}
+      <div className="bf-kind">
+        <div className="seg" role="radiogroup" aria-label="غرض الزيارة">
+          <label className={procedureOnly ? '' : 'on'}>
+            <input type="radio" name="visit-kind" checked={!procedureOnly} onChange={setKind('consultation')} />
+            زيارة عادية
+          </label>
+          <label className={procedureOnly ? 'on' : ''}>
+            <input type="radio" name="visit-kind" checked={procedureOnly} onChange={setKind(PROCEDURE_ONLY)} />
+            إجراء فقط (بلا كشفية)
+          </label>
+        </div>
+        {procedureOnly && (
+          <small className="hint">لا كشفية تُقبض ولا تُطبع. يأخذ دوراً كغيره، ويُضاف الإجراء ويُقبض كالمعتاد.</small>
+        )}
       </div>
 
       {/* تحذير الأولوية: سطرٌ كامل تحت الصفّ لا داخل خانة ضيّقة تكسر محاذاتها */}
@@ -1035,7 +1057,7 @@ function ReferralBadge({ appt }) {
 function FeeCell({ appt }) {
   const r = (appt.referrals || []).length > 0
   if (!appt.procedures_total) {
-    if (!r) return <>{fmtMoney(appt.fee)}</>
+    if (!r) return isProcedureOnly(appt) ? <span className="muted">بلا كشفية</span> : <>{fmtMoney(appt.fee)}</>
     return (
       <span className="fee-breakdown">
         <span>{appt.referral_discount > 0 && <><s className="muted">{fmtMoney(appt.fee)}</s> ← </>}
@@ -1053,7 +1075,8 @@ function FeeCell({ appt }) {
   const unpaid = live.filter((l) => !l.paid_at).length
   return (
     <span className="fee-breakdown">
-      <span>{VISIT_TYPES[appt.visit_type] || 'زيارة'} {fmtMoney(appt.fee)}</span>
+      {isProcedureOnly(appt) ? <span>بلا كشفية</span>
+        : <span>{VISIT_TYPES[appt.visit_type] || 'زيارة'} {fmtMoney(appt.fee)}</span>}
       <span>إجراءات {fmtMoney(appt.procedures_total)}</span>
       {/* سطران لا سطرٌ واحد: الأصل مشطوباً ثمّ المطلوب — فلا يتّسع العمود فيضيق الاسم */}
       {r && appt.referral_discount > 0 ? (
@@ -1066,7 +1089,7 @@ function FeeCell({ appt }) {
       {names && (
         <span className="fee-action">
           {/* بعد خصم الإحالة على الإجراءات (إن شملها النطاق) — ما يُستوفى فعلاً */}
-          إجراء: {names} — خذي {fmtMoney(r ? appt.patient_total - appt.patient_fee : appt.procedures_total)} زيادة
+          إجراء: {names} — خذي {fmtMoney(r ? appt.patient_total - appt.patient_fee : appt.procedures_total)}{isProcedureOnly(appt) ? '' : ' زيادة'}
         </span>
       )}
       {unpaid > 0 && <span className="pay-badge is-unpaid">⏳ بانتظار المحاسبة {unpaid.toLocaleString('ar-SY')}</span>}
@@ -1121,7 +1144,7 @@ function AttendanceQueueTable({ data, rows, tab, actions }) {
               <td className="rt-title"><VisitLink appt={a} /> <MissingBadge appt={a} /><QueueNote appt={a} /></td>
               <td data-label="الموبايل"><bdi dir="ltr">{a.mobile || '—'}</bdi></td>
               <td data-label="نوع الزيارة">
-                {VISIT_TYPES[a.visit_type] || a.visit_type}
+                {isProcedureOnly(a) ? <ProcedureOnlyBadge appt={a} /> : (VISIT_TYPES[a.visit_type] || a.visit_type)}
                 {a.followup_override_by && (
                   <span className="badge warn" style={{ marginInlineStart: 6 }}
                     title={a.followup_override_reason || ''}>تجاوز</span>
@@ -1180,7 +1203,7 @@ function SlotsQueueTable({ data, rows, actions, onDone, onError }) {
             <td className="rt-title"><VisitLink appt={a} /><QueueNote appt={a} /></td>
             <td data-label="الموبايل"><bdi dir="ltr">{a.mobile}</bdi></td>
             <td data-label="نوع الزيارة">
-              {VISIT_TYPES[a.visit_type] || a.visit_type}
+              {isProcedureOnly(a) ? <ProcedureOnlyBadge appt={a} /> : (VISIT_TYPES[a.visit_type] || a.visit_type)}
               {a.followup_override_by && (
                 <span className="badge warn" style={{ marginInlineStart: 6 }}
                   title={a.followup_override_reason || ''}>تجاوز</span>

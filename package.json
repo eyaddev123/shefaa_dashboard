@@ -23,7 +23,8 @@
     "test:doctors": "node test/doctors-search-check.mjs",
     "test:earnings": "node test/earnings-check.mjs",
     "test:command": "node test/command-dashboard-check.mjs",
-    "test:doctor-view": "node test/doctor-view-check.mjs"
+    "test:doctor-view": "node test/doctor-view-check.mjs",
+    "test:procedure-only": "node test/procedure-only-check.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",
