@@ -4204,10 +4204,44 @@ button.combo-trigger:focus-visible, button.combo-trigger[aria-expanded='true'] {
 .iron-dist-cell strong { font-size: 16px; font-weight: 700; }
 .iron-flags { list-style: none; display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; font-size: 13px; line-height: 1.7; }
 button.ghost.iron-details-btn { white-space: nowrap; padding-inline: 12px; }
-/* أزرار سطر السجلّ على الحاسوب: عمودٌ مصطفّ بعرضٍ واحد وفراغٍ ثابت (الجوال صفّ البطاقة في table.rtable) */
-@media (min-width: 768px) {
+/* أزرار سطر السجلّ على الحاسوب: عمودٌ مصطفّ بعرضٍ واحد وفراغٍ ثابت */
+@media (min-width: 1181px) {
   .iron-table td.rt-actions > button { display: block; width: 100%; min-height: 32px; padding: 4px 12px; font-size: 12.5px; line-height: 1.4; }
   .iron-table td.rt-actions > button + button { margin-top: 6px; }
+}
+/* سجلّ الحديد بعد الجوال وحتى 1180 (أوّل عرضٍ يتّسع فيه جدول المشرفة): تسعة أعمدة لا تسعها الشاشة، فيبقى بطاقاتٍ كنمط table.rtable (تحت 768)
+   بدل تمريرٍ أفقيّ يُخرج الأزرار من الشاشة. القواعد هنا نسخة ما يلزم لهذا الجدول وحده: البقية يبقى جدولها. */
+@media (min-width: 768px) and (max-width: 1180px) {
+  table.rtable.iron-table { display: block; width: 100%; min-width: 0; }
+  table.rtable.iron-table > thead { display: none; }
+  table.rtable.iron-table > tbody { display: block; }
+  table.rtable.iron-table > tbody > tr {
+    display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px 12px;
+    padding: 12px 14px; margin-bottom: 10px;
+    border: 1px solid var(--grid); border-radius: 12px; background: var(--surface-1);
+  }
+  table.rtable.iron-table > tbody > tr > td {
+    display: block; flex: 1 1 calc(50% - 6px); min-width: 0; max-width: none;
+    padding: 0; border: 0; white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere;
+  }
+  table.rtable.iron-table > tbody > tr > td[data-label]::before {
+    content: attr(data-label); display: block; margin-bottom: 2px;
+    font-size: 11px; font-weight: 700; color: var(--muted);
+  }
+  table.rtable.iron-table > tbody > tr > td.rt-title { order: -2; flex: 1 1 0; min-width: 50%; align-self: center; font-size: 15px; font-weight: 800; }
+  table.rtable.iron-table > tbody > tr > td.rt-badge {
+    order: -1; flex: 0 1 auto; max-width: calc(50% - 12px); align-self: center;
+    display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end;
+  }
+  table.rtable.iron-table > tbody > tr > td.rt-full { flex-basis: 100%; }
+  table.rtable.iron-table > tbody > tr > td.rt-actions {
+    order: 1; flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 8px; padding-top: 10px; border-top: 1px solid var(--grid);
+  }
+  table.rtable.iron-table > tbody > tr > td.rt-actions > button {
+    min-height: 44px; flex: 1 1 auto; display: inline-flex; align-items: center; justify-content: center;
+    padding: 8px 14px !important; font-size: 13px !important; margin: 0 !important;
+  }
+  table.rtable.iron-table > tbody > tr > td.rt-actions:empty { display: none; }
 }
 @media (max-width: 767px) {
   .iron-paybar { bottom: calc(-16px - env(safe-area-inset-bottom)); margin: 0 -16px calc(-16px - env(safe-area-inset-bottom)); padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); }
@@ -4215,7 +4249,7 @@ button.ghost.iron-details-btn { white-space: nowrap; padding-inline: 12px; }
   button.iron-save { flex: 1 1 0; }
   .iron-form :is(input:not(.mat-qty), select) { min-height: 44px; }
   .iron-materials .mat-x { width: 40px; height: 40px; }
-  button.ghost.iron-details-btn, .iron-details .iron-actions > button { min-height: 44px; }
+  .iron-details .iron-actions > button { min-height: 44px; }
 }
 @media (max-width: 480px) {
   .iron-ed-row { grid-template-columns: 1fr 1fr; }
