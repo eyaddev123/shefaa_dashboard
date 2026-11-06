@@ -4,6 +4,7 @@ import { AttendanceBadge, urgentRowClass, isAttendanceSession, usePolling, fmtCl
 import { useToast, RecallButton } from '../action-feedback.jsx'
 import { waitingReturnOf, serverOffsetOf, Elapsed } from '../waiting-return.jsx'
 import BottomSheet from '../components/BottomSheet.jsx'
+import { ProcedureOnlyBadge } from '../components/ProcedureOnly.jsx'
 import MaterialsEditor, { qtyValid, toPayload } from '../components/MaterialsEditor.jsx'
 import {
   ringDoctor, primeOnFirstGesture, onAudioState, audioReady, unlockAudio,
@@ -401,7 +402,7 @@ export default function DoctorScreen() {
                     {bookings.map((a) => (
                       <li key={a.id} className="dk-book">
                         <span className="dk-book-time" dir="ltr">{timeOf(a) || '—'}</span>
-                        <span className="dk-book-name">{a.full_name}</span>
+                        <span className="dk-book-name">{a.full_name}<ProcedureOnlyBadge appt={a} /></span>
                         <span className="dk-book-ref">حجز {a.queue_number}</span>
                       </li>
                     ))}
@@ -418,7 +419,7 @@ export default function DoctorScreen() {
                       <div className="dk-current-who">
                         <span className="dk-current-num">الدور {shownNumber(current)}</span>
                         {attendance && <AttendanceBadge priority={current.priority} />}
-                        <span className="dk-current-name">{current.full_name}</span>
+                        <span className="dk-current-name">{current.full_name}<ProcedureOnlyBadge appt={current} /></span>
                         {current.reason && <span className="dk-current-note">ملاحظة الحجز: {current.reason}</span>}
                         {attendance && current.started_at && (
                           <span className="dk-current-note">بدأ الكشف {fmtClock(current.started_at)}</span>
@@ -480,7 +481,7 @@ export default function DoctorScreen() {
                       {returning.map((a) => (
                         <li key={a.id} className="wr-item">
                           <span className="wr-num">الدور {shownNumber(a)}</span>
-                          <span className="wr-name">{a.full_name}</span>
+                          <span className="wr-name">{a.full_name}<ProcedureOnlyBadge appt={a} /></span>
                           <Elapsed since={a.stepped_out_at} offset={offset} />
                           <button className="ghost wr-call dk-tap" disabled={busy || !!current}
                             onClick={() => act(api.clinic.returnCall, a.id)}>
@@ -503,6 +504,7 @@ export default function DoctorScreen() {
                         <div className="dk-next-who">
                           الدور {shownNumber(nextUp)} — {nextUp.full_name}
                           {attendance && <AttendanceBadge priority={nextUp.priority} />}
+                          <ProcedureOnlyBadge appt={nextUp} />
                         </div>
                         {nextUp.reason && <div className="dk-next-note">{nextUp.reason}</div>}
                       </div>
@@ -533,7 +535,7 @@ export default function DoctorScreen() {
                         <li key={a.id} className={['dk-wait', a.id === nextUp?.id ? 'is-next' : '',
                           attendance ? urgentRowClass(a) : ''].filter(Boolean).join(' ')}>
                           <span className="dk-wait-num">{shownNumber(a)}</span>
-                          <span className="dk-wait-name">{a.full_name}{attendance && <AttendanceBadge priority={a.priority} />}</span>
+                          <span className="dk-wait-name">{a.full_name}{attendance && <AttendanceBadge priority={a.priority} />}<ProcedureOnlyBadge appt={a} /></span>
                           {a.id === nextUp?.id && <span className="doc-next-tag">التالي</span>}
                         </li>
                       ))}

@@ -9,9 +9,10 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useDialogs } from '../dialogs.jsx'
 import { loadPrinter, printTicket, ticketFrom, MAX_COPIES } from '../ticket-print.js'
 import { printViaHelper } from '../print-helper.js'
-import { api, APPOINTMENT_STATUSES, BOOKING_TYPES, VISIT_TYPES, PRIORITIES, fmtMoney, toLatinDigits } from '../api.js'
+import { api, APPOINTMENT_STATUSES, BOOKING_TYPES, VISIT_TYPES, PROCEDURE_ONLY, PRIORITIES, fmtMoney, toLatinDigits } from '../api.js'
 import { isAttendanceSession, usePolling, fmtClock, turnLabel, fmtTimeOfDay } from '../attendance-ui.jsx'
 import { useRole } from '../RoleContext.jsx'
+import { ProcedureOnlyBadge, isProcedureOnly, endedWithoutProcedure, visitKindLockReason } from '../components/ProcedureOnly.jsx'
 import { useToast } from '../action-feedback.jsx'
 import { canEditAppointmentProcedures, canEditBooking, canEditReferral, canSeeVisitAudit, canTakePayment } from '../permissions.js'
 import { WAITING_RETURN, serverOffsetOf, useStaffEvents } from '../waiting-return.jsx'
@@ -74,7 +75,9 @@ function PaymentCard({ appt, session, onToast }) {
       <h3>المطلوب من المريض</h3>
       <table>
         <tbody>
-          <tr><td>رسم الكشف ({VISIT_TYPES[appt.visit_type] || 'زيارة'})</td><td className="num">{fmtMoney(appt.fee)}</td></tr>
+          {isProcedureOnly(appt)
+            ? <tr><td>رسم الكشف</td><td className="num"><span className="muted">بلا كشفية — إجراء فقط</span></td></tr>
+            : <tr><td>رسم الكشف ({VISIT_TYPES[appt.visit_type] || 'زيارة'})</td><td className="num">{fmtMoney(appt.fee)}</td></tr>}
           <tr>
             <td>الإجراءات {live.length > 0 && <span className="muted">({live.length})</span>}</td>
             <td className="num">{live.length ? fmtMoney(appt.procedures_total) : <span className="muted">لا إجراءات</span>}</td>
@@ -95,6 +98,7 @@ function PaymentCard({ appt, session, onToast }) {
         <p className="visit-pay-was">قبل الخصم <s>{fmtMoney(appt.total ?? appt.fee)}</s></p>
       )}
       {note && <p className="visit-empty">{note}</p>}
+      {endedWithoutProcedure(appt) && <p className="visit-empty">انتهت الزيارة بلا إجراء ولا كشفية — لم يُقبض شيء.</p>}
       {canReprint && <ReprintButton appt={appt} session={session} onToast={onToast} />}
     </section>
   )
@@ -202,7 +206,9 @@ function PatientCard({ appt, session, onChanged, onToast, onArrived }) {
     setBusy(true)
     try {
       const r = await api.clinic.saveAppointmentDetails(appt.id, d)
-      onToast(r?.message || 'حُفظت التعديلات', 'success'); onChanged()
+      // «إجراء فقط» الحاضر لم يدفع شيئاً، فصار عليه الآن ما لا يذكره سند الحضور
+      const feeNowDue = d.visit_type && isProcedureOnly(appt) && appt.status === 'arrived'
+      onToast(feeNowDue ? 'صارت زيارة عادية — خذي الكشفية وأعيدي طباعة البطاقة' : r?.message || 'حُفظت التعديلات', 'success'); onChanged()
       setEditingForm(false)
       // «بانتظار الحضور» ⇒ «حاضر» من هذه اللوحة مسارُ حضورٍ كغيره.
       // was_first_arrival من الخادم يمنع الطباعة الثانية عند التبديل ذهاباً وإياباً.
@@ -210,6 +216,9 @@ function PatientCard({ appt, session, onChanged, onToast, onArrived }) {
     } catch (ex) { onToast(ex.message) } finally { setBusy(false) }
   }
 
+  // «عادية» ↔ «إجراء فقط» تُغلق بعد القبض أو الدخول أو الإجراء — معاينة ↔ مراجعة كما كانتا
+  const kindLock = visitKindLockReason(appt)
+  const crossesKind = (type) => (type === PROCEDURE_ONLY) !== isProcedureOnly(appt)
   const missing = missingOf(appt)
   const age = appt.birth_year ? Number(String(session.server_today).slice(0, 4)) - Number(appt.birth_year) : null
   const facts = [
@@ -217,7 +226,7 @@ function PatientCard({ appt, session, onChanged, onToast, onArrived }) {
     ['العمر', age != null && age >= 0 ? <>{age} سنة <span className="muted">({appt.birth_year})</span></> : null],
     ['الجنس', GENDERS[appt.gender]],
     ['الموبايل', appt.mobile ? <span dir="ltr">{appt.mobile}</span> : null],
-    ['نوع الزيارة', <>{VISIT_TYPES[appt.visit_type] || appt.visit_type}
+    ['نوع الزيارة', <>{isProcedureOnly(appt) ? <ProcedureOnlyBadge appt={appt} /> : (VISIT_TYPES[appt.visit_type] || appt.visit_type)}
       {appt.followup_override_by && (
         <span className="badge warn sm" style={{ marginInlineStart: 6 }} title={appt.followup_override_reason || ''}>تجاوز</span>
       )}</>],
@@ -263,8 +272,14 @@ function PatientCard({ appt, session, onChanged, onToast, onArrived }) {
               <input value={form.birth_year} onChange={set('birth_year')} dir="ltr" disabled={fieldsFrozen} /></label>
             <label>نوع الزيارة
               <select value={form.visit_type} onChange={set('visit_type')} disabled={fieldsFrozen}>
-                {Object.entries(VISIT_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-              </select></label>
+                {Object.entries(VISIT_TYPES).map(([k, v]) => (
+                  <option key={k} value={k} disabled={!!kindLock && crossesKind(k)}>
+                    {k === PROCEDURE_ONLY ? 'إجراء فقط (بلا كشفية)' : v}
+                  </option>
+                ))}
+              </select>
+              {kindLock && <small className="hint">{kindLock} — لا تغيير بين «عادية» و«إجراء فقط»</small>}
+            </label>
             <label>الأولوية
               <select value={form.priority} onChange={set('priority')} disabled={fieldsFrozen}>
                 <option value="normal">عادي</option><option value="urgent">إسعافي</option>
