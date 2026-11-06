@@ -87,6 +87,7 @@ export function ticketHtml(data, width = 80, heightMm = null, origin = '', copy 
   const base = w === 58 ? 11 : 13
   const pageH = heightMm ? `${heightMm}mm` : 'auto'
 
+  const receipt = data.receipt || null
   const age = ageFrom(data.birth_year)
   // القائم وحده يُطبع: المُزال سطرٌ ملغيّ، وطباعته تجعل المريض يدفع ثمن ما أُلغي
   const procs = (data.procedures || []).filter((p) => !p.removed_at)
@@ -105,11 +106,11 @@ export function ticketHtml(data, width = 80, heightMm = null, origin = '', copy 
       ${rows}
       <tr class="total"><td class="k">المجموع للدفع</td><td class="v">${esc(money(total))}</td></tr>
     </table>` : `
-    <div class="pay"><span>المبلغ للدفع</span><strong>${esc(money(fee))}</strong></div>`
+    <div class="pay"><span>${receipt ? 'المبلغ المقبوض' : 'المبلغ للدفع'}</span><strong>${esc(money(fee))}</strong></div>`
 
   return `<!doctype html>
 <html lang="ar" dir="rtl"><head><meta charset="utf-8">
-<title>بطاقة الدور</title>
+<title>${receipt ? 'إيصال' : 'بطاقة الدور'}</title>
 <style>
   /* ═══ خطّ Cairo من ملفات التطبيق لا من شبكة خارجية ═══
      الاستقبال قد يعمل بلا إنترنت (شبكةٌ محلّية والطابعة عليها)، وخطٌّ من CDN
@@ -175,16 +176,16 @@ export function ticketHtml(data, width = 80, heightMm = null, origin = '', copy 
   <div class="org">${ORG_NAME_PARTS.map((p) => `<span>${esc(p)}</span>`).join(' ')}</div>
   <div class="rule"></div>
 
-  <div class="num-label">رقم الدور</div>
-  <div class="num">${esc(data.queue_number)}</div>
+  ${receipt ? `<div class="clinic">${esc(receipt.title)}</div>` : `<div class="num-label">رقم الدور</div>
+  <div class="num">${esc(data.queue_number)}</div>`}
 
   <div class="name">${esc(data.full_name)}</div>
   ${age != null ? `<div class="meta">العمر: ${age} سنة</div>` : ''}
 
   <div class="rule"></div>
-  <div class="clinic">${data.room ? `العيادة ${esc(data.room)}` : ''}</div>
+  ${receipt ? (receipt.lines || []).map((l) => `<div class="meta">${esc(l)}</div>`).join('') : `<div class="clinic">${data.room ? `العيادة ${esc(data.room)}` : ''}</div>
   <div class="meta">${esc(data.doctor_name || '')}</div>
-  <div class="meta">${esc(data.visit_type === 'followup' ? 'مراجعة' : 'معاينة')}</div>
+  <div class="meta">${esc(data.visit_type === 'followup' ? 'مراجعة' : 'معاينة')}</div>`}
 
   ${amountBlock}
 
@@ -294,6 +295,19 @@ export const ticketFrom = (appt, session) => ({
     (p.patient_price != null ? { ...p, price: p.patient_price } : p)),
   doctor_name: session?.doctor_name,
   room: session?.room,
+})
+
+// ═══ إيصال جلسة الحديد ═══
+// بلا رقم دور ولا عيادة: البطاقة نفسها بقالبها، و receipt يبدّل رأسها ويكتب «المبلغ المقبوض».
+// لا حصص فيه: يذهب للمريض. s: ردّ التسجيل أو سطر السجلّ — كلاهما بالاسم والسعر.
+export const ironReceiptFrom = (s) => ({
+  receipt: {
+    title: 'إيصال جلسة تسريب حديد',
+    lines: [(s.with_drug ?? s.withDrug) ? 'مع دواء' : 'بلا دواء', s.doctor, s.by && `القابضة: ${s.by}`].filter(Boolean),
+  },
+  full_name: s.patient,
+  fee: s.price,
+  now: s.collected_at || (s.date ? `${s.date}T${s.time}:00` : undefined),
 })
 
 // بطاقة تجريبية — لفحص الطابعة من صفحة الإعداد
