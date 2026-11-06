@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { api, fmtMoney, openStaffStream } from '../api.js'
 import { useDialogs } from '../dialogs.jsx'
 import { useToast } from '../action-feedback.jsx'
-import { PunctualityTiles, DutyCalendar, fmtMinutes } from '../components/Punctuality.jsx'
+import { PunctualityTiles, DutyCalendar, fmtMinutes, fmtDuration } from '../components/Punctuality.jsx'
 
 // ═══════════════════════════════════════════════════════════════════
 // «أعمالي» — صفحة الطبيب المستقلّة في القائمة الجانبية (تحت «شاشتي»)
@@ -136,6 +136,107 @@ function MyPunctuality() {
   )
 }
 
+// ═══ «راتبي وحضوري» — أرقامه هو وحده، قراءةً (GET /clinic/my-salary: الدكتور من الحساب) ═══
+// الشهر بسهمين، ولا شهرٌ بعد الجاري. الحساب كلّه في الخادم — هنا عرضٌ وحده.
+// ولا «·» ولا «٠» بجانب الأرقام: الفراغ جملة.
+const fmtInt = (n) => Number(n || 0).toLocaleString('ar-SY', { maximumFractionDigits: 2 })
+const daysText = (n) => (n === 1 ? 'يوم واحد' : n === 2 ? 'يومان' : `${fmtInt(n)} ${n >= 3 && n <= 10 ? 'أيام' : 'يوماً'}`)
+const shiftMonth = (m, by) => {
+  const [y, mm] = m.split('-').map(Number)
+  const d = new Date(y, mm - 1 + by, 1)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+function SalaryLines({ s }) {
+  if (s.kind === 'per_patient') return <p className="dk-sal-line">{fmtInt(s.patients)} مريض × {fmtInt(s.rate)} ل.س</p>
+  if (s.kind !== 'daily_hourly') return <p className="dk-sal-line">راتب شهري ثابت</p>
+  return null
+}
+
+function MySalary() {
+  const [month, setMonth] = useState(null)   // null = الشهر الجاري من الخادم
+  const [data, setData] = useState(null)
+  const [err, setErr] = useState(null)
+  useEffect(() => {
+    let alive = true
+    setErr(null)
+    api.clinic.mySalary(month).then((d) => { if (alive) setData(d) })
+      .catch((e) => { if (alive) setErr(e.message) })
+    return () => { alive = false }
+  }, [month])
+  const shown = data && (month === null || data.month === month) ? data : null
+  const a = shown?.attendance, s = shown?.salary
+  const dh = s?.kind === 'daily_hourly'
+  return (
+    <div className="card dk-salary">
+      <div className="dk-sal-head">
+        <h3>راتبي وحضوري</h3>
+        {shown && (
+          <div className="dk-sal-month" role="group" aria-label="الشهر">
+            <button type="button" className="ghost" aria-label="الشهر السابق" onClick={() => setMonth(shiftMonth(shown.month, -1))}>‹</button>
+            <span dir="ltr">{shown.month}</span>
+            <button type="button" className="ghost" aria-label="الشهر التالي" disabled={shown.month >= shown.today.slice(0, 7)}
+              onClick={() => setMonth(shiftMonth(shown.month, 1))}>›</button>
+          </div>
+        )}
+      </div>
+      {err ? <p className="error">{err}</p> : !shown ? <p className="empty">جارٍ التحميل…</p> : (
+        <>
+          <div className="tiles earn-tiles pn-tiles pn-3">
+            <div className="tile">
+              <div className="label">أيام الحضور</div>
+              <div className="value">{a.days ? fmtInt(a.days) : 'لا أيام'}</div>
+            </div>
+            <div className="tile">
+              <div className="label">ساعات الدوام</div>
+              <div className="value">{a.minutes ? fmtDuration(a.minutes) : 'لا ساعات'}</div>
+              {a.noDeparture > 0 && <div className="pn-sub">بلا أيام «انصراف غير مسجَّل»</div>}
+            </div>
+            <div className="tile earn-hero">
+              <div className="label">الراتب المحسوب</div>
+              <div className="value">{s ? <>{s.total === 0 ? 'صفر' : fmtInt(s.total)}<span className="cash-unit">ل.س</span></> : '—'}</div>
+              {s && <div className="pn-sub">حسب الحضور المسجَّل</div>}
+            </div>
+          </div>
+          {!s && <p className="dk-sal-unset">لم تُحدد إعدادات الراتب بعد</p>}
+          {s && dh && (
+            <ul className="dk-sal-calc">
+              {s.dailyRate > 0 && <li><span>{daysText(a.days)} × {fmtInt(s.dailyRate)}</span><b>{fmtInt(s.salaryDays)} ل.س</b></li>}
+              {s.hourlyRate > 0 && <li><span>{fmtInt(a.hours)} ساعة × {fmtInt(s.hourlyRate)}</span><b>{fmtInt(s.salaryHours)} ل.س</b></li>}
+            </ul>
+          )}
+          {s && <SalaryLines s={s} />}
+          {a.noDeparture > 0 && (
+            <p className="share-warn acc-warn" role="alert">
+              {daysText(a.noDeparture)} «انصراف غير مسجَّل»: {dh && s.hourlyRate > 0 ? 'اليومية محسوبة والساعات لا، ' : ''}وتصحّحها المشرفة.
+            </p>
+          )}
+          {shown.days.length === 0 ? <p className="empty">لا حضور مسجَّل في هذا الشهر.</p> : (
+            <table className="rtable dt-table">
+              <thead><tr><th>اليوم</th><th>الحضور</th><th>الانصراف</th><th>المدّة</th><th>الحالة</th></tr></thead>
+              <tbody>
+                {shown.days.map((d) => (
+                  <tr key={d.id} className={d.state === 'no_departure' ? 'dt-row-warn' : undefined}>
+                    <td className="rt-title" dir="ltr">{d.date}</td>
+                    <td className="num" data-label="الحضور" dir="ltr">{d.arrived}</td>
+                    <td className="num" data-label="الانصراف" dir="ltr">{d.departed || '—'}</td>
+                    <td className="num" data-label="المدّة">{d.minutes == null ? '—' : fmtDuration(d.minutes)}</td>
+                    <td data-label="الحالة">
+                      {d.state === 'no_departure' ? <span className="badge warn sm">انصراف غير مسجَّل</span>
+                        : d.state === 'on_duty' ? <span className="badge sm">على الدوام</span>
+                        : <span className="muted">مكتمل</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
 export default function MyWorkPage() {
   const dialogs = useDialogs()
   const [toast, showToast] = useToast()
@@ -169,10 +270,11 @@ export default function MyWorkPage() {
   return (
     <div className="dk-work-page">
       <h2>أعمالي</h2>
-      <p className="subtitle">مرضاك وإجراءاتك المحاسَبة وحصّتك — لليوم أو الأسبوع أو الشهر، والتزامك بالدوام</p>
+      <p className="subtitle">مرضاك وإجراءاتك المحاسَبة وحصّتك — لليوم أو الأسبوع أو الشهر، والتزامك بالدوام، وراتبك وحضورك</p>
       {toast}
       <MyWork reloadKey={key} pending={pending} onRemove={remove} />
       <MyPunctuality />
+      <MySalary />
     </div>
   )
 }
