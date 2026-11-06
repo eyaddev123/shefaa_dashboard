@@ -66,7 +66,7 @@ function ProfileForm({ doctor, globalBuffer, onSaved, readOnly = false }) {
       <fieldset className="ro-fieldset" disabled={readOnly}>
       <div className="inline" style={{ flexWrap: 'wrap' }}>
         <div className="field"><label>اسم الدكتور</label><input value={form.name} onChange={set('name')} required /></div>
-        <SpecialtyPicker value={form.specialty_id} canAdd
+        <SpecialtyPicker value={form.specialty_id} canAdd={!readOnly}
           onChange={(v) => setForm((f) => ({ ...f, specialty_id: v }))} />
         <div className="field"><label>الجوال</label><input value={form.phone} onChange={set('phone')} dir="ltr" /></div>
         {/* رقم الغرفة يظهر ويُنطَق على شاشة الصالة، ويُشتقّ منه اسم المقطع الصوتي
