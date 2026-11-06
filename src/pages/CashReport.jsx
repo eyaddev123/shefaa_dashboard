@@ -54,7 +54,7 @@ function LineRow({ l, onLog }) {
       <td className="num cash-q rt-badge" data-label="الدور">{l.queue === '' || l.queue == null ? '—' : fmtNum(l.queue)}</td>
       <td className="cash-name rt-title">{l.name}</td>
       <td className="cash-visit" data-label="الزيارة">{l.visit}</td>
-      <td className="num cash-m" data-label="الكشف">{fmtNum(l.fee)}</td>
+      <td className="num cash-m" data-label="الكشف">{l.procedureOnly ? <span className="muted">—</span> : fmtNum(l.fee)}</td>
       <td className="cash-procs" data-label="الإجراءات">
         {l.procItems.length === 0 ? <span className="muted">—</span> : l.procItems.map((p, i) => (
           <span key={i} className="cash-proc">{p.name} <span className="muted">{fmtNum(p.price)}</span></span>
@@ -164,7 +164,8 @@ function Breakdown({ t }) {
   )
   return (
     <span className="cash-doc-break">
-      <span>{item('الكشوف', t.patients, `${fmtNum(t.fee)} ل.س`)}</span>
+      {/* مرضى «إجراء فقط» لا كشف لهم: يُعدّون في المرضى لا في الكشوف */}
+      <span>{item('الكشوف', t.patients - (t.procedureOnly || 0), `${fmtNum(t.fee)} ل.س`)}</span>
       {t.procCount > 0 && <span>{item('الإجراءات', t.procCount, `${fmtNum(t.procTotal)} ل.س`)}</span>}
       {t.referralCount > 0 && (
         <span className="cash-doc-break-ref">
