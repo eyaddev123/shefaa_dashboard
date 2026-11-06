@@ -21,6 +21,7 @@
     "test:rooms": "node test/room-occupancy-check.mjs",
     "test:generate-board": "node test/generate-board-check.mjs",
     "test:doctors": "node test/doctors-search-check.mjs",
+    "test:inventory-import": "node test/inventory-import-check.mjs",
     "test:earnings": "node test/earnings-check.mjs",
     "test:command": "node test/command-dashboard-check.mjs",
     "test:doctor-view": "node test/doctor-view-check.mjs",
