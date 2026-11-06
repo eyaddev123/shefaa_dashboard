@@ -243,6 +243,7 @@ async function run() {
     await page.waitForSelector('.cash-doc-break')
     const fa = (n) => Number(n).toLocaleString('ar-SY')
     ok((await textOf(page.locator('.cash-doc-break').first())).includes(`الكشوف (${fa(feeCountBefore)})`), '★ «الكشوف» لا تعدّ مرضى «إجراء فقط»')
+    await page.click('.cash-docs-head .link-btn')   // الكتل مطويّة افتراضاً
     const tr = page.locator('tr:has-text("مريض إجراء فقط")')
     ok(await tr.evaluate((e) => e.classList.contains('cash-flag')), 'سطرها مُعلَّم')
     ok((await tr.locator('[data-label="الكشف"]').innerText()).trim() === '—', 'وخانة الكشف «—» لا صفر')
