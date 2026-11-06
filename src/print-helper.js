@@ -193,18 +193,23 @@ export async function renderTicketPng(data, width = 80, doc = document, { copy =
     rule()
     if (data.room) line(`العيادة ${data.room}`, { size: 'room', weight: 700, gap: 4 })
     if (data.doctor_name) line(data.doctor_name, { size: 'doctor', gap: 4 })
-    line(data.visit_type === 'followup' ? 'مراجعة' : 'معاينة', { size: 'type', gap: 8 })
+    const procedureOnly = data.visit_type === 'procedure_only'
+    const visitLabel = procedureOnly ? 'إجراء فقط' : data.visit_type === 'followup' ? 'مراجعة' : 'معاينة'
+    line(visitLabel, { size: 'type', gap: 8 })
 
     const procs = (data.procedures || []).filter((p) => !p.removed_at)
     const fee = Number(data.fee || 0)
     if (procs.length) {
       rule()
-      row(data.visit_type === 'followup' ? 'مراجعة' : 'معاينة', money(fee))
+      if (!procedureOnly) row(visitLabel, money(fee))
       procs.forEach((p) => row(p.name, money(p.price)))
       rule(false)
       row('المجموع للدفع',
         money(fee + procs.reduce((s, p) => s + Number(p.price || 0), 0)),
         { size: 'total', weight: 700 })
+    } else if (procedureOnly) {
+      rule(false)
+      line('بلا كشفية', { size: 'type', gap: 8 })
     } else {
       rule(false)
       row('المبلغ للدفع', money(fee), { size: 'total', weight: 700 })

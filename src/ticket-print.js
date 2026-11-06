@@ -64,6 +64,9 @@ export const ageFrom = (birthYear, now = new Date()) => {
   return age >= 0 && age < 130 ? age : null
 }
 
+// «إجراء فقط»: البطاقة تحمل الدور والإجراءات، ولا سطر كشفية عليها.
+const visitLabel = (type) => (type === 'procedure_only' ? 'إجراء فقط' : type === 'followup' ? 'مراجعة' : 'معاينة')
+
 const esc = (s) => String(s ?? '')
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   .replace(/"/g, '&quot;')
@@ -98,13 +101,15 @@ export function ticketHtml(data, width = 80, heightMm = null, origin = '', copy 
       <tr><td class="k">${esc(p.name)}</td><td class="v">${esc(money(p.price))}</td></tr>`).join('')
 
   // مع إجراءات: تفصيلٌ ومجموع. بلا إجراءات: سطر «المبلغ للدفع» وحده.
+  const procedureOnly = data.visit_type === 'procedure_only'
   const amountBlock = procs.length > 0 ? `
     <table class="amounts">
-      <tr><td class="k">${esc(data.visit_type === 'followup' ? 'مراجعة' : 'معاينة')}</td>
-          <td class="v">${esc(money(fee))}</td></tr>
+      ${procedureOnly ? '' : `<tr><td class="k">${esc(visitLabel(data.visit_type))}</td>
+          <td class="v">${esc(money(fee))}</td></tr>`}
       ${rows}
       <tr class="total"><td class="k">المجموع للدفع</td><td class="v">${esc(money(total))}</td></tr>
-    </table>` : `
+    </table>` : procedureOnly ? `
+    <div class="pay"><span>بلا كشفية</span></div>` : `
     <div class="pay"><span>المبلغ للدفع</span><strong>${esc(money(fee))}</strong></div>`
 
   return `<!doctype html>
@@ -184,7 +189,7 @@ export function ticketHtml(data, width = 80, heightMm = null, origin = '', copy 
   <div class="rule"></div>
   <div class="clinic">${data.room ? `العيادة ${esc(data.room)}` : ''}</div>
   <div class="meta">${esc(data.doctor_name || '')}</div>
-  <div class="meta">${esc(data.visit_type === 'followup' ? 'مراجعة' : 'معاينة')}</div>
+  <div class="meta">${esc(visitLabel(data.visit_type))}</div>
 
   ${amountBlock}
 
