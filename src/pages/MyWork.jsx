@@ -10,7 +10,7 @@ import { PunctualityTiles, DutyCalendar, fmtMinutes, fmtDuration } from '../comp
 // المكان الوحيد الذي يرى فيه الطبيب أرقاماً ماليّة: اليوم / الأسبوع (من السبت) / الشهر، المرضى
 // والإجراءات، والإجراءات المحاسَبة بحصّته من لقطة السطر ومجموعها — من /clinic/my-work، أي حساب
 // صفحة المستحقات نفسه لطبيبه وحده (الخادم يأخذ الطبيب من الحساب لا من الطلب).
-// ★ hideSplit بمعناه: لا سعر ولا حصّة الشفاء ولا قاعدة التوزيع — حصّته هو فقط.
+// ★ hideSplit بمعناه: لا سعر ولا حصّة الشفاء — حصّته هو فقط، و«قاعدة حصّتي» عرضٌ لقاعدته هو بلا تعديل.
 // وتحتها ما ينتظر المحاسبة بالأسماء (بلا مبالغ)، ومنه يحذف الطبيب سطره قبل أن يُقبض.
 // حيّة: حدث «procedure» على بثّ الموظفين (بلا أرقام) ⇒ إعادة تحميل من المسار المحميّ.
 // ═══════════════════════════════════════════════════════════════════
@@ -130,6 +130,38 @@ function MyPunctuality() {
           <DutyCalendar from={shown.from} to={shown.to} days={shown.days} />
           <p className="dk-hint">بالوقت = وصلت خلال {fmtMinutes(shown.grace)} من بداية الدوام أو قبلها، بكبسة
             «وصل الطبيب» عند الاستقبال.</p>
+        </>
+      )}
+    </div>
+  )
+}
+
+// ═══ «قاعدة حصّتي» — قاعدته هو وحده، عرضٌ بلا تعديل (GET /clinic/my-share-rule) ═══
+const myRuleText = (r) => (r.kind !== 'percent' ? `مبلغ ثابت ${fmtMoney(r.value)}`
+  : r.value === 0 ? 'بلا حصّة' : `${fmtInt(r.value)}٪ بعد المواد`)
+
+function MyShareRule() {
+  const [rule, setRule] = useState(null)
+  const [err, setErr] = useState(null)
+  useEffect(() => { api.clinic.myShareRule().then(setRule).catch((e) => setErr(e.message)) }, [])
+  return (
+    <div className="card dk-rule">
+      <h3>قاعدة حصّتي</h3>
+      {err ? <p className="error">{err}</p> : !rule ? <p className="empty">جارٍ التحميل…</p> : (
+        <>
+          <p className="dk-rule-general">
+            <span>القاعدة العامّة</span>
+            <strong>{rule.general ? myRuleText(rule.general) : 'لم تُحدَّد بعد'}</strong>
+          </p>
+          {rule.procedures?.length > 0 && (
+            <>
+              <p className="dk-rule-note">قواعد خاصّة تغلب العامّة في هذه الإجراءات:</p>
+              <ul className="dk-rule-list">
+                {rule.procedures.map((p) => <li key={p.name}><span>{p.name}</span><strong>{myRuleText(p)}</strong></li>)}
+              </ul>
+            </>
+          )}
+          <p className="dk-rule-note">للاطّلاع — تعدّلها مشرفة العيادات.</p>
         </>
       )}
     </div>
@@ -275,6 +307,7 @@ export default function MyWorkPage() {
       <MyWork reloadKey={key} pending={pending} onRemove={remove} />
       <MyPunctuality />
       <MySalary />
+      <MyShareRule />
     </div>
   )
 }
