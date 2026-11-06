@@ -24,6 +24,7 @@ const PERIODS = [
 const KIND_BADGE = {
   opening: 'blue', material_sale: 'good', material_edit: '', material_reversal: 'bad', purchase: 'warn', expense: 'bad',
   iron_drug: 'good', iron_surplus: 'good', iron_drug_rev: 'bad', iron_surplus_rev: 'bad',
+  iron_materials: 'good', iron_materials_rev: 'bad', iron_materials_edit: '', iron_surplus_edit: '',
 }
 
 const fmtNum = (n) => Number(n || 0).toLocaleString('ar-SY', { maximumFractionDigits: 2 })

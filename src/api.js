@@ -230,6 +230,7 @@ export const api = {
     // ── خدمة الحديد ── (period أو from/to كالمستحقات)
     ironOptions: () => http('/clinic/iron/options'),
     addIronSession: (body) => http('/clinic/iron/sessions', { method: 'POST', body: JSON.stringify(body) }),
+    setIronShares: (id, body) => http(`/clinic/iron/sessions/${id}/shares`, { method: 'PATCH', body: JSON.stringify(body) }),
     cancelIronSession: (id, reason) => http(`/clinic/iron/sessions/${id}/cancel`, { method: 'POST', body: JSON.stringify({ reason }) }),
     ironSessions: ({ period, from, to }) => http(`/clinic/iron/sessions?${new URLSearchParams(period ? { period } : { from, to: to || from })}`),
     ironDues: ({ period, from, to }) => http(`/clinic/iron/dues?${new URLSearchParams(period ? { period } : { from, to: to || from })}`),

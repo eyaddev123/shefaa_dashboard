@@ -4080,6 +4080,14 @@ button.ghost.iron-cancel-btn { color: var(--status-bad); margin-inline-start: 6p
 .iron-cancelled td { color: var(--muted); }
 .iron-cancelled .num { text-decoration: line-through; }
 .iron-cancel-badge { margin-inline-start: 8px; }
+.iron-materials { margin: 0; }
+.iron-mats { font-size: 12.5px; min-width: 110px; }
+.iron-override { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.iron-override legend { font-size: 13px; font-weight: 600; padding-inline: 6px; }
+.iron-override-open { align-self: flex-start; }
+.iron-over-count { color: var(--status-bad); }
+.iron-edit-note { display: block; margin-top: 4px; font-size: 12px; font-weight: 400; color: var(--text-secondary); }
+button.ghost.iron-edit-btn { margin-inline-start: 6px; }
 .iron-cancel-note { display: block; margin-top: 4px; font-size: 12px; font-weight: 400; color: var(--status-bad); }
 @media (max-width: 640px) {
   .iron-form .bf-row { grid-template-columns: 1fr; }
