@@ -205,7 +205,7 @@ function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel, urgent = f
 
   // «مريض جديد»: إن طابق الاسمُ مسجَّلاً يُسأل أولاً — والخادم يسأل أيضاً لو فات هنا
   const chooseNew = () => {
-    if (patientSearch.nameMatches.length) setSameName({ matches: patientSearch.nameMatches, fromSubmit: false })
+    if (patientSearch.nearNames.length) setSameName({ matches: patientSearch.nearNames, fromSubmit: false })
     else { setNewConfirmed(true); patientSearch.dismiss() }
   }
   // «نعم، مريض جديد»: إن جاء السؤال من الحفظ نفسه، يُعاد الحجز بالتأكيد فوراً
@@ -254,7 +254,7 @@ function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel, urgent = f
       onBooked(attendance ? { ...appt, preview_estimated_time: shownAtClick } : appt)
     } catch (ex) {
       // اسمٌ مطابق لمسجَّل بلا تأكيد: السؤال نفسه بدل رسالة خطأ
-      if (ex.data?.code === 'SAME_NAME_EXISTS') { setSameName({ matches: ex.data.matches || [], fromSubmit: true }); return }
+      if (ex.data?.code === 'SAME_NAME_EXISTS') { setSameName({ matches: [...(ex.data.matches || []), ...(ex.data.similar || [])], fromSubmit: true }); return }
       setErr(ex.message)
       // السيرفر يعيد تفاصيل عدم الأهلية — نعرضها ونفتح خانة سبب التجاوز
       if (ex.data?.code === 'FOLLOWUP_NOT_ELIGIBLE') {
@@ -315,7 +315,7 @@ function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel, urgent = f
 
       {/* النتائج: الاسم وحده، والموظفة تقرّر — لا النظام */}
       {!sameName && (
-        <PatientCandidates candidates={patientSearch.candidates} onPick={pick} onNew={chooseNew} disabled={busy} />
+        <PatientCandidates candidates={patientSearch.candidates} similar={patientSearch.similar} onPick={pick} onNew={chooseNew} disabled={busy} />
       )}
       <SameNameConfirm matches={sameName?.matches} onPick={pick} onConfirm={confirmNew} disabled={busy} />
       {mobileAsk && picked && (

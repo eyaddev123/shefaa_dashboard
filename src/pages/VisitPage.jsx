@@ -569,7 +569,7 @@ function SwapPatient({ appt, onToast, onDone, onCancel }) {
     setBusy(true)
     try {
       const r = await api.clinic.lookupPatientBy(asMobile ? { mobile: cleanMobile(q) } : { full_name: q })
-      setFound(Array.isArray(r) ? r : [])
+      setFound({ matches: r?.matches || [], similar: r?.similar || [] })
     } catch (ex) { onToast(ex.message) } finally { setBusy(false) }
   }
   const link = async (body) => {
@@ -577,7 +577,7 @@ function SwapPatient({ appt, onToast, onDone, onCancel }) {
     try { await api.clinic.changePatient(appt.id, { ...body, reason: reason.trim() })
       onToast('تغيّر المريض', 'success'); onDone() }
     catch (ex) {
-      if (ex.data?.code === 'SAME_NAME_EXISTS') setSameName(ex.data.matches || [])
+      if (ex.data?.code === 'SAME_NAME_EXISTS') setSameName([...(ex.data.matches || []), ...(ex.data.similar || [])])
       else onToast(ex.message)
     } finally { setBusy(false) }
   }
@@ -596,18 +596,21 @@ function SwapPatient({ appt, onToast, onDone, onCancel }) {
         <input placeholder="سبب التغيير (إلزامي)…" value={reason} onChange={(e) => setReason(e.target.value)} />
         <button className="ghost" onClick={onCancel}>إغلاق</button>
       </div>
-      {found && found.length > 0 && (
-        <ul className="ad-swap-results">
-          {found.map((p) => (
-            <li key={p.id}>
-              <span>{p.full_name}</span>
-              <button className="ghost" disabled={busy || !reasonOk}
-                onClick={() => link({ patient_id: p.id })}>هو نفسه</button>
-            </li>
-          ))}
-        </ul>
-      )}
-      {found && found.length === 0 && <p className="ad-readonly">لا نتائج — أنشئ مريضاً جديداً:</p>}
+      {[['matches', null], ['similar', 'أسماء مشابهة']].map(([k, title]) => found?.[k]?.length > 0 && (
+        <Fragment key={k}>
+          {title && <p className="ad-readonly">{title}</p>}
+          <ul className="ad-swap-results">
+            {found[k].map((p) => (
+              <li key={p.id}>
+                <span>{p.full_name}</span>
+                <button className="ghost" disabled={busy || !reasonOk}
+                  onClick={() => link({ patient_id: p.id })}>هو نفسه</button>
+              </li>
+            ))}
+          </ul>
+        </Fragment>
+      ))}
+      {found && !found.matches.length && !found.similar.length && <p className="ad-readonly">لا نتائج — أنشئ مريضاً جديداً:</p>}
       <div className="ad-swap-row">
         <input placeholder="اسم مريض جديد (ثلاثي)" value={newPt.full_name}
           onChange={(e) => { setSameName(null); setNewPt((f) => ({ ...f, full_name: e.target.value })) }} />

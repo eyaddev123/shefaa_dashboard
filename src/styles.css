@@ -1517,6 +1517,8 @@ button.ghost:hover { background: var(--primary-soft); filter: none; }
   border: 1px solid rgba(240, 179, 126, 0.45); border-radius: 12px;
 }
 .candidates-title { font-size: 12.5px; font-weight: 700; color: #8a4b08; margin-bottom: 8px; }
+/* «أسماء مشابهة»: عنوانٌ أصغر تحت المطابقين — اقتراحٌ لا نتيجة */
+.candidates-title.candidates-similar { font-size: 11.5px; font-weight: 600; opacity: .85; margin-top: 10px; }
 .candidate-row {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding: 6px 0; border-top: 1px solid rgba(240, 179, 126, 0.3);
