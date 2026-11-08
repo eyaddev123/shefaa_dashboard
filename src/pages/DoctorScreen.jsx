@@ -262,9 +262,16 @@ export default function DoctorScreen() {
     else refreshPush(api.push)
   }, [])
 
-  const act = async (fn, apptId) => {
+  // ok: رسالة النجاح، undo: نوع التراجع ('walk_in' | 'start' | 'done') — زرّ «تراجع» في الإشعار
+  const act = async (fn, apptId, { ok, undo } = {}) => {
     setBusy(true)
-    try { await fn(apptId) }
+    try {
+      await fn(apptId)
+      if (ok) showToast(ok, 'success', undo ? 10000 : 3500, undo ? {
+        label: 'تراجع',
+        run: () => act((id) => api.clinic.undoFlow(id, undo), apptId, { ok: 'تمّ التراجع' }),
+      } : null)
+    }
     catch (ex) { showToast(ex.message) }
     // بعد النجاح والفشل معاً: الرفض (409) يعني غالباً أن الطابور تغيّر من شاشة أخرى
     finally { setBusy(false); loadQueue() }
@@ -437,12 +444,13 @@ export default function DoctorScreen() {
                           <div className="dk-actions">
                             {needsStart ? (
                               <button className="dk-btn dk-primary dk-btn-start" disabled={busy}
-                                onClick={() => act(api.clinic.start, current.id)}>
-                                <span aria-hidden="true">▶</span> بدء الكشف
+                                title="المريض دخل الغرفة — يبدأ الكشف بلا نداء جديد"
+                                onClick={() => act(api.clinic.start, current.id, { ok: 'بدأ الكشف', undo: 'start' })}>
+                                <span aria-hidden="true">▶</span> المريض جوّا — بدء كشف
                               </button>
                             ) : (
                               <button className="dk-btn dk-primary dk-btn-done" disabled={busy}
-                                onClick={() => act(api.clinic.done, current.id)}>
+                                onClick={() => act(api.clinic.done, current.id, { ok: 'انتهى الكشف', undo: 'done' })}>
                                 إنهاء الكشف
                               </button>
                             )}
@@ -459,8 +467,9 @@ export default function DoctorScreen() {
                               {/* إنهاءٌ بلا بدء ممكن (يُستبعد من حساب المدة) — خفيفٌ هنا لا ينافس «بدء» */}
                               {needsStart && (
                                 <button className="ghost dk-btn dk-light" disabled={busy}
-                                  onClick={() => act(api.clinic.done, current.id)}>
-                                  إنهاء
+                                  title="المريض دخل وخرج — يُنهى بلا نداء"
+                                  onClick={() => act(api.clinic.done, current.id, { ok: 'انتهى الكشف', undo: 'done' })}>
+                                  إنهاء كشف
                                 </button>
                               )}
                             </div>
@@ -483,15 +492,27 @@ export default function DoctorScreen() {
                           <span className="wr-num">الدور {shownNumber(a)}</span>
                           <span className="wr-name">{a.full_name}<ProcedureOnlyBadge appt={a} /></span>
                           <Elapsed since={a.stepped_out_at} offset={offset} />
+                          {/* رجع وحده إلى الغرفة: استئنافٌ صامت بلا نداء على الصالة */}
+                          <button className="wr-call dk-tap" disabled={busy || !!current}
+                            title="المريض رجع إلى الغرفة — يُستأنف كشفه بلا نداء"
+                            onClick={() => act(api.clinic.resume, a.id, { ok: `استُؤنف كشف الدور ${shownNumber(a)}`, undo: 'resume' })}>
+                            رجع — استئناف الكشف
+                          </button>
+                          {/* من يريد أن يناديه للعودة: نداء العودة كما كان (صوت وبطاقة نداء) */}
                           <button className="ghost wr-call dk-tap" disabled={busy || !!current}
                             onClick={() => act(api.clinic.returnCall, a.id)}>
                             نداء
+                          </button>
+                          {/* أكمل وخرج: إنهاءٌ مباشر بلا نداء عودة ولا رجوع */}
+                          <button className="ghost wr-call dk-tap" disabled={busy}
+                            onClick={() => act(api.clinic.done, a.id, { ok: `انتهى كشف الدور ${shownNumber(a)}`, undo: 'done' })}>
+                            إنهاء كشف
                           </button>
                         </li>
                       ))}
                     </ul>
                     {current && (
-                      <p className="wr-hint">أنهِ الكشف الحالي أو اجعله «خروجاً مؤقتاً» قبل نداء العودة.</p>
+                      <p className="wr-hint">أنهِ الكشف الحالي أو اجعله «خروجاً مؤقتاً» قبل استئناف كشفٍ أو نداء العودة.</p>
                     )}
                   </div>
                 )}
@@ -512,6 +533,11 @@ export default function DoctorScreen() {
                         <button className="dk-tap" disabled={busy || !!current} onClick={() => act(api.clinic.call, nextUp.id)}>
                           نادِ التالي
                         </button>
+                        <button className="ghost dk-tap" disabled={busy || !!current}
+                          title="المريض دخل وحده — يبدأ كشفه بلا نداء ولا صوت في الصالة"
+                          onClick={() => act(api.clinic.walkIn, nextUp.id, { ok: `دخل الدور ${shownNumber(nextUp)} بلا نداء — بدأ الكشف`, undo: 'walk_in' })}>
+                          دخل بدون نداء
+                        </button>
                         <button className="ghost dk-tap" disabled={busy} onClick={() => act(api.clinic.noShow, nextUp.id)}>
                           لم يحضر
                         </button>
@@ -521,7 +547,7 @@ export default function DoctorScreen() {
                     <p className="empty">لا أحد حاضر بانتظار الدور بعد.</p>
                   )}
                   {current && nextUp && (
-                    <p className="dk-hint">أنهِ الكشف الحالي أولاً قبل استدعاء التالي.</p>
+                    <p className="dk-hint">أنهِ الكشف الحالي أولاً قبل استدعاء التالي أو تسجيل دخول مريض.</p>
                   )}
                 </div>
 
@@ -537,6 +563,14 @@ export default function DoctorScreen() {
                           <span className="dk-wait-num">{shownNumber(a)}</span>
                           <span className="dk-wait-name">{a.full_name}{attendance && <AttendanceBadge priority={a.priority} />}<ProcedureOnlyBadge appt={a} /></span>
                           {a.id === nextUp?.id && <span className="doc-next-tag">التالي</span>}
+                          {/* غير الأوّل مسموح (دخل فعلاً) — وأرقام الباقين كما هي */}
+                          {a.id !== nextUp?.id && (
+                            <button className="ghost dk-wait-walkin" disabled={busy || !!current}
+                              title="المريض دخل وحده — يبدأ كشفه بلا نداء ولا صوت في الصالة"
+                              onClick={() => act(api.clinic.walkIn, a.id, { ok: `دخل الدور ${shownNumber(a)} بلا نداء — بدأ الكشف`, undo: 'walk_in' })}>
+                              دخل بدون نداء
+                            </button>
+                          )}
                         </li>
                       ))}
                     </ul>

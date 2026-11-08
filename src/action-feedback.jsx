@@ -21,11 +21,12 @@ export function secondsAr(n) {
 // واحدٌ في كل مرة (الأحدث يحلّ محلّ الأقدم)، يختفي بعد مدّته، ويُغلق بنقرة.
 // role=alert للخطأ كي يُقرأ فوراً، و status للمعلومة.
 export function useToast() {
-  const [toast, setToast] = useState(null)   // { msg, kind, id }
+  const [toast, setToast] = useState(null)   // { msg, kind, id, action }
   const timer = useRef(null)
-  const show = useCallback((msg, kind = 'error', ms = 6000) => {
+  // action اختياري: { label, run } — زرّ «تراجع» داخل الإشعار (الضغطة الخاطئة تُصلَح فوراً)
+  const show = useCallback((msg, kind = 'error', ms = 6000, action = null) => {
     clearTimeout(timer.current)
-    setToast({ msg, kind, id: Date.now() })
+    setToast({ msg, kind, id: Date.now(), action })
     timer.current = setTimeout(() => setToast(null), ms)
   }, [])
   useEffect(() => () => clearTimeout(timer.current), [])
@@ -33,6 +34,12 @@ export function useToast() {
     <div key={toast.id} className={`toast toast-${toast.kind}`}
       role={toast.kind === 'error' ? 'alert' : 'status'} onClick={() => setToast(null)}>
       {toast.msg}
+      {toast.action && (
+        <button type="button" className="toast-action"
+          onClick={(e) => { e.stopPropagation(); setToast(null); toast.action.run() }}>
+          {toast.action.label}
+        </button>
+      )}
     </div>
   )
   return [node, show]

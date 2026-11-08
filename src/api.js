@@ -390,6 +390,14 @@ export const api = {
     // ── نمط الحضور ──
     // بدء الكشف: منفصل عن النداء — يسجّل started_at وحده
     start: (appointmentId) => http(`/clinic/appointments/${appointmentId}/start`, { method: 'POST' }),
+    // «دخل بدون نداء»: من الانتظار إلى قيد الكشف بلا نداء ولا صوت (طبيب الحجز وحده)
+    walkIn: (appointmentId) => http(`/clinic/appointments/${appointmentId}/walk-in`, { method: 'POST' }),
+    // «رجع — استئناف الكشف»: من «خروج مؤقت» إلى قيد الكشف بصمت (نداء العودة returnCall باقٍ)
+    resume: (appointmentId) => http(`/clinic/appointments/${appointmentId}/resume`, { method: 'POST' }),
+    // التراجع عن «دخل بدون نداء» / «بدء الكشف» / «الاستئناف» / «إنهاء» — للطبيب
+    // action: 'walk_in' | 'start' | 'resume' | 'done'
+    undoFlow: (appointmentId, action) =>
+      http(`/clinic/appointments/${appointmentId}/undo-flow`, { method: 'POST', body: JSON.stringify({ action }) }),
     // وصول الطبيب: مرة واحدة لجلسة اليوم، والتصحيح بوقت HH:MM يترك أثراً
     doctorArrived: (sessionId) => http(`/clinic/sessions/${sessionId}/doctor-arrived`, { method: 'POST' }),
     fixDoctorArrival: (sessionId, time) =>

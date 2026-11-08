@@ -22,9 +22,14 @@ const val = (v) => (v == null || v === '' ? '—' : (VALUE_LABELS[v] || v))
 const change = (e) => `${val(e.old_value)} ← ${val(e.new_value)}`
 
 // الانتقالات المعتادة باسمها، وما عداها (قائمة «تغيير الحالة») بقيمتيه
-function statusTitle(from, to) {
+function statusTitle(from, to, reason) {
+  // أبواب الكشف الصامتة (doctor-call-flow-fixes): السبب يميّزها عن النداء
+  if (reason === 'دخل بدون نداء') return 'دخل بدون نداء — بدء الكشف'
+  if (reason === 'رجع — استئناف الكشف') return 'رجع من الخروج المؤقت — استئناف الكشف (بلا نداء)'
+  if (reason && reason.startsWith('تراجع')) return reason
   if (to === 'arrived' && from === 'waiting') return 'تعليم «حاضر» (قطع الوصل)'
   if (to === 'in_service' && from === 'arrived') return 'النداء — دخل الكشف'
+  if (to === 'done' && from === 'waiting_return') return 'إنهاء الكشف (من الخروج المؤقت)'
   if (to === 'in_service' && from === 'waiting_return') return 'نداء العودة من الخروج المؤقت'
   if (to === 'waiting_return') return 'خروج مؤقت'
   if (to === 'done' && from === 'in_service') return 'إنهاء الكشف'
@@ -40,9 +45,9 @@ export function describeEvent(e) {
   switch (e.field) {
     case 'created':
       return { title: e.old_value ? 'تسجيل الحجز (تأجيلاً من حجزٍ سابق)' : 'تسجيل الحجز', detail: e.new_value, tone: 'add' }
-    case 'status': return { title: statusTitle(e.old_value, e.new_value),
+    case 'status': return { title: statusTitle(e.old_value, e.new_value, e.reason),
       tone: ['no_show', 'cancelled', 'postponed'].includes(e.new_value) ? 'remove' : undefined }
-    case 'started': return { title: 'بدء الكشف' }
+    case 'started': return { title: e.new_value == null && e.old_value ? 'تراجع عن بدء الكشف' : 'بدء الكشف' }
     case 'procedure':
       return e.new_value
         ? { title: `إضافة إجراء: ${e.new_value}`, tone: 'add', note: true }
