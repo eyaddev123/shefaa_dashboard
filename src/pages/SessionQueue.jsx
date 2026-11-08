@@ -16,7 +16,7 @@ import ReferralsEditor from '../components/ReferralFields.jsx'
 import { referralPayload, referralReady, referralSummary } from '../referral.js'
 import RoomBadge from '../components/RoomBadge.jsx'
 import { ProcedureOnlyBadge, isProcedureOnly } from '../components/ProcedureOnly.jsx'
-import { fmtDuration } from '../components/Punctuality.jsx'
+import { fmtDuration, AppointmentsBadge } from '../components/Punctuality.jsx'
 
 // شارة الأولوية — تُبرز من يتقدّم الطابور وسببه
 export function priorityBadge(priority) {
@@ -1008,6 +1008,8 @@ function DoctorArrivalCard({ data, onChanged, onError, canAct }) {
           ].filter(Boolean).join('\n')}>
             <span className="attn-compact-hint">وصل</span>
             <span className="attn-arrival-time" dir="ltr">{fmtClock(data.doctor_arrived_at)}</span>
+            {/* «بمواعيد خاصة»: الوقت وحده بلا حكم تأخير — يأتي على مواعيده مع مرضاه */}
+            {data.doctor_appointments_based && <AppointmentsBadge />}
             {history.length > 0 && <span className="attn-compact-hint">صُحّح {history.length === 1 ? 'مرة' : `${history.length} مرات`}</span>}
             {canAct && <button className="link-btn" disabled={busy} onClick={fix}>تصحيح</button>}
           </div>

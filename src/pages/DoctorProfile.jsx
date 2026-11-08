@@ -27,6 +27,7 @@ function ProfileForm({ doctor, globalBuffer, onSaved, readOnly = false }) {
     expected_visit_minutes: doctor.expected_visit_minutes,
     notes: doctor.notes || '',
     accepts_urgent: doctor.accepts_urgent !== false,
+    appointments_based: doctor.appointments_based === true,
   })
   const [err, setErr] = useState(null)
   const [saved, setSaved] = useState(false)
@@ -81,6 +82,16 @@ function ProfileForm({ doctor, globalBuffer, onSaved, readOnly = false }) {
             يقبل الحالات الإسعافية
           </label>
           <small className="hint">أطفئه للاختصاصات التي لا تأتيها حالات إسعافية (تخاطب، علاج فيزيائي)</small>
+        </div>
+        {/* مسؤول العيادات وحده يكتبه (الخادم 403 لغيره). بأثرٍ رجعي: التأخير يُحسب لحظة العرض لا يُخزَّن،
+            فالتقارير القديمة تتبع القيمة الحالية. «وصل الطبيب» والحضور واليومية لا تتأثّر. */}
+        <div className="field field-check">
+          <label>
+            <input type="checkbox" checked={form.appointments_based} onChange={setBool('appointments_based')} />
+            بمواعيد خاصة
+          </label>
+          <small className="hint">يعطي مرضاه مواعيد بنفسه: لا يُحسب عليه تأخير ولا نسبة التزام — حتى في التقارير السابقة.
+            يوم حضوره يُحسب كالمعتاد بـ«وصل الطبيب».</small>
         </div>
       </div>
 
@@ -194,6 +205,8 @@ function changeText(h) {
   if (h.field === 'pricing') return pricingText(h, 'doctor')
   if (h.field === 'room') return `الغرفة: ${roomLabel(h.old_value)} ← ${roomLabel(h.new_value)}`
   if (h.field === 'schedule') return scheduleEditText(h)
+  if (h.field === 'appointments_based')
+    return h.new_value === 'true' ? 'فُعِّل «بمواعيد خاصة» — لا تأخير يُحسب عليه' : 'أُطفئ «بمواعيد خاصة» — عاد حساب التأخير'
   const line = h.weekday == null ? 'سطر دوامٍ حُذف لاحقاً'
     : `دوام ${WEEKDAYS[h.weekday]} ${ltr(`${h.start_time}–${h.end_time}`)}${h.repeat_weeks === 2 ? ' (كل أسبوعين)' : ''}`
   return `${h.new_value === 'true' ? 'فُعِّل' : 'أُوقف'} ${line}`

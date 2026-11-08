@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { api, todayLocal } from '../api.js'
-import { PunctualityTiles, DutyCalendar, LateDays, fmtMinutes } from '../components/Punctuality.jsx'
+import { PunctualityTiles, DutyCalendar, LateDays, fmtMinutes, AppointmentsBadge } from '../components/Punctuality.jsx'
 import DoctorTimesCard from '../components/DoctorTimesCard.jsx'
 import { useRole } from '../RoleContext.jsx'
 
@@ -117,7 +117,8 @@ export default function DoctorDashboard() {
   return (
     <>
       <Link className="plain earn-back-link" to="/clinic/doctors">→ الدكاترة</Link>
-      <h2>{doc ? doc.name : 'لوحة الدكتور'}{doc?.specialty && <span className="pn-spec">{doc.specialty}</span>}</h2>
+      <h2>{doc ? doc.name : 'لوحة الدكتور'}{doc?.specialty && <span className="pn-spec">{doc.specialty}</span>}
+        {doc?.appointmentsBased && <> <AppointmentsBadge /></>}</h2>
       <p className="subtitle">
         الالتزام بالدوام وأرقام الدكتور — للاطّلاع.
         {doc && <> <Link to={`/clinic/doctors/${doc.id}`}>البروفايل والدوام</Link></>}
@@ -166,10 +167,17 @@ export default function DoctorDashboard() {
             </div>
           </div>
 
-          <div className="card">
-            <h3>أيام التأخير <span className="pn-grace">بعد {fmtMinutes(shown.grace)} من بداية الدوام</span></h3>
-            <LateDays days={shown.days} />
-          </div>
+          {shown.punctuality.appointmentsBased ? (
+            <div className="card">
+              <h3>أيام التأخير <AppointmentsBadge /></h3>
+              <p className="empty">يعطي مرضاه مواعيد بنفسه — لا يُحسب عليه تأخير. وقت وصوله في التقويم و«الحضور والانصراف».</p>
+            </div>
+          ) : (
+            <div className="card">
+              <h3>أيام التأخير <span className="pn-grace">بعد {fmtMinutes(shown.grace)} من بداية الدوام</span></h3>
+              <LateDays days={shown.days} />
+            </div>
+          )}
         </>
       )}
     </>

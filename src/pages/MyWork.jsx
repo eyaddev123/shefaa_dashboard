@@ -128,8 +128,11 @@ function MyPunctuality() {
         <>
           <PunctualityTiles p={shown.punctuality} />
           <DutyCalendar from={shown.from} to={shown.to} days={shown.days} />
-          <p className="dk-hint">بالوقت = وصلت خلال {fmtMinutes(shown.grace)} من بداية الدوام أو قبلها، بكبسة
-            «وصل الطبيب» عند الاستقبال.</p>
+          <p className="dk-hint">{shown.punctuality.appointmentsBased
+            ? <>أنت «بمواعيد خاصة»: تأتي على مواعيدك مع مرضاك فلا يُحسب عليك تأخير، ويُسجَّل وصولك
+              بكبسة «وصل الطبيب» عند الاستقبال ليُحسب يوم حضورك.</>
+            : <>بالوقت = وصلت خلال {fmtMinutes(shown.grace)} من بداية الدوام أو قبلها، بكبسة
+              «وصل الطبيب» عند الاستقبال.</>}</p>
         </>
       )}
     </div>
