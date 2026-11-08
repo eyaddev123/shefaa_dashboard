@@ -259,6 +259,10 @@ function DoctorRow({ doctor, onChanged, onSchedulesChanged }) {
             <span className="badge warn" style={{ marginInlineStart: 5 }}
               title="سيرى الإجراءات العامّة وحدها حتى يُختار اختصاصه">بلا اختصاص</span>
           )}
+          {doctor.appointments_based && (
+            <span className="badge blue sm" style={{ marginInlineStart: 5 }}
+              title="يعطي مرضاه مواعيد بنفسه — لا يُحسب عليه تأخير ولا يدخل نسبة الالتزام">بمواعيد خاصة</span>
+          )}
         </td>
         <td data-label="الجوال" dir={doctor.phone ? 'ltr' : undefined}>{doctor.phone || '—'}</td>
         <td className="num" data-label="سعر المعاينة">{fmtMoney(doctor.consultation_fee)}</td>

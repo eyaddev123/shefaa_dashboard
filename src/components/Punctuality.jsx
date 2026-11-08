@@ -2,10 +2,19 @@
 // الحساب كلّه في الخادم (server/src/doctor-dashboard.js) — هنا عرضٌ وحده:
 //   بالوقت (≤ ١٠ د) أخضر · متأخّر أصفر · غائب أحمر · تقديري رمادي (بلا «وصل الطبيب»، بأوّل نداء)
 // والتقديريّ لا يدخل نسبة الالتزام ولا الترتيب. اليوم الجاري بلا وصولٍ بعد «لم يُحسم» بلا لون.
+// دكتور «بمواعيد خاصة» (p.appointmentsBased): لا نسبة ولا تأخير — «بمواعيد خاصة» مكانهما، وأيام
+// حضوره زرقاء بوقت وصولها وحده.
 
 export const DAY_LABELS = {
   on_time: 'بالوقت', late: 'متأخّر', absent: 'غائب', estimated: 'تقديري', pending: 'لم يُحسم بعد',
+  appointments: 'بمواعيد خاصة',
 }
+export const APPOINTMENTS_LABEL = 'بمواعيد خاصة'
+/** شارة صغيرة «بمواعيد خاصة» — بجانب وقت الوصول أو اسم الدكتور */
+export const AppointmentsBadge = () => (
+  <span className="badge blue sm" title="يعطي مرضاه مواعيد بنفسه — لا يُحسب عليه تأخير ولا يدخل نسبة الالتزام">
+    {APPOINTMENTS_LABEL}</span>
+)
 const fmtInt = (n) => Number(n || 0).toLocaleString('ar-SY')
 // السماح من الخادم (LATE_GRACE_MINUTES): «١٥ دقيقة»، «١٠ دقائق»
 export const fmtMinutes = (n) => `${Number(n).toLocaleString('ar-SY')} ${n >= 3 && n <= 10 ? 'دقائق' : 'دقيقة'}`
@@ -20,6 +29,7 @@ const minutes = (n) => `${fmtInt(n)} د`
 
 /** بطاقات الالتزام: أيام الدوام / حضر / غاب، النسبة، متوسّط التأخير */
 export function PunctualityTiles({ p, extra = null }) {
+  const appt = !!p.appointmentsBased
   return (
     <div className={`tiles earn-tiles pn-tiles${extra ? '' : ' pn-3'}`}>
       <div className="tile pn-days">
@@ -32,15 +42,21 @@ export function PunctualityTiles({ p, extra = null }) {
       </div>
       <div className="tile earn-hero">
         <div className="label">نسبة الالتزام</div>
-        <div className="value">{fmtPct(p.commitment)}</div>
-        <div className="pn-sub">{p.actual
-          ? `${fmtInt(p.onTime)} بالوقت من ${fmtInt(p.actual)} ${p.actual === 1 ? 'يوم' : 'أيام'} حضورٍ فعلي`
-          : 'لا حضور فعليّ مسجَّل بعد'}</div>
+        {appt ? <>
+          <div className="value pn-appt-value">{APPOINTMENTS_LABEL}</div>
+          <div className="pn-sub">يأتي على مواعيده مع مرضاه — لا تُحسب له نسبة التزام</div>
+        </> : <>
+          <div className="value">{fmtPct(p.commitment)}</div>
+          <div className="pn-sub">{p.actual
+            ? `${fmtInt(p.onTime)} بالوقت من ${fmtInt(p.actual)} ${p.actual === 1 ? 'يوم' : 'أيام'} حضورٍ فعلي`
+            : 'لا حضور فعليّ مسجَّل بعد'}</div>
+        </>}
       </div>
       <div className="tile">
         <div className="label">متوسّط التأخير</div>
-        <div className="value">{p.avgLate === null ? '—' : minutes(p.avgLate)}</div>
-        <div className="pn-sub">{p.late ? `${fmtInt(p.late)} ${p.late === 1 ? 'يوم' : 'أيام'} تأخير` : 'لا تأخير'}</div>
+        <div className="value">{appt || p.avgLate === null ? '—' : minutes(p.avgLate)}</div>
+        <div className="pn-sub">{appt ? APPOINTMENTS_LABEL
+          : p.late ? `${fmtInt(p.late)} ${p.late === 1 ? 'يوم' : 'أيام'} تأخير` : 'لا تأخير'}</div>
       </div>
       {extra}
     </div>
@@ -97,6 +113,7 @@ export function DutyCalendar({ from, to, days }) {
         <span><i className="is-late" /> متأخّر</span>
         <span><i className="is-absent" /> غائب</span>
         <span><i className="is-estimated" /> تقديري ≈</span>
+        {days.some((d) => d.status === 'appointments') && <span><i className="is-appointments" /> {APPOINTMENTS_LABEL}</span>}
       </div>
       {days.some((d) => d.status === 'estimated') && (
         <p className="earn-note">≈ تقديري: لم يُكبس «وصل الطبيب» فاعتُمد أوّل نداء — لا يدخل نسبة الالتزام ولا الترتيب.</p>

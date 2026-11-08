@@ -3842,12 +3842,16 @@ td.fund-amt.is-out { color: var(--status-bad); }
 .pn-cell.is-absent { background: var(--status-bad-bg); border-color: var(--status-bad); color: var(--status-bad); }
 .pn-cell.is-estimated { background: var(--status-neutral-bg); border-color: var(--status-neutral); color: var(--status-neutral); }
 .pn-cell.is-pending { border-style: dashed; color: var(--text-secondary); }
+/* «بمواعيد خاصة»: حضر، ولا يُقاس له تأخير — أزرق المراجعة لا أخضر «بالوقت» ولا كهرماني */
+.pn-cell.is-appointments { background: var(--status-review-bg); border-color: var(--status-review); color: var(--status-review); }
 .pn-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; font-size: 12px; color: var(--text-secondary); }
 .pn-legend i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; vertical-align: -1px; margin-inline-end: 4px; }
 .pn-legend i.is-on_time { background: var(--status-good); }
 .pn-legend i.is-late { background: var(--status-pending); }
 .pn-legend i.is-absent { background: var(--status-bad); }
 .pn-legend i.is-estimated { background: var(--status-neutral); }
+.pn-legend i.is-appointments { background: var(--status-review); }
+.pn-appt-value { font-size: 20px; }
 .pn-late-n { color: var(--status-pending); font-weight: 700; }
 .dk-punct { margin-top: 16px; }
 .dk-punct .pn-tiles { margin-bottom: 14px; }
