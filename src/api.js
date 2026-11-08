@@ -331,14 +331,14 @@ export const api = {
     queue: (sessionId) => http(`/clinic/sessions/${sessionId}/queue`),
     slots: (sessionId) => http(`/clinic/sessions/${sessionId}/slots`),
     doctor: (id) => http(`/clinic/doctors/${id}`),
-    // يبحث بالموبايل أو بالاسم. الرد إمّا مريضاً واحداً (مطابقة موبايل قاطعة)،
-    // أو { candidates: [...] } (مطابقة اسم — يقرّر الموظف)، أو null.
+    // يبحث بالموبايل أو بالاسم. الرد **قائمة دائماً** من { id, full_name } وحدهما —
+    // ولو مريضاً واحداً: الموظفة تختار «هو نفسه»، ولا تعبئة قبل اختيارها.
     lookupPatientBy: (body) =>
       http('/clinic/patients/lookup', { method: 'POST', body: JSON.stringify(body) }),
-    lookupPatient: (mobile, sessionId) =>
-      http('/clinic/patients/lookup', { method: 'POST', body: JSON.stringify({ mobile, session_id: sessionId }) }),
-    followupCheck: (sessionId, mobile) =>
-      http(`/clinic/sessions/${sessionId}/followup-check?mobile=${encodeURIComponent(mobile)}`),
+    // بيانات المريض بعد اختياره (الاسم والرقم والجنس والسنة — بلا ملاحظات)
+    patient: (id) => http(`/clinic/patients/${id}`),
+    followupCheck: (sessionId, patientId) =>
+      http(`/clinic/sessions/${sessionId}/followup-check?patient_id=${encodeURIComponent(patientId)}`),
     prioritize: (appointmentId, priority) =>
       http(`/clinic/appointments/${appointmentId}/prioritize`, { method: 'POST', body: JSON.stringify({ priority }) }),
     // قراءةٌ فقط: الوقت الذي سيأخذه الحجز التالي لو حُفظ الآن (نمط الحضور). الحقيقيّ يُعطى عند الحفظ.
@@ -710,10 +710,21 @@ export const DELAY_CAUSES = {
 // يُستعمل في الإدخال ليرى الموظف **ما سيُخزَّن فعلاً** فور كتابته.
 // ⚠️ وهذا عرضٌ لا حراسة: الخادم يطبّع أيضاً (normalizeMobile/normalizeBirthYear)،
 // فأي مسار آخر — طلب مباشر أو تبويب قديم — يبقى محميّاً.
-// التخزين لاتينيٌّ دائماً، وإلا انكسر البحث و ON CONFLICT (المقارنة نصّية).
+// التخزين لاتينيٌّ دائماً، وإلا انكسر البحث وتفرّد الموبايل (المقارنة نصّية).
 export const toLatinDigits = (v) => String(v ?? '')
   .replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))
   .replace(/[۰-۹]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d))
+
+// ═══ رقم موبايل المريض — مرآة normalizeMobile/isValidMobile في الخادم ═══
+// التنظيف وقت الكتابة: أرقام لاتينية بلا مسافات ولا شحطات («0933 123-456» ⇒ 0933123456).
+// والفحص قبل الإرسال برسالة الخادم نفسها. الخادم يفحص أيضاً — هذا عرضٌ لا حراسة.
+// 963… و+963… تُرفض ولا تُحوَّل. الفارغ مقبول (الرقم اختياري).
+export const MOBILE_FORMAT_ERROR = 'رقم الموبايل لازم يبدأ بـ 09 ويكون 10 أرقام'
+export const cleanMobile = (v) => toLatinDigits(v).replace(/[\s\-‐-―−]/g, '')
+export const mobileError = (v) => {
+  const t = cleanMobile(v)
+  return t === '' || /^09[0-9]{8}$/.test(t) ? null : MOBILE_FORMAT_ERROR
+}
 
 export const fmtTime = (t) => (t ? t.slice(0, 5) : '—')
 

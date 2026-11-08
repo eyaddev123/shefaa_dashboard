@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { api, APPOINTMENT_STATUSES, fmtTime } from '../api.js'
+import { api, APPOINTMENT_STATUSES, fmtTime, mobileError } from '../api.js'
+import MobileInput from '../components/MobileInput.jsx'
 
 export default function PatientTurn() {
   const [mobile, setMobile] = useState('')
@@ -10,6 +11,8 @@ export default function PatientTurn() {
 
   const submit = async (e) => {
     e.preventDefault()
+    // شكل الرقم قبل الإرسال برسالة الاستقبال نفسها (والتنظيف تمّ وقت الكتابة)
+    if (mobileError(mobile)) { setErr(mobileError(mobile)); setResult(null); return }
     setErr(null); setBusy(true); setResult(null)
     try {
       const r = await api.clinic.myTurn({ mobile, access_code: accessCode })
@@ -28,7 +31,7 @@ export default function PatientTurn() {
         <form onSubmit={submit}>
           <div className="field">
             <label>رقم الموبايل</label>
-            <input value={mobile} onChange={(e) => setMobile(e.target.value)} dir="ltr" required autoFocus />
+            <MobileInput value={mobile} onChange={setMobile} required autoFocus />
           </div>
           <div className="field">
             {/* رمز وصول من 6 أرقام لا رمز البطاقة: البطاقة تُخمَّن بالعدّ، والرمز لا.
