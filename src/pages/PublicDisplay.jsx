@@ -11,6 +11,7 @@ import { pickGrid, lastRowOffset, cardFonts, planChips, tierOf, chipMinPx, TIERS
 const FALLBACK_REFRESH_MS = 60000
 const BANNER_MS = 12000          // مدة بقاء بطاقة النداء الكبيرة على الشاشة
 const FLASH_MS = 3000            // وميض البطاقة عند تغيّر رقمها
+const QUIET_MS = 15000           // نافذة «التحديث الصامت»: تكفي سحبة اللوحة التي يُطلقها الحدث
 const OFFLINE_ALERT_MS = 120000  // بعد دقيقتين انقطاع: لافتة صريحة لا مؤشّر صغير
 const DAILY_RELOAD_HOUR = 3      // إعادة تحميل مسكّرة: تتخلّص من تراكم الذاكرة وبناءٍ قديم
 
@@ -157,6 +158,9 @@ export default function PublicDisplay() {
   const flashTimers = useRef({})
   const lastSeq = useRef(0)       // يُسقط الحدث المكرّر فلا تُنطق نداءةٌ مرّتين
   const prevNumbers = useRef({})  // doctor_name → رقم «يُخدَم الآن» السابق
+  // doctor_name → حتى متى (ms) يتغيّر «يُخدَم الآن» بصمت: «بدء كشف» بلا نداء وأبواب الكشف الصامتة.
+  // الرقم يتحدّث في خانته فوراً، بلا وميض ولا صوت — الوميض للنداء وحده.
+  const quietUntil = useRef({})
   const retryStep = useRef(0)
 
   // رمز الجهاز من عنوان الصفحة: ?key=... — الشاشة تُفتح بهذا الرابط عند إقلاع الجهاز
@@ -281,7 +285,8 @@ export default function PublicDisplay() {
     for (const b of data.board) {
       const num = b.current?.queue_number ?? null
       const key = b.doctor_name
-      if (prevNumbers.current[key] !== undefined && prevNumbers.current[key] !== num && num != null) {
+      const quiet = (quietUntil.current[key] || 0) > Date.now()
+      if (prevNumbers.current[key] !== undefined && prevNumbers.current[key] !== num && num != null && !quiet) {
         flashDoctor(key)
       }
       prevNumbers.current[key] = num
@@ -369,7 +374,20 @@ export default function PublicDisplay() {
         load() // النداء غيّر «يُخدَم الآن» و«التالي» — أعِد سحب اللوحة
       })
 
-      es.addEventListener('refresh', () => load())
+      // تحديثٌ بلا صوت. ومن أبواب الكشف (بدء كشف بعد النداء أو بلاه، استئناف، إنهاء، تراجع) يحمل appointment_id:
+      // بطاقة النداء الكبيرة لهذا المريض تُسحب ونداؤه المنتظر في الطابور يسقط — دخل فعلاً.
+      // وquiet: تغيّر «يُخدَم الآن» الناتج عنه لا يومض.
+      es.addEventListener('refresh', (ev) => {
+        let p = null
+        try { p = JSON.parse(ev.data) } catch (e) { p = null }
+        if (p && p.quiet && p.doctor_name) quietUntil.current[p.doctor_name] = Date.now() + QUIET_MS
+        if (p && p.appointment_id != null) {
+          const id = String(p.appointment_id)
+          setBanner((b) => (b && String(b.id) === id ? null : b))
+          callAudio.queue = callAudio.queue.filter((c) => String(c.id) !== id)
+        }
+        load()
+      })
     }
 
     connect()

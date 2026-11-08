@@ -583,6 +583,11 @@ button.link-btn:hover:not(:disabled) { filter: none; opacity: 0.8; }
 .toast-info { background: var(--surface-1); color: var(--text-primary); border: 1px solid var(--border); }
 .toast-success { background: var(--status-good-bg); color: var(--status-good); border: 1px solid var(--status-good); }
 @keyframes toast-in { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+/* زرّ «تراجع» داخل الإشعار — الضغطة الخاطئة تُصلَح من مكانها */
+.toast-action {
+  margin-right: 12px; padding: 4px 14px; border-radius: 8px; font-size: 13px; font-weight: 800;
+  background: transparent; color: inherit; border: 1.5px solid currentColor; cursor: pointer;
+}
 /* عدّاد إعادة النداء داخل الزرّ */
 .recall-wait { font-weight: 600; opacity: 0.85; }
 /* تحميل أوّل فشل: رسالة مع «إعادة المحاولة» بدل صفحة بيضاء */
@@ -3715,6 +3720,22 @@ button.unpaid-pay { min-height: 48px; padding: 8px 16px; background: var(--statu
    الجوال واللوحي: بعرض الشاشة. الواسع (≥1024): بعرض المحتوى، لا يغطّي القائمة الجانبية (250px يميناً).
    المحتوى يُدفع بارتفاع الشريط المسكّر فلا يغطّي أزرار المريض الحالي. أعدادٌ وأسماء — لا مبالغ. */
 .dk { padding-bottom: 84px; }
+/* الإشعار في شاشة الدكتور: شريطٌ ثابت أسفل الشاشة فوق «إجراءات اليوم» مباشرةً (داخل حاويته،
+   فيأخذ عرضه ولا يغطّي القائمة الجانبية)، والمحتوى يُدفع بارتفاعه ما دام ظاهراً فلا يغطّي زرّاً.
+   المدّة والإغلاق بالنقرة و«تراجع» كما هي (useToast) — التغيير هنا موضعٌ وشكل فقط. */
+.dk.has-toast { padding-bottom: 156px; }
+.dk-toast-strip { padding: 8px 12px 0; }
+.dk-toast-strip .toast {
+  position: static; transform: none; max-width: none; width: auto;
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
+  min-height: 56px; padding: 8px 14px; border-radius: 12px; box-shadow: none;
+  font-size: 15px; animation: dk-toast-in 0.18s ease-out;
+}
+@keyframes dk-toast-in { from { opacity: 0; } to { opacity: 1; } }
+.dk-toast-strip .toast-action {
+  margin: 0 0 0 0; margin-inline-start: 12px; min-height: 44px; min-width: 88px;
+  padding: 6px 18px; font-size: 15px;
+}
 .dk-today {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 950;
   background: var(--surface-1); color: var(--text-primary);
