@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { api, APPOINTMENT_STATUSES, fmtTime } from '../api.js'
+import { api, APPOINTMENT_STATUSES, fmtTime, cleanMobile } from '../api.js'
+import MobileInput from '../components/MobileInput.jsx'
 
 export default function PatientTurn() {
   const [mobile, setMobile] = useState('')
@@ -10,9 +11,11 @@ export default function PatientTurn() {
 
   const submit = async (e) => {
     e.preventDefault()
+    // ★ لا رفض بسبب الشكل هنا وحدها: رقمٌ قديم مسجَّل «+963 944-123-456» يدخل به صاحبه.
+    // يُنظَّف (أرقام عربية، مسافات، شحطات) ويُرسل، والخادم يقارنه بالمخزَّن منظَّفاً.
     setErr(null); setBusy(true); setResult(null)
     try {
-      const r = await api.clinic.myTurn({ mobile, access_code: accessCode })
+      const r = await api.clinic.myTurn({ mobile: cleanMobile(mobile), access_code: accessCode })
       setResult(r)
     } catch (ex) { setErr(ex.message) }
     finally { setBusy(false) }
@@ -28,7 +31,8 @@ export default function PatientTurn() {
         <form onSubmit={submit}>
           <div className="field">
             <label>رقم الموبايل</label>
-            <input value={mobile} onChange={(e) => setMobile(e.target.value)} dir="ltr" required autoFocus />
+            {/* حدّ 30 لا 10: الرقم القديم بمفتاح الدولة أطول — والتنظيف نفسه */}
+            <MobileInput value={mobile} onChange={setMobile} maxLength={30} required autoFocus />
           </div>
           <div className="field">
             {/* رمز وصول من 6 أرقام لا رمز البطاقة: البطاقة تُخمَّن بالعدّ، والرمز لا.

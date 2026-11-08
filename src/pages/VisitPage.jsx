@@ -9,7 +9,9 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useDialogs } from '../dialogs.jsx'
 import { loadPrinter, printTicket, ticketFrom, MAX_COPIES } from '../ticket-print.js'
 import { printViaHelper } from '../print-helper.js'
-import { api, APPOINTMENT_STATUSES, BOOKING_TYPES, VISIT_TYPES, PROCEDURE_ONLY, PRIORITIES, fmtMoney, toLatinDigits } from '../api.js'
+import { api, APPOINTMENT_STATUSES, BOOKING_TYPES, VISIT_TYPES, PROCEDURE_ONLY, PRIORITIES, fmtMoney, toLatinDigits, cleanMobile, mobileError } from '../api.js'
+import MobileInput from '../components/MobileInput.jsx'
+import { SameNameConfirm } from '../components/PatientPicker.jsx'
 import { isAttendanceSession, usePolling, fmtClock, turnLabel, fmtTimeOfDay } from '../attendance-ui.jsx'
 import { useRole } from '../RoleContext.jsx'
 import { ProcedureOnlyBadge, isProcedureOnly, endedWithoutProcedure, visitKindLockReason } from '../components/ProcedureOnly.jsx'
@@ -189,6 +191,12 @@ function PatientCard({ appt, session, onChanged, onToast, onArrived }) {
 
   const save = async () => {
     const d = { ...changes }
+    // الرقم: يُرسل ويُفحص إن تغيّر فعلاً — فتعديل جنس مريضٍ رقمه القديم غلط يمرّ
+    if (d.mobile !== undefined) {
+      if (cleanMobile(d.mobile) === cleanMobile(appt.mobile || '')) delete d.mobile
+      else if (mobileError(d.mobile)) { onToast(mobileError(d.mobile)); return }
+      else d.mobile = cleanMobile(d.mobile)
+    }
     if (Object.keys(d).length === 0) return
     // التأكيد باسم المريض: الإلغاء و«لم يحضر» يُخرجانه من الطابور
     if (['cancelled', 'no_show'].includes(d.status)) {
@@ -263,7 +271,7 @@ function PatientCard({ appt, session, onChanged, onToast, onArrived }) {
             <label>الاسم الثلاثي
               <input value={form.full_name} onChange={set('full_name')} disabled={fieldsFrozen} /></label>
             <label>الموبايل
-              <input value={form.mobile} onChange={set('mobile')} dir="ltr" disabled={fieldsFrozen} /></label>
+              <MobileInput value={form.mobile} onChange={(v) => setForm((f) => ({ ...f, mobile: v }))} disabled={fieldsFrozen} /></label>
             <label>الجنس
               <select value={form.gender} onChange={set('gender')} disabled={fieldsFrozen}>
                 <option value="">—</option><option value="male">ذكر</option><option value="female">أنثى</option>
@@ -542,60 +550,78 @@ function ReferralSection({ appt, session, onChanged, onToast }) {
 
 // ═══ تغيير المريض — اختير الخطأ عند الحجز ═══
 // يُربط هذا الحجز وحده بمريضٍ آخر؛ سجلّ المريض الحالي لا يُمَسّ. بسببٍ إلزامي.
+// البحث أسماءٌ فقط (سطرٌ لكل مريض) و«هو نفسه» يرسل patient_id. و«مريض جديد» باسمٍ
+// مطابقٍ لمسجَّل يُسأل عنه أولاً (الخادم يرفضه بلا تأكيد).
 function SwapPatient({ appt, onToast, onDone, onCancel }) {
   const [search, setSearch] = useState('')
   const [found, setFound] = useState(null)
-  const [newPt, setNewPt] = useState({})
+  const [newPt, setNewPt] = useState({ full_name: '', mobile: '' })
+  const [sameName, setSameName] = useState(null)
   const [reason, setReason] = useState('')
   const [busy, setBusy] = useState(false)
+  const reasonOk = reason.trim().length >= 3
 
   const doSearch = async () => {
     const q = search.trim()
     if (q.length < 2) return
-    const digits = toLatinDigits(q).replace(/\D/g, '')
+    // أرقامٌ وحدها (بعد التنظيف) ⇒ بحثٌ بالرقم، وإلّا بالاسم الثلاثي
+    const asMobile = /^\d+$/.test(cleanMobile(q))
     setBusy(true)
     try {
-      const r = await api.clinic.lookupPatientBy(digits.length >= 6 ? { mobile: q } : { full_name: q })
-      setFound(r == null ? [] : (r.candidates || [r]))
+      const r = await api.clinic.lookupPatientBy(asMobile ? { mobile: cleanMobile(q) } : { full_name: q })
+      setFound({ matches: r?.matches || [], similar: r?.similar || [] })
     } catch (ex) { onToast(ex.message) } finally { setBusy(false) }
   }
   const link = async (body) => {
     setBusy(true)
     try { await api.clinic.changePatient(appt.id, { ...body, reason: reason.trim() })
       onToast('تغيّر المريض', 'success'); onDone() }
-    catch (ex) { onToast(ex.message) } finally { setBusy(false) }
+    catch (ex) {
+      if (ex.data?.code === 'SAME_NAME_EXISTS') setSameName([...(ex.data.matches || []), ...(ex.data.similar || [])])
+      else onToast(ex.message)
+    } finally { setBusy(false) }
+  }
+  const linkNew = (extra = {}) => {
+    if (mobileError(newPt.mobile)) { onToast(mobileError(newPt.mobile)); return }
+    link({ full_name: newPt.full_name, mobile: cleanMobile(newPt.mobile), ...extra })
   }
 
   return (
     <div className="ad-swap">
       <div className="ad-swap-row">
-        <input placeholder="ابحث بالاسم الكامل أو الموبايل…" value={search}
+        <input placeholder="ابحث بالاسم الثلاثي أو الموبايل…" value={search}
           onChange={(e) => setSearch(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); doSearch() } }} />
         <button className="ghost" disabled={busy} onClick={doSearch}>بحث</button>
         <input placeholder="سبب التغيير (إلزامي)…" value={reason} onChange={(e) => setReason(e.target.value)} />
         <button className="ghost" onClick={onCancel}>إغلاق</button>
       </div>
-      {found && found.length > 0 && (
-        <ul className="ad-swap-results">
-          {found.map((p) => (
-            <li key={p.id}>
-              <span>{p.full_name} <span dir="ltr" className="muted">{p.mobile || '—'}</span></span>
-              <button className="ghost" disabled={busy || reason.trim().length < 3}
-                onClick={() => link({ patient_id: p.id })}>اختر</button>
-            </li>
-          ))}
-        </ul>
-      )}
-      {found && found.length === 0 && <p className="ad-readonly">لا نتائج — أنشئ مريضاً جديداً:</p>}
+      {[['matches', null], ['similar', 'أسماء مشابهة']].map(([k, title]) => found?.[k]?.length > 0 && (
+        <Fragment key={k}>
+          {title && <p className="ad-readonly">{title}</p>}
+          <ul className="ad-swap-results">
+            {found[k].map((p) => (
+              <li key={p.id}>
+                <span>{p.full_name}</span>
+                <button className="ghost" disabled={busy || !reasonOk}
+                  onClick={() => link({ patient_id: p.id })}>هو نفسه</button>
+              </li>
+            ))}
+          </ul>
+        </Fragment>
+      ))}
+      {found && !found.matches.length && !found.similar.length && <p className="ad-readonly">لا نتائج — أنشئ مريضاً جديداً:</p>}
       <div className="ad-swap-row">
-        <input placeholder="اسم مريض جديد (ثلاثي)"
-          onChange={(e) => setNewPt((f) => ({ ...f, full_name: e.target.value }))} />
-        <input placeholder="موبايله" dir="ltr"
-          onChange={(e) => setNewPt((f) => ({ ...f, mobile: e.target.value }))} />
-        <button className="ghost" disabled={busy || reason.trim().length < 3 || !newPt.full_name}
-          onClick={() => link(newPt)}>إنشاء وربط</button>
+        <input placeholder="اسم مريض جديد (ثلاثي)" value={newPt.full_name}
+          onChange={(e) => { setSameName(null); setNewPt((f) => ({ ...f, full_name: e.target.value })) }} />
+        <MobileInput placeholder="موبايله (اختياري)" value={newPt.mobile}
+          onChange={(v) => setNewPt((f) => ({ ...f, mobile: v }))} />
+        <button className="ghost" disabled={busy || !reasonOk || !newPt.full_name.trim()}
+          onClick={() => linkNew()}>مريض جديد</button>
       </div>
+      <SameNameConfirm matches={sameName} disabled={busy || !reasonOk}
+        onPick={(c) => { setSameName(null); link({ patient_id: c.id }) }}
+        onConfirm={() => { setSameName(null); linkNew({ confirm_new_patient: true }) }} />
     </div>
   )
 }

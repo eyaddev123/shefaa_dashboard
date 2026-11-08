@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { api, toLatinDigits } from '../api.js'
+import { api, cleanMobile, mobileError } from '../api.js'
+import MobileInput from './MobileInput.jsx'
+import { usePatientSearch, PatientCandidates, SameNameConfirm, MobileUpdateAsk } from './PatientPicker.jsx'
 import { Modal } from './inventory/shared.jsx'
 import Combobox, { byNameAr } from './Combobox.jsx'
 import { readAmountInput } from '../iron-shares.js'
@@ -27,9 +29,9 @@ const NO_DOCTOR = 'بلا دكتور / محوّل من خارج الجمعية'
 const MIN_CLOSE_MS = 300
 const isThreePart = (v) => v.trim().split(/\s+/).filter(Boolean).length >= 3
 // حقول الخادم (field في ردّ الخطأ) بأسماء النموذج
-const SERVER_FIELDS = { full_name: 'name', nurse_id: 'nurse', doctor_id: 'doctor', with_drug: 'with_drug', reason: 'ov_reason', doctor_share: 'ov_doctor', nurse_share: 'ov_nurse' }
+const SERVER_FIELDS = { full_name: 'name', mobile: 'mobile', nurse_id: 'nurse', doctor_id: 'doctor', with_drug: 'with_drug', reason: 'ov_reason', doctor_share: 'ov_doctor', nurse_share: 'ov_nurse' }
 // بترتيب ظهورها: التركيز ينزل لأوّل ناقص
-const FOCUS_ORDER = [['name', '#iron-name'], ['nurse', '#iron-nurse'], ['doctor', '#iron-doctor'], ['with_drug', '.iron-choice'],
+const FOCUS_ORDER = [['name', '#iron-name'], ['mobile', '#iron-mobile'], ['nurse', '#iron-nurse'], ['doctor', '#iron-doctor'], ['with_drug', '.iron-choice'],
   ['materials', '.mat-qty.is-bad'], ['ov_doctor', '#iron-ov-doctor'], ['ov_nurse', '#iron-ov-nurse'], ['ov_reason', '#iron-ov-reason']]
 
 async function printReceipt(session, copies) {
@@ -85,9 +87,12 @@ export default function IronSessionDialog({ onClose, onSaved }) {
   const [doctorId, setDoctorId] = useState('')
   const [name, setName] = useState('')
   const [mobile, setMobile] = useState('')
-  const [lookup, setLookup] = useState(null)        // null | 'checking' | 'new'
-  const [candidates, setCandidates] = useState(null)
-  const [picked, setPicked] = useState(null)
+  // المريض: بحثٌ بأسماء فقط واختيارٌ صريح — لا اختيار تلقائي ولا قفل لخانة الرقم
+  const patientSearch = usePatientSearch()
+  const { picked } = patientSearch
+  const [newConfirmed, setNewConfirmed] = useState(false)  // «نعم، مريض جديد» رغم اسمٍ مطابق
+  const [sameName, setSameName] = useState(null)           // { matches, fromSubmit }
+  const [mobileAsk, setMobileAsk] = useState(false)
   const [tried, setTried] = useState(false)         // ضُغط الحفظ: الأخطاء تظهر وتختفي مع التصحيح
   const [serverField, setServerField] = useState(null) // {field, msg}: خطأٌ من الخادم له حقل
   const [err, setErr] = useState(null)
@@ -103,27 +108,27 @@ export default function IronSessionDialog({ onClose, onSaved }) {
     read.then((r) => setCatalog(r.filter((m) => m.is_active !== false && m.material_kind !== 'consumable').sort(byNameAr))).catch((e) => setLoadErr(e.message))
   }, [])
 
-  const pick = (p) => {
-    setPicked(p); setName(p.full_name); setMobile(p.mobile || '')
-    setCandidates(null); setLookup(null)
+  const pick = async (c) => {
+    setSameName(null); setMobileAsk(false); setErr(null)
+    const p = await patientSearch.pick(c)
+    // بعد «هو نفسه» تُعرض بياناته. ورقمٌ كُتب قبل الاختيار يبقى إن لم يكن له رقم (ويُسأل عنه)
+    if (p) { setName(p.full_name); setMobile((m) => p.mobile || m) }
   }
-  const handleLookup = (r) => {
-    const list = r?.candidates
-    if (list?.length) { setCandidates(list); setLookup(null); return }
-    if (r?.id) { pick(r); return }
-    setCandidates(null); setLookup('new')
+  const undoPick = () => { patientSearch.reset(); setName(''); setMobile(''); setMobileAsk(false) }
+  const onName = (v) => { setName(v); setNewConfirmed(false); setSameName(null); patientSearch.byName(v) }
+  const onMobile = (v) => { setMobile(v); setMobileAsk(false); patientSearch.byMobile(v) }
+  const chooseNew = () => {
+    if (patientSearch.nearNames.length) setSameName({ matches: patientSearch.nearNames, fromSubmit: false })
+    else { setNewConfirmed(true); patientSearch.dismiss() }
   }
-  const checkName = async (v) => {
-    if (v.trim().split(/\s+/).filter(Boolean).length < 3) { setCandidates(null); setLookup(null); return }
-    setLookup('checking')
-    try { handleLookup(await api.clinic.lookupPatientBy({ full_name: v })) } catch { setLookup(null) }
+  // «نعم، مريض جديد»: إن جاء السؤال من الحفظ نفسه، يُعاد الحفظ بالتأكيد فوراً
+  const confirmNew = () => {
+    const again = sameName?.fromSubmit
+    setNewConfirmed(true); setSameName(null); patientSearch.dismiss()
+    if (again) submit(null, null, true)
   }
-  const checkMobile = async (v) => {
-    if (v.trim().length < 8) return
-    setLookup('checking')
-    try { handleLookup(await api.clinic.lookupPatientBy({ mobile: v })) } catch { setLookup(null) }
-  }
-  const undoPick = () => { setPicked(null); setName(''); setMobile(''); setLookup(null) }
+  // رقمٌ مكتوب يختلف عن رقم المختار؟ (الفارغ ليس تغييراً)
+  const pickedMobileDiffers = picked && cleanMobile(mobile) !== '' && cleanMobile(mobile) !== cleanMobile(picked.mobile || '')
 
   const price = opts && withDrug !== null ? (withDrug ? opts.prices.with_drug : opts.prices.without_drug) : null
 
@@ -131,6 +136,7 @@ export default function IronSessionDialog({ onClose, onSaved }) {
     const e = {}
     if (!picked && !name.trim()) e.name = 'اكتبي اسم المريض'
     else if (!picked && !isThreePart(name)) e.name = 'الاسم الثلاثي مطلوب: الاسم واسم الأب والكنية'
+    if ((!picked || pickedMobileDiffers) && mobileError(mobile)) e.mobile = mobileError(mobile)
     if (!nurseId) e.nurse = 'اختاري الممرضة'
     if (withDrug === null) e.with_drug = 'اختاري النوع: مع دوا أو بلا دوا — منه يتحدّد المبلغ'
     if (!qtyValid(items)) e.materials = 'صحّحي الكمّية المعلَّمة: رقمٌ أكبر من صفر'
@@ -161,19 +167,26 @@ export default function IronSessionDialog({ onClose, onSaved }) {
     confirmLabel: 'تأكيد وحفظ', cancelLabel: 'رجوع للتعديل',
   })
 
-  const submit = async (e) => {
-    e.preventDefault()
+  const submit = async (e, mobileDecision = null, confirmedNew = false) => {
+    e?.preventDefault?.()
     if (sending.current) return
     setTried(true); setServerField(null); setErr(null)
     const invalid = validate()
     if (Object.keys(invalid).length > 0) { focusFirst(invalid); return }
+    // المختار برقمٍ مختلف: لا يتغيّر رقمه من تلقاء نفسه — نسأل، والافتراضي «اتركيه»
+    if (pickedMobileDiffers && mobileDecision === null) { setMobileAsk(true); return }
+    setMobileAsk(false)
     sending.current = true
     setBusy(true)
     const startedAt = Date.now()
     const body = {
       with_drug: withDrug, nurse_id: nurseId, doctor_id: doctorId || null, materials: toPayload(items),
       ...(override ? { share_override: { ...override, doctor_share: doctorId ? override.doctor_share : '' } } : {}),
-      ...(picked ? { patient_id: picked.id } : { full_name: name, mobile }),
+      ...(picked
+        ? { patient_id: picked.id,
+            ...(mobileDecision === 'update' ? { update_mobile: true, mobile: cleanMobile(mobile) } : {}) }
+        : { full_name: name, mobile: cleanMobile(mobile),
+            ...(newConfirmed || confirmedNew ? { confirm_new_patient: true } : {}) }),
     }
     try {
       let s
@@ -187,6 +200,8 @@ export default function IronSessionDialog({ onClose, onSaved }) {
       if (wait > 0) await new Promise((r) => setTimeout(r, wait))
       onSaved(s)
     } catch (ex) {
+      // اسمٌ مطابق لمسجَّل بلا تأكيد: السؤال نفسه بدل رسالة خطأ — ولا شيء حُفظ
+      if (ex.data?.code === 'SAME_NAME_EXISTS') { setSameName({ matches: [...(ex.data.matches || []), ...(ex.data.similar || [])], fromSubmit: true }); return }
       const field = SERVER_FIELDS[ex.data?.field]
       if (field) {
         setServerField({ field, msg: ex.message })
@@ -208,17 +223,17 @@ export default function IronSessionDialog({ onClose, onSaved }) {
               <div className="field">
                 <label htmlFor="iron-name">اسم المريض الثلاثي</label>
                 <input id="iron-name" value={name} disabled={!!picked} placeholder="الاسم واسم الأب والكنية" {...invalidProps('name')}
-                  onChange={(e) => { setName(e.target.value); checkName(e.target.value) }} />
+                  onChange={(e) => onName(e.target.value)} />
                 {errors.name ? <FieldError id="iron-err-name" msg={errors.name} /> : (
                   <small className="hint">
-                    {lookup === 'checking' ? 'جارٍ البحث…' : lookup === 'new' ? 'مريض جديد' : 'ثلاث كلمات على الأقل — نبحث بها عن المريض السابق'}
+                    {patientSearch.checking ? 'جارٍ البحث…' : picked ? '\u00A0' : newConfirmed || patientSearch.noMatch ? 'مريض جديد' : 'ثلاث كلمات على الأقل — نبحث بها عن المريض السابق'}
                   </small>
                 )}
               </div>
               <div className="field">
                 <label htmlFor="iron-mobile">الموبايل <span className="opt">(اختياري)</span></label>
-                <input id="iron-mobile" value={mobile} disabled={!!picked} dir="ltr" inputMode="numeric" placeholder="09XXXXXXXX"
-                  onChange={(e) => { const v = toLatinDigits(e.target.value); setMobile(v); checkMobile(v) }} />
+                <MobileInput id="iron-mobile" value={mobile} onChange={onMobile} {...invalidProps('mobile')} />
+                {errors.mobile && <FieldError id="iron-err-mobile" msg={errors.mobile} />}
               </div>
             </div>
 
@@ -228,32 +243,19 @@ export default function IronSessionDialog({ onClose, onSaved }) {
                   <strong>اختير المريض:</strong> {picked.full_name}
                   <span className="candidate-meta">
                     {picked.mobile ? <span dir="ltr">{picked.mobile}</span> : 'بلا موبايل'}
-                    {picked.visits_count > 0 && ` · ${picked.visits_count} زيارة`}
                   </span>
                 </div>
                 <button type="button" className="ghost" onClick={undoPick}>تراجع — ليس هو</button>
               </div>
             )}
-            {candidates?.length > 0 && (
-              <div className="candidates-box">
-                <div className="candidates-title">وُجد مرضى بهذا الاسم — اختر الصحيح أو تابع كمريض جديد</div>
-                {candidates.map((c) => (
-                  <div key={c.id} className="candidate-row">
-                    <div>
-                      <strong>{c.full_name}</strong>
-                      <span className="candidate-meta">
-                        {c.mobile ? <span dir="ltr">{c.mobile}</span> : 'بلا موبايل'}
-                        {c.visits_count > 0 && ` · ${c.visits_count} زيارة`}
-                        {c.last_visit && ` · آخرها ${c.last_visit}`}
-                      </span>
-                    </div>
-                    <button type="button" className="ghost" onClick={() => pick(c)}>هو نفسه</button>
-                  </div>
-                ))}
-                <button type="button" className="ghost candidate-new" onClick={() => { setCandidates(null); setLookup('new') }}>
-                  لا — مريض جديد
-                </button>
-              </div>
+            {patientSearch.pickError && <p className="error">{patientSearch.pickError}</p>}
+            {!sameName && (
+              <PatientCandidates candidates={patientSearch.candidates} similar={patientSearch.similar} onPick={pick} onNew={chooseNew} disabled={busy} />
+            )}
+            <SameNameConfirm matches={sameName?.matches} onPick={pick} onConfirm={confirmNew} disabled={busy} />
+            {mobileAsk && picked && (
+              <MobileUpdateAsk storedMobile={picked.mobile} disabled={busy}
+                onUpdate={() => submit(null, 'update')} onKeep={() => submit(null, 'keep')} />
             )}
           </Section>
 
