@@ -273,7 +273,7 @@ export default function DoctorScreen() {
     setBusy(true)
     try {
       await fn(apptId)
-      if (ok) showToast(ok, 'success', undo ? 3000 : 3500, undo ? {
+      if (ok) showToast(ok, 'success', undo ? 10000 : 3500, undo ? {
         label: 'تراجع',
         run: () => act((id) => api.clinic.undoFlow(id, undo), apptId, { ok: 'تمّ التراجع' }),
       } : null)
