@@ -3,11 +3,11 @@
 //
 // يُشغَّل بـ: npm run test:call-flow
 //
-// الخادم يبثّ لـ«المريض جوّا» و«دخل بدون نداء» والتراجع refresh صامتاً (quiet) يحمل
+// الخادم يبثّ لـ«بدء كشف» بعد النداء و«بدء كشف» بلا نداء والتراجع refresh صامتاً (quiet) يحمل
 // appointment_id، وللإنهاء refresh يحمله بلا quiet. نفحص ما يراه الواقف في الصالة:
 //   ١) نداءٌ حقيقي: بطاقة النداء الكبيرة + وميض البطاقة (كما كان).
-//   ٢) «المريض جوّا» لهذا المريض: بطاقة النداء تُسحب فوراً، بلا وميض.
-//   ٣) «دخل بدون نداء»: الرقم في «يُخدَم الآن» ويخرج من الحبّات — بلا بطاقة نداء ولا وميض.
+//   ٢) «بدء كشف» بعد النداء لهذا المريض: بطاقة النداء تُسحب فوراً، بلا وميض.
+//   ٣) «بدء كشف» بلا نداء: الرقم في «يُخدَم الآن» ويخرج من الحبّات — بلا بطاقة نداء ولا وميض.
 //   ٤) شاهد: refresh عادي (غير صامت) يغيّر «يُخدَم الآن» عند دكتورٍ آخر ⇒ يومض كما كان.
 // ═══════════════════════════════════════════════════════════════════
 import { chromium } from 'playwright'
@@ -27,6 +27,7 @@ const ok = (cond, label) => {
 }
 
 const D1 = 'د. عيون', D2 = 'د. سامي'
+const j2 = (o) => JSON.stringify(o)
 const card = (doctor_name, room, current, waiting) => ({
   doctor_name, specialty: 'عام', room, closed: false, awaiting_doctor: false,
   current: current == null ? null : { queue_number: current },
@@ -97,13 +98,13 @@ const run = async () => {
   ok(s.cards[0].number.trim() === '1', `النداء الحقيقي: «يُخدَم الآن» = ١ (${s.cards[0].number})`)
   await pause(3300)   // ينتهي الوميض (FLASH_MS)
 
-  // ٢) «المريض جوّا» لهذا المريض: refresh صامت برقم حجزه
+  // ٢) «بدء كشف» بعد النداء لهذا المريض: refresh صامت برقم حجزه
   await emit('refresh', { session_id: '1', appointment_id: 7, doctor_name: D1, quiet: true, seq: 3 })
   await pause(600)
   s = await read()
-  ok(!s.banner, '★ «المريض جوّا»: بطاقة النداء سُحبت فوراً (لا يبقى «منادى»)')
-  ok(!s.cards[0].flash, '★ «المريض جوّا»: بلا وميض')
-  ok(s.cards[0].number.trim() === '1', '★ «المريض جوّا»: الرقم ما زال في «يُخدَم الآن»')
+  ok(!s.banner, '★ «بدء كشف» بعد النداء: بطاقة النداء سُحبت فوراً (لا يبقى «منادى»)')
+  ok(!s.cards[0].flash, '★ «بدء كشف» بعد النداء: بلا وميض')
+  ok(s.cards[0].number.trim() === '1', '★ «بدء كشف» بعد النداء: الرقم ما زال في «يُخدَم الآن»')
 
   // إنهاء: refresh بلا quiet، «يُخدَم الآن» يفرغ
   served = board(null, [2, 3], 20, [21, 22])
@@ -112,17 +113,17 @@ const run = async () => {
   s = await read()
   ok(s.cards[0].number.trim() === '—', `الإنهاء: «يُخدَم الآن» فرغ (${s.cards[0].number})`)
 
-  // ٣) «دخل بدون نداء» للدور ٣ (ليس الأوّل)
+  // ٣) «بدء كشف» بلا نداء للدور ٣ (ليس الأوّل)
   served = board(3, [2], 20, [21, 22])
   await emit('refresh', { session_id: '1', appointment_id: 9, doctor_name: D1, quiet: true, seq: 5 })
   await pause(150)
   const early = await read()
   await pause(600)
   s = await read()
-  ok(s.cards[0].number.trim() === '3', `★ «دخل بدون نداء»: الدور ٣ في «يُخدَم الآن» (${s.cards[0].number})`)
-  ok(!s.cards[0].chips.includes('3') && s.cards[0].chips.includes('2'), `★ «دخل بدون نداء»: خرج من الحبّات، وبقي الدور ٢ (${s.cards[0].chips})`)
-  ok(!s.banner && !early.banner, '★ «دخل بدون نداء»: لا بطاقة نداء إطلاقاً')
-  ok(!s.cards[0].flash && !early.cards[0].flash, '★ «دخل بدون نداء»: لا وميض')
+  ok(s.cards[0].number.trim() === '3', `★ «بدء كشف» بلا نداء: الدور ٣ في «يُخدَم الآن» (${s.cards[0].number})`)
+  ok(!s.cards[0].chips.includes('3') && s.cards[0].chips.includes('2'), `★ «بدء كشف» بلا نداء: خرج من الحبّات، وبقي الدور ٢ (${s.cards[0].chips})`)
+  ok(!s.banner && !early.banner, '★ «بدء كشف» بلا نداء: لا بطاقة نداء إطلاقاً')
+  ok(!s.cards[0].flash && !early.cards[0].flash, '★ «بدء كشف» بلا نداء: لا وميض')
 
   // ٤) شاهد: refresh عادي يغيّر «يُخدَم الآن» عند د. سامي ⇒ يومض كما كان
   served = board(3, [2], 21, [22])
@@ -140,6 +141,70 @@ const run = async () => {
   ok(s.banner && s.cards[0].flash, '★ نداءٌ حقيقي بعد بابٍ صامت: بطاقة النداء والوميض كما كانا')
 
   ok(errors.length === 0, `أخطاء صفحة: ${errors.join(' | ') || 'لا شيء'}`)
+
+  // ═══ شاشة الدكتور: «بدء كشف» في بطاقة «التالي» وحدها، والقائمة للعرض؛ ومريضٌ فعّال ⇒ الأزرار
+  // معطّلة مع الجملة نفسها ═══
+  console.log('\n═══ شاشة الدكتور: مريضٌ فعّال واحد ═══\n')
+  const HINT = 'أنهِ الكشف الحالي أولاً قبل نداء التالي أو بدء كشف مريض'
+  const ap = (id, status, n, extra = {}) => ({ id: String(id), session_id: '1', status, arrival_number: n, queue_number: n,
+    full_name: `مريض ${n}`, priority: 'normal', visit_type: 'consultation', procedures: [], ...extra })
+  const now = new Date().toISOString()
+  const scenarios = [
+    ['منادى (بلا بدء)', ap(1, 'in_service', 1, { served_at: now, started_at: null })],
+    ['قيد الكشف', ap(1, 'in_service', 1, { served_at: now, started_at: now })],
+    ['لا أحد فعّال', null],
+  ]
+  for (const [label, cur] of scenarios) {
+    const dctx = await browser.newContext({ viewport: { width: 1366, height: 900 }, locale: 'ar' })
+    await dctx.addInitScript(() => localStorage.setItem('token', 'test'))
+    const dp = await dctx.newPage()
+    const derr = []; dp.on('pageerror', (e) => derr.push(e.message))
+    const appts = [...(cur ? [cur] : []), ap(2, 'arrived', 2), ap(3, 'arrived', 3), ap(4, 'arrived', 4),
+      ap(5, 'waiting_return', 5, { served_at: now, started_at: now, stepped_out_at: now })]
+    await dp.route('**/api/**', (r) => {
+      const p = new URL(r.request().url()).pathname.replace(/^\/api/, '')
+      const json = (b) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) })
+      if (p === '/auth/me') return json({ role: 'doctor', doctor_id: 1, display_name: 'د. عيون' })
+      if (p === '/clinic/my-sessions') return json([{ id: 1, start_time: '09:00:00', end_time: '14:00:00', status: 'open',
+        active_count: appts.length, flow_mode: 'attendance', apologized: false }])
+      if (/^\/clinic\/sessions\/\d+\/queue$/.test(p)) return json({ session: { id: 1, flow_mode: 'attendance', doctor_name: D1 },
+        appointments: appts, server_now: now })
+      if (p === '/clinic/my-procedures') return json({ lines: [], usage: {} })
+      if (p.startsWith('/push')) return json({ enabled: false })
+      return json([])
+    })
+    await dp.goto(`${BASE}/clinic/doctor`, { waitUntil: 'load' })
+    await dp.waitForSelector('.dk-wait-list', { timeout: 10000 }).catch(() => {})
+    const st = await dp.evaluate(() => {
+      const btn = (sel, text) => [...document.querySelectorAll(sel)].filter((b) => b.textContent.includes(text))
+      return {
+        listButtons: document.querySelectorAll('.dk-wait-list button').length,
+        listRows: document.querySelectorAll('.dk-wait-list li').length,
+        walkins: btn('.dk-next-actions button', 'بدء كشف').map((b) => b.disabled),
+        walkinsElsewhere: btn('button', 'بدء كشف').filter((b) => !b.closest('.dk-next-actions, .dk-actions')).length,
+        call: btn('.dk-next-actions button', 'نادِ التالي').map((b) => b.disabled),
+        resume: btn('.wr-list button', 'استئناف الكشف').map((b) => b.disabled),
+        returnCall: btn('.wr-list button', 'نداء').filter((b) => b.textContent.trim() === 'نداء').map((b) => b.disabled),
+        hints: [...document.querySelectorAll('.dk-hint, .wr-hint')].map((h) => h.textContent.trim()),
+      }
+    })
+    ok(st.listRows === 3 && st.listButtons === 0, `★ ${label}: قائمة المنتظرين للعرض — ٣ أسطر بلا أيّ زرّ (${st.listButtons})`)
+    ok(st.walkins.length === 1 && st.walkinsElsewhere === 0, `★ ${label}: «بدء كشف» في بطاقة «التالي» وحدها (${st.walkins.length}/${st.walkinsElsewhere})`)
+    if (cur) {
+      ok(st.walkins.every(Boolean), `★ ${label}: «بدء كشف» في بطاقة التالي معطّل`)
+      ok(st.call.length === 1 && st.call[0], `${label}: «نادِ التالي» معطّل`)
+      ok(st.resume.length === 1 && st.resume[0], `★ ${label}: «استئناف الكشف» معطّل (${j2(st.resume)})`)
+      ok(st.returnCall.length === 1 && st.returnCall[0], `${label}: نداء العودة معطّل`)
+      ok(st.hints.length === 2 && st.hints.every((h) => h.startsWith(HINT)),
+        `★ ${label}: الجملة نفسها تحت بطاقة «التالي» وتحت المنتظرين العودة (${j2(st.hints)})`)
+    } else {
+      ok(st.walkins.every((d) => !d) && st.resume.every((d) => !d) && st.call.every((d) => !d),
+        `${label}: الأزرار مفعّلة (${j2(st)})`)
+      ok(st.hints.length === 0, `${label}: بلا جملة المنع`)
+    }
+    ok(derr.length === 0, `${label}: لا أخطاء صفحة ${derr.join(' | ')}`)
+    await dctx.close()
+  }
   await browser.close()
   stop()
   console.log(`\n═══ ${pass} ✔   ${failures.length} ✘ ═══`)

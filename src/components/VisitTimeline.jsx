@@ -24,8 +24,8 @@ const change = (e) => `${val(e.old_value)} ← ${val(e.new_value)}`
 // الانتقالات المعتادة باسمها، وما عداها (قائمة «تغيير الحالة») بقيمتيه
 function statusTitle(from, to, reason) {
   // أبواب الكشف الصامتة (doctor-call-flow-fixes): السبب يميّزها عن النداء
-  if (reason === 'دخل بدون نداء') return 'دخل بدون نداء — بدء الكشف'
-  if (reason === 'رجع — استئناف الكشف') return 'رجع من الخروج المؤقت — استئناف الكشف (بلا نداء)'
+  if (reason === 'بدء كشف') return 'بدء كشف (بلا نداء)'
+  if (reason === 'استئناف الكشف') return 'استئناف الكشف بعد الخروج المؤقت (بلا نداء)'
   if (reason && reason.startsWith('تراجع')) return reason
   if (to === 'arrived' && from === 'waiting') return 'تعليم «حاضر» (قطع الوصل)'
   if (to === 'in_service' && from === 'arrived') return 'النداء — دخل الكشف'

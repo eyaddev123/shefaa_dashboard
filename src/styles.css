@@ -3541,8 +3541,6 @@ button.dk-light { min-height: 48px; font-size: 13.5px; font-weight: 600; color: 
 .dk-wait.is-next { background: var(--status-good-bg); border-radius: 10px; padding: 6px 10px; }
 .dk-wait-num { min-width: 34px; font-weight: 800; color: var(--accent-text); font-variant-numeric: tabular-nums; }
 .dk-wait-name, .dk-book-name { flex: 1 1 auto; min-width: 0; }
-/* «دخل بدون نداء» على سطر منتظرٍ غير الأوّل — خفيفٌ لا ينافس «نادِ التالي»، ولمسه ≥40px */
-.dk-wait-walkin { padding: 8px 12px; font-size: 12.5px; min-height: 40px; white-space: nowrap; }
 .dk-book-time { min-width: 52px; font-weight: 800; color: var(--accent-text); font-variant-numeric: tabular-nums; }
 .dk-book-ref { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
 
@@ -3722,6 +3720,22 @@ button.unpaid-pay { min-height: 48px; padding: 8px 16px; background: var(--statu
    الجوال واللوحي: بعرض الشاشة. الواسع (≥1024): بعرض المحتوى، لا يغطّي القائمة الجانبية (250px يميناً).
    المحتوى يُدفع بارتفاع الشريط المسكّر فلا يغطّي أزرار المريض الحالي. أعدادٌ وأسماء — لا مبالغ. */
 .dk { padding-bottom: 84px; }
+/* الإشعار في شاشة الدكتور: شريطٌ ثابت أسفل الشاشة فوق «إجراءات اليوم» مباشرةً (داخل حاويته،
+   فيأخذ عرضه ولا يغطّي القائمة الجانبية)، والمحتوى يُدفع بارتفاعه ما دام ظاهراً فلا يغطّي زرّاً.
+   المدّة والإغلاق بالنقرة و«تراجع» كما هي (useToast) — التغيير هنا موضعٌ وشكل فقط. */
+.dk.has-toast { padding-bottom: 156px; }
+.dk-toast-strip { padding: 8px 12px 0; }
+.dk-toast-strip .toast {
+  position: static; transform: none; max-width: none; width: auto;
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
+  min-height: 56px; padding: 8px 14px; border-radius: 12px; box-shadow: none;
+  font-size: 15px; animation: dk-toast-in 0.18s ease-out;
+}
+@keyframes dk-toast-in { from { opacity: 0; } to { opacity: 1; } }
+.dk-toast-strip .toast-action {
+  margin: 0 0 0 0; margin-inline-start: 12px; min-height: 44px; min-width: 88px;
+  padding: 6px 18px; font-size: 15px;
+}
 .dk-today {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 950;
   background: var(--surface-1); color: var(--text-primary);
