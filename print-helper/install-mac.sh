@@ -25,21 +25,49 @@ if [ "$MAJOR" -lt 18 ]; then
 fi
 echo "✔ Node $NODE_V — $NODE"
 
-# ── ② الطابعة ──
-PRINTER="$(python3 - "$HERE/config.json" <<'PY' 2>/dev/null || echo ""
-import json,sys
-try: print(json.load(open(sys.argv[1])).get("printer",""))
-except Exception: print("")
-PY
-)"
-if [ -z "$PRINTER" ]; then PRINTER="Printer_POS_80"; fi
+# ── قراءة config.json بـ Node نفسه (موجودٌ يقيناً بعد ①؛ python3 على ماكٍ جديد
+#    قد يكون مجرّد نافذة «ثبّت أدوات المطوّر») — والـ BOM يُنزع كما في الوسيط ──
+cfg_get() {
+  "$NODE" -e '
+    try {
+      const c = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8").replace(/^\uFEFF/, ""))
+      const v = c[process.argv[2]]
+      process.stdout.write(v === undefined || v === null ? "" : String(v).trim())
+    } catch { process.stdout.write("") }' "$HERE/config.json" "$1"
+}
 
-if lpstat -p "$PRINTER" >/dev/null 2>&1; then
-  echo "✔ الطابعة «${PRINTER}» معروفة للنظام"
+# ── ② الطابعة: على الشبكة (printer_ip) أم معرّفة في النظام (printer)؟ ──
+PRINTER_IP="$(cfg_get printer_ip)"
+PRINTER_PORT="$(cfg_get printer_port)"
+if [ -z "$PRINTER_PORT" ]; then PRINTER_PORT=9100; fi
+
+if [ -n "$PRINTER_IP" ]; then
+  # وضع الشبكة: لا تعريف طابعة في النظام أصلاً، فلا lpstat — نفحص الاتصال نفسه
+  echo "✔ وضع الشبكة: الطابعة على ${PRINTER_IP}:${PRINTER_PORT} (اسم printer مُتجاهَل)"
+  if "$NODE" -e '
+      const s = require("net").connect({ host: process.argv[1], port: Number(process.argv[2]) })
+      const t = setTimeout(() => { console.log("     المهلة انتهت (3 ثوانٍ)"); process.exit(1) }, 3000)
+      s.on("connect", () => { clearTimeout(t); s.destroy(); process.exit(0) })
+      s.on("error", (e) => { clearTimeout(t); console.log("     " + e.code); process.exit(1) })' \
+      "$PRINTER_IP" "$PRINTER_PORT"; then
+    echo "✔ الاتصال بالطابعة على ${PRINTER_IP}:${PRINTER_PORT} نجح"
+  else
+    echo "⚠ تعذّر الاتصال بالطابعة على ${PRINTER_IP}:${PRINTER_PORT}"
+    echo "   تأكّد أنّها مشغّلة وموصولة بكبل الشبكة، وأنّ هذا الجهاز على شبكة الشفاء،"
+    echo "   وأنّ العنوان في config.json مطابقٌ لورقة الفحص الذاتي (Self Test)."
+    echo "   (التثبيت يكمل — الوسيط يعمل ويعيد المحاولة عند كلّ طباعة.)"
+  fi
 else
-  echo "⚠ الطابعة «${PRINTER}» غير موجودة. الطابعات المتاحة:"
-  lpstat -p 2>/dev/null | awk '{print "     - " $2}' || echo "     (لا طابعات)"
-  echo "   عدّل printer في config.json ثمّ أعد تشغيل هذا السكربت."
+  PRINTER="$(cfg_get printer)"
+  if [ -z "$PRINTER" ]; then PRINTER="Printer_POS_80"; fi
+
+  if lpstat -p "$PRINTER" >/dev/null 2>&1; then
+    echo "✔ الطابعة «${PRINTER}» معروفة للنظام"
+  else
+    echo "⚠ الطابعة «${PRINTER}» غير موجودة. الطابعات المتاحة:"
+    lpstat -p 2>/dev/null | awk '{print "     - " $2}' || echo "     (لا طابعات)"
+    echo "   عدّل printer في config.json ثمّ أعد تشغيل هذا السكربت."
+  fi
 fi
 
 # ── ③ LaunchAgent ──
@@ -70,21 +98,29 @@ launchctl unload "$PLIST" >/dev/null 2>&1 || true
 launchctl load "$PLIST"
 sleep 2
 
-PORT="$(python3 - "$HERE/config.json" <<'PY' 2>/dev/null || echo 17625
-import json,sys
-try: print(json.load(open(sys.argv[1])).get("port",17625))
-except Exception: print(17625)
-PY
-)"
+PORT="$(cfg_get port)"
+if [ -z "$PORT" ]; then PORT=17625; fi
 
 echo
 if curl -fsS "http://127.0.0.1:$PORT/health" >/dev/null 2>&1; then
   echo "✔ الوسيط يعمل على المنفذ $PORT"
   echo
-  curl -s "http://127.0.0.1:$PORT/health"
+  HEALTH="$(curl -s "http://127.0.0.1:$PORT/health")"
+  echo "$HEALTH"
   echo
   echo
   echo "افتح صفحة «إعداد الطابعة» في النظام — يجب أن تصير اللافتة خضراء."
+  echo
+  # ★ السطر الأخير: بأيّ وضعٍ اشتغل الوسيط فعلاً (من ردّه هو، لا من قراءتنا للإعداد)
+  echo "$HEALTH" | "$NODE" -e '
+    let t = ""; process.stdin.on("data", (d) => t += d).on("end", () => {
+      try {
+        const h = JSON.parse(t)
+        console.log(h.mode === "network"
+          ? `═══ الوسيط يعمل بوضع: الشبكة — الطابعة ${h.printer_ip}:${h.printer_port} — ${h.printer_state} ═══`
+          : `═══ الوسيط يعمل بوضع: نظام التشغيل — الطابعة «${h.printer}» ═══`)
+      } catch { console.log("═══ الوسيط يعمل (تعذّرت قراءة الوضع) ═══") }
+    })'
 else
   echo "✘ الوسيط لم يستجب. راجع السجلّ:"
   echo "   tail -20 $LOGDIR/shefaa-print.err.log"

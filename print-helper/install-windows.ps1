@@ -29,29 +29,48 @@ if ($major -lt 18) {
 }
 Say "✔ Node $ver — $nodePath" Green
 
-# ── ② الطابعة ──
+# ── ② الطابعة: على الشبكة (printer_ip) أم معرّفة في ويندوز (printer)؟ ──
 $cfgPath = Join-Path $Here 'config.json'
 $cfg = Get-Content $cfgPath -Raw -Encoding UTF8 | ConvertFrom-Json
 $printer = $cfg.printer
+$printerIp = if ($cfg.printer_ip) { ([string]$cfg.printer_ip).Trim() } else { '' }
+$printerPort = if ($cfg.printer_port) { [int]$cfg.printer_port } else { 9100 }
 
 Say ""
-Say "الطابعات المثبّتة على هذا الجهاز:" Cyan
-$printers = Get-CimInstance Win32_Printer | Select-Object -ExpandProperty Name
-$printers | ForEach-Object { Say "     - $_" }
-
-if ($printers -contains $printer) {
-  Say "✔ الطابعة «$printer» موجودة" Green
+if ($printerIp) {
+  # وضع الشبكة: لا تعريف طابعة في ويندوز أصلاً — فلا Win32_Printer ولا سؤال عن الاسم،
+  # بل فحص الاتصال نفسه بالطابعة على الشبكة
+  Say "✔ وضع الشبكة: الطابعة على ${printerIp}:${printerPort} (اسم printer مُتجاهَل)" Green
+  Say "   جارٍ فحص الاتصال بالطابعة (قد يأخذ ثوانيَ)…"
+  $tcp = Test-NetConnection -ComputerName $printerIp -Port $printerPort `
+    -WarningAction SilentlyContinue -InformationLevel Quiet
+  if ($tcp) {
+    Say "✔ الاتصال بالطابعة على ${printerIp}:${printerPort} نجح" Green
+  } else {
+    Say "⚠ تعذّر الاتصال بالطابعة على ${printerIp}:${printerPort}" Yellow
+    Say "   تأكّد أنّها مشغّلة وموصولة بكبل الشبكة، وأنّ هذا الجهاز على شبكة الشفاء،"
+    Say "   وأنّ العنوان في config.json مطابقٌ لورقة الفحص الذاتي (Self Test)."
+    Say "   (التثبيت يكمل — الوسيط يعمل ويعيد المحاولة عند كلّ طباعة.)"
+  }
 } else {
-  Say ""
-  Say "⚠ الطابعة «$printer» المذكورة في config.json غير موجودة." Yellow
-  $pick = Read-Host "اكتب اسم الطابعة الصحيح بالضبط (أو اترك فارغاً للإبقاء)"
-  if ($pick) {
-    $cfg.printer = $pick
-    # ★ بلا BOM: Node يرفض JSON يبدأ بـ BOM فيسقط الوسيط عند الإقلاع
-    [IO.File]::WriteAllText($cfgPath, ($cfg | ConvertTo-Json -Depth 5),
-      (New-Object Text.UTF8Encoding $false))
-    Say "✔ حُفظ الاسم «$pick» في config.json" Green
-    $printer = $pick
+  Say "الطابعات المثبّتة على هذا الجهاز:" Cyan
+  $printers = Get-CimInstance Win32_Printer | Select-Object -ExpandProperty Name
+  $printers | ForEach-Object { Say "     - $_" }
+
+  if ($printers -contains $printer) {
+    Say "✔ الطابعة «$printer» موجودة" Green
+  } else {
+    Say ""
+    Say "⚠ الطابعة «$printer» المذكورة في config.json غير موجودة." Yellow
+    $pick = Read-Host "اكتب اسم الطابعة الصحيح بالضبط (أو اترك فارغاً للإبقاء)"
+    if ($pick) {
+      $cfg.printer = $pick
+      # ★ بلا BOM: Node يرفض JSON يبدأ بـ BOM فيسقط الوسيط عند الإقلاع
+      [IO.File]::WriteAllText($cfgPath, ($cfg | ConvertTo-Json -Depth 5),
+        (New-Object Text.UTF8Encoding $false))
+      Say "✔ حُفظ الاسم «$pick» في config.json" Green
+      $printer = $pick
+    }
   }
 }
 
@@ -84,9 +103,16 @@ try {
   Say "✔ الوسيط يعمل على المنفذ $port" Green
   Say ""
   Say "   الطابعة : $($health.printer)"
-  Say "   جاهزة   : $($health.printer_ready)"
+  Say "   جاهزة   : $($health.printer_ready) — $($health.printer_state)"
   Say ""
   Say "افتح صفحة «إعداد الطابعة» في النظام — يجب أن تصير اللافتة خضراء." Cyan
+  Say ""
+  # ★ السطر الأخير: بأيّ وضعٍ اشتغل الوسيط فعلاً (من ردّه هو، لا من قراءتنا للإعداد)
+  if ($health.mode -eq 'network') {
+    Say "═══ الوسيط يعمل بوضع: الشبكة — الطابعة $($health.printer_ip):$($health.printer_port) ═══" Green
+  } else {
+    Say "═══ الوسيط يعمل بوضع: نظام التشغيل — الطابعة «$($health.printer)» ═══" Green
+  }
 } catch {
   Say "✘ الوسيط لم يستجب. راجع السجلّ:" Red
   Say "   $env:LOCALAPPDATA\shefaa-print\shefaa-print.log"

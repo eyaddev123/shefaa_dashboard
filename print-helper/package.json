@@ -6,7 +6,8 @@
   "description": "وسيط طباعة محلّي: صورة البطاقة ⇒ ESC/POS ⇒ الطابعة الحرارية",
   "scripts": {
     "start": "node src/server.js",
-    "test": "node test/escpos-check.mjs"
+    "test": "node test/escpos-check.mjs && node test/network-check.mjs",
+    "test:net": "node test/network-check.mjs"
   },
   "engines": { "node": ">=18" }
 }
