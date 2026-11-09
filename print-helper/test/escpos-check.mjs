@@ -315,7 +315,7 @@ console.log('\n── ١٠) الخادم: نسخٌ في طلبٍ واحد ──
   const Bp = (x, y) => y < 2 || (x > 500 && y > 30)
   try {
     const h = await (await fetch(`${B}/health`, { headers: { Origin: 'http://test.local' } })).json()
-    ok(h.version === 2 && h.max_copies === 5, '★ /health: الإصدار ٢ ويقبل حتى ٥ نسخ', JSON.stringify(h))
+    ok(h.version === 3 && h.max_copies === 5 && h.mode === 'os', '★ /health: الإصدار ٣ (وضع نظام التشغيل) ويقبل حتى ٥ نسخ', JSON.stringify(h))
     // ★ حارس: لا طلب طباعة إلا لوسيطٍ جافٍّ — وإلّا فالمجيب ليس وسيطنا
     if (h.dry_run !== true) { console.error('✖ الوسيط على المنفذ ليس جافّاً — توقّف الفحص قبل أيّ طباعة'); srv.kill(); process.exit(1) }
     ok(h.dry_run === true, '★ /health يقول dry_run قبل أيّ طلب طباعة')

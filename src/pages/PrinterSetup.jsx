@@ -25,6 +25,10 @@ export default function PrinterSetup() {
     return () => clearInterval(t)
   }, [])
 
+  // وضع الشبكة (وسيط ٣ فأعلى): الوسيط يكلّم الطابعة على TCP مباشرةً، فلا تعريف
+  // طابعة في نظام التشغيل — والنصوص التي تفترض التعريف تُخفى أو تُعدَّل
+  const isNet = !!(helper && helper.ok && helper.mode === 'network')
+
   const update = (patch) => {
     const next = { ...printer, ...patch }
     setPrinter(next); savePrinter(next); setMsg(null)
@@ -72,10 +76,20 @@ export default function PrinterSetup() {
                 <>
                   <strong>وسيط الطباعة يعمل</strong>
                   <div className="ps-status-sub">
-                    {helper.printer_ready
-                      ? `الطابعة «${helper.printer}» متّصلة وجاهزة.`
-                      : `الوسيط يعمل لكنّ الطابعة «${helper.printer}» غير جاهزة — ${helper.printer_state || 'تحقّق من الكبل والورق'}.`}
+                    {isNet
+                      ? (helper.printer_ready
+                        ? `الطابعة على الشبكة متّصلة — ${helper.printer_state || 'جاهزة'}.`
+                        : `الوسيط يعمل لكنّ الطابعة على الشبكة غير جاهزة — ${helper.printer_state || 'تحقّق من الكبل والورق'}.`)
+                      : helper.printer_ready
+                        ? `الطابعة «${helper.printer}» متّصلة وجاهزة.`
+                        : `الوسيط يعمل لكنّ الطابعة «${helper.printer}» غير جاهزة — ${helper.printer_state || 'تحقّق من الكبل والورق'}.`}
                   </div>
+                  {isNet && (
+                    <div className="ps-status-sub">
+                      وضع الشبكة — العنوان <code dir="ltr">{helper.printer_ip}</code> المنفذ
+                      {' '}<code dir="ltr">{helper.printer_port}</code>
+                    </div>
+                  )}
                   {/* الإصدار ١ لا يعرف النسخ في مهمّةٍ واحدة: يطبعها النظام نسخةً نسخة
                       (الورق نفسه)، والتحديث يجعلها مهمّةً واحدة — انظر «التحديث» في الدليل */}
                   {!(helper.version >= 2) && (
@@ -105,8 +119,9 @@ export default function PrinterSetup() {
             <span>هذا الجهاز يطبع البطاقات</span>
           </label>
           <p className="setting-desc">
-            فعّله على الحاسوب الموصول بالطابعة وحده. الجهاز الآخر يبقى مطفأً فلا يحاول
-            الطباعة عند كلّ حضور.
+            {isNet
+              ? 'الطابعة على الشبكة: فعّله على كلّ جهاز استقبالٍ عليه وسيط — كلّ حضورٍ تُطبع بطاقته مرّةً واحدة من الجهاز الذي ضغط «حضر».'
+              : 'فعّله على الحاسوب الموصول بالطابعة وحده. الجهاز الآخر يبقى مطفأً فلا يحاول الطباعة عند كلّ حضور.'}
           </p>
 
           <div className="field ps-width">
@@ -157,6 +172,17 @@ export default function PrinterSetup() {
           للطابعة مباشرةً — فتُطبع <strong>بلا نافذة</strong>، و<strong>بطول المحتوى</strong>،
           و<strong>تُقطع تلقائياً</strong>. بدونه يبقى الحضور يعمل، لكن لا تُطبع بطاقة.
         </p>
+        <div className="ps-note ps-warn">
+          <strong>كلّ جهازٍ يطبع يحتاج وسيطاً خاصّاً به</strong> — حتى والطابعة على الشبكة.
+          الموقع يُفتح بـ <code dir="ltr">https</code>، والمتصفّح لا يسمح لصفحة <code dir="ltr">https</code>
+          {' '}أن تكلّم عنواناً على الشبكة مثل <code dir="ltr">192.168.1.50</code> مباشرةً
+          (محتوى مختلط)، فيكلّم الوسيط على الجهاز نفسه (<code dir="ltr">127.0.0.1</code>)، والوسيط
+          هو الذي يكلّم الطابعة.
+          <br />
+          <strong>وإذن كروم «الوصول إلى الشبكة المحلية»</strong> يُمنح مرّةً على كلّ جهاز: عند أوّل
+          طباعة يظهر طلب إذن — اضغط <strong>«سماح»</strong>. وإن رُفض بالخطأ: القفل بجانب العنوان ←
+          إعدادات الموقع ← السماح بالوصول إلى الشبكة المحلية.
+        </div>
         <ol className="ps-steps">
           <Step n="١">
             انسخ مجلّد <code dir="ltr">print-helper</code> إلى الجهاز، مثلاً إلى
@@ -168,8 +194,18 @@ export default function PrinterSetup() {
             إن لم يكن مثبّتاً فنزّله من <code dir="ltr">nodejs.org</code>.
           </Step>
           <Step n="٣">
-            اعرف اسم طابعتك كما يراها النظام:
-            <div className="ps-note">
+            افتح <code dir="ltr">config.json</code> داخل المجلّد واكتب عنوان الطابعة في
+            {' '}<code dir="ltr">printer_ip</code>:
+            <pre dir="ltr" className="ps-cmd">{`"printer_ip": "192.168.1.50",
+"printer_port": 9100,`}</pre>
+            بهذا يرسل الوسيط البطاقة للطابعة على الشبكة مباشرةً، و<strong>لا داعي لتعريف
+            الطابعة في نظام التشغيل إطلاقاً</strong> (يُتجاهل <code dir="ltr">printer</code>).
+            احفظ الملفّ كما هو (UTF-8)، ولا تحذف الفواصل ولا علامات الاقتباس.
+            {!isNet && (
+              <details className="ps-note">
+                <summary>الوضع القديم: طابعة معرّفة في نظام التشغيل (اترك <code dir="ltr">printer_ip</code> فارغاً)</summary>
+                اعرف اسم طابعتك كما يراها النظام:
+                <div className="ps-note">
               <strong>ماك:</strong>
               <pre dir="ltr" className="ps-cmd">lpstat -p | awk '{'{'}print $2{'}'}'</pre>
             </div>
@@ -181,7 +217,9 @@ export default function PrinterSetup() {
               <strong>مهمّ:</strong> اكتب الاسم <strong>كما هو بالضبط</strong> كما يظهر في
               «الطابعات والماسحات» — بمسافاته وشَرطاته.
             </div>
-            ثمّ يُحفظ في <code dir="ltr">config.json</code> تحت <code dir="ltr">printer</code>.
+                ثمّ يُحفظ في <code dir="ltr">config.json</code> تحت <code dir="ltr">printer</code>.
+              </details>
+            )}
           </Step>
           <Step n="٤">
             ثبّته ليعمل تلقائياً عند الدخول:
@@ -194,7 +232,8 @@ export default function PrinterSetup() {
               <strong>ويندوز:</strong> انقر بالزرّ الأيمن على
               {' '}<code dir="ltr">install-windows.ps1</code> ثمّ
               {' '}<strong>«تشغيل باستخدام PowerShell»</strong>.
-              يعرض لك الطابعات المثبّتة ليختار الصحيحة، ويسجّل مهمّةً تعمل عند كلّ دخول.
+              يفحص الاتصال بالطابعة على الشبكة (أو، في الوضع القديم، يعرض الطابعات المثبّتة
+              ليختار الصحيحة)، ويسجّل مهمّةً تعمل عند كلّ دخول.
               {' '}<em>لا يحتاج صلاحية مسؤول.</em>
               <br />
               إن رفض ويندوز تشغيل السكربت، افتح PowerShell ونفّذ:
@@ -202,8 +241,10 @@ export default function PrinterSetup() {
             </div>
           </Step>
           <Step n="٥">
-            تأكّد: يجب أن تصير اللافتة في أعلى هذه الصفحة <strong>خضراء</strong>.
-            وللفحص من الطرفية:
+            تأكّد: آخر سطر يطبعه سكربت التثبيت يقول
+            {' '}<strong>«الوسيط يعمل بوضع: الشبكة — الطابعة 192.168.1.50:9100»</strong>،
+            واللافتة في أعلى هذه الصفحة <strong>خضراء</strong> وتحتها العنوان والمنفذ.
+            وللفحص من الطرفية (يجب أن يظهر <code dir="ltr">"mode":"network"</code>):
             <pre dir="ltr" className="ps-cmd">curl http://127.0.0.1:17625/health</pre>
           </Step>
         </ol>
@@ -218,31 +259,57 @@ export default function PrinterSetup() {
         </div>
       </div>
 
-      {/* ═══ توصيل الطابعة بالشبكة ═══ */}
+      {/* ═══ الطابعة على الإيثرنت ═══ */}
       <div className="card">
-        <h3>أولاً: الطابعة على الشبكة (مرّة واحدة)</h3>
+        <h3>الطابعة على الإيثرنت</h3>
         <p className="setting-desc">
-          الطابعة موصولة بالشبكة (LAN)، فيستعملها الحاسوبان معاً. ونحتاج رقمها (IP) أوّلاً.
+          الطابعة موصولة بكبل شبكة إلى راوتر الشفاء، بعنوانٍ <strong>ثابت</strong>
+          {' '}<code dir="ltr">192.168.1.50</code> محفوظٍ في الطابعة نفسها، و<code dir="ltr">DHCP</code>
+          {' '}معطّلٌ عن قصد (كي لا يتغيّر العنوان فتتوقّف الطباعة). كلّ جهاز عليه وسيط يطبع عليها مباشرةً،
+          و<strong>لا داعي لتعريف طابعة في نظام التشغيل إطلاقاً</strong>. وإن طبع جهازان معاً
+          ينتظر أحدهما الآخر ويعيد المحاولة وحده.
         </p>
         <ol className="ps-steps">
           <Step n="١">
-            أطفئ الطابعة، ثمّ شغّلها مع الضغط المستمرّ على زرّ <strong>FEED</strong> حتى تطبع
-            ورقة <strong>الفحص الذاتي</strong> (Self Test).
+            <strong>لمعرفة عنوانها:</strong> أطفئ الطابعة، ثمّ شغّلها مع الضغط المستمرّ على زرّ
+            {' '}<strong>FEED</strong> حتى تطبع ورقة <strong>الفحص الذاتي</strong> (Self Test). فيها سطر
+            {' '}<code dir="ltr">IP Address</code> — يجب أن يكون <code dir="ltr">192.168.1.50</code>.
           </Step>
           <Step n="٢">
-            في الورقة ستجد سطر <code dir="ltr">IP Address</code> — مثل <code dir="ltr">192.168.1.87</code>.
-            اكتبه، فهو ما ستُدخله على الحاسوبين.
+            <strong>لتغيير العنوان</strong> (نادراً، مثلاً إن تغيّر الراوتر): من حاسوبٍ على الشبكة نفسها
+            افتح في المتصفّح <code dir="ltr">http://192.168.1.50</code> (أو العنوان الذي في ورقة الفحص)،
+            فتظهر صفحة <code dir="ltr">Ethernet WebConfig</code> ← تبويب
+            {' '}<strong><span dir="ltr">Configuration</span></strong> ← غيّر
+            {' '}<code dir="ltr">Fixed IP Address</code> و<code dir="ltr">Subnet Mask</code>
+            {' '}(<code dir="ltr">255.255.255.0</code>) و<code dir="ltr">Gateway</code>
+            {' '}(<code dir="ltr">192.168.1.1</code>) ← <strong>Save</strong> ← <strong>Restart</strong>.
+            ثمّ اكتب العنوان الجديد في <code dir="ltr">printer_ip</code> على <strong>كلّ</strong> جهاز
+            وأعد تشغيل سكربت التثبيت.
           </Step>
           <Step n="٣">
-            إن لم يظهر رقم أو ظهر <code dir="ltr">0.0.0.0</code>، فالطابعة لم تأخذ عنواناً من
-            الشبكة: تأكّد من كبل الشبكة ومن أنّ ضوء المنفذ يومض، ثمّ أعد الفحص الذاتي.
+            إن ظهر في ورقة الفحص <code dir="ltr">0.0.0.0</code> أو عنوانٌ لا يبدأ بـ
+            {' '}<code dir="ltr">192.168.1.</code>، فالإعداد ضاع (أو أُعيدت الطابعة لإعدادات المصنع:
+            {' '}<code dir="ltr">192.168.123.100</code>): تأكّد من الكبل ومن أنّ ضوء المنفذ يومض،
+            ثمّ أعد ضبط العنوان كما في الخطوة ٢.
           </Step>
         </ol>
       </div>
 
+      {/* ═══ تعريف الطابعة في نظام التشغيل: في وضع الشبكة اختياريّ (احتياط المتصفّح وحده) ═══ */}
+      {isNet && (
+        <div className="card">
+          <h3>تعريف الطابعة في نظام التشغيل — غير مطلوب</h3>
+          <p className="setting-desc">
+            هذا الجهاز بوضع الشبكة: الوسيط يطبع بلا تعريف. التعريف يفيد فقط <strong>احتياط
+            المتصفّح</strong> (حين يتوقّف الوسيط، في إعادة الطباعة وإيصال الحديد)، فإن أردته
+            فالخطوات في البطاقتين أدناه.
+          </p>
+        </div>
+      )}
+
       {/* ═══ ويندوز ═══ */}
       <div className="card">
-        <h3>على حاسوب ويندوز</h3>
+        <h3>{isNet ? 'اختياري — تعريف الطابعة على ويندوز (لاحتياط المتصفّح)' : 'على حاسوب ويندوز'}</h3>
         <ol className="ps-steps">
           <Step n="١">
             نزّل تعريف <strong>Xprinter</strong> المناسب للموديل (80mm / XP‑T80Q) من موقع الشركة،
@@ -286,7 +353,7 @@ export default function PrinterSetup() {
 
       {/* ═══ ماك ═══ */}
       <div className="card">
-        <h3>على حاسوب ماك</h3>
+        <h3>{isNet ? 'اختياري — تعريف الطابعة على ماك (لاحتياط المتصفّح)' : 'على حاسوب ماك'}</h3>
         <ol className="ps-steps">
           <Step n="١">
             نزّل تعريف Xprinter الخاصّ بـ <strong>macOS</strong> وثبّته. قد يطلب السماح له من
@@ -341,11 +408,25 @@ export default function PrinterSetup() {
           <li>
             <strong>لا شيء يخرج والضوء الأحمر يومض:</strong> الورق انتهى أو الغطاء غير مُحكم.
           </li>
-          <li>
-            <strong>لا شيء يخرج ولا ضوء:</strong> المنفذ خطأ — في ويندوز: خصائص الطابعة ←
-            <strong> منافذ</strong>، وتأكّد أنّ المنفذ المحدَّد هو عنوان الطابعة نفسه الذي في
-            ورقة الفحص الذاتي (قد يكون تغيّر إن أعادت الشبكة توزيع العناوين).
-          </li>
+          {isNet ? (
+            <>
+              <li>
+                <strong>«الطابعة مشغولة أو غير متاحة»:</strong> الوسيط أعاد المحاولة ٥ مرّات ولم
+                يصل. تأكّد أنّ الطابعة مشغّلة وكبل الشبكة موصول، وأنّ هذا الجهاز على شبكة الشفاء،
+                وأنّ <code dir="ltr">printer_ip</code> مطابقٌ لورقة الفحص الذاتي — ثمّ أعد الطباعة.
+              </li>
+              <li>
+                <strong>«انقطع الاتصال بالطابعة أثناء الطباعة»:</strong> انظر إلى الورقة أوّلاً —
+                ربما طُبع جزءٌ منها. الوسيط لا يعيد الإرسال وحده كي لا تُطبع البطاقة مرّتين.
+              </li>
+            </>
+          ) : (
+            <li>
+              <strong>لا شيء يخرج ولا ضوء:</strong> المنفذ خطأ — في ويندوز: خصائص الطابعة ←
+              <strong> منافذ</strong>، وتأكّد أنّ المنفذ المحدَّد هو عنوان الطابعة نفسه الذي في
+              ورقة الفحص الذاتي (قد يكون تغيّر إن أعادت الشبكة توزيع العناوين).
+            </li>
+          )}
           <li>
             <strong>تطبع رموزاً غريبة بدل العربية:</strong> التعريف قديم أو خطأ — أعد تثبيت
             تعريف الموديل الصحيح (80mm) كمسؤول.

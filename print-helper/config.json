@@ -1,6 +1,9 @@
 {
   "port": 17625,
   "printer": "Printer_POS_80",
+  "printer_ip": "",
+  "printer_port": 9100,
+  "net_timeout_ms": 5000,
   "printable_width": 80,
   "token": "",
   "feed_mm": 5,

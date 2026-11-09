@@ -16,6 +16,7 @@ import { homedir, tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import { decodePng } from './png.js'
 import { rgbaToBits, buildJob } from './escpos.js'
+import { sendNet, probe } from './net-printer.js'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const CFG_PATHS = [
@@ -35,6 +36,12 @@ const DEFAULTS = {
   // على 58 ترسم الواجهة البطاقة في الشريط الأيسر (٣٨٤ نقطة) لأنّ ورق ٥٨مم
   // يقف على يسار الرأس، وما عن يمينه يُطبع في الهواء.
   printable_width: 80,
+  // ═══ وضع الشبكة ═══ عنوان الطابعة على الشبكة: إن ضُبط يرسل الوسيط البايتات
+  // مباشرةً على TCP (printer_port) ويتجاهل printer كلّياً. فارغٌ = وضع نظام
+  // التشغيل كما كان (lp على ماك، السبولر على ويندوز).
+  printer_ip: '',
+  printer_port: 9100,
+  net_timeout_ms: 5000,
   origins: ['http://localhost:5173', 'http://localhost:5199', 'http://127.0.0.1:5173',
             'https://dashboard-shefaa.abukm.com'],
   log: process.platform === 'win32'
@@ -55,6 +62,20 @@ function loadConfig() {
 }
 
 const CFG = loadConfig()
+
+/** وضع الشبكة: { ip, port, timeoutMs } — أو null لوضع نظام التشغيل */
+const NET = (() => {
+  const ip = typeof CFG.printer_ip === 'string' ? CFG.printer_ip.trim() : ''
+  if (!ip) return null
+  const port = Number(CFG.printer_port)
+  const t = Number(CFG.net_timeout_ms)
+  return {
+    ip,
+    port: Number.isInteger(port) && port > 0 && port < 65536 ? port : 9100,
+    timeoutMs: Number.isFinite(t) && t >= 500 ? Math.round(t) : 5000,
+  }
+})()
+const NET_ADDR = NET ? `${NET.ip}:${NET.port}` : ''
 const PRINTABLE = Number(CFG.printable_width) === 58 ? 58 : 80
 // الشريط الأيسر المضمون على ورق ٥٨مم: ٣٨٤ نقطة = ٤٨مم (مساحة الطباعة القياسية له)
 const STRIP_DOTS = { 80: 576, 58: 384 }
@@ -192,13 +213,66 @@ async function sendRawWindows(bytes, printer) {
   }
 }
 
-/** يرسل بايتاتٍ خاماً — CUPS على ماك/لينكس، والسبولر على ويندوز */
+// ═══ طابور الطابعة الشبكية ═══
+// بطاقتان من هذا الجهاز وراء بعض تمشيان بالدور لا باتّصالين معاً، والفحص
+// (/health) يدخل الطابور نفسه فلا يزاحم بطاقة. printing = بطاقاتٌ في الطابور الآن.
+let lane = Promise.resolve()
+let printing = 0
+function inLane(fn) {
+  const p = lane.then(fn, fn)
+  lane = p.catch(() => {})
+  return p
+}
+
+// آخر نتيجة فحصٍ للطابعة الشبكية — لا نفتح اتصال فحصٍ أكثر من مرّة كلّ ١٠ ثوانٍ
+const PROBE_EVERY_MS = 10000
+const PROBE_TIMEOUT_MS = 1200
+let lastProbe = null          // { ready, state, at }
+let probing = null            // وعد الفحص الجاري — الطلبات المتزامنة تنتظره ولا تفتح غيره
+
+async function netState() {
+  if (printing > 0)           // ★ طباعةٌ جارية ⇒ لا اتصال فحص، آخر نتيجة كما هي
+    return lastProbe || { ready: true, state: 'تطبع الآن', at: null }
+  if (lastProbe && Date.now() - lastProbe.at < PROBE_EVERY_MS) return lastProbe
+  if (!probing) {
+    probing = inLane(async () => {
+      const r = await probe(NET, PROBE_TIMEOUT_MS)
+      lastProbe = { ready: r.ready, state: r.state, at: Date.now() }
+      return lastProbe
+    }).finally(() => { probing = null })
+  }
+  return probing
+}
+
+/** يرسل بايتاتٍ خاماً — الشبكة (TCP) إن ضُبط printer_ip، وإلا CUPS على ماك/لينكس والسبولر على ويندوز */
 async function sendRaw(bytes, printer) {
   if (DRY_RUN) {
     mkdirSync(DRY_RUN, { recursive: true })
     const f = join(DRY_RUN, `job-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.bin`)
     writeFileSync(f, bytes)
     return { ok: true, job: `dry-run:${f}` }
+  }
+  if (NET) {
+    printing++
+    try {
+      const r = await inLane(() => sendNet(bytes, NET, {
+        onRetry: (a, wait) => log('WARN', `محاولة ${a.attempts} لم تنجح (${a.code}) — إعادةٌ بعد ${wait}ms`),
+      }))
+      if (r.ok) {
+        if (r.note) log('INFO', r.note)
+        return { ok: true, job: `tcp:${NET_ADDR}${r.attempts > 1 ? ` (المحاولة ${r.attempts})` : ''}`,
+                 attempts: r.attempts }
+      }
+      // فشل الاتصال ⇒ هذا ما يجب أن تقوله /health التالية، لا «جاهزة» قديمة
+      lastProbe = { ready: false, state: r.detail, at: Date.now() }
+      return {
+        ok: false, attempts: r.attempts, wrote: r.wrote, detail: r.detail,
+        // ★ بدأت الكتابة ⇒ لا إعادة: قد يكون جزءٌ طُبع، فالموظفة تنظر للورقة أوّلاً
+        error: r.wrote
+          ? 'انقطع الاتصال بالطابعة أثناء الطباعة — انظري إلى الورقة قبل إعادة الطباعة'
+          : 'الطابعة مشغولة أو غير متاحة — حاولي مرة أخرى',
+      }
+    } finally { printing-- }
   }
   if (IS_WIN) return sendRawWindows(bytes, printer)
   const r = await run('lp', ['-d', printer, '-o', 'raw', '-t', 'shefaa-ticket'], bytes)
@@ -255,18 +329,35 @@ const server = http.createServer(async (req, res) => {
 
   // ── /health: هل الوسيط حيّ، وهل الطابعة متّصلة؟ ──
   if (url.pathname === '/health' && req.method === 'GET') {
-    const st = await printerState(CFG.printer)
+    // الحقول القديمة كلّها كما هي (الواجهة المنشورة تقرؤها)، والجديدة زيادةٌ فقط
+    let ready, state, checkedAt
+    if (NET) {
+      const st = await netState()
+      ready = st.ready; state = st.state
+      checkedAt = st.at ? new Date(st.at).toISOString() : null
+    } else {
+      const st = await printerState(CFG.printer)
+      ready = !!(st.known && !st.disabled && !st.offline)
+      state = st.text || 'غير معروفة'
+      checkedAt = new Date().toISOString()
+    }
     json(res, 200, {
       // version 2: يقبل images[] (نسخٌ في مهمّةٍ واحدة) — الواجهة تقرأ ذلك من ردّ /print
-      ok: true, service: 'shefaa-print', version: 2, max_copies: MAX_COPIES,
+      // version 3: وضع الشبكة (mode, printer_ip, printer_port, printer_checked_at)
+      ok: true, service: 'shefaa-print', version: 3, max_copies: MAX_COPIES,
       // الفحوص تتحقّق من هذا قبل أيّ طباعة: لا ترسل إلا لوسيطٍ جافٍّ شغّلته هي
       dry_run: !!DRY_RUN,
-      printer: CFG.printer,
+      // في وضع الشبكة: العنوان بدل الاسم — فالواجهة الأقدم تعرض «الطابعة «IP:منفذ» جاهزة»
+      printer: NET ? NET_ADDR : CFG.printer,
       // الواجهة تقرؤه قبل كلّ طباعة فترسم البطاقة داخل هذا العرض
       printable_width: PRINTABLE,
-      printer_ready: !!(st.known && !st.disabled && !st.offline),
-      printer_state: st.text || 'غير معروفة',
+      printer_ready: ready,
+      printer_state: state,
       needs_token: !!CFG.token,
+      mode: NET ? 'network' : 'os',
+      printer_ip: NET ? NET.ip : null,
+      printer_port: NET ? NET.port : null,
+      printer_checked_at: checkedAt,
     })
     return
   }
@@ -309,12 +400,18 @@ const server = http.createServer(async (req, res) => {
       const sent = await sendRaw(job, CFG.printer)
 
       if (!sent.ok) {
+        if (NET) {
+          log('ERROR', `فشل الإرسال إلى ${NET_ADDR} بعد ${sent.attempts} محاولة: ${sent.detail}`)
+          json(res, 502, { error: sent.error, detail: sent.detail, printer: NET_ADDR,
+                           attempts: sent.attempts, wrote: sent.wrote }); return
+        }
         log('ERROR', `فشل الإرسال: ${sent.error}`)
         json(res, 502, { error: sent.error, printer: CFG.printer }); return
       }
       log('INFO', `طُبعت بطاقة ${img.width}×${img.height} × ${monos.length} نسخة (${job.length} بايت) — ${sent.job}`)
       json(res, 200, { ok: true, job: sent.job, width: img.width, height: img.height,
-                       copies: monos.length, bytes: job.length })
+                       copies: monos.length, bytes: job.length,
+                       ...(sent.attempts ? { attempts: sent.attempts } : {}) })
     } catch (e) {
       log('ERROR', `خطأ: ${e.message}`)
       json(res, 400, { error: e.message })
@@ -326,7 +423,9 @@ const server = http.createServer(async (req, res) => {
 })
 
 server.listen(CFG.port, '127.0.0.1', () => {
-  log('INFO', `خادم الطباعة يعمل على 127.0.0.1:${CFG.port} — الطابعة ${CFG.printer}`
+  log('INFO', `خادم الطباعة يعمل على 127.0.0.1:${CFG.port}`
+    + (NET ? ` — وضع الشبكة: ${NET_ADDR} (مهلة ${NET.timeoutMs}ms، printer مُتجاهَل)`
+           : ` — وضع نظام التشغيل: الطابعة ${CFG.printer}`)
     + ` — ورق ${PRINTABLE}مم`
     + ` — الإعداد من ${CFG._from}${CFG.token ? ' — برمز' : ' — ★ بلا رمز'}`
     + (DRY_RUN ? ` — ★ تشغيلٌ جافّ: لا شيء يُرسل للطابعة (${DRY_RUN})` : ''))
