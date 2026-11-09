@@ -4,14 +4,15 @@ import { matchesAr } from '../../arabic-search.js'
 import { EmptyState, fmtQty, materialsCount, parseNum } from './shared.jsx'
 
 // ═══ أسعار الشراء ═══
-// سعر شراء القطعة لكلّ مادة — أساس المتوسّط المرجّح الذي يحسب ربح المواد في «صندوق العيادات».
+// سعر شراء القطعة لكلّ مادة — المتوسّط المرجّح، وبه تُطرح المواد من سعر الإجراء وجلسة الحديد
+// (المادة بلا سعر شراء تُطرح بسعر البيع حتى يُكتب). ويحسب ربح المواد في «صندوق العيادات».
 // الكتابة هنا للمواد الموجودة على الرفّ قبل الصندوق: تُكتب كما هي، **بلا حركة صرف** (لم تُشترَ
 // الآن). والشراء الجديد يُحدّث السعر وحده بمزجه مع الموجود حسب الكمية.
 // حفظٌ واحد لكلّ ما تغيّر، والفارغ لا يُرسل.
-export default function PurchasePrices({ materials, canWrite, onSaved }) {
+export default function PurchasePrices({ materials, canWrite, onSaved, initialOnlyMissing = false }) {
   const [vals, setVals] = useState({})
   const [query, setQuery] = useState('')
-  const [onlyMissing, setOnlyMissing] = useState(false)
+  const [onlyMissing, setOnlyMissing] = useState(initialOnlyMissing)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState(null)
 
@@ -42,8 +43,9 @@ export default function PurchasePrices({ materials, canWrite, onSaved }) {
           onChange={(e) => setQuery(e.target.value)} />
       </div>
       <p className="inv-modal-sub">
-        سعر شراء القطعة (متوسّط مرجّح). كتابته هنا للمواد الموجودة لا تُخصم من صندوق العيادات —
-        والشراء الجديد يُحدّثه وحده ويخصم مبلغه.
+        سعر شراء القطعة (متوسّط مرجّح). به تُطرح المواد من سعر الإجراء وجلسة الحديد لحظة صرفها —
+        والمادة بلا سعر شراء تُطرح بسعر البيع حتى يُكتب. كتابته هنا للمواد الموجودة لا تُخصم من صندوق
+        العيادات، والشراء الجديد يُحدّثه وحده ويخصم مبلغه. ما صُرف قبل كتابته يبقى بحسابه.
       </p>
       {missing > 0 && (
         <button type="button" className={`rev-flag${onlyMissing ? ' is-on' : ''}`} aria-pressed={onlyMissing}

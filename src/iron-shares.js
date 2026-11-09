@@ -46,7 +46,7 @@ export function previewShareEdit(row, doctorText, nurseText) {
   if (d.error || n.error) return { bad, after: null, changed: false, fundDelta: 0 }
   const after = computeIronDistribution({
     price: row.price, doctor: d.value ?? row.split.doctor, nurse: n.value ?? row.split.nurse, cap: row.shifaCap,
-    materialsTotal: row.materials.reduce((t, m) => t + m.cost, 0) })
+    materialsTotal: row.materials.reduce((t, m) => t + m.deduct, 0) })
   const changed = after.doctor !== row.split.doctor || after.nurse !== row.split.nurse
   return { bad, after, changed, fundDelta: after.negative ? 0 : money(fundOf(after) - fundOf(row.split)) }
 }

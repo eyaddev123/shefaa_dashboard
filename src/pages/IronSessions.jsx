@@ -129,7 +129,9 @@ function EditChanges({ e }) {
 }
 
 function SessionDetailsDialog({ row: r, canEdit, onEdit, onClose }) {
-  const itemsTotal = r.materials.reduce((t, m) => t + m.cost, 0)
+  // ما طُرح للمواد من سعر الجلسة: بسعر الشراء لحظة الصرف (القديم وما بلا سعر شراء: بسعر البيع)
+  const itemsTotal = r.materials.reduce((t, m) => t + m.deduct, 0)
+  const legacy = r.materials.some((m) => m.costBasis === 'legacy')
   const s = r.split
   const hasFlags = r.lowMaterialsConfirmed || r.overPrice || r.edits.length > 0 || r.cancelled
   return (
@@ -149,20 +151,25 @@ function SessionDetailsDialog({ row: r, canEdit, onEdit, onClose }) {
           {r.materials.length === 0 ? <p className="empty">لا مواد في هذه الجلسة.</p> : (
             <>
               <table className="iron-mat-table">
-                <thead><tr><th>المادة</th><th className="num">الكمية</th><th className="num">سعر الوحدة</th><th className="num">الإجمالي</th></tr></thead>
+                <thead><tr><th>المادة</th><th className="num">الكمية</th><th className="num">سعر البيع</th><th className="num">قيمة البيع</th><th className="num">المطروح</th></tr></thead>
                 <tbody>
                   {r.materials.map((m) => (
                     <tr key={m.material_id}>
-                      <td>{m.name}</td>
+                      <td>{m.name}{m.costBasis === 'sale' && <> <span className="badge warn sm" title="لم يكن لها سعر شراء لحظة الصرف">بلا سعر شراء</span></>}</td>
                       <td className="num">{fmtNum(m.qty)} <small>{m.unit}</small></td>
                       <td className="num">{fmtNum(m.unit_price)}</td>
                       <td className="num">{fmtNum(m.cost)}</td>
+                      <td className="num">{fmtNum(m.deduct)}</td>
                     </tr>
                   ))}
                 </tbody>
-                <tfoot><tr><td colSpan={3}>مجموع المواد</td><td className="num">{fmtNum(itemsTotal)}</td></tr></tfoot>
+                <tfoot><tr><td colSpan={4}>المطروح للمواد</td><td className="num">{fmtNum(itemsTotal)}</td></tr></tfoot>
               </table>
-              <p className="earn-note">بأسعار لحظة التسجيل: تغيير سعر المادة في المخزون لا يمسّها.</p>
+              <p className="earn-note">
+                {legacy ? 'جلسة قبل الطرح بسعر الشراء: موادّها طُرحت بسعر البيع كما حُسبت يومها.'
+                  : 'المطروح بسعر الشراء لحظة التسجيل (والمادة بلا سعر شراء بسعر البيع).'}
+                {' '}تغيير الأسعار في المخزون لا يمسّها.
+              </p>
             </>
           )}
         </section>
