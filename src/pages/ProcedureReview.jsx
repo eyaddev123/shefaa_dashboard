@@ -2,6 +2,7 @@ import { Fragment, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, fmtMoney, fmtDateTime, todayLocal, toLatinDigits, openStaffStream } from '../api.js'
 import MaterialsEditor, { qtyValid, toPayload, fmtQty, materialsSummary } from '../components/MaterialsEditor.jsx'
+import ProcedureMaterialsDetail from '../components/ProcedureMaterialsDetail.jsx'
 
 // ═══ المراجعة: كلّ إجراءٍ بموادّه وحصّتيه ═══
 // لا شيء ينتظر هنا: كلّ سطرٍ حُسب لحظة إضافته. الصفحة للاطّلاع والتصحيح:
@@ -290,6 +291,10 @@ export default function ProcedureReview({ canEdit, showToast }) {
           <span>الأسعار <strong>{fmtMoney(t.price)}</strong></span>
           <span>المواد <strong>{fmtMoney(t.materials)}</strong>
             {t.consumables > 0 && <small> (منها مستهلكات {fmtMoney(t.consumables)})</small>}</span>
+          {/* للإدارة وحدها: كلفة شراء المواد وربحها — للعلم، خارج التقسيم */}
+          {t.purchase && <span>كلفة شراء المواد <strong>{fmtMoney(t.purchase.cost)}</strong></span>}
+          {t.purchase && <span>ربح المواد <strong>{fmtMoney(t.purchase.profit)}</strong>
+            {t.purchase.unknown > 0 && <small> ({t.purchase.unknown} بلا سعر شراء)</small>}</span>}
           <span>حصص الدكاترة <strong>{fmtMoney(t.doctor)}</strong></span>
           <span>حصّة الشفاء <strong className={t.shifa < 0 ? 'neg' : undefined}>{fmtMoney(t.shifa)}</strong></span>
         </div>
@@ -326,6 +331,10 @@ export default function ProcedureReview({ canEdit, showToast }) {
                       </span>
                       {Number(l.consumables_cost) > 0 && <span className="rev-mats-list">منها مستهلكات {fmtMoney(l.consumables_cost)}</span>}
                       {l.over_price && <span className="rev-note">المواد فوق السعر — طُرح السعر كلّه</span>}
+                      {l.purchase && l.materials.length > 0 && (
+                        <span className="rev-mats-list rev-purchase">شراء {fmtMoney(l.purchase.cost)} · ربح {fmtMoney(l.purchase.profit)}
+                          {l.purchase.unknown > 0 && ` · ${l.purchase.unknown} بلا سعر شراء`}</span>
+                      )}
                     </td>
                     <td className="rev-rule">
                       {l.rule_label}
@@ -342,6 +351,9 @@ export default function ProcedureReview({ canEdit, showToast }) {
                         <button className="ghost" style={{ padding: '2px 10px', fontSize: 11.5 }}
                           onClick={() => toggle(l.id, 'edit')}>المواد</button>
                       )}{' '}
+                      {l.purchase && (l.materials.length > 0 || Number(l.consumables_cost) > 0 || Number(l.legacy_materials) > 0) && <>
+                        <button className="ghost rev-mats-btn" style={{ padding: '2px 10px', fontSize: 11.5 }}
+                          onClick={() => toggle(l.id, 'mats')}>تفصيل المواد</button>{' '}</>}
                       <button className="ghost" style={{ padding: '2px 10px', fontSize: 11.5 }}
                         onClick={() => toggle(l.id, 'history')}>
                         الأثر{l.changes_count ? ` (${l.changes_count})` : ''}
@@ -355,7 +367,10 @@ export default function ProcedureReview({ canEdit, showToast }) {
                           ? <EditLine line={l} catalog={catalog} showToast={showToast}
                               onCancel={() => toggle(l.id, 'edit')}
                               onSaved={() => { setOpen((o) => ({ ...o, [l.id]: null })); load() }} />
-                          : <History lineId={l.id} />}
+                          : open[l.id] === 'mats'
+                            ? <ProcedureMaterialsDetail items={l.materials} consumables={Number(l.consumables_cost)}
+                                legacy={Number(l.legacy_materials)} summary={l.purchase} />
+                            : <History lineId={l.id} />}
                       </td>
                     </tr>
                   )}

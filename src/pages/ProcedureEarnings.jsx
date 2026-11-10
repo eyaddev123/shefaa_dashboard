@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api, todayLocal } from '../api.js'
+import ProcedureMaterialsDetail from '../components/ProcedureMaterialsDetail.jsx'
 
 // ═══ مستحقات الدكاترة من الإجراءات ═══
 // «كم طلع لكل دكتور بهالفترة؟» — سطرٌ لكل دكتورٍ له إجراءات، وكبسةٌ تفتح تفصيله إجراءً إجراءً.
@@ -34,16 +35,42 @@ const TILES = [
   { key: 'shifa', label: 'حصّة الشفاء', money: true },
 ]
 
-function Tiles({ totals, doctorLabel, iron, grand }) {
+// ما بقي خارج كلفة الشراء والربح: مواد بلا سعر شراء (أو قبل التفعيل)، والمستهلكات، والمواد السابقة
+export function purchaseOutside(p) {
+  return [
+    p.unknown > 0 && `${fmtNum(p.unknown)} ${p.unknown === 1 ? 'مادة' : 'مواد'} بلا سعر شراء (مبيعها ${fmtNum(p.unknownSale)})`,
+    p.consumables > 0 && `مستهلكات ${fmtNum(p.consumables)}`,
+    p.legacy > 0 && `مواد سابقة ${fmtNum(p.legacy)}`,
+  ].filter(Boolean)
+}
+
+function Tiles({ totals, doctorLabel, iron, grand, purchase }) {
+  const outside = purchase ? purchaseOutside(purchase) : []
   return (
+    <>
     <div className="tiles earn-tiles">
       {TILES.map((t) => (
-        <div key={t.key} className={`tile${t.hero ? ' earn-hero' : ''}`}>
+        <Fragment key={t.key}>
+        <div className={`tile${t.hero ? ' earn-hero' : ''}`}>
           <div className="label">{t.key === 'doctor' && doctorLabel ? doctorLabel : t.label}</div>
           <div className={`value${t.key === 'shifa' && totals.shifa < 0 ? ' neg' : ''}`}>
             {t.money ? <Money value={totals[t.key]} /> : fmtNum(totals[t.key])}
           </div>
         </div>
+        {/* بجانب «تكلفة المواد» (قيمة المبيع المطروحة): كلفة شرائها وربحها — للعلم وحده */}
+        {t.key === 'materials' && purchase && (
+          <>
+            <div className="tile earn-purchase">
+              <div className="label">كلفة شراء المواد</div>
+              <div className="value"><Money value={purchase.cost} /></div>
+            </div>
+            <div className="tile earn-purchase">
+              <div className="label">ربح المواد</div>
+              <div className="value"><Money value={purchase.profit} /></div>
+            </div>
+          </>
+        )}
+        </Fragment>
       ))}
       {/* الحديد مميَّز عن الإجراءات: بطاقتان تظهران لمن له جلسات وحده */}
       {iron?.count > 0 && (
@@ -59,15 +86,21 @@ function Tiles({ totals, doctorLabel, iron, grand }) {
         </>
       )}
     </div>
+    {purchase && outside.length > 0 && (
+      <p className="earn-note earn-purchase-note">كلفة الشراء والربح لما عُرف سعر شرائه — خارجهما: {outside.join('، ')}.</p>
+    )}
+    </>
   )
 }
 
 function Summary({ data, onOpen }) {
   const hasIron = data.iron?.count > 0
+  const hasP = Boolean(data.purchase)
   return (
     <table className="rtable earn-table">
       <thead>
         <tr><th>الدكتور</th><th>الإجراءات</th><th>إجمالي القيمة</th><th>تكلفة المواد</th>
+          {hasP && <th>كلفة الشراء</th>}{hasP && <th>ربح المواد</th>}
           <th>حصّة الدكتور</th><th>حصّة الشفاء</th>{hasIron && <th>حصّة الحديد</th>}{hasIron && <th>مجموع المستحق</th>}<th></th></tr>
       </thead>
       <tbody>
@@ -84,6 +117,8 @@ function Summary({ data, onOpen }) {
             </td>
             <td className="num" data-label="إجمالي القيمة">{fmtNum(d.totals.price)}</td>
             <td className="num" data-label="تكلفة المواد">{fmtNum(d.totals.materials)}</td>
+            {hasP && <td className="num" data-label="كلفة الشراء">{fmtNum(d.purchase.cost)}</td>}
+            {hasP && <td className="num" data-label="ربح المواد">{fmtNum(d.purchase.profit)}</td>}
             <td className="num earn-doc" data-label="حصّة الدكتور">{fmtNum(d.totals.doctor)}</td>
             <td className={`num${d.totals.shifa < 0 ? ' neg' : ''}`} data-label="حصّة الشفاء">{fmtNum(d.totals.shifa)}</td>
             {hasIron && <td className="num iron-cell" data-label="حصّة الحديد">{d.iron.count > 0 ? fmtNum(d.iron.share) : <span className="muted">—</span>}</td>}
@@ -101,6 +136,8 @@ function Summary({ data, onOpen }) {
           <td className="rt-badge earn-count"><span className="badge sm">{countText(data.totals.count)}</span></td>
           <td className="num" data-label="إجمالي القيمة">{fmtNum(data.totals.price)}</td>
           <td className="num" data-label="تكلفة المواد">{fmtNum(data.totals.materials)}</td>
+          {hasP && <td className="num" data-label="كلفة الشراء">{fmtNum(data.purchase.cost)}</td>}
+          {hasP && <td className="num" data-label="ربح المواد">{fmtNum(data.purchase.profit)}</td>}
           <td className="num earn-doc" data-label="حصص الدكاترة">{fmtNum(data.totals.doctor)}</td>
           <td className={`num${data.totals.shifa < 0 ? ' neg' : ''}`} data-label="حصّة الشفاء">{fmtNum(data.totals.shifa)}</td>
           {hasIron && <td className="num iron-cell" data-label="حصّة الحديد">{fmtNum(data.iron.share)}</td>}
@@ -144,7 +181,8 @@ function Detail({ doctor, multiDay }) {
       </thead>
       <tbody>
         {doctor.lines.map((l) => (
-          <tr key={l.id} className={l.negative ? 'earn-neg' : l.noRule ? 'earn-norule' : undefined}>
+          <Fragment key={l.id}>
+          <tr className={l.negative ? 'earn-neg' : l.noRule ? 'earn-norule' : undefined}>
             <td className="rt-badge earn-when" dir="ltr">
               {multiDay && <span className="earn-date">{l.date}</span>}
               <span>{l.time}</span>
@@ -167,6 +205,16 @@ function Detail({ doctor, multiDay }) {
             <td className="num earn-doc" data-label="حصّته">{fmtNum(l.doctor)}</td>
             <td className={`num${l.negative ? ' neg' : ''}`} data-label="الشفاء">{fmtNum(l.shifa)}{l.negative && ' ⚠'}</td>
           </tr>
+          {/* تحت كلّ إجراء: جدول موادّه بالمبيع والشراء والربح (الإدارة وحدها تستلم l.purchase) */}
+          {l.purchase && (l.items.length > 0 || l.consumables > 0 || l.legacyMaterials > 0) && (
+            <tr className="earn-mat-row">
+              <td colSpan={8} className="rt-full">
+                <ProcedureMaterialsDetail items={l.items} consumables={l.consumables} legacy={l.legacyMaterials}
+                  summary={l.purchase} />
+              </td>
+            </tr>
+          )}
+          </Fragment>
         ))}
       </tbody>
     </table>
@@ -283,7 +331,7 @@ export default function ProcedureEarnings({ showToast }) {
           ) : (
             <>
               <button type="button" className="ghost earn-back" onClick={() => update({ doctor: null })}>→ كل الدكاترة</button>
-              <Tiles totals={doctor.totals} doctorLabel="حصّة الدكتور" iron={doctor.iron} grand={doctor.grand} />
+              <Tiles totals={doctor.totals} doctorLabel="حصّة الدكتور" iron={doctor.iron} grand={doctor.grand} purchase={doctor.purchase} />
               {doctor.lines.length > 0 && <Detail doctor={doctor} multiDay={multiDay} />}
               {doctor.iron?.count > 0 && <IronDetail iron={doctor.iron} multiDay={multiDay} />}
             </>
@@ -292,7 +340,7 @@ export default function ProcedureEarnings({ showToast }) {
         : data.doctors.length === 0 ? <p className="empty">لا إجراءات في هذه الفترة.</p>
         : (
           <>
-            <Tiles totals={data.totals} iron={data.iron} grand={data.grand} />
+            <Tiles totals={data.totals} iron={data.iron} grand={data.grand} purchase={data.purchase} />
             <Summary data={data} onOpen={open} />
             <p className="earn-note">
               الأرقام من لقطة كلّ سطر لحظة تسجيله — تغيير قاعدةٍ أو سعرٍ لاحقاً لا يمسّها. والإجراء المُزال لا يُحسب.

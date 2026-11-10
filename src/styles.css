@@ -4295,3 +4295,16 @@ button.ghost.iron-details-btn { white-space: nowrap; padding-inline: 12px; }
   .iron-ed-row { grid-template-columns: 1fr 1fr; }
   .iron-ed-label { grid-column: 1 / -1; }
 }
+
+/* ═══ تفصيل مواد الإجراء: المبيع والشراء والربح (materials-at-cost، للإدارة وحدها) ═══ */
+.proc-mat-detail { margin: 2px 0 8px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2, transparent); }
+.proc-mat-table .badge { margin-inline-start: 4px; }
+.proc-mat-extra td { color: var(--text-secondary); }
+.earn-mat-row > td { padding-top: 0; }
+.earn-purchase .value { color: var(--text-secondary); }
+.earn-purchase-note { margin: 6px 0 10px; }
+@media (max-width: 600px) {
+  .proc-mat-table .col-unit { display: none; }
+  .proc-mat-table th, .proc-mat-table td { padding: 6px 4px; font-size: 12.5px; }
+  .proc-mat-detail { padding: 6px; overflow-x: auto; }
+}
