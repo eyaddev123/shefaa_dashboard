@@ -70,11 +70,11 @@ function MaterialsTable({ data, canWrite, onOpen, onPurchase, onEdit, onAdd, onI
         </button>
       )}
 
-      {/* سعر الشراء هو ما يُطرح للمواد من الإجراءات وجلسات الحديد — بدونه تُطرح بسعر البيع */}
+      {/* سعر الشراء هو ما يُطرح للمواد من جلسات الحديد (الإجراءات بسعر البيع) — بدونه تُطرح بسعر البيع */}
       {summary.no_purchase_price > 0 && (
         <button type="button" className="inv-banner" onClick={onShowMissingCost}>
           <span>
-            ⚠ {materialsCount(summary.no_purchase_price)} بلا سعر شراء — تُطرح من الإجراءات وجلسات الحديد بسعر البيع حتى {canWrite ? 'تعبّئي' : 'يُعبَّأ'} سعر شرائها
+            ⚠ {materialsCount(summary.no_purchase_price)} بلا سعر شراء — تُطرح من جلسات الحديد بسعر البيع حتى {canWrite ? 'تعبّئي' : 'يُعبَّأ'} سعر شرائها
             {summary.issued_at_sale > 0 && <> (صُرفت منها {summary.issued_at_sale.toLocaleString('ar-SY')} مرّة بسعر البيع)</>}
           </span>
           <span className="inv-banner-link">{canWrite ? 'عبّئيها' : 'اعرضها'}</span>
@@ -117,7 +117,7 @@ function MaterialsTable({ data, canWrite, onOpen, onPurchase, onEdit, onAdd, onI
                     <div className="inv-status">
                       <span className={`badge sm ${st.cls}`}>{st.label}</span>
                       {m.selling_at_loss && m.is_active && <span className="badge sm bad">بيع بخسارة</span>}
-                      {m.no_purchase_price && <span className="badge sm warn" title="تُطرح من الإجراءات والحديد بسعر البيع">بلا سعر شراء</span>}
+                      {m.no_purchase_price && <span className="badge sm warn" title="تُطرح من جلسات الحديد بسعر البيع">بلا سعر شراء</span>}
                     </div>
                   </td>
                   <td className="inv-row-actions rt-actions" onClick={(e) => e.stopPropagation()}>

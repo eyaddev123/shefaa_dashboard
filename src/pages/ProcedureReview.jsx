@@ -326,17 +326,6 @@ export default function ProcedureReview({ canEdit, showToast }) {
                       </span>
                       {Number(l.consumables_cost) > 0 && <span className="rev-mats-list">منها مستهلكات {fmtMoney(l.consumables_cost)}</span>}
                       {l.over_price && <span className="rev-note">المواد فوق السعر — طُرح السعر كلّه</span>}
-                      {/* قيمة البيع والمطروح (بسعر الشراء) والفرق: ربح المواد الذي ذهب للتوزيع */}
-                      {l.materials.some((m) => m.deduct_cost != null) && (() => {
-                        const sale = l.materials.reduce((t, m) => t + Number(m.cost), 0)
-                        const buy = l.materials.reduce((t, m) => t + Number(m.deduct_cost ?? m.cost), 0)
-                        return <span className="rev-mats-list" title={l.materials.map((m) => `${m.name}: بيع ${fmtMoney(m.unit_price)} · ${m.cost_basis === 'purchase' ? `شراء ${fmtMoney(m.deduct_unit)}` : 'بلا سعر شراء'}`).join('\n')}>
-                          بيع {fmtMoney(sale)} · شراء {fmtMoney(buy)} · ربح {fmtMoney(sale - buy)}</span>
-                      })()}
-                      {/* المواد تُطرح بسعر الشراء؛ ما لم يكن له سعر شراء لحظة الصرف طُرح بسعر البيع */}
-                      {l.materials.some((m) => m.cost_basis === 'sale') && (
-                        <span className="rev-note">بلا سعر شراء: {l.materials.filter((m) => m.cost_basis === 'sale').map((m) => m.name).join('، ')} — طُرحت بسعر البيع</span>
-                      )}
                     </td>
                     <td className="rev-rule">
                       {l.rule_label}
