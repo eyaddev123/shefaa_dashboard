@@ -151,12 +151,16 @@ function EditLine({ line, catalog, onSaved, onCancel, showToast }) {
       else if (r.warnings && r.warnings.length) showToast(`حُفظ — ⚠ ${r.warnings[0]}`, 'warn', 7000)
       else showToast(`أُعيد الحساب: الدكتور ${fmtMoney(r.doctor_share)} · الشفاء ${fmtMoney(r.shifa_share)}`, 'success', 4000)
       onSaved()
-    } catch (ex) { showToast(ex.message) }
+    } catch (ex) {
+      // لم يُحفظ شيء: الكمّيات ترجع لآخر قيمةٍ محفوظة
+      setMats(line.materials.map((m) => ({ ...m, qty: fmtQty(m.qty) })))
+      showToast(`${ex.message} — لم تُحفظ المواد، ورجعت الكمّيات لآخر قيمةٍ محفوظة`)
+    }
     finally { setBusy(false) }
   }
   return (
     <div className="rev-edit">
-      <MaterialsEditor catalog={catalog} value={mats} onChange={setMats} disabled={busy} />
+      <MaterialsEditor catalog={catalog} value={mats} onChange={setMats} disabled={busy} saved={line.materials} />
       {/* مواد إجمالية من التصميم السابق (بلا أصناف) — تُعدَّل أو تُصفَّر هنا وحدها */}
       {legacyStart > 0 && (
         <label className="rev-legacy">مواد سابقة (إجمالي، من التسوية القديمة):

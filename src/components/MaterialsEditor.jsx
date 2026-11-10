@@ -11,8 +11,17 @@ import { ComboAdd } from './Combobox.jsx'
 // value: [{material_id, name, unit, qty}] — qty نصٌّ كما كُتب، يُتحقَّق منه بـ qtyValid.
 // والمادّة المعطَّلة القائمة على سطرٍ تبقى في value وإن غابت عن البحث.
 // combo: الكبسة تفتح القائمة كاملةً بدل البحث وحده (ComboAdd)، ومعها الرصيد إن وصل مع الكتالوج.
+//
+// ★ الكمّية: [➖] الرقم [➕] — كبسةٌ = ±1، والكتابة باليد باقية احتياطاً (للكميات الكبيرة).
+//   الأدنى 1: ➖ معطّل عنده (الحذف بزرّ ×). الأعلى: الرصيد المتوفر إن وصل مع الكتالوج (الاستقبال؛ ومخزون
+//   المشرفة في الحديد) — وعند تعديل سطرٍ محفوظ يُضاف إليه ما صُرف عليه أصلاً (saved). ➕ يتوقّف عنده
+//   مع «الرصيد المتوفر: N». الكتابة باليد فوقه تبقى ممكنة: الخادم لا يمنع بالرصيد (يحذّر وحده) — لا قاعدة
+//   جديدة هنا. وبلا رصيدٍ في الكتالوج (الطبيب، المراجعة) الأعلى حدّ الخادم وحده.
+//   الأزرار تغيّر الحالة المحلّية وحدها: الحفظ بزرّ الشاشة كما كان، بطلبٍ واحد بالكمّية النهائية.
 
 const MAX_RESULTS = 8
+export const MAX_QTY = 9999999999.99   // NUMERIC(12,2) — حدّ الخادم (parseQty)
+const round2 = (n) => Math.round(n * 100) / 100
 
 export const parseQtyInput = (v) => {
   const t = toLatinDigits(String(v ?? '')).replace(/[٫,]/g, '.').trim()
@@ -33,7 +42,20 @@ const materialOption = (m) => ({
   warn: m.balance !== undefined && Number(m.balance) <= 0,
 })
 
-export default function MaterialsEditor({ catalog, value, onChange, disabled, combo }) {
+/**
+ * الحدّ الأعلى لكمّية مادة: الرصيد المتوفر (+ ما صُرف عليها في السطر المحفوظ) إن عُرف، وإلا حدّ الخادم.
+ * @returns {{max:number, available:number|null}}
+ */
+export function qtyLimit(material, catalog, saved) {
+  const c = (catalog || []).find((m) => String(m.id) === String(material.material_id))
+  if (!c || c.balance === undefined || c.balance === null) return { max: MAX_QTY, available: null }
+  const already = (saved || []).filter((m) => String(m.material_id) === String(material.material_id))
+    .reduce((t, m) => t + Number(m.qty || 0), 0)
+  const available = round2(Number(c.balance) + already)
+  return { max: Math.max(available, 0), available }
+}
+
+export default function MaterialsEditor({ catalog, value, onChange, disabled, combo, saved }) {
   const [query, setQuery] = useState('')
   const chosen = new Set(value.map((m) => String(m.material_id)))
   const results = query.trim() === '' ? [] : (catalog || [])
@@ -52,17 +74,34 @@ export default function MaterialsEditor({ catalog, value, onChange, disabled, co
       {value.length > 0 && (
         <ul className="mat-chosen">
           {value.map((m) => {
-            const bad = parseQtyInput(m.qty) === null
+            const q = parseQtyInput(m.qty)
+            const bad = q === null
+            const { max, available } = qtyLimit(m, catalog, saved)
+            const atMax = !bad && q >= max
+            const hint = available === null ? '' : `الرصيد المتوفر: ${fmtBalance(available)}`
+            // الكسر يُكمَّل بالكبسة: 1.5 ➖ ⇒ 1 · 2.5 ➕ (والأعلى 3) ⇒ 3
+            const minus = () => setQty(m.material_id, String(Math.max(1, Number.isInteger(q) ? q - 1 : Math.floor(q))))
+            const plus = () => setQty(m.material_id, String(Math.min(max, bad ? 1 : Math.floor(q) + 1)))
             return (
               <li key={m.material_id}>
                 <span className="mat-name">{m.name}</span>
-                <input className={`mat-qty${bad ? ' is-bad' : ''}`} value={m.qty} inputMode="decimal"
-                  disabled={disabled} aria-label={`كمّية ${m.name}`} aria-invalid={bad}
-                  onChange={(e) => setQty(m.material_id, e.target.value)} />
+                <span className="mat-step">
+                  <button type="button" className="mat-minus" disabled={disabled || bad || q <= 1}
+                    aria-label={`إنقاص كمّية ${m.name}`} title={q <= 1 ? 'الأقلّ ١ — للحذف زرّ ×' : `إنقاص ${m.name}`}
+                    onClick={minus}>−</button>
+                  <input className={`mat-qty${bad ? ' is-bad' : ''}`} value={m.qty} inputMode="decimal"
+                    disabled={disabled} aria-label={`كمّية ${m.name}`} aria-invalid={bad}
+                    onChange={(e) => setQty(m.material_id, e.target.value)} />
+                  <button type="button" className="mat-plus" disabled={disabled || atMax}
+                    aria-label={`زيادة كمّية ${m.name}`} title={atMax && hint ? hint : `زيادة ${m.name}`}
+                    onClick={plus}>+</button>
+                </span>
                 <span className="mat-unit">{m.unit}</span>
                 <button type="button" className="mat-x" disabled={disabled}
                   aria-label={`إزالة ${m.name}`} title={`إزالة ${m.name}`}
                   onClick={() => remove(m.material_id)}>×</button>
+                {/* اللمس لا يُظهر title: التلميح نصٌّ ظاهر عند بلوغ الرصيد */}
+                {atMax && hint && <small className="mat-limit" role="status">{hint}</small>}
               </li>
             )
           })}
