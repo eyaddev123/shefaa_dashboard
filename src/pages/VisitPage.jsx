@@ -832,7 +832,11 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
       if (r.doctor_share !== undefined && !r.unchanged) setSplit({ ...r, name: line.name, price: line.price })
       onToast(r.unchanged ? 'لا تغيير في المواد' : `حُدّثت مواد «${line.name}»`, 'success')
       setEditing(null); onChanged()
-    } catch (ex) { onToast(ex.message) }
+    } catch (ex) {
+      // لم يُحفظ شيء: الكمّيات ترجع لآخر قيمةٍ محفوظة، والرسالة تقول ذلك
+      setEditMats((line.materials || []).map((m) => ({ ...m, qty: fmtQty(m.qty) })))
+      onToast(`${ex.message} — لم تُحفظ المواد، ورجعت الكمّيات لآخر قيمةٍ محفوظة`)
+    }
     finally { setBusy(false) }
   }
 
@@ -902,7 +906,7 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
                 {!l.removed_at && (editing === l.id ? (
                   <tr className="proc-mats-row rt-sub">
                     <td colSpan={4}>
-                      <MaterialsEditor catalog={matCatalog} value={editMats} onChange={setEditMats} disabled={busy} />
+                      <MaterialsEditor catalog={matCatalog} value={editMats} onChange={setEditMats} disabled={busy} saved={l.materials} />
                       <div className="mat-actions">
                         <button disabled={busy || !qtyValid(editMats)} onClick={() => saveEdit(l)}>حفظ المواد</button>
                         <button className="ghost" disabled={busy} onClick={() => setEditing(null)}>إلغاء</button>

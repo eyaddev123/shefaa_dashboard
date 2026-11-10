@@ -26,7 +26,7 @@ const TABS = [['materials', 'المواد'], ['costs', 'أسعار الشراء'
 const FILTERS = [['all', 'الكل'], ['low', 'تحتاج شراء'], ['consumable', 'استهلاكية'], ['inactive', 'غير مفعّلة']]
 const isConsumable = (m) => m.material_kind === 'consumable'
 
-function MaterialsTable({ data, canWrite, onOpen, onPurchase, onEdit, onAdd, onImport, onTemplate, onBuyAny }) {
+function MaterialsTable({ data, canWrite, onOpen, onPurchase, onEdit, onAdd, onImport, onTemplate, onBuyAny, onShowMissingCost }) {
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState('all')
   const { materials, summary } = data
@@ -70,6 +70,17 @@ function MaterialsTable({ data, canWrite, onOpen, onPurchase, onEdit, onAdd, onI
         </button>
       )}
 
+      {/* سعر الشراء هو ما يُطرح للمواد من جلسات الحديد (الإجراءات بسعر البيع) — بدونه تُطرح بسعر البيع */}
+      {summary.no_purchase_price > 0 && (
+        <button type="button" className="inv-banner" onClick={onShowMissingCost}>
+          <span>
+            ⚠ {materialsCount(summary.no_purchase_price)} بلا سعر شراء — تُطرح من جلسات الحديد بسعر البيع حتى {canWrite ? 'تعبّئي' : 'يُعبَّأ'} سعر شرائها
+            {summary.issued_at_sale > 0 && <> (صُرفت منها {summary.issued_at_sale.toLocaleString('ar-SY')} مرّة بسعر البيع)</>}
+          </span>
+          <span className="inv-banner-link">{canWrite ? 'عبّئيها' : 'اعرضها'}</span>
+        </button>
+      )}
+
       {materials.length === 0 ? (canWrite ? (
         <EmptyState text="لا مواد بعد."
           hint="عرّف المواد واحدةً واحدة، أو استوردها كلّها من ملف Excel بأرصدتها الحالية.">
@@ -106,6 +117,7 @@ function MaterialsTable({ data, canWrite, onOpen, onPurchase, onEdit, onAdd, onI
                     <div className="inv-status">
                       <span className={`badge sm ${st.cls}`}>{st.label}</span>
                       {m.selling_at_loss && m.is_active && <span className="badge sm bad">بيع بخسارة</span>}
+                      {m.no_purchase_price && <span className="badge sm warn" title="تُطرح من جلسات الحديد بسعر البيع">بلا سعر شراء</span>}
                     </div>
                   </td>
                   <td className="inv-row-actions rt-actions" onClick={(e) => e.stopPropagation()}>
@@ -221,6 +233,7 @@ function InventoryCatalogView() {
 function InventoryFull({ canWrite }) {
   const [params, setParams] = useSearchParams()
   const [tab, setTab] = useState('materials')
+  const [costsMissingOnly, setCostsMissingOnly] = useState(false)
   const [data, setData] = useState(null)
   const [units, setUnits] = useState([])
   const [err, setErr] = useState(null)
@@ -263,7 +276,7 @@ function InventoryFull({ canWrite }) {
         {TABS.filter(([k]) => canWrite || k !== 'stocktake').map(([k, label]) => (
           <button key={k} type="button" role="tab" aria-selected={tab === k}
             className={tab === k ? '' : 'ghost'}
-            onClick={() => { setTab(k); if (openId) backToList() }}>{label}</button>
+            onClick={() => { setTab(k); setCostsMissingOnly(false); if (openId) backToList() }}>{label}</button>
         ))}
       </div>
 
@@ -279,6 +292,7 @@ function InventoryFull({ canWrite }) {
           onEdit={(m) => setDialog({ kind: 'edit', material: m })}
           onAdd={() => setDialog({ kind: 'add' })}
           onImport={() => setDialog({ kind: 'import' })}
+          onShowMissingCost={() => { setCostsMissingOnly(true); setTab('costs') }}
           onTemplate={() => api.inventory.template().catch((ex) => showToast(ex.message))} />
       ))}
       {tab === 'stocktake' && canWrite && (
@@ -286,7 +300,8 @@ function InventoryFull({ canWrite }) {
           onDone={(r) => { refresh(); showToast(`سُجّلت ${r.count === 1 ? 'تسويةٌ واحدة' : r.count === 2 ? 'تسويتان' : `${r.count.toLocaleString('ar-SY')} تسويات`} — الأرصدة صارت العدد الفعلي`, 'success', 5000) }} />
       )}
       {tab === 'costs' && (
-        <PurchasePrices materials={data.materials} canWrite={canWrite}
+        <PurchasePrices key={costsMissingOnly ? 'missing' : 'all'} materials={data.materials} canWrite={canWrite}
+          initialOnlyMissing={costsMissingOnly}
           onSaved={(r) => { refresh(); showToast(r.changed ? `حُفظ سعر شراء ${materialsCount(r.changed)}` : 'لا تغيير', 'success', 4000) }} />
       )}
       {tab === 'reports' && <Reports showToast={showToast} withCost />}
