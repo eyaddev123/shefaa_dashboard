@@ -248,6 +248,9 @@ export const api = {
     // حسابات الدكاترة: { month } شهرٌ (بلاه الحالي) أو { from, to } يومٌ أو فترة
     doctorAccounts: ({ month, from, to } = {}) => http(`/clinic/doctor-accounts${
       from ? `?${new URLSearchParams({ from, to: to || from })}` : month ? `?month=${month}` : ''}`),
+    // الالتزام بالدوام لكلّ الدكاترة بالفترة نفسها: { doctors: { [id]: ملخّص } }
+    doctorsPunctuality: ({ month, from, to } = {}) => http(`/clinic/doctors-punctuality${
+      from ? `?${new URLSearchParams({ from, to: to || from })}` : month ? `?month=${month}` : ''}`),
     // المستهلكات لشهر: مشتريات العبوات مقابل المستردّ من الإجراءات
     consumablesReport: (month) => http(`/clinic/consumables-report${month ? `?month=${month}` : ''}`),
     // لوحة تحكم الدكتور: period = week | month | custom (مع from/to)

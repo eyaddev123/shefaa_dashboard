@@ -4342,7 +4342,7 @@ button.ghost.iron-details-btn { white-space: nowrap; padding-inline: 12px; }
 .dr-range-lbl { color: var(--muted); font-weight: 700; font-size: 13px; }
 
 /* الملخّص: أربع بطاقات، والربح بطلها */
-.dr-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.dr-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; }
 .dr-stat { display: flex; flex-direction: column; gap: 4px; padding: 18px 20px; border-radius: 18px;
   background: var(--surface-1); border: 1px solid var(--border); box-shadow: var(--shadow-card); min-width: 0; }
 .dr-stat-lbl { font-size: 13px; font-weight: 700; color: var(--text-secondary); }
@@ -4423,9 +4423,9 @@ a.dr-chip:hover { color: var(--accent-text); border-color: var(--primary); }
 .dr-how dt { font-weight: 800; color: var(--text-primary); }
 .dr-how dd { margin: 0; color: var(--text-secondary); line-height: 1.7; }
 
-@media (max-width: 1100px) { .dr-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 640px) {
-  .dr-summary { gap: 10px; }
+  .dr-summary { gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dr-stat-hero { grid-column: 1 / -1; }
   .dr-stat { padding: 14px; }
   .dr-stat-val { font-size: 23px; }
   .dr-grid { grid-template-columns: minmax(0, 1fr); }
@@ -4481,3 +4481,23 @@ a.dr-chip:hover { color: var(--accent-text); border-color: var(--primary); }
   .pn-log-date { grid-row: span 2; }
   .pn-log-detail { grid-column: 2; }
 }
+
+/* الالتزام بالدوام في بطاقة الدكتور */
+.dr-punct { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 12px; background: var(--page); }
+.dr-punct-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 12px; font-weight: 700; color: var(--muted); }
+.dr-punct-head strong { font-size: 15px; font-weight: 800; color: var(--text-primary); }
+.dr-punct-head strong.is-good { color: var(--status-good); }
+.dr-punct-head strong.is-warn { color: var(--status-pending); }
+.dr-punct-head strong.is-bad { color: var(--status-bad); }
+.dr-punct.is-appt .dr-punct-head strong { color: var(--status-review); }
+.dr-punct-bar { display: flex; gap: 2px; height: 8px; border-radius: 999px; overflow: hidden; background: var(--grid); }
+.dr-punct-bar span { display: block; height: 100%; }
+.dr-punct-bar .on { background: var(--status-good); }
+.dr-punct-bar .late { background: var(--status-pending); }
+.dr-punct-sub { margin: 0; font-size: 12.5px; color: var(--text-secondary); line-height: 1.6; }
+.dr-punct-sub b { color: var(--text-primary); }
+.dr-punct-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.dr-pchip { font-size: 12px; font-weight: 700; padding: 2px 10px; border-radius: 999px; }
+.dr-pchip.is-absent { color: var(--status-bad); background: var(--status-bad-bg); box-shadow: inset 0 0 0 1px var(--status-bad); }
+.dr-pchip.is-apology { color: #fff; background: var(--status-bad); }
+:root[data-theme='dark'] .dr-pchip.is-apology { color: #2a0b0b; }
