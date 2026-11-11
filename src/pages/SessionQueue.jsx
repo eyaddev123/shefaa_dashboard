@@ -5,7 +5,7 @@ import { printViaHelper } from '../print-helper.js'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api, APPOINTMENT_STATUSES, BOOKING_TYPES, VISIT_TYPES, REGULAR_VISIT_TYPES, PROCEDURE_ONLY, PRIORITIES, DELAY_CAUSES, WEEKDAYS, addDays, todayLocal, fmtMoney, fmtTime, toLatinDigits, cleanMobile, mobileError } from '../api.js'
 import MobileInput from '../components/MobileInput.jsx'
-import { usePatientSearch, PatientCandidates, SameNameConfirm, MobileUpdateAsk, blockedName } from '../components/PatientPicker.jsx'
+import { usePatientSearch, PatientCandidates, SameNameConfirm, MobileUpdateAsk, blockedName, nameCharsError } from '../components/PatientPicker.jsx'
 import { AttendanceBadge, urgentRowClass, isAttendanceSession, usePolling, fmtClock, FlowModeTag, FLOW_MODE_LABELS,
   AttendanceNumber, turnLabel, fmtTimeOfDay } from '../attendance-ui.jsx'
 import { attendanceBookedMessage } from '../booking-message.js'
@@ -211,10 +211,12 @@ function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel, urgent = f
     else { setNewConfirmed(true); patientSearch.dismiss() }
   }
   // «نعم، مريض جديد»: إن جاء السؤال من الحفظ نفسه، يُعاد الحجز بالتأكيد فوراً
-  const confirmNew = () => {
+  // ومعها سنة الميلاد (إلزامية لـ«شخص آخر» باسمٍ قريب) — تُكتب في خانتها أيضاً
+  const confirmNew = (year) => {
     const again = sameName?.fromSubmit
+    setForm((f) => ({ ...f, birth_year: String(year) }))
     setNewConfirmed(true); setSameName(null); patientSearch.dismiss()
-    if (again) submit(null, null, true)
+    if (again) submit(null, null, true, year)
   }
 
   const isFollowup = form.visit_type === 'followup'
@@ -226,9 +228,10 @@ function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel, urgent = f
   const pickedMobileDiffers = picked && cleanMobile(form.mobile) !== ''
     && cleanMobile(form.mobile) !== cleanMobile(picked.mobile || '')
 
-  const submit = async (e, mobileDecision = null, confirmedNew = false) => {
+  const submit = async (e, mobileDecision = null, confirmedNew = false, yearNow = null) => {
     e?.preventDefault?.()
     setErr(null)
+    if (!picked && nameCharsError(form.full_name)) { setErr(nameCharsError(form.full_name)); return }
     // الرقم: الشكل قبل الإرسال برسالة الخادم نفسها — لمريضٍ جديد، أو لتحديث رقم المختار
     if ((!picked || pickedMobileDiffers) && mobileError(form.mobile)) { setErr(mobileError(form.mobile)); return }
     // المختار برقمٍ مختلف: لا يتغيّر الرقم من تلقاء نفسه — نسأل، والافتراضي «اتركيه»
@@ -242,7 +245,7 @@ function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel, urgent = f
       ? { patient_id: picked.id,
           ...(mobileDecision === 'update' ? { update_mobile: true, mobile: cleanMobile(form.mobile) } : {}) }
       : { full_name: form.full_name, mobile: cleanMobile(form.mobile), gender: form.gender,
-          birth_year: form.birth_year ? Number(form.birth_year) : null,
+          birth_year: yearNow ?? (form.birth_year ? Number(form.birth_year) : null),
           ...(newConfirmed || confirmedNew ? { confirm_new_patient: true } : {}) }
     try {
       const appt = await api.clinic.book(sessionId, {
@@ -257,7 +260,8 @@ function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel, urgent = f
     } catch (ex) {
       // اسمٌ مطابق لمسجَّل بلا تأكيد: السؤال نفسه بدل رسالة خطأ
       if (ex.data?.code === 'SAME_NAME_EXISTS') { setSameName({ matches: [...(ex.data.matches || []), ...(ex.data.similar || [])], fromSubmit: true }); return }
-      if (blockedName(ex)) { setNewConfirmed(false); setSameName({ matches: blockedName(ex), blocked: true, fromSubmit: true }); return }
+      if (blockedName(ex)) { setNewConfirmed(false); setSameName({ matches: blockedName(ex), blocked: true, message: ex.data.code === 'NAME_EXISTS' ? null : ex.message, fromSubmit: true }); return }
+      if (ex.data?.code === 'SIMILAR_NEEDS_BIRTH_YEAR') { setNewConfirmed(false); setSameName({ matches: patientSearch.nearNames.length ? patientSearch.nearNames : [{ id: 0, full_name: form.full_name }], fromSubmit: true }); return }
       setErr(ex.message)
       // السيرفر يعيد تفاصيل عدم الأهلية — نعرضها ونفتح خانة سبب التجاوز
       if (ex.data?.code === 'FOLLOWUP_NOT_ELIGIBLE') {
@@ -286,7 +290,8 @@ function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel, urgent = f
             onChange={(e) => onName(e.target.value)}
             required autoFocus placeholder="الاسم واسم الأب والكنية" />
           <small className="hint">
-            {patientSearch.checking ? 'جارٍ البحث…'
+            {!picked && nameCharsError(form.full_name) ? nameCharsError(form.full_name)
+              : patientSearch.checking ? 'جارٍ البحث…'
               : picked ? ' '
               : newConfirmed || patientSearch.noMatch ? 'مريض جديد'
               : 'ثلاث كلمات على الأقل — نبحث بها عن المريض السابق'}
@@ -320,7 +325,8 @@ function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel, urgent = f
       {!sameName && (
         <PatientCandidates candidates={patientSearch.candidates} similar={patientSearch.similar} onPick={pick} onNew={chooseNew} disabled={busy} />
       )}
-      <SameNameConfirm matches={sameName?.matches} blocked={sameName?.blocked} onPick={pick} onConfirm={confirmNew} disabled={busy} />
+      <SameNameConfirm key={sameName ? 'open' : 'closed'} matches={sameName?.matches} blocked={sameName?.blocked} message={sameName?.message}
+        defaultYear={form.birth_year} onPick={pick} onConfirm={confirmNew} disabled={busy} />
       {mobileAsk && picked && (
         <MobileUpdateAsk storedMobile={picked.mobile} disabled={busy}
           onUpdate={() => submit(null, 'update')} onKeep={() => submit(null, 'keep')} />
