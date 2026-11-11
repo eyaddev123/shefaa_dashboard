@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { api, todayLocal } from '../api.js'
 import { matchesAr } from '../arabic-search.js'
 
@@ -154,11 +154,21 @@ function Summary({ data, active }) {
   )
 }
 
+// البطاقة كلّها تفتح وجهتها (لوحة الدكتور في التقارير، البروفايل في الصندوق) — بالنقر وبـ Enter.
+// الاسم يبقى رابطاً حقيقياً (فتحٌ في تبويب جديد، قارئ الشاشة)؛ ورابطٌ داخل رابط غير صالح فلا <a> حولها.
 function DoctorCard({ d, share, link }) {
   const a = d.attendance
   const pay = payText(d)
+  const navigate = useNavigate()
+  const open = (e) => {
+    if (!link || e.target.closest('a, button')) return
+    if (window.getSelection?.().toString()) return   // تحديد نصٍّ لنسخه ليس نقراً
+    navigate(link)
+  }
   return (
-    <article className="dr-card">
+    <article className={`dr-card${link ? ' is-link' : ''}`} onClick={open}
+      {...(link ? { role: 'link', tabIndex: 0,
+        onKeyDown: (e) => { if (e.key === 'Enter') navigate(link) } } : {})}>
       <header className="dr-card-head">
         <span className="dr-avatar" aria-hidden="true">{initial(d.doctor)}</span>
         <div className="dr-who">

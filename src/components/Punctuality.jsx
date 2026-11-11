@@ -1,6 +1,7 @@
 // ═══ الالتزام بالدوام — قطعٌ مشتركة بين لوحة تحكم الدكتور و«التزامي» في «أعمالي» ═══
 // الحساب كلّه في الخادم (server/src/doctor-dashboard.js) — هنا عرضٌ وحده:
-//   بالوقت (≤ ١٠ د) أخضر · متأخّر أصفر · غائب أحمر · تقديري رمادي (بلا «وصل الطبيب»، بأوّل نداء)
+//   بالوقت (≤ ١٥ د) أخضر · متأخّر أصفر بدقائقه · غائب أحمر فاتح · اعتذر أحمر ممتلئ · تقديري رمادي
+//   (بلا «وصل الطبيب»، بأوّل نداء). الاعتذار من قائمةٍ منفصلة (apologies) — لا يدخل أيّ عدّاد.
 // والتقديريّ لا يدخل نسبة الالتزام ولا الترتيب. اليوم الجاري بلا وصولٍ بعد «لم يُحسم» بلا لون.
 // دكتور «بمواعيد خاصة» (p.appointmentsBased): لا نسبة ولا تأخير — «بمواعيد خاصة» مكانهما، وأيام
 // حضوره زرقاء بوقت وصولها وحده.
@@ -28,7 +29,7 @@ export const fmtPct = (c) => (c === null || c === undefined ? '—' : `${Math.ro
 const minutes = (n) => `${fmtInt(n)} د`
 
 /** بطاقات الالتزام: أيام الدوام / حضر / غاب، النسبة، متوسّط التأخير */
-export function PunctualityTiles({ p, extra = null }) {
+export function PunctualityTiles({ p, extra = null, apologized = 0 }) {
   const appt = !!p.appointmentsBased
   return (
     <div className={`tiles earn-tiles pn-tiles${extra ? '' : ' pn-3'}`}>
@@ -38,6 +39,7 @@ export function PunctualityTiles({ p, extra = null }) {
         <div className="pn-split">
           <span>حضر <strong>{fmtInt(p.attended)}</strong></span>
           <span className={p.absent ? 'pn-bad' : ''}>غاب <strong>{fmtInt(p.absent)}</strong></span>
+          {apologized > 0 && <span className="pn-bad">اعتذر <strong>{fmtInt(apologized)}</strong></span>}
         </div>
       </div>
       <div className="tile earn-hero">
@@ -84,8 +86,10 @@ const dayTitle = (d) => {
   return `${head} · الوصول ${d.arrival}${how}${d.late ? ` · ${d.late} د` : ''}`
 }
 
-export function DutyCalendar({ from, to, days }) {
+// apologies: تواريخ اعتذار الدكتور (بلا السبب) — يومٌ أحمر مكتوبٌ فيه «اعتذر»
+export function DutyCalendar({ from, to, days, apologies = [] }) {
   const byDate = new Map(days.map((d) => [d.date, d]))
+  const apology = new Set(apologies)
   const first = addDays(from, -((weekdayOf(from) + 1) % 7))
   const cells = []
   for (let d = first; d <= to || cells.length % 7; d = addDays(d, 1)) cells.push(d)
@@ -94,15 +98,21 @@ export function DutyCalendar({ from, to, days }) {
       <div className="pn-cal" role="grid" aria-label="تقويم الدوام">
         {WEEK_HEAD.map((h) => <div key={h} className="pn-cal-head" role="columnheader">{h}</div>)}
         {cells.map((ymd) => {
-          const d = byDate.get(ymd)
           const out = ymd < from || ymd > to
+          const apologized = !out && apology.has(ymd)
+          const d = apologized ? null : byDate.get(ymd)
           const dayN = Number(ymd.slice(8))
+          const title = apologized ? 'اعتذر الدكتور عن هذا اليوم' : dayTitle(d)
+          // كلمةٌ في الخانة نفسها — فلا يُقرأ اليوم باللون وحده
+          const tag = apologized ? 'اعتذر' : d?.status === 'late' ? `+${fmtDuration(d.late)}`
+            : d?.status === 'absent' ? 'غاب' : null
           return (
-            <div key={ymd} role="gridcell" title={dayTitle(d)}
-              className={`pn-cell${out ? ' is-out' : ''}${d ? ` is-${d.status}` : ''}`}
-              aria-label={d ? `${ymd}: ${dayTitle(d)}` : ymd}>
+            <div key={ymd} role="gridcell" title={title}
+              className={`pn-cell${out ? ' is-out' : ''}${apologized ? ' is-apology' : d ? ` is-${d.status}` : ''}`}
+              aria-label={title ? `${ymd}: ${title}` : ymd}>
               <span className="pn-cell-n">{dayN.toLocaleString('ar-SY')}</span>
-              {dayN === 1 && !out && <span className="pn-cell-m">{MONTHS[Number(ymd.slice(5, 7)) - 1]}</span>}
+              {tag ? <span className="pn-cell-tag">{tag}</span>
+                : dayN === 1 && !out && <span className="pn-cell-m">{MONTHS[Number(ymd.slice(5, 7)) - 1]}</span>}
               {d?.status === 'estimated' && <span className="pn-cell-mark" aria-hidden="true">≈</span>}
             </div>
           )
@@ -110,8 +120,9 @@ export function DutyCalendar({ from, to, days }) {
       </div>
       <div className="pn-legend">
         <span><i className="is-on_time" /> بالوقت</span>
-        <span><i className="is-late" /> متأخّر</span>
+        <span><i className="is-late" /> متأخّر (بدقائقه)</span>
         <span><i className="is-absent" /> غائب</span>
+        {apology.size > 0 && <span><i className="is-apology" /> اعتذر</span>}
         <span><i className="is-estimated" /> تقديري ≈</span>
         {days.some((d) => d.status === 'appointments') && <span><i className="is-appointments" /> {APPOINTMENTS_LABEL}</span>}
       </div>

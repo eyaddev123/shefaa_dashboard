@@ -144,7 +144,7 @@ export default function DoctorDashboard() {
 
       {err ? <p className="error">{err}</p> : !shown ? <p className="empty">جارٍ التحميل…</p> : (
         <>
-          <PunctualityTiles p={shown.punctuality} extra={<>
+          <PunctualityTiles p={shown.punctuality} apologized={(shown.apologies || []).filter((x) => x <= shown.today).length} extra={<>
             <div className="tile"><div className="label">المرضى</div><div className="value">{fmtNum(shown.finance.patients)}</div>
               <div className="pn-sub">الكشوف المنتهية</div></div>
             <div className="tile"><div className="label">الإجراءات</div><div className="value">{fmtNum(shown.finance.procedures)}</div>
@@ -159,7 +159,7 @@ export default function DoctorDashboard() {
           <div className="pn-grid">
             <div className="card">
               <h3>تقويم الدوام</h3>
-              <DutyCalendar from={shown.from} to={shown.to} days={shown.days} />
+              <DutyCalendar from={shown.from} to={shown.to} days={shown.days} apologies={shown.apologies || []} />
             </div>
             <div className="card">
               <h3>أكثر ٥ إجراءات</h3>
