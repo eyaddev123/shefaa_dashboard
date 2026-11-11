@@ -21,6 +21,8 @@ const mins = (m) => {
   const h = Math.floor(m / 60), r = m % 60
   return h ? `${fmtInt(h)} س${r ? ` ${fmtInt(r)} د` : ''}` : `${fmtInt(r)} د`
 }
+// الوحدة «دوام» = دكتورٌ في يوم: «دوام واحد» · «دوامان» · «٥ دوامات» · «١٤ دواماً»
+const shifts = (n) => (n === 1 ? 'دوام واحد' : n === 2 ? 'دوامين' : `${fmtInt(n)} ${n <= 10 ? 'دوامات' : 'دواماً'}`)
 const pct = (x) => `${Math.round(x * 100).toLocaleString('ar-SY')}٪`
 const docLink = (id) => ({ pathname: `/clinic/doctors/${id}/dashboard`, search: '?period=week' })
 const SHORT = 3, SHORT_PEOPLE = 6
@@ -58,22 +60,33 @@ function Punctuality({ data, full }) {
 
   return (
     <div className="hl-punct">
+      {/* بكلامٍ لا بنسبةٍ وحدها: الوحدة «دوام» (دكتور × يوم) لا «يوم» — ١٤ يوماً في أسبوعٍ من ٥ أيام كانت تُربك */}
       <div className="hl-punct-sum">
-        <span className="hl-punct-lbl">الالتزام بالدوام</span>
+        <span className="hl-punct-lbl">الالتزام بالدوام هالأسبوع</span>
         {actual ? <>
-          <strong className="hl-punct-big">{pct(onTime / actual)}<small> بالوقت</small></strong>
-          <div className="hl-punct-bar" role="img" aria-label={`بالوقت ${pct(onTime / actual)}، تأخير ${pct(late / actual)}`}>
-            {onTime > 0 && <span className="on" style={{ width: `${onW}%` }} />}
-            {late > 0 && <span className="late" style={{ width: `${100 - onW}%` }} />}
+          <p className="hl-punct-lead">
+            من أصل <b>{shifts(actual)}</b> سُجّل فيها وصول الدكتور، وصل <b className="is-on">{fmtInt(onTime)}</b> بالوقت
+            {late > 0 && <> و<b className="is-late">{fmtInt(late)}</b> متأخّراً</>}.
+          </p>
+          <div className="hl-punct-barrow">
+            <div className="hl-punct-bar" role="img" aria-label={`بالوقت ${pct(onTime / actual)}، تأخير ${pct(late / actual)}`}>
+              {onTime > 0 && <span className="on" style={{ width: `${onW}%` }} />}
+              {late > 0 && <span className="late" style={{ width: `${100 - onW}%` }} />}
+            </div>
+            <span className="hl-punct-pct">{pct(onTime / actual)} بالوقت</span>
           </div>
-          <div className="hl-punct-counts">
-            <span className="is-on">بالوقت {days(onTime)}</span>
-            {late > 0 && <span className="is-late">تأخير {days(late)}</span>}
-            {absent > 0 && <span className="is-absent">غياب {days(absent)}</span>}
-            {apologized > 0 && <span className="is-apology">اعتذار {days(apologized)}</span>}
-          </div>
-        </> : <strong className="hl-punct-big is-none">لا حضور مسجَّل بعد</strong>}
-        <span className="hl-punct-note">بالوقت = حتى {fmtInt(data.grace ?? 20)} دقيقة من بداية الدوام</span>
+        </> : <p className="hl-punct-lead">لم يُسجَّل وصول أيّ دكتور هالأسبوع بعد.</p>}
+        <ul className="hl-punct-legend">
+          <li className="is-on"><i /><b>بالوقت</b><span>{onTime ? shifts(onTime) : '—'}</span>
+            <small>وصل خلال {fmtInt(data.grace ?? 20)} دقيقة من بداية دوامه</small></li>
+          <li className="is-late"><i /><b>تأخّر</b><span>{late ? shifts(late) : '—'}</span>
+            <small>وصل بعد أكثر من {fmtInt(data.grace ?? 20)} دقيقة</small></li>
+          <li className="is-apology"><i /><b>اعتذر</b><span>{apologized ? shifts(apologized) : '—'}</span>
+            <small>اعتذر مسبقاً عن دوامه</small></li>
+          <li className="is-absent"><i /><b>غاب</b><span>{absent ? shifts(absent) : '—'}</span>
+            <small>لم يأتِ ولم يعتذر</small></li>
+        </ul>
+        <span className="hl-punct-note">وقت الوصول = لحظة كبس الاستقبال «وصل الطبيب». اضغط اسم أيّ دكتور لترى أيامه.</span>
       </div>
 
       <div className="hl-punct-cols">
