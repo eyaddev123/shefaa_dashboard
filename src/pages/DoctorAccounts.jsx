@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { api, todayLocal } from '../api.js'
 import { matchesAr } from '../arabic-search.js'
+import { fmtClock, clockTitle } from '../components/Punctuality.jsx'
 
 // ═══ حسابات الدكاترة — لشهر أو يوم أو فترة ═══
 // صفحة «تقارير الدكاترة» وتبويب «حسابات الدكاترة» في صندوق العيادات يعرضان هذا نفسه.
@@ -10,14 +11,15 @@ import { matchesAr } from '../arabic-search.js'
 // «صافي الربح» = ما دخل الشفاء من كشوف الدكتور وإجراءاته − راتبه (كان اسمه «الفرق»).
 // الفترة في الرابط (?month= · ?day= · ?from=&to=)؛ البحث والترتيب في الصفحة وحدها.
 
-// المبالغ بالليرة الكاملة (الأسعار بالمئات — الكسر ضجيج)، والساعات بمنزلةٍ عشرية واحدة
+// المبالغ بالليرة الكاملة (الأسعار بالمئات — الكسر ضجيج)، والنسب بمنزلةٍ عشرية واحدة
 const fmtNum = (n) => Number(n || 0).toLocaleString('ar-SY', { maximumFractionDigits: 0 })
-const fmtHours = (h) => Number(h || 0).toLocaleString('ar-SY', { maximumFractionDigits: 1 })
+const fmtOne = (h) => Number(h || 0).toLocaleString('ar-SY', { maximumFractionDigits: 1 })
 // «+١٦٬٠٠٠» و«−٦٠٬٠٠٠» — الإشارة نصّاً: toLocaleString يسبق السالب بعلامة اتجاه تُرسم شرطةً ثانية
 const signed = (n) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${fmtNum(Math.abs(n))}`
 // «يوم واحد» · «يومان» · «٥ أيام» · «١١ يوماً» — ولا «·» بجانب رقمٍ هنديّ (يُقرأ صفراً)
 const daysText = (n) => (n === 1 ? 'يوم واحد' : n === 2 ? 'يومان' : `${fmtNum(n)} ${n >= 3 && n <= 10 ? 'أيام' : 'يوماً'}`)
-const hoursText = (h) => (h === 1 ? 'ساعة واحدة' : h === 2 ? 'ساعتان' : `${fmtHours(h)} ${h >= 3 && h <= 10 && Number.isInteger(h) ? 'ساعات' : 'ساعة'}`)
+// ساعات العمل من الدقائق: «١١:٣٦ ساعة» (ساعة:دقيقة)، والتلميح بالكلمات
+const hoursText = (m) => `${fmtClock(m)} ساعة`
 const countText = (n, one, two, few, many) => (n === 1 ? one : n === 2 ? two : `${fmtNum(n)} ${n >= 3 && n <= 10 ? few : many}`)
 const procText = (n) => (n ? countText(n, 'إجراء واحد', 'إجراءان', 'إجراءات', 'إجراءً') : 'بلا إجراءات')
 const payText = (d) => (d.payKind === 'daily_hourly' ? 'يومية + ساعة'
@@ -46,7 +48,7 @@ const SORTS = [
   ['profit', 'الأعلى ربحاً', (a, b) => (b.diff ?? -Infinity) - (a.diff ?? -Infinity)],
   ['patients', 'الأكثر مرضى', (a, b) => b.patients - a.patients],
   ['late', 'الأكثر تأخيراً', (a, b) => (b.p?.lateRate ?? -1) - (a.p?.lateRate ?? -1) || (b.p?.late ?? 0) - (a.p?.late ?? 0)],
-  ['hours', 'الأكثر حضوراً', (a, b) => b.attendance.days - a.attendance.days || b.attendance.hours - a.attendance.hours],
+  ['hours', 'الأكثر حضوراً', (a, b) => b.attendance.days - a.attendance.days || b.attendance.minutes - a.attendance.minutes],
   ['name', 'أبجدياً', (a, b) => a.doctor.localeCompare(b.doctor, 'ar')],
 ]
 const hasActivity = (d) => d.patients > 0 || d.procedures > 0 || d.attendance.days > 0 || d.shifa > 0
@@ -185,15 +187,15 @@ function Summary({ data, active }) {
   const apologized = active.reduce((n, d) => n + (d.p?.apologized || 0), 0)
   const appt = active.filter((d) => d.p?.appointmentsBased).length
   const days = active.reduce((s, d) => s + d.attendance.days, 0)
-  const hours = Math.round(active.reduce((s, d) => s + d.attendance.hours, 0) * 10) / 10
+  const minutes = active.reduce((s, d) => s + d.attendance.minutes, 0)
   const present = active.filter((d) => d.attendance.days > 0).length
   return (
     <div className="dr-summary">
       <div className="dr-stat">
         <span className="dr-stat-lbl">الحضور</span>
         <strong className="dr-stat-val">{days ? daysText(days) : '—'}</strong>
-        <span className="dr-stat-sub">{hours ? `${hoursText(hours)} عمل` : 'لا ساعات مسجّلة'}</span>
-        {present > 0 && <span className="dr-stat-foot">مجموع أيام {present === 1 ? 'دكتورٍ واحد' : present === 2 ? 'دكتورَين' : `${fmtNum(present)} ${present <= 10 ? 'دكاترة' : 'دكتوراً'}`}</span>}
+        <span className="dr-stat-sub" title={minutes ? clockTitle(minutes) : undefined}>{minutes ? `${hoursText(minutes)} عمل` : 'لا ساعات مسجّلة'}</span>
+        {present > 0 && <span className="dr-stat-foot">حضر {present === 1 ? 'دكتورٌ واحد' : present === 2 ? 'دكتوران' : `${fmtNum(present)} ${present <= 10 ? 'دكاترة' : 'دكتوراً'}`}</span>}
       </div>
       <div className="dr-stat">
         <span className="dr-stat-lbl">المرضى</span>
@@ -260,7 +262,7 @@ function DoctorCard({ d, share, link }) {
         <div className="dr-fig">
           <span className="dr-fig-lbl">الحضور</span>
           <strong>{a.days ? daysText(a.days) : '—'}</strong>
-          <span className="dr-fig-sub">{a.hours ? hoursText(a.hours) : a.days ? 'بلا ساعات' : 'لم يحضر'}</span>
+          <span className="dr-fig-sub" title={a.minutes ? clockTitle(a.minutes) : undefined}>{a.minutes ? hoursText(a.minutes) : a.days ? 'بلا ساعات' : 'لم يحضر'}</span>
         </div>
         <div className="dr-fig">
           <span className="dr-fig-lbl">المرضى</span>
@@ -280,7 +282,7 @@ function DoctorCard({ d, share, link }) {
       <div className="dr-share" title="حصّته من دخل الشفاء في الفترة">
         <div className="dr-meter" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={share}
           aria-label="حصّته من دخل الفترة"><span style={{ width: `${Math.max(share, share > 0 ? 2 : 0)}%` }} /></div>
-        <span className="dr-share-txt">{fmtHours(share)}٪ من دخل الفترة</span>
+        <span className="dr-share-txt">{fmtOne(share)}٪ من دخل الفترة</span>
       </div>
 
       {(a.noDeparture > 0 || a.onDuty > 0) && (
@@ -301,7 +303,7 @@ function DoctorCard({ d, share, link }) {
             <span className="dr-pay-val">
               <strong>{fmtNum(d.salary)}</strong>
               {d.payKind === 'daily_hourly'
-                ? <small>{daysText(a.days)} × {fmtNum(d.dailyRate)} + {hoursText(a.hours)} × {fmtNum(d.hourlyRate)}</small>
+                ? <small>{daysText(a.days)} × {fmtNum(d.dailyRate)} + {hoursText(a.minutes)} × {fmtNum(d.hourlyRate)}</small>
                 : pay && <small>{pay}</small>}
             </span>
           )}

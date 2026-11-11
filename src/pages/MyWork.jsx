@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { api, fmtMoney, openStaffStream } from '../api.js'
 import { useDialogs } from '../dialogs.jsx'
 import { useToast } from '../action-feedback.jsx'
-import { PunctualityTiles, DutyCalendar, fmtMinutes, fmtDuration } from '../components/Punctuality.jsx'
+import { PunctualityTiles, DutyCalendar, fmtMinutes, fmtDuration, fmtClock, clockTitle } from '../components/Punctuality.jsx'
 
 // ═══════════════════════════════════════════════════════════════════
 // «أعمالي» — صفحة الطبيب المستقلّة في القائمة الجانبية (تحت «شاشتي»)
@@ -237,7 +237,7 @@ function MySalary() {
           {s && dh && (
             <ul className="dk-sal-calc">
               {s.dailyRate > 0 && <li><span>{daysText(a.days)} × {fmtInt(s.dailyRate)}</span><b>{fmtInt(s.salaryDays)} ل.س</b></li>}
-              {s.hourlyRate > 0 && <li><span>{fmtInt(a.hours)} ساعة × {fmtInt(s.hourlyRate)}</span><b>{fmtInt(s.salaryHours)} ل.س</b></li>}
+              {s.hourlyRate > 0 && <li><span><span title={clockTitle(a.minutes)}>{fmtClock(a.minutes)} ساعة</span> × {fmtInt(s.hourlyRate)}</span><b>{fmtInt(s.salaryHours)} ل.س</b></li>}
             </ul>
           )}
           {s && <SalaryLines s={s} />}

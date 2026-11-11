@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { api, todayLocal } from '../api.js'
-import { PunctualityTiles, DutyCalendar, AttendanceLog, fmtMinutes, AppointmentsBadge } from '../components/Punctuality.jsx'
+import { PunctualityTiles, DutyCalendar, AttendanceLog, fmtMinutes, AppointmentsBadge, fmtClock, clockTitle } from '../components/Punctuality.jsx'
 import DoctorTimesCard from '../components/DoctorTimesCard.jsx'
 import { useRole } from '../RoleContext.jsx'
 
@@ -25,7 +25,7 @@ function FinanceCard({ f }) {
   const salaryNote = f.noPay ? 'بلا نوع حساب — الراتب صفر'
     : f.payKind === 'daily_hourly' ? <>
         {fmtNum(a.days)} {a.days >= 3 && a.days <= 10 ? 'أيام' : 'يوم'} × {fmtNum(f.dailyRate)} = {fmtNum(f.salaryDays)}
-        <br />{fmtNum(a.hours)} س × {fmtNum(f.hourlyRate)} = {fmtNum(f.salaryHours)}
+        <br /><span title={clockTitle(a.minutes)}>{fmtClock(a.minutes)} ساعة</span> × {fmtNum(f.hourlyRate)} = {fmtNum(f.salaryHours)}
       </>
     : f.payKind === 'per_patient' ? `${fmtNum(f.payAmount)} للمريض × ${fmtNum(f.patients)}`
     : f.salary === null ? `راتب شهري ثابت ${fmtNum(f.payAmount)} — يُحسب للشهر الكامل` : 'راتب شهري ثابت'

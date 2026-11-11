@@ -26,6 +26,16 @@ export const fmtDuration = (m) => {
   const n = (x) => Number(x).toLocaleString('ar-SY')
   return h ? `${n(h)} س${r ? ` ${n(r)} د` : ''}` : `${n(r)} د`
 }
+// ساعات العمل ساعةً:دقيقة — «١٤:٤٢» = ١٤ ساعة و٤٢ دقيقة (قرار المستخدم: لا كسر عشريّ ١٤٫٧).
+// الأرقام الهندية والنقطتان تبقى بترتيبها داخل النصّ العربي (رقمٌ عربيّ مفصولٌ بفاصلٍ مشترك).
+export const fmtClock = (m) => {
+  const t = Math.max(0, Math.round(m || 0)), h = Math.floor(t / 60), r = t % 60
+  return `${h.toLocaleString('ar-SY')}:${r.toLocaleString('ar-SY', { minimumIntegerDigits: 2 })}`
+}
+export const clockTitle = (m) => {
+  const t = Math.max(0, Math.round(m || 0)), h = Math.floor(t / 60), r = t % 60
+  return `${h.toLocaleString('ar-SY')} ساعة${r ? ` و${r.toLocaleString('ar-SY')} دقيقة` : ''}`
+}
 export const fmtPct = (c) => (c === null || c === undefined ? '—' : `${Math.round(c * 100).toLocaleString('ar-SY')}٪`)
 const minutes = (n) => `${fmtInt(n)} د`
 

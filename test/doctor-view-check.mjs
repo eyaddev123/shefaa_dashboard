@@ -80,7 +80,7 @@ const run = async () => {
     await page.waitForSelector('.dk-sal-calc')
     const t = await page.textContent('.dk-salary')
     ok(t.includes('٣٩٠'), '★ الراتب ٣٩٠٬٠٠٠')
-    ok(t.includes('٥ أيام × ٥٠') && t.includes('١٤ ساعة × ١٠'), '★ الحساب: يومية × أيام + ساعة × ساعات')
+    ok(t.includes('٥ أيام × ٥٠') && t.includes('١٤:٠٠ ساعة × ١٠'), '★ الحساب: يومية × أيام + ساعة × ساعات (الساعات س:دد)')
     ok(t.includes('انصراف غير مسجَّل') && await has(page, '.dk-salary tr.dt-row-warn .badge.warn'), '★ يوم بلا انصراف معلَّم')
     ok(!/حصّة الشفاء|الربح|خسارة|تحاسبه/.test(t), '★ لا حصّة ولا فرق ولا دورة')
     await page.waitForSelector('.dk-rule-list li')
