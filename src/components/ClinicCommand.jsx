@@ -4,7 +4,7 @@ import { api, dayLabel, fmtTime } from '../api.js'
 import { useRole } from '../RoleContext.jsx'
 import { useToast } from '../action-feedback.jsx'
 import { generateLabel, generateSummary } from '../generate-summary.js'
-import { canGenerateSessions, canSeeCashReport, canSeeClinicFunds, canSeeInventory, canSeeProceduresPage, isReadOnly } from '../permissions.js'
+import { canGenerateSessions, canSeeCashReport, canSeeClinicFunds, canSeeInventory, canSeeProceduresPage, canSeeReferralsPage, isReadOnly } from '../permissions.js'
 import RoomBadge from './RoomBadge.jsx'
 import Highlights from './Highlights.jsx'
 import { CC } from './cc-icons.jsx'
@@ -175,7 +175,8 @@ function SessionsCard({ sessions, today, doctorsActive, canGenerate, busy, onGen
   )
 }
 
-function FinanceCard({ f, role }) {
+// إحالات اليوم (الخادم يرسلها لقرّاء الإحالات وحدهم): الزيارات المحالة التي حضر أصحابها، وما على الجهات
+function FinanceCard({ f, r, role }) {
   return (
     <div className="card cc-panel cc-finance">
       <div className="cc-panel-head"><h3>لمحة مالية</h3></div>
@@ -197,6 +198,28 @@ function FinanceCard({ f, role }) {
             <div className="cc-fin-note">{f.receiptsPatients ? `من ${plural(f.receiptsPatients, 'مريض واحد', 'مريضين', 'مرضى', 'مريضاً')}` : 'لا مقبوضات بعد'}</div>
           </div>
           {canSeeCashReport(role) && <Link className="plain" to="/clinic/cash-report">الجرد</Link>}
+        </div>
+      )}
+      {r && (
+        <div className="cc-fin-row">
+          <span className="cc-ico" aria-hidden="true">{CC.referral}</span>
+          <div>
+            <div className="cc-fin-label">إحالات اليوم</div>
+            <div className="cc-fin-value"><Money value={r.due} /></div>
+            <div className="cc-fin-note">
+              {r.visits ? `مستحقّ على ${plural(r.sourcesCount, 'جهة واحدة', 'جهتين', 'جهات', 'جهة')} عن ${plural(r.visits, 'مريض واحد', 'مريضين', 'مرضى', 'مريضاً')}`
+                : 'لا إحالات اليوم بعد'}
+            </div>
+            {r.sources.length > 0 && (
+              <ul className="cc-ref-list">
+                {r.sources.map((x) => (
+                  <li key={x.id}><span>{x.name}</span><b>{plural(x.visits, 'مريض واحد', 'مريضان', 'مرضى', 'مريضاً')}</b><Money value={x.due} /></li>
+                ))}
+                {r.sourcesCount > r.sources.length && <li className="cc-ref-more">و{plural(r.sourcesCount - r.sources.length, 'جهة واحدة', 'جهتان', 'جهات', 'جهة')} غيرها</li>}
+              </ul>
+            )}
+          </div>
+          {canSeeReferralsPage(role) && <Link className="plain" to="/clinic/referrals">الإحالات</Link>}
         </div>
       )}
     </div>
@@ -304,7 +327,7 @@ export default function ClinicCommand() {
         <SessionsCard sessions={data.sessions} today={data.today} doctorsActive={data.doctorsActive}
           canGenerate={canGenerateSessions(role)} busy={busy} onGenerate={generate} />
         <div className="cc-side">
-          {data.finance && <FinanceCard f={data.finance} role={role} />}
+          {data.finance && <FinanceCard f={data.finance} r={data.referrals} role={role} />}
           <AlertsCard a={data.alerts} role={role} />
         </div>
       </div>
