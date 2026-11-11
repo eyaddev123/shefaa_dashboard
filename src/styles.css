@@ -4050,24 +4050,31 @@ a.cc-stat:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px
 .hl-card > .empty, .hl-card > .error { padding: 0 20px 16px; }
 .hl-body { display: flex; flex-direction: column; gap: 16px; padding: 4px 20px 20px; }
 
-.hl-punct { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 16px; }
-.hl-punct-sum { display: flex; flex-direction: column; gap: 8px; padding: 16px; border-radius: 14px; background: var(--page); }
+.hl-punct { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 16px; align-items: start; }
+.hl-punct-sum { display: flex; flex-direction: column; gap: 12px; padding: 16px; border-radius: 14px; background: var(--page); align-self: start; }
+.hl-punct-lead { margin: 0; font-size: 15px; line-height: 1.8; color: var(--text-primary); }
+.hl-punct-lead b { font-size: 17px; font-weight: 800; }
+.hl-punct-lead b.is-on { color: var(--status-good); }
+.hl-punct-lead b.is-late { color: var(--status-pending); }
+.hl-punct-barrow { display: flex; align-items: center; gap: 10px; }
+.hl-punct-barrow .hl-punct-bar { flex: 1; }
+.hl-punct-pct { font-size: 13px; font-weight: 800; color: var(--status-good); white-space: nowrap; }
+.hl-punct-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.hl-punct-legend li { display: grid; grid-template-columns: 10px auto 1fr; grid-template-rows: auto auto; align-items: center; gap: 0 8px; }
+.hl-punct-legend i { width: 10px; height: 10px; border-radius: 3px; grid-row: span 2; align-self: start; margin-top: 6px; }
+.hl-punct-legend b { font-size: 14px; font-weight: 800; color: var(--text-primary); }
+.hl-punct-legend span { justify-self: end; font-size: 14px; font-weight: 800; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.hl-punct-legend small { grid-column: 2 / -1; font-size: 12px; color: var(--muted); }
+.hl-punct-legend .is-on i { background: var(--status-good); }
+.hl-punct-legend .is-late i { background: var(--status-pending); }
+.hl-punct-legend .is-apology i { background: var(--status-bad); }
+.hl-punct-legend .is-absent i { background: var(--status-bad-bg); box-shadow: inset 0 0 0 1.5px var(--status-bad); }
 .hl-punct-lbl { font-size: 13px; font-weight: 700; color: var(--text-secondary); }
-.hl-punct-big { font-size: 38px; font-weight: 800; line-height: 1; color: var(--status-good); font-variant-numeric: tabular-nums; }
-.hl-punct-big small { font-size: 14px; font-weight: 700; color: var(--text-secondary); }
-.hl-punct-big.is-none { font-size: 18px; color: var(--muted); }
 .hl-punct-bar { display: flex; gap: 2px; height: 10px; border-radius: 999px; overflow: hidden; background: var(--grid); }
 .hl-punct-bar span { display: block; height: 100%; }
 .hl-punct-bar .on { background: var(--status-good); }
 .hl-punct-bar .late { background: var(--status-pending); }
-.hl-punct-counts { display: flex; flex-wrap: wrap; gap: 4px 6px; }
-.hl-punct-counts span { padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; }
-.hl-punct-counts .is-on { color: var(--status-good); background: var(--status-good-bg); }
-.hl-punct-counts .is-late { color: var(--status-pending); background: var(--status-pending-bg); }
-.hl-punct-counts .is-absent { color: var(--status-bad); background: var(--status-bad-bg); }
-.hl-punct-counts .is-apology { color: #fff; background: var(--status-bad); }
-:root[data-theme='dark'] .hl-punct-counts .is-apology { color: #2a0b0b; }
-.hl-punct-note { margin-top: auto; font-size: 11.5px; color: var(--muted); }
+.hl-punct-note { font-size: 12px; line-height: 1.6; color: var(--muted); }
 .hl-punct-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .hl-col { padding: 12px 14px; border-radius: 14px; background: var(--page); border-top: 3px solid var(--grid); min-width: 0; }
 .hl-col.is-on { border-top-color: var(--status-good); }
