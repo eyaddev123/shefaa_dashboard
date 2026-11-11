@@ -56,7 +56,14 @@ const emptyOf = (c) => ({ ...c, sessions: [], day: { ...zeroDay, ...(c.day.apolo
   alerts: { unpaid: { n: 0, total: 0 }, ...(c.alerts.lowStock ? { lowStock: { n: 0, items: [] } } : {}), ...(c.alerts.noDeparture ? { noDeparture: { days: 0, doctorsCount: 0, doctors: [] } } : {}) } })
 const hl = (n) => Array.from({ length: n }, (_, i) => ({ doctorId: String(i + 1), doctor: `د. رقم ${i + 1}`, specialty: 'عظمية', commitment: 100, onTime: 7, actual: 7,
   patients: 40 - i, procedures: 20 - i, shifa: 90000 - i * 1000, lateMinutes: 90, lateDays: 3, absent: 2, scheduled: 6 }))
-const HIGHLIGHTS = { from: '2026-10-31', to: today, period: 'week', minActualDays: 2, commitment: hl(5), patients: hl(5), procedures: hl(5), shifa: hl(5), late: [], absent: hl(1) }
+// roster: كلّ دكتورٍ بدوامٍ أو اعتذار — بالوقت دائماً · متأخّر · غائب · معتذر · بمواعيد خاصة
+const R = (id, doctor, o) => ({ doctorId: id, doctor, specialty: 'عظمية', appointmentsBased: false, scheduled: 3, actual: 3, onTime: 3, late: 0, estimated: 0,
+  absent: 0, lateMinutes: 0, avgLate: null, apologized: 0, ...o })
+const ROSTER = [R('1', 'د. رقم 1', {}), R('2', 'د. رقم 2', { onTime: 1, late: 2, lateMinutes: 70, avgLate: 35 }),
+  R('3', 'د. رقم 3', { actual: 2, onTime: 2, absent: 1 }), R('4', 'د. رقم 4', { scheduled: 0, actual: 0, onTime: 0, apologized: 2 }),
+  R('5', 'د. رقم 5', { appointmentsBased: true, actual: 0, onTime: 0 })]
+const HIGHLIGHTS = { from: '2026-10-31', to: today, period: 'week', minActualDays: 2, grace: 20, commitment: hl(5), patients: hl(5), procedures: hl(5), shifa: hl(5),
+  late: [], absent: hl(1), apologized: [], roster: ROSTER }
 const AID = { view: 'board', families: 5, persons: 9, requests: 3, byStatus: [], vouchersCount: 0, vouchersTotal: 0, myQueue: [], myReviewsCount: 1, readyForDecision: [], todaySessions: [], doctorsCount: 8 }
 const SUPER = { ...AID, view: 'super_admin', users: { active: 3, total: 4, suspended: 1, never_logged_in: 0 } }
 
@@ -107,13 +114,15 @@ const run = async () => {
     await page.waitForSelector('.hl-grid')
     ok(await page.$$eval('.cc-stat', (x) => x.length) === 4, 'أربع بطاقات علوية')
     ok((await text(page, '.cc-stats')).includes('٢٨'), 'مرضى اليوم بالأرقام')
-    ok(await has(page, '.cc-finance') && await has(page, '.cc-alerts') && await has(page, '.cc-sessions table'), 'المالية والتنبيهات والجلسات')
+    ok(await has(page, '.cc-finance') && await has(page, '.cc-alerts') && await has(page, '.cc-scards'), 'المالية والتنبيهات والجلسات (بطاقات)')
     ok((await text(page, '.cc-finance')).includes('من ٣٢ مريضاً'), 'عدد مرضى المقبوضات')
     ok((await text(page, '.cc-alerts')).includes('إجراءان بانتظار المحاسبة'), '★ مثنّى الإجراء')
     ok((await text(page, '.cc-alerts')).includes('مادتان عند الحدّ الأدنى'), '★ مثنّى المادة')
     ok((await text(page, '.cc-alerts')).includes('يومان بلا انصراف'), '★ مثنّى اليوم')
-    ok(await page.$eval('tbody tr:nth-child(1) .cc-now', (e) => e.textContent) === '٧', '★ الدور الحالي');
-    ok(await page.$eval('tbody tr:nth-child(2) .cc-now', (e) => e.textContent) === '—', 'بلا كشفٍ جارٍ: شرطة')
+    ok(await page.$eval('.cc-scard[href="/clinic/session/1"] .cc-scard-turn strong', (e) => e.textContent) === '٧', '★ الدور الحالي');
+    ok(await page.$eval('.cc-scard[href="/clinic/session/2"] .cc-scard-turn strong', (e) => e.textContent) === '—', 'بلا كشفٍ جارٍ: شرطة')
+    ok(JSON.stringify(await page.$$eval('.cc-scard', (x) => x.map((a) => a.getAttribute('href').split('/').pop()))) === '["1","2","3"]', '★ الترتيب: شغّالة ⇐ جاهزة ⇐ منتهية')
+    ok((await text(page, '.cc-scard[href="/clinic/session/1"]')).includes('انتهى ٧ من ١٤'), 'التقدّم في البطاقة')
     const api = calls.filter((c) => !c.includes('/auth/me') && !c.includes('notifications') && !c.includes('/unpaid') && !c.includes('/events'))
     // StrictMode في التطوير يضاعف كلّ effect — فالعدد الفعليّ يُفحص على البناء، وهنا الأنواع
     ok([...new Set(api)].sort().join() === 'GET /clinic/command,GET /clinic/highlights', `★ اللوحة طلبان لا غير (${api.join(' | ')})`)
@@ -121,13 +130,19 @@ const run = async () => {
     ok(await page.$$eval('.hl-box:first-child .hl-list li', (x) => x.length) === 3, 'الأبرز: الثلاثة الأوائل')
     await page.click('.hl-more')
     ok(await page.$$eval('.hl-box:first-child .hl-list li', (x) => x.length) === 5, '★ وبكبسة الخمسة')
-    ok(await page.$$eval('.hl-box', (x) => x.length) === 6, '★ ستّ بطاقات كما كانت')
-    ok((await text(page, '.hl-grid')).includes('لا تأخير هالأسبوع'), 'الفارغ يقول ذلك')
+    ok(await page.$$eval('.hl-box', (x) => x.length) === 3, '★ ثلاثة أوائل: مرضى · إجراءات · حصّة')
+    const pu = await text(page, '.hl-punct')
+    ok(/الالتزام بالدوام/.test(pu) && /٧٥٪/.test(pu), `★ النسبة الكلّية بلا «بمواعيد خاصة»: ٦ من ٨ (${pu.slice(0, 80)})`)
+    ok((await text(page, '.hl-col.is-on')).includes('د. رقم 1') && !(await text(page, '.hl-col.is-on')).includes('د. رقم 2'), '★ «بالوقت دائماً» من لم يتأخّر')
+    ok(/د\. رقم 2[\s\S]*تأخّر يومين من ٣، متوسّط ٣٥ د/.test(await text(page, '.hl-col.is-late')), '★ «يتأخّرون» بكم من كم ومتوسّط')
+    ok(/غاب يوم/.test(await text(page, '.hl-col.is-away')) && /اعتذر يومين/.test(await text(page, '.hl-col.is-away')), '★ غياب واعتذار')
+    ok((await text(page, '.hl-appt')).includes('د. رقم 5') && !(await text(page, '.hl-punct-cols')).includes('د. رقم 5'), '★ «بمواعيد خاصة» سطرٌ وحده')
+    ok((await text(page, '.hl-punct')).includes('حتى ٢٠ دقيقة'), 'السماح مكتوب')
     ok(await page.getAttribute('.hl-who a', 'href') === '/clinic/doctors/1/dashboard?period=week', 'الاسم يفتح لوحة الدكتور بالأسبوع')
     ok(!/·\s*[٠-٩]|[٠-٩]\s*·/.test(await text(page, '.cc')), '★ لا «·» بجانب رقم هنديّ')
     ok(errors.length === 0, `بلا أخطاء صفحة (${errors[0] || ''})`)
-    await page.click('tbody tr:nth-child(2) td[data-label="الوقت"]')
-    ok(new URL(page.url()).pathname === '/clinic/session/2', 'الصفّ يفتح الدور')
+    await page.click('.cc-scard[href="/clinic/session/2"] .cc-scard-time')
+    ok(new URL(page.url()).pathname === '/clinic/session/2', 'البطاقة تفتح الدور')
     await ctx.close()
   }
 
@@ -151,13 +166,13 @@ const run = async () => {
   {
     const { ctx, page, calls } = await open(browser, { empty: true })
     await page.waitForSelector('.cc-empty')
-    ok(!await has(page, '.cc-sessions table'), 'بلا جدول فارغ')
+    ok(!await has(page, '.cc-scards'), 'بلا بطاقات فارغة')
     ok((await text(page, '.cc-empty button')).startsWith('توليد جلسات'), 'زرّ التوليد باسم اليوم')
     ok((await text(page, '.cc-allclear')).includes('لا شيء ينتظرك'), 'لا تنبيهات: جملةٌ هادئة')
     await shot(page, 'empty-light')
     const reads = calls.filter((c) => c === 'GET /clinic/command').length
     await page.click('.cc-empty button')
-    await page.waitForSelector('.cc-sessions table')
+    await page.waitForSelector('.cc-scards')
     ok(calls.includes('POST /clinic/sessions/generate'), '★ الزرّ يولّد')
     ok(calls.filter((c) => c === 'GET /clinic/command').length === reads + 1, '★ وتُعاد القراءة')
     ok((await text(page, '.toast')).includes('جلسات جديدة'), 'وملخّص التوليد')
@@ -227,7 +242,7 @@ const run = async () => {
     await page.waitForSelector('.hl-grid')
     ok(await noHScroll(page), `بلا تمرير أفقي ${w} ${theme} ${empty ? 'فارغ' : 'شغّال'}`)
     ok(errors.length === 0, `بلا أخطاء ${w} ${theme}`)
-    if (w === 390 && !empty) ok(!(await page.$('.cc-table thead'))?.offsetHeight, 'الجوال بطاقاتٌ لا جدول')
+    if (w === 390 && !empty) ok(await page.$$eval('.cc-scard', (x) => x.length) > 0 && new Set(await page.$$eval('.cc-scard', (x) => x.map((e) => e.getBoundingClientRect().left))).size === 1, 'الجوال: بطاقةٌ في كلّ سطر')
     await shot(page, `${empty ? 'empty' : 'busy'}-${theme}-${w}`)
     await ctx.close()
   }
