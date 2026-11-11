@@ -11,7 +11,7 @@ import { loadPrinter, printTicket, ticketFrom, MAX_COPIES } from '../ticket-prin
 import { printViaHelper } from '../print-helper.js'
 import { api, APPOINTMENT_STATUSES, BOOKING_TYPES, VISIT_TYPES, PROCEDURE_ONLY, PRIORITIES, fmtMoney, toLatinDigits, cleanMobile, mobileError } from '../api.js'
 import MobileInput from '../components/MobileInput.jsx'
-import { SameNameConfirm } from '../components/PatientPicker.jsx'
+import { SameNameConfirm, blockedName } from '../components/PatientPicker.jsx'
 import { isAttendanceSession, usePolling, fmtClock, turnLabel, fmtTimeOfDay } from '../attendance-ui.jsx'
 import { useRole } from '../RoleContext.jsx'
 import { ProcedureOnlyBadge, isProcedureOnly, endedWithoutProcedure, visitKindLockReason } from '../components/ProcedureOnly.jsx'
@@ -551,7 +551,7 @@ function ReferralSection({ appt, session, onChanged, onToast }) {
 // ═══ تغيير المريض — اختير الخطأ عند الحجز ═══
 // يُربط هذا الحجز وحده بمريضٍ آخر؛ سجلّ المريض الحالي لا يُمَسّ. بسببٍ إلزامي.
 // البحث أسماءٌ فقط (سطرٌ لكل مريض) و«هو نفسه» يرسل patient_id. و«مريض جديد» باسمٍ
-// مطابقٍ لمسجَّل يُسأل عنه أولاً (الخادم يرفضه بلا تأكيد).
+// مطابقٍ لمسجَّل ممنوع (الخادم 409 NAME_EXISTS)، وباسمٍ مشابه يُسأل عنه أولاً.
 function SwapPatient({ appt, onToast, onDone, onCancel }) {
   const [search, setSearch] = useState('')
   const [found, setFound] = useState(null)
@@ -577,7 +577,8 @@ function SwapPatient({ appt, onToast, onDone, onCancel }) {
     try { await api.clinic.changePatient(appt.id, { ...body, reason: reason.trim() })
       onToast('تغيّر المريض', 'success'); onDone() }
     catch (ex) {
-      if (ex.data?.code === 'SAME_NAME_EXISTS') setSameName([...(ex.data.matches || []), ...(ex.data.similar || [])])
+      if (ex.data?.code === 'SAME_NAME_EXISTS') setSameName({ matches: [...(ex.data.matches || []), ...(ex.data.similar || [])] })
+      else if (blockedName(ex)) setSameName({ matches: blockedName(ex), blocked: true })
       else onToast(ex.message)
     } finally { setBusy(false) }
   }
@@ -619,7 +620,7 @@ function SwapPatient({ appt, onToast, onDone, onCancel }) {
         <button className="ghost" disabled={busy || !reasonOk || !newPt.full_name.trim()}
           onClick={() => linkNew()}>مريض جديد</button>
       </div>
-      <SameNameConfirm matches={sameName} disabled={busy || !reasonOk}
+      <SameNameConfirm matches={sameName?.matches} blocked={sameName?.blocked} disabled={busy || !reasonOk}
         onPick={(c) => { setSameName(null); link({ patient_id: c.id }) }}
         onConfirm={() => { setSameName(null); linkNew({ confirm_new_patient: true }) }} />
     </div>

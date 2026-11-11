@@ -4567,3 +4567,45 @@ a.dr-chip:hover { color: var(--accent-text); border-color: var(--primary); }
 .dr-pchip.is-absent { color: var(--status-bad); background: var(--status-bad-bg); box-shadow: inset 0 0 0 1px var(--status-bad); }
 .dr-pchip.is-apology { color: #fff; background: var(--status-bad); }
 :root[data-theme='dark'] .dr-pchip.is-apology { color: #2a0b0b; }
+
+/* ═══ المرضى المكرّرون (unique-name) ═══ */
+.dup-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin-bottom: 16px; }
+.dup-count { font-size: 15px; color: var(--text-secondary); }
+.dup-clean { color: var(--status-good); }
+.dup-search { flex: 0 1 300px; min-width: 0; }
+.dup-group { padding: 18px; }
+.dup-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 12px; }
+.dup-head h3 { margin: 0; font-size: 16px; }
+.dup-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.dup-row {
+  display: grid; grid-template-columns: auto 1fr auto; gap: 6px 14px; align-items: start;
+  padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--page);
+}
+.dup-row.is-keep { border-color: var(--status-good); background: var(--status-good-bg); }
+.dup-row.is-merge { border-style: dashed; border-color: var(--status-pending); }
+.dup-pick { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--text-secondary); min-width: 92px; }
+.dup-pick label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap; }
+.dup-main { min-width: 0; display: grid; gap: 4px; }
+.dup-name { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.dup-name strong { font-size: 15px; color: var(--text-primary); }
+.dup-id { font-size: 12px; color: var(--muted); }
+.dup-facts { font-size: 13px; color: var(--text-secondary); }
+.dup-visits { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--text-secondary); }
+.dup-none { color: var(--muted); }
+.dup-created { color: var(--muted); }
+.dup-other { align-self: center; white-space: nowrap; font-size: 13px; }
+.dup-rename { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.dup-rename input { flex: 1 1 220px; min-width: 0; }
+.dup-rename .hint, .dup-rename .error { flex-basis: 100%; margin: 0; }
+.dup-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 14px; }
+.dup-actions .hint { color: var(--muted); }
+.dup-history summary { cursor: pointer; font-weight: 700; }
+.dup-history ul { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 6px; font-size: 13px; }
+.dup-history li { display: flex; flex-wrap: wrap; gap: 4px 12px; color: var(--text-secondary); }
+.dup-when, .dup-by { color: var(--muted); }
+.candidates-box.name-taken { border-color: var(--status-bad); background: var(--status-bad-bg); }
+@media (max-width: 640px) {
+  .dup-row { grid-template-columns: 1fr; }
+  .dup-pick { flex-direction: row; flex-wrap: wrap; gap: 6px 16px; }
+  .dup-other { justify-self: start; }
+}

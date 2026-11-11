@@ -4,8 +4,9 @@ import { api, cleanMobile } from '../api.js'
 // ═══ البحث عن مريض في الاستقبال — مصدرٌ واحد للحجز وجلسة الحديد وتغيير المريض ═══
 // النتيجة أسماءٌ فقط (الخادم يعيد { matches, similar } من { id, full_name })، سطرٌ لكل مريض:
 // المطابقون، ثمّ تحت عنوان «أسماء مشابهة» ما يقرب بغلطةٍ إملائية أو اسم جدّ زائد. ولا تعبئة
-// قبل أن تكبس الموظفة «هو نفسه» — ولو طلع مريضٌ واحد: الرقم قد يكون رقم الأم،
-// والاسم قد يكون لشخصين. النظام لا يختار ولا يدمج.
+// قبل أن تكبس الموظفة «هو نفسه» — ولو طلع مريضٌ واحد: الرقم قد يكون رقم الأم (والرقم ليس
+// فريداً — العائلة كلّها برقمٍ واحد). النظام لا يختار ولا يدمج.
+// والاسم الثلاثي المطابق لا يتكرّر (2026-11-11): «مريض جديد» به ممنوع — تختار الموجود أو تضيف للاسم.
 
 const threeWords = (v) => String(v || '').trim().split(/\s+/).filter(Boolean).length >= 3
 const isFullMobile = (v) => /^09[0-9]{8}$/.test(cleanMobile(v))
@@ -68,11 +69,13 @@ export function usePatientSearch() {
   const similar = picked || dismissed ? [] : nameSimilar.filter(uniq)
   // من يُسأل عنه عند «مريض جديد»: المطابقون بالاسم ثمّ المشابهون (الرقم وحده لا يعني الاسم)
   const nearNames = [...nameMatches, ...nameSimilar]
+  // والمطابقون وحدهم يمنعون «مريض جديد» منعاً (لا «نعم، مريض جديد»)
+  const exactNames = nameMatches
 
   // «غير موجود عندنا»: بحث الاسم انتهى بلا أحد، ولا مطابق بالرقم
   const noMatch = !picked && nameDone && pending === 0 && nameMatches.length === 0
     && nameSimilar.length === 0 && mobileMatches.length === 0
-  return { candidates, similar, nearNames, picked, checking: pending > 0, noMatch, pickError,
+  return { candidates, similar, nearNames, exactNames, picked, checking: pending > 0, noMatch, pickError,
     byName, byMobile, pick, reset, dismiss }
 }
 
@@ -103,10 +106,29 @@ export function PatientCandidates({ candidates = [], similar = [], onPick, onNew
   )
 }
 
-// «مريض جديد» باسمٍ مطابق أو مشابه لمسجَّل — تأكيدٌ صريح. «لا، هو نفسه» يختاره، و«نعم» يُنشئ جديداً.
-// matches هنا: المطابقون ثمّ المشابهون في قائمةٍ واحدة (الأقرب أولاً).
-export function SameNameConfirm({ matches, onPick, onConfirm, disabled = false }) {
+// «مريض جديد» باسمٍ لمسجَّل:
+//   • مشابه (فرق حرف، اسم جدّ زائد) ⇒ تأكيدٌ صريح: «لا، هو نفسه» يختاره، و«نعم» يُنشئ جديداً.
+//   • مطابق (blocked) ⇒ منعٌ: «هو نفسه» وحده، أو تعديل الاسم في خانته (يطوي هذا الصندوق).
+// matches: المطابقون، أو المشابهون (الأقرب أولاً).
+export function blockedName(ex) {
+  return ex?.data?.code === 'NAME_EXISTS' ? (ex.data.matches || []) : null
+}
+export function SameNameConfirm({ matches, blocked = false, onPick, onConfirm, disabled = false }) {
   if (!matches?.length) return null
+  if (blocked) return (
+    <div className="candidates-box name-taken" role="alertdialog" aria-live="assertive">
+      <div className="candidates-title">
+        هذا الاسم مسجّل لمريض: <strong>{matches[0].full_name}</strong>. إذا كان هو نفسه اختاريه، وإذا كان شخصاً آخر
+        أضيفي اسم الجد أو الكنية للاسم — لا يُسجَّل مريضان بالاسم نفسه.
+      </div>
+      {matches.map((c) => (
+        <div key={c.id} className="candidate-row">
+          <div><strong>{c.full_name}</strong></div>
+          <button type="button" className="ghost" disabled={disabled} onClick={() => onPick(c)}>هو نفسه</button>
+        </div>
+      ))}
+    </div>
+  )
   return (
     <div className="candidates-box" role="alertdialog" aria-live="assertive">
       <div className="candidates-title">

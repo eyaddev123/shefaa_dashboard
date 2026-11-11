@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { api, cleanMobile, mobileError } from '../api.js'
 import MobileInput from './MobileInput.jsx'
-import { usePatientSearch, PatientCandidates, SameNameConfirm, MobileUpdateAsk } from './PatientPicker.jsx'
+import { usePatientSearch, PatientCandidates, SameNameConfirm, MobileUpdateAsk, blockedName } from './PatientPicker.jsx'
 import { Modal } from './inventory/shared.jsx'
 import Combobox, { byNameAr } from './Combobox.jsx'
 import { readAmountInput } from '../iron-shares.js'
@@ -118,7 +118,8 @@ export default function IronSessionDialog({ onClose, onSaved }) {
   const onName = (v) => { setName(v); setNewConfirmed(false); setSameName(null); patientSearch.byName(v) }
   const onMobile = (v) => { setMobile(v); setMobileAsk(false); patientSearch.byMobile(v) }
   const chooseNew = () => {
-    if (patientSearch.nearNames.length) setSameName({ matches: patientSearch.nearNames, fromSubmit: false })
+    if (patientSearch.exactNames.length) setSameName({ matches: patientSearch.exactNames, blocked: true, fromSubmit: false })
+    else if (patientSearch.nearNames.length) setSameName({ matches: patientSearch.nearNames, fromSubmit: false })
     else { setNewConfirmed(true); patientSearch.dismiss() }
   }
   // «نعم، مريض جديد»: إن جاء السؤال من الحفظ نفسه، يُعاد الحفظ بالتأكيد فوراً
@@ -202,6 +203,7 @@ export default function IronSessionDialog({ onClose, onSaved }) {
     } catch (ex) {
       // اسمٌ مطابق لمسجَّل بلا تأكيد: السؤال نفسه بدل رسالة خطأ — ولا شيء حُفظ
       if (ex.data?.code === 'SAME_NAME_EXISTS') { setSameName({ matches: [...(ex.data.matches || []), ...(ex.data.similar || [])], fromSubmit: true }); return }
+      if (blockedName(ex)) { setNewConfirmed(false); setSameName({ matches: blockedName(ex), blocked: true, fromSubmit: true }); return }
       const field = SERVER_FIELDS[ex.data?.field]
       if (field) {
         setServerField({ field, msg: ex.message })
@@ -252,7 +254,7 @@ export default function IronSessionDialog({ onClose, onSaved }) {
             {!sameName && (
               <PatientCandidates candidates={patientSearch.candidates} similar={patientSearch.similar} onPick={pick} onNew={chooseNew} disabled={busy} />
             )}
-            <SameNameConfirm matches={sameName?.matches} onPick={pick} onConfirm={confirmNew} disabled={busy} />
+            <SameNameConfirm matches={sameName?.matches} blocked={sameName?.blocked} onPick={pick} onConfirm={confirmNew} disabled={busy} />
             {mobileAsk && picked && (
               <MobileUpdateAsk storedMobile={picked.mobile} disabled={busy}
                 onUpdate={() => submit(null, 'update')} onKeep={() => submit(null, 'keep')} />
