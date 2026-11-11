@@ -1,6 +1,8 @@
+import { useState } from 'react'
 // ═══ الالتزام بالدوام — قطعٌ مشتركة بين لوحة تحكم الدكتور و«التزامي» في «أعمالي» ═══
 // الحساب كلّه في الخادم (server/src/doctor-dashboard.js) — هنا عرضٌ وحده:
-//   بالوقت (≤ ١٠ د) أخضر · متأخّر أصفر · غائب أحمر · تقديري رمادي (بلا «وصل الطبيب»، بأوّل نداء)
+//   بالوقت (≤ ١٥ د) أخضر · متأخّر أصفر بدقائقه · غائب أحمر فاتح · اعتذر أحمر ممتلئ · تقديري رمادي
+//   (بلا «وصل الطبيب»، بأوّل نداء). الاعتذار من قائمةٍ منفصلة (apologies) — لا يدخل أيّ عدّاد.
 // والتقديريّ لا يدخل نسبة الالتزام ولا الترتيب. اليوم الجاري بلا وصولٍ بعد «لم يُحسم» بلا لون.
 // دكتور «بمواعيد خاصة» (p.appointmentsBased): لا نسبة ولا تأخير — «بمواعيد خاصة» مكانهما، وأيام
 // حضوره زرقاء بوقت وصولها وحده.
@@ -24,11 +26,21 @@ export const fmtDuration = (m) => {
   const n = (x) => Number(x).toLocaleString('ar-SY')
   return h ? `${n(h)} س${r ? ` ${n(r)} د` : ''}` : `${n(r)} د`
 }
+// ساعات العمل ساعةً:دقيقة — «١٤:٤٢» = ١٤ ساعة و٤٢ دقيقة (قرار المستخدم: لا كسر عشريّ ١٤٫٧).
+// الأرقام الهندية والنقطتان تبقى بترتيبها داخل النصّ العربي (رقمٌ عربيّ مفصولٌ بفاصلٍ مشترك).
+export const fmtClock = (m) => {
+  const t = Math.max(0, Math.round(m || 0)), h = Math.floor(t / 60), r = t % 60
+  return `${h.toLocaleString('ar-SY')}:${r.toLocaleString('ar-SY', { minimumIntegerDigits: 2 })}`
+}
+export const clockTitle = (m) => {
+  const t = Math.max(0, Math.round(m || 0)), h = Math.floor(t / 60), r = t % 60
+  return `${h.toLocaleString('ar-SY')} ساعة${r ? ` و${r.toLocaleString('ar-SY')} دقيقة` : ''}`
+}
 export const fmtPct = (c) => (c === null || c === undefined ? '—' : `${Math.round(c * 100).toLocaleString('ar-SY')}٪`)
 const minutes = (n) => `${fmtInt(n)} د`
 
 /** بطاقات الالتزام: أيام الدوام / حضر / غاب، النسبة، متوسّط التأخير */
-export function PunctualityTiles({ p, extra = null }) {
+export function PunctualityTiles({ p, extra = null, apologized = 0 }) {
   const appt = !!p.appointmentsBased
   return (
     <div className={`tiles earn-tiles pn-tiles${extra ? '' : ' pn-3'}`}>
@@ -38,6 +50,7 @@ export function PunctualityTiles({ p, extra = null }) {
         <div className="pn-split">
           <span>حضر <strong>{fmtInt(p.attended)}</strong></span>
           <span className={p.absent ? 'pn-bad' : ''}>غاب <strong>{fmtInt(p.absent)}</strong></span>
+          {apologized > 0 && <span className="pn-bad">اعتذر <strong>{fmtInt(apologized)}</strong></span>}
         </div>
       </div>
       <div className="tile earn-hero">
@@ -84,8 +97,10 @@ const dayTitle = (d) => {
   return `${head} · الوصول ${d.arrival}${how}${d.late ? ` · ${d.late} د` : ''}`
 }
 
-export function DutyCalendar({ from, to, days }) {
+// apologies: [{ date, reason }] — يومٌ أحمر مكتوبٌ فيه «اعتذر»، والسبب في التلميح
+export function DutyCalendar({ from, to, days, apologies = [] }) {
   const byDate = new Map(days.map((d) => [d.date, d]))
+  const apology = new Map(apologies.map((x) => [x.date, x.reason]))
   const first = addDays(from, -((weekdayOf(from) + 1) % 7))
   const cells = []
   for (let d = first; d <= to || cells.length % 7; d = addDays(d, 1)) cells.push(d)
@@ -94,15 +109,21 @@ export function DutyCalendar({ from, to, days }) {
       <div className="pn-cal" role="grid" aria-label="تقويم الدوام">
         {WEEK_HEAD.map((h) => <div key={h} className="pn-cal-head" role="columnheader">{h}</div>)}
         {cells.map((ymd) => {
-          const d = byDate.get(ymd)
           const out = ymd < from || ymd > to
+          const apologized = !out && apology.has(ymd)
+          const d = apologized ? null : byDate.get(ymd)
           const dayN = Number(ymd.slice(8))
+          const title = apologized ? `اعتذر${apology.get(ymd) ? `: ${apology.get(ymd)}` : ' (بلا سبب مكتوب)'}` : dayTitle(d)
+          // كلمةٌ في الخانة نفسها — فلا يُقرأ اليوم باللون وحده
+          const tag = apologized ? 'اعتذر' : d?.status === 'late' ? `+${fmtDuration(d.late)}`
+            : d?.status === 'absent' ? 'غاب' : null
           return (
-            <div key={ymd} role="gridcell" title={dayTitle(d)}
-              className={`pn-cell${out ? ' is-out' : ''}${d ? ` is-${d.status}` : ''}`}
-              aria-label={d ? `${ymd}: ${dayTitle(d)}` : ymd}>
+            <div key={ymd} role="gridcell" title={title}
+              className={`pn-cell${out ? ' is-out' : ''}${apologized ? ' is-apology' : d ? ` is-${d.status}` : ''}`}
+              aria-label={title ? `${ymd}: ${title}` : ymd}>
               <span className="pn-cell-n">{dayN.toLocaleString('ar-SY')}</span>
-              {dayN === 1 && !out && <span className="pn-cell-m">{MONTHS[Number(ymd.slice(5, 7)) - 1]}</span>}
+              {tag ? <span className="pn-cell-tag">{tag}</span>
+                : dayN === 1 && !out && <span className="pn-cell-m">{MONTHS[Number(ymd.slice(5, 7)) - 1]}</span>}
               {d?.status === 'estimated' && <span className="pn-cell-mark" aria-hidden="true">≈</span>}
             </div>
           )
@@ -110,8 +131,9 @@ export function DutyCalendar({ from, to, days }) {
       </div>
       <div className="pn-legend">
         <span><i className="is-on_time" /> بالوقت</span>
-        <span><i className="is-late" /> متأخّر</span>
+        <span><i className="is-late" /> متأخّر (بدقائقه)</span>
         <span><i className="is-absent" /> غائب</span>
+        {apology.size > 0 && <span><i className="is-apology" /> اعتذر</span>}
         <span><i className="is-estimated" /> تقديري ≈</span>
         {days.some((d) => d.status === 'appointments') && <span><i className="is-appointments" /> {APPOINTMENTS_LABEL}</span>}
       </div>
@@ -122,23 +144,65 @@ export function DutyCalendar({ from, to, days }) {
   )
 }
 
-/** أيام التأخير: التاريخ، بداية الدوام، الوصول، كم دقيقة */
-export function LateDays({ days }) {
-  const late = days.filter((d) => d.status === 'late')
-  if (late.length === 0) return <p className="empty">لا أيام تأخير في هذه الفترة.</p>
+// ═══ سجلّ الحضور: كلّ يومٍ في الفترة بحالته وتفاصيله — عدّاداتٌ تُرشِّح ═══
+// الاعتذار من apologies (بسببه)، والباقي من days. الترتيب بالتاريخ.
+const LOG_KINDS = [
+  ['apology', 'اعتذر'], ['absent', 'غاب'], ['late', 'تأخّر'], ['on_time', 'بالوقت'],
+  ['estimated', 'تقديري'], ['appointments', APPOINTMENTS_LABEL], ['pending', 'لم يُحسم'],
+]
+const longDay = (ymd) => new Date(`${ymd}T12:00:00Z`).toLocaleDateString('ar-SY', { weekday: 'long', timeZone: 'UTC' })
+const T = ({ v }) => <bdi dir="ltr" className="pn-log-t">{v}</bdi>
+
+function LogDetail({ e }) {
+  if (e.status === 'apology') return <>
+    {e.reason ? <span className="pn-log-reason">«{e.reason}»</span> : <span className="muted">بلا سبب مكتوب</span>}
+    {e.upcoming && <span className="badge blue sm">قادم</span>}
+  </>
+  if (e.status === 'late') return <>وصل <T v={e.arrival} /> والدوام <T v={e.start} /> — <strong className="pn-late-n">تأخّر {fmtDuration(e.late)}</strong></>
+  if (e.status === 'on_time') return <>وصل <T v={e.arrival} /> والدوام <T v={e.start} /></>
+  if (e.status === 'absent') return <>لا «وصل الطبيب» ولا مريضٌ خُدم — الدوام <T v={e.start} /></>
+  if (e.status === 'estimated') return <>أوّل نداء <T v={e.arrival} /> بلا «وصل الطبيب» — الدوام <T v={e.start} /></>
+  if (e.status === 'appointments') return <>وصل <T v={e.arrival} /> — {APPOINTMENTS_LABEL}</>
+  return <>اليوم — لم يصل بعد (الدوام <T v={e.start} />)</>
+}
+
+export function AttendanceLog({ days, apologies = [], today }) {
+  const [filter, setFilter] = useState('all')
+  const entries = [
+    ...days.map((d) => ({ ...d })),
+    ...apologies.map((x) => ({ date: x.date, status: 'apology', reason: x.reason, upcoming: !!today && x.date > today })),
+  ].sort((a, b) => a.date.localeCompare(b.date))
+  const count = (k) => entries.filter((e) => e.status === k).length
+  const kinds = LOG_KINDS.filter(([k]) => count(k) > 0)
+  const lateTotal = entries.filter((e) => e.status === 'late').reduce((t, e) => t + (e.late || 0), 0)
+  const shown = filter === 'all' ? entries : entries.filter((e) => e.status === filter)
+  if (entries.length === 0) return <p className="empty">لا أيام دوام ولا اعتذارات في هذه الفترة.</p>
   return (
-    <table className="rtable earn-table pn-late">
-      <thead><tr><th>التاريخ</th><th>بداية الدوام</th><th>الوصول</th><th>التأخير</th></tr></thead>
-      <tbody>
-        {late.map((d) => (
-          <tr key={d.date}>
-            <td className="rt-title"><span dir="ltr">{d.date}</span> <span className="earn-spec">{WEEK_HEAD[(weekdayOf(d.date) + 1) % 7]}</span></td>
-            <td className="num" data-label="بداية الدوام"><span dir="ltr">{d.start}</span></td>
-            <td className="num" data-label="الوصول"><span dir="ltr">{d.arrival}</span></td>
-            <td className="num pn-late-n" data-label="التأخير">{minutes(d.late)}</td>
-          </tr>
+    <div className="pn-log">
+      <div className="pn-log-filters" role="group" aria-label="ترشيح السجلّ">
+        <button type="button" aria-pressed={filter === 'all'} className={filter === 'all' ? 'is-on' : ''}
+          onClick={() => setFilter('all')}>الكل <b>{fmtInt(entries.length)}</b></button>
+        {kinds.map(([k, label]) => (
+          <button key={k} type="button" aria-pressed={filter === k} className={`is-${k}${filter === k ? ' is-on' : ''}`}
+            onClick={() => setFilter(filter === k ? 'all' : k)}>{label} <b>{fmtInt(count(k))}</b></button>
         ))}
-      </tbody>
-    </table>
+      </div>
+      {lateTotal > 0 && (filter === 'all' || filter === 'late') && (
+        <p className="pn-log-total">مجموع التأخير في الفترة: <strong>{fmtDuration(lateTotal)}</strong></p>
+      )}
+      <ul className="pn-log-list">
+        {shown.map((e) => (
+          <li key={`${e.date}-${e.status}`} className={`pn-log-row is-${e.status}`}>
+            <div className="pn-log-date">
+              <strong>{Number(e.date.slice(8)).toLocaleString('ar-SY')}</strong>
+              <span>{MONTHS[Number(e.date.slice(5, 7)) - 1]}</span>
+              <span>{longDay(e.date)}</span>
+            </div>
+            <span className={`pn-log-badge is-${e.status}`}>{e.status === 'apology' ? 'اعتذر' : DAY_LABELS[e.status]}</span>
+            <div className="pn-log-detail"><LogDetail e={e} /></div>
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }

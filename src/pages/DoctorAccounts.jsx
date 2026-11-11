@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { api, todayLocal } from '../api.js'
 import { matchesAr } from '../arabic-search.js'
+import { fmtClock, clockTitle } from '../components/Punctuality.jsx'
 
 // ═══ حسابات الدكاترة — لشهر أو يوم أو فترة ═══
 // صفحة «تقارير الدكاترة» وتبويب «حسابات الدكاترة» في صندوق العيادات يعرضان هذا نفسه.
@@ -10,14 +11,15 @@ import { matchesAr } from '../arabic-search.js'
 // «صافي الربح» = ما دخل الشفاء من كشوف الدكتور وإجراءاته − راتبه (كان اسمه «الفرق»).
 // الفترة في الرابط (?month= · ?day= · ?from=&to=)؛ البحث والترتيب في الصفحة وحدها.
 
-// المبالغ بالليرة الكاملة (الأسعار بالمئات — الكسر ضجيج)، والساعات بمنزلةٍ عشرية واحدة
+// المبالغ بالليرة الكاملة (الأسعار بالمئات — الكسر ضجيج)، والنسب بمنزلةٍ عشرية واحدة
 const fmtNum = (n) => Number(n || 0).toLocaleString('ar-SY', { maximumFractionDigits: 0 })
-const fmtHours = (h) => Number(h || 0).toLocaleString('ar-SY', { maximumFractionDigits: 1 })
+const fmtOne = (h) => Number(h || 0).toLocaleString('ar-SY', { maximumFractionDigits: 1 })
 // «+١٦٬٠٠٠» و«−٦٠٬٠٠٠» — الإشارة نصّاً: toLocaleString يسبق السالب بعلامة اتجاه تُرسم شرطةً ثانية
 const signed = (n) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${fmtNum(Math.abs(n))}`
 // «يوم واحد» · «يومان» · «٥ أيام» · «١١ يوماً» — ولا «·» بجانب رقمٍ هنديّ (يُقرأ صفراً)
 const daysText = (n) => (n === 1 ? 'يوم واحد' : n === 2 ? 'يومان' : `${fmtNum(n)} ${n >= 3 && n <= 10 ? 'أيام' : 'يوماً'}`)
-const hoursText = (h) => (h === 1 ? 'ساعة واحدة' : h === 2 ? 'ساعتان' : `${fmtHours(h)} ${h >= 3 && h <= 10 && Number.isInteger(h) ? 'ساعات' : 'ساعة'}`)
+// ساعات العمل من الدقائق: «١١:٣٦ ساعة» (ساعة:دقيقة)، والتلميح بالكلمات
+const hoursText = (m) => `${fmtClock(m)} ساعة`
 const countText = (n, one, two, few, many) => (n === 1 ? one : n === 2 ? two : `${fmtNum(n)} ${n >= 3 && n <= 10 ? few : many}`)
 const procText = (n) => (n ? countText(n, 'إجراء واحد', 'إجراءان', 'إجراءات', 'إجراءً') : 'بلا إجراءات')
 const payText = (d) => (d.payKind === 'daily_hourly' ? 'يومية + ساعة'
@@ -45,10 +47,65 @@ const MODES = [['month', 'شهر'], ['day', 'يوم'], ['custom', 'فترة']]
 const SORTS = [
   ['profit', 'الأعلى ربحاً', (a, b) => (b.diff ?? -Infinity) - (a.diff ?? -Infinity)],
   ['patients', 'الأكثر مرضى', (a, b) => b.patients - a.patients],
-  ['hours', 'الأكثر حضوراً', (a, b) => b.attendance.days - a.attendance.days || b.attendance.hours - a.attendance.hours],
+  ['late', 'الأكثر تأخيراً', (a, b) => (b.p?.lateRate ?? -1) - (a.p?.lateRate ?? -1) || (b.p?.late ?? 0) - (a.p?.late ?? 0)],
+  ['hours', 'الأكثر حضوراً', (a, b) => b.attendance.days - a.attendance.days || b.attendance.minutes - a.attendance.minutes],
   ['name', 'أبجدياً', (a, b) => a.doctor.localeCompare(b.doctor, 'ar')],
 ]
 const hasActivity = (d) => d.patients > 0 || d.procedures > 0 || d.attendance.days > 0 || d.shifa > 0
+  || (d.p && (d.p.scheduled > 0 || d.p.apologized > 0))
+const pct = (x) => `${Math.round(x * 100).toLocaleString('ar-SY')}٪`
+const minText = (m) => {
+  const h = Math.floor(m / 60), r = m % 60
+  return h ? `${fmtNum(h)} س${r ? ` ${fmtNum(r)} د` : ''}` : `${fmtNum(r)} د`
+}
+const dayCount = (n) => (n === 1 ? 'يوم' : n === 2 ? 'يومين' : `${fmtNum(n)} ${n <= 10 ? 'أيام' : 'يوماً'}`)
+
+// ═══ الالتزام بالدوام في البطاقة: بالوقت مقابل التأخير، والغياب والاعتذار ═══
+// «بمواعيد خاصة»: لا نسبة ولا تأخير — يأتي على مواعيده التي يعطيها لمرضاه.
+function PunctStrip({ p }) {
+  if (!p) return null
+  const extra = (
+    <>
+      {p.absent > 0 && <span className="dr-pchip is-absent">غاب {dayCount(p.absent)}</span>}
+      {p.apologized > 0 && <span className="dr-pchip is-apology">اعتذر {dayCount(p.apologized)}</span>}
+    </>
+  )
+  if (p.appointmentsBased) return (
+    <div className="dr-punct is-appt">
+      <div className="dr-punct-head"><span>الالتزام بالدوام</span><strong>بمواعيد خاصة</strong></div>
+      <p className="dr-punct-sub">يأتي على المواعيد التي يعطيها لمرضاه — لا يُحسب عليه تأخير.</p>
+      {(p.absent > 0 || p.apologized > 0) && <div className="dr-punct-chips">{extra}</div>}
+    </div>
+  )
+  if (!p.actual) return (
+    <div className="dr-punct">
+      <div className="dr-punct-head"><span>الالتزام بالدوام</span><strong className="muted">—</strong></div>
+      <p className="dr-punct-sub">{p.estimated ? `لم يُكبس «وصل الطبيب» في أيامه (${dayCount(p.estimated)} بأوّل نداء)` : 'لا حضور مسجَّل في الفترة'}</p>
+      {(p.absent > 0 || p.apologized > 0) && <div className="dr-punct-chips">{extra}</div>}
+    </div>
+  )
+  const onW = (p.onTime / p.actual) * 100
+  return (
+    <div className="dr-punct">
+      <div className="dr-punct-head">
+        <span>الالتزام بالدوام</span>
+        <strong className={p.lateRate > 0.5 ? 'is-bad' : p.lateRate > 0 ? 'is-warn' : 'is-good'}>
+          {p.late ? `يتأخّر ${pct(p.lateRate)}` : 'دائماً بالوقت'}</strong>
+      </div>
+      <div className="dr-punct-bar" role="img" aria-label={`بالوقت ${pct(1 - p.lateRate)}، تأخير ${pct(p.lateRate)}`}>
+        {p.onTime > 0 && <span className="on" style={{ width: `${onW}%` }} />}
+        {p.late > 0 && <span className="late" style={{ width: `${100 - onW}%` }} />}
+      </div>
+      {/* بلا «٠»: الصفر الهنديّ بجانب كلمة يُقرأ نقطة — فالجملة تُبنى على ما وقع */}
+      <p className="dr-punct-sub">
+        {p.late
+          ? <>تأخّر في <b>{dayCount(p.late)}</b> من {fmtNum(p.actual)} — متوسّط التأخير <b>{minText(p.avgLate)}</b></>
+          : <>بالوقت في كلّ أيامه (<b>{dayCount(p.onTime)}</b>)</>}
+      </p>
+      {(p.absent > 0 || p.apologized > 0) && <div className="dr-punct-chips">{extra}</div>}
+    </div>
+  )
+}
 
 const SearchIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -63,7 +120,9 @@ function useAccounts(query) {
   useEffect(() => {
     let live = true
     setErr(null)
-    api.clinic.doctorAccounts(query).then((d) => { if (live) setLoaded({ key, d }) }).catch((e) => { if (live) setErr(e.message) })
+    Promise.all([api.clinic.doctorAccounts(query), api.clinic.doctorsPunctuality(query).catch(() => null)])
+      .then(([d, p]) => { if (live) setLoaded({ key, d: { ...d, punct: p?.doctors || null, grace: p?.grace } }) })
+      .catch((e) => { if (live) setErr(e.message) })
     return () => { live = false }
   }, [key])
   return [loaded && loaded.key === key ? loaded.d : null, err]
@@ -121,16 +180,22 @@ function PeriodBar({ mode, cur, curDay, from, to, data, set }) {
 
 function Summary({ data, active }) {
   const t = data.totals
+  const ps = active.map((d) => d.p).filter((p) => p && !p.appointmentsBased)
+  const sum = (k) => ps.reduce((n, p) => n + (p[k] || 0), 0)
+  const onTime = sum('onTime'), late = sum('late'), actual = onTime + late
+  const absent = active.reduce((n, d) => n + (d.p?.absent || 0), 0)
+  const apologized = active.reduce((n, d) => n + (d.p?.apologized || 0), 0)
+  const appt = active.filter((d) => d.p?.appointmentsBased).length
   const days = active.reduce((s, d) => s + d.attendance.days, 0)
-  const hours = Math.round(active.reduce((s, d) => s + d.attendance.hours, 0) * 10) / 10
+  const minutes = active.reduce((s, d) => s + d.attendance.minutes, 0)
   const present = active.filter((d) => d.attendance.days > 0).length
   return (
     <div className="dr-summary">
       <div className="dr-stat">
         <span className="dr-stat-lbl">الحضور</span>
         <strong className="dr-stat-val">{days ? daysText(days) : '—'}</strong>
-        <span className="dr-stat-sub">{hours ? `${hoursText(hours)} عمل` : 'لا ساعات مسجّلة'}</span>
-        {present > 0 && <span className="dr-stat-foot">مجموع أيام {present === 1 ? 'دكتورٍ واحد' : present === 2 ? 'دكتورَين' : `${fmtNum(present)} ${present <= 10 ? 'دكاترة' : 'دكتوراً'}`}</span>}
+        <span className="dr-stat-sub" title={minutes ? clockTitle(minutes) : undefined}>{minutes ? `${hoursText(minutes)} عمل` : 'لا ساعات مسجّلة'}</span>
+        {present > 0 && <span className="dr-stat-foot">حضر {present === 1 ? 'دكتورٌ واحد' : present === 2 ? 'دكتوران' : `${fmtNum(present)} ${present <= 10 ? 'دكاترة' : 'دكتوراً'}`}</span>}
       </div>
       <div className="dr-stat">
         <span className="dr-stat-lbl">المرضى</span>
@@ -144,6 +209,15 @@ function Summary({ data, active }) {
         <span className="dr-stat-sub">من الكشوفات {fmtNum(t.visitShifa)}</span>
         <span className="dr-stat-foot">ومن الإجراءات {fmtNum(t.procShifa)}</span>
       </div>
+      {data.punct && (
+        <div className="dr-stat">
+          <span className="dr-stat-lbl">الالتزام بالدوام</span>
+          <strong className="dr-stat-val">{actual ? pct(onTime / actual) : '—'}<small> بالوقت</small></strong>
+          <span className="dr-stat-sub">{actual ? (late ? `تأخير في ${pct(late / actual)} من الأيام` : 'بلا أيّ تأخير') : 'لا حضور مسجَّل'}</span>
+          <span className="dr-stat-foot">{[absent && `غياب ${dayCount(absent)}`, apologized && `اعتذار ${dayCount(apologized)}`,
+            appt && `${fmtNum(appt)} بمواعيد خاصة`].filter(Boolean).join('، ') || 'لا غياب ولا اعتذار'}</span>
+        </div>
+      )}
       <div className={`dr-stat dr-stat-hero${t.diff < 0 ? ' is-loss' : ''}`}>
         <span className="dr-stat-lbl">{t.diff < 0 ? 'صافي الخسارة' : 'صافي الربح'}</span>
         <strong className="dr-stat-val">{signed(t.diff)}<small> ل.س</small></strong>
@@ -154,11 +228,21 @@ function Summary({ data, active }) {
   )
 }
 
+// البطاقة كلّها تفتح وجهتها (لوحة الدكتور في التقارير، البروفايل في الصندوق) — بالنقر وبـ Enter.
+// الاسم يبقى رابطاً حقيقياً (فتحٌ في تبويب جديد، قارئ الشاشة)؛ ورابطٌ داخل رابط غير صالح فلا <a> حولها.
 function DoctorCard({ d, share, link }) {
   const a = d.attendance
   const pay = payText(d)
+  const navigate = useNavigate()
+  const open = (e) => {
+    if (!link || e.target.closest('a, button')) return
+    if (window.getSelection?.().toString()) return   // تحديد نصٍّ لنسخه ليس نقراً
+    navigate(link)
+  }
   return (
-    <article className="dr-card">
+    <article className={`dr-card${link ? ' is-link' : ''}`} onClick={open}
+      {...(link ? { role: 'link', tabIndex: 0,
+        onKeyDown: (e) => { if (e.key === 'Enter') navigate(link) } } : {})}>
       <header className="dr-card-head">
         <span className="dr-avatar" aria-hidden="true">{initial(d.doctor)}</span>
         <div className="dr-who">
@@ -178,7 +262,7 @@ function DoctorCard({ d, share, link }) {
         <div className="dr-fig">
           <span className="dr-fig-lbl">الحضور</span>
           <strong>{a.days ? daysText(a.days) : '—'}</strong>
-          <span className="dr-fig-sub">{a.hours ? hoursText(a.hours) : a.days ? 'بلا ساعات' : 'لم يحضر'}</span>
+          <span className="dr-fig-sub" title={a.minutes ? clockTitle(a.minutes) : undefined}>{a.minutes ? hoursText(a.minutes) : a.days ? 'بلا ساعات' : 'لم يحضر'}</span>
         </div>
         <div className="dr-fig">
           <span className="dr-fig-lbl">المرضى</span>
@@ -193,10 +277,12 @@ function DoctorCard({ d, share, link }) {
         </div>
       </div>
 
+      <PunctStrip p={d.p} />
+
       <div className="dr-share" title="حصّته من دخل الشفاء في الفترة">
         <div className="dr-meter" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={share}
           aria-label="حصّته من دخل الفترة"><span style={{ width: `${Math.max(share, share > 0 ? 2 : 0)}%` }} /></div>
-        <span className="dr-share-txt">{fmtHours(share)}٪ من دخل الفترة</span>
+        <span className="dr-share-txt">{fmtOne(share)}٪ من دخل الفترة</span>
       </div>
 
       {(a.noDeparture > 0 || a.onDuty > 0) && (
@@ -217,7 +303,7 @@ function DoctorCard({ d, share, link }) {
             <span className="dr-pay-val">
               <strong>{fmtNum(d.salary)}</strong>
               {d.payKind === 'daily_hourly'
-                ? <small>{daysText(a.days)} × {fmtNum(d.dailyRate)} + {hoursText(a.hours)} × {fmtNum(d.hourlyRate)}</small>
+                ? <small>{daysText(a.days)} × {fmtNum(d.dailyRate)} + {hoursText(a.minutes)} × {fmtNum(d.hourlyRate)}</small>
                 : pay && <small>{pay}</small>}
             </span>
           )}
@@ -255,11 +341,12 @@ export function DoctorsTab({ canWrite, linkDashboard = false }) {
 
   const { active, idle, shown } = useMemo(() => {
     if (!data) return { active: [], idle: [], shown: [] }
-    const act = data.doctors.filter(hasActivity)
+    const withP = data.doctors.map((d) => ({ ...d, p: data.punct?.[d.doctorId] || null }))
+    const act = withP.filter(hasActivity)
     const cmp = SORTS.find(([k]) => k === sort)[2]
     return {
       active: act,
-      idle: data.doctors.filter((d) => !hasActivity(d)),
+      idle: withP.filter((d) => !hasActivity(d)),
       shown: act.filter((d) => matchesAr(`${d.doctor} ${d.specialty}`, search)).sort(cmp),
     }
   }, [data, search, sort])
@@ -354,6 +441,9 @@ export function DoctorsTab({ canWrite, linkDashboard = false }) {
                 <dd>الكشوف التي انتهت في جلسات الفترة. الإجراءات تُعدّ وحدها.</dd>
                 <dt>دخل الشفاء</dt>
                 <dd>من الكشوفات: رسم كلّ زيارةٍ حضرت (كما في الجرد). ومن الإجراءات: حصّة الشفاء من كلّ إجراءٍ قُبض في الفترة.</dd>
+                <dt>الالتزام بالدوام</dt>
+                <dd>من زرّ «وصل الطبيب»: بالوقت حتى {fmtNum(data.grace ?? 15)} دقيقة من بداية الدوام، وبعدها تأخير. نسبة التأخير = أيام التأخير ÷ أيام الحضور المسجَّل.
+                  الغياب = يوم دوامٍ بلا وصول ولا مريض، والاعتذار لا يُعدّ غياباً. «بمواعيد خاصة» يأتي على مواعيده مع مرضاه فلا يُحسب عليه تأخير.</dd>
                 <dt>صافي الربح</dt>
                 <dd>دخل الشفاء من الدكتور ناقص راتبه. للعرض فقط: الراتب لا يُسحب من الإيرادات ولا يمسّ الجرد ولا الصندوق.</dd>
                 <dt>الراتب</dt>

@@ -3878,13 +3878,17 @@ td.fund-amt.is-out { color: var(--status-bad); }
 .pn-cell.is-pending { border-style: dashed; color: var(--text-secondary); }
 /* «بمواعيد خاصة»: حضر، ولا يُقاس له تأخير — أزرق المراجعة لا أخضر «بالوقت» ولا كهرماني */
 .pn-cell.is-appointments { background: var(--status-review-bg); border-color: var(--status-review); color: var(--status-review); }
+.pn-cell.is-apology { background: var(--status-bad); border-color: var(--status-bad); color: #fff; }
+:root[data-theme='dark'] .pn-cell.is-apology { color: #2a0b0b; }
+.pn-cell-tag { font-size: 11px; font-weight: 800; line-height: 1.2; white-space: nowrap; }
 .pn-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; font-size: 12px; color: var(--text-secondary); }
 .pn-legend i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; vertical-align: -1px; margin-inline-end: 4px; }
 .pn-legend i.is-on_time { background: var(--status-good); }
 .pn-legend i.is-late { background: var(--status-pending); }
-.pn-legend i.is-absent { background: var(--status-bad); }
+.pn-legend i.is-absent { background: var(--status-bad-bg); box-shadow: inset 0 0 0 1.5px var(--status-bad); }
 .pn-legend i.is-estimated { background: var(--status-neutral); }
 .pn-legend i.is-appointments { background: var(--status-review); }
+.pn-legend i.is-apology { background: var(--status-bad); }
 .pn-appt-value { font-size: 20px; }
 .pn-late-n { color: var(--status-pending); font-weight: 700; }
 .dk-punct { margin-top: 16px; }
@@ -3901,6 +3905,7 @@ td.fund-amt.is-out { color: var(--status-bad); }
   .pn-cal { gap: 3px; }
   .pn-cell { min-height: 40px; padding: 4px 5px; }
   .pn-cell-m { display: none; }
+  .pn-cell-tag { font-size: 10px; white-space: normal; }
 }
 
 /* ═══ حساب الدكتور: يومية + ساعة، و«تحاسبه» ═══ */
@@ -4337,7 +4342,7 @@ button.ghost.iron-details-btn { white-space: nowrap; padding-inline: 12px; }
 .dr-range-lbl { color: var(--muted); font-weight: 700; font-size: 13px; }
 
 /* الملخّص: أربع بطاقات، والربح بطلها */
-.dr-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.dr-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; }
 .dr-stat { display: flex; flex-direction: column; gap: 4px; padding: 18px 20px; border-radius: 18px;
   background: var(--surface-1); border: 1px solid var(--border); box-shadow: var(--shadow-card); min-width: 0; }
 .dr-stat-lbl { font-size: 13px; font-weight: 700; color: var(--text-secondary); }
@@ -4367,6 +4372,9 @@ button.ghost.iron-details-btn { white-space: nowrap; padding-inline: 12px; }
 .dr-card { display: flex; flex-direction: column; gap: 16px; padding: 18px 20px; border-radius: 18px; min-width: 0;
   background: var(--surface-1); border: 1px solid var(--border); box-shadow: var(--shadow-card); transition: border-color .15s, transform .15s; }
 .dr-card:hover { border-color: color-mix(in srgb, var(--primary) 45%, transparent); transform: translateY(-1px); }
+.dr-card.is-link { cursor: pointer; }
+.dr-card.is-link:hover { box-shadow: var(--shadow-pop); }
+.dr-card.is-link:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .dr-card-head { display: flex; align-items: center; gap: 12px; }
 .dr-avatar { flex: none; width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center;
   background: var(--primary-soft); color: var(--accent-text); font-size: 21px; font-weight: 800; }
@@ -4415,9 +4423,9 @@ a.dr-chip:hover { color: var(--accent-text); border-color: var(--primary); }
 .dr-how dt { font-weight: 800; color: var(--text-primary); }
 .dr-how dd { margin: 0; color: var(--text-secondary); line-height: 1.7; }
 
-@media (max-width: 1100px) { .dr-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 640px) {
-  .dr-summary { gap: 10px; }
+  .dr-summary { gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dr-stat-hero { grid-column: 1 / -1; }
   .dr-stat { padding: 14px; }
   .dr-stat-val { font-size: 23px; }
   .dr-grid { grid-template-columns: minmax(0, 1fr); }
@@ -4430,3 +4438,66 @@ a.dr-chip:hover { color: var(--accent-text); border-color: var(--primary); }
   .dr-how dl { grid-template-columns: 1fr; gap: 2px; }
   .dr-how dd { margin-bottom: 8px; }
 }
+
+/* ═══ سجلّ الحضور في لوحة الدكتور (AttendanceLog): عدّاداتٌ تُرشِّح، ويومٌ لكلّ سطر ═══ */
+.pn-log { display: flex; flex-direction: column; gap: 12px; }
+.pn-log-filters { display: flex; flex-wrap: wrap; gap: 6px; }
+.pn-log-filters button { min-height: 0; padding: 6px 14px; border-radius: 999px; font-size: 13px; font-weight: 700; box-shadow: none;
+  background: var(--surface-1); color: var(--text-secondary); border: 1px solid var(--border); cursor: pointer; }
+.pn-log-filters button b { font-variant-numeric: tabular-nums; margin-inline-start: 2px; }
+.pn-log-filters button.is-apology { color: var(--status-bad); border-color: color-mix(in srgb, var(--status-bad) 40%, transparent); }
+.pn-log-filters button.is-absent { color: var(--status-bad); }
+.pn-log-filters button.is-late { color: var(--status-pending); }
+.pn-log-filters button.is-on_time { color: var(--status-good); }
+.pn-log-filters button.is-on { background: var(--primary); border-color: var(--primary); color: #fff; }
+:root[data-theme='dark'] .pn-log-filters button.is-on { color: #06301b; }
+.pn-log-total { margin: 0; font-size: 13px; color: var(--text-secondary); }
+.pn-log-total strong { color: var(--status-pending); }
+.pn-log-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.pn-log-row { display: grid; grid-template-columns: 64px 76px minmax(0, 1fr); align-items: center; gap: 12px;
+  padding: 10px 12px; border-radius: 12px; background: var(--page); border-inline-start: 4px solid var(--grid); }
+.pn-log-row.is-apology { border-inline-start-color: var(--status-bad); background: var(--status-bad-bg); }
+.pn-log-row.is-absent { border-inline-start-color: var(--status-bad); }
+.pn-log-row.is-late { border-inline-start-color: var(--status-pending); }
+.pn-log-row.is-on_time { border-inline-start-color: var(--status-good); }
+.pn-log-row.is-estimated { border-inline-start-color: var(--status-neutral); }
+.pn-log-row.is-appointments { border-inline-start-color: var(--status-review); }
+.pn-log-date { display: flex; flex-direction: column; line-height: 1.25; }
+.pn-log-date strong { font-size: 18px; font-weight: 800; color: var(--text-primary); }
+.pn-log-date span { font-size: 11.5px; color: var(--muted); }
+.pn-log-badge { justify-self: start; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; white-space: nowrap; }
+.pn-log-badge.is-apology { background: var(--status-bad); color: #fff; }
+:root[data-theme='dark'] .pn-log-badge.is-apology { color: #2a0b0b; }
+.pn-log-badge.is-absent { background: var(--status-bad-bg); color: var(--status-bad); box-shadow: inset 0 0 0 1px var(--status-bad); }
+.pn-log-badge.is-late { background: var(--status-pending-bg); color: var(--status-pending); }
+.pn-log-badge.is-on_time { background: var(--status-good-bg); color: var(--status-good); }
+.pn-log-badge.is-estimated, .pn-log-badge.is-pending { background: var(--status-neutral-bg); color: var(--status-neutral); }
+.pn-log-badge.is-appointments { background: var(--status-review-bg); color: var(--status-review); }
+.pn-log-detail { font-size: 13.5px; color: var(--text-secondary); line-height: 1.7; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+.pn-log-reason { color: var(--text-primary); font-weight: 600; }
+.pn-log-t { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--text-primary); }
+@media (max-width: 640px) {
+  .pn-log-row { grid-template-columns: 76px minmax(0, 1fr); gap: 4px 10px; }
+  .pn-log-date { grid-row: span 2; }
+  .pn-log-detail { grid-column: 2; }
+}
+
+/* الالتزام بالدوام في بطاقة الدكتور */
+.dr-punct { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 12px; background: var(--page); }
+.dr-punct-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 12px; font-weight: 700; color: var(--muted); }
+.dr-punct-head strong { font-size: 15px; font-weight: 800; color: var(--text-primary); }
+.dr-punct-head strong.is-good { color: var(--status-good); }
+.dr-punct-head strong.is-warn { color: var(--status-pending); }
+.dr-punct-head strong.is-bad { color: var(--status-bad); }
+.dr-punct.is-appt .dr-punct-head strong { color: var(--status-review); }
+.dr-punct-bar { display: flex; gap: 2px; height: 8px; border-radius: 999px; overflow: hidden; background: var(--grid); }
+.dr-punct-bar span { display: block; height: 100%; }
+.dr-punct-bar .on { background: var(--status-good); }
+.dr-punct-bar .late { background: var(--status-pending); }
+.dr-punct-sub { margin: 0; font-size: 12.5px; color: var(--text-secondary); line-height: 1.6; }
+.dr-punct-sub b { color: var(--text-primary); }
+.dr-punct-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.dr-pchip { font-size: 12px; font-weight: 700; padding: 2px 10px; border-radius: 999px; }
+.dr-pchip.is-absent { color: var(--status-bad); background: var(--status-bad-bg); box-shadow: inset 0 0 0 1px var(--status-bad); }
+.dr-pchip.is-apology { color: #fff; background: var(--status-bad); }
+:root[data-theme='dark'] .dr-pchip.is-apology { color: #2a0b0b; }
