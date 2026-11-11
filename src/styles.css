@@ -4112,7 +4112,6 @@ a.cc-stat:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px
 .iron-history summary { cursor: pointer; font-weight: 600; }
 .iron-history ul { margin: 10px 0 0; padding-inline-start: 18px; font-size: 13px; }
 .iron-history li { margin-bottom: 4px; }
-.iron-revenue { display: flex; flex-wrap: wrap; gap: 6px 24px; margin: 12px 0; font-size: 13.5px; color: var(--text-secondary); }
 .iron-tile .label, .iron-cell { color: var(--primary); }
 .iron-sub { margin: 18px 0 8px; display: flex; align-items: center; gap: 8px; }
 .iron-badge { background: var(--primary-soft); color: var(--primary); }

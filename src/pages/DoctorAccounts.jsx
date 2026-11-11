@@ -327,7 +327,7 @@ export function DoctorsTab({ canWrite, linkDashboard = false }) {
             )}
 
             {data.iron?.count > 0 && (
-              <p className="dr-note">
+              <p className="dr-note iron-revenue">
                 جلسات الحديد ({fmtNum(data.iron.count)}) أدخلت للشفاء <strong>{fmtNum(data.iron.shifa)} ل.س</strong> خارج حساب الدكاترة —
                 فدخل الشفاء كلّه مع الحديد <strong>{fmtNum(data.revenue)} ل.س</strong>.
               </p>
