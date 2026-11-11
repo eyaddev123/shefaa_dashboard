@@ -1,3 +1,4 @@
+import { useState } from 'react'
 // ═══ الالتزام بالدوام — قطعٌ مشتركة بين لوحة تحكم الدكتور و«التزامي» في «أعمالي» ═══
 // الحساب كلّه في الخادم (server/src/doctor-dashboard.js) — هنا عرضٌ وحده:
 //   بالوقت (≤ ١٥ د) أخضر · متأخّر أصفر بدقائقه · غائب أحمر فاتح · اعتذر أحمر ممتلئ · تقديري رمادي
@@ -86,10 +87,10 @@ const dayTitle = (d) => {
   return `${head} · الوصول ${d.arrival}${how}${d.late ? ` · ${d.late} د` : ''}`
 }
 
-// apologies: تواريخ اعتذار الدكتور (بلا السبب) — يومٌ أحمر مكتوبٌ فيه «اعتذر»
+// apologies: [{ date, reason }] — يومٌ أحمر مكتوبٌ فيه «اعتذر»، والسبب في التلميح
 export function DutyCalendar({ from, to, days, apologies = [] }) {
   const byDate = new Map(days.map((d) => [d.date, d]))
-  const apology = new Set(apologies)
+  const apology = new Map(apologies.map((x) => [x.date, x.reason]))
   const first = addDays(from, -((weekdayOf(from) + 1) % 7))
   const cells = []
   for (let d = first; d <= to || cells.length % 7; d = addDays(d, 1)) cells.push(d)
@@ -102,7 +103,7 @@ export function DutyCalendar({ from, to, days, apologies = [] }) {
           const apologized = !out && apology.has(ymd)
           const d = apologized ? null : byDate.get(ymd)
           const dayN = Number(ymd.slice(8))
-          const title = apologized ? 'اعتذر الدكتور عن هذا اليوم' : dayTitle(d)
+          const title = apologized ? `اعتذر${apology.get(ymd) ? `: ${apology.get(ymd)}` : ' (بلا سبب مكتوب)'}` : dayTitle(d)
           // كلمةٌ في الخانة نفسها — فلا يُقرأ اليوم باللون وحده
           const tag = apologized ? 'اعتذر' : d?.status === 'late' ? `+${fmtDuration(d.late)}`
             : d?.status === 'absent' ? 'غاب' : null
@@ -133,23 +134,65 @@ export function DutyCalendar({ from, to, days, apologies = [] }) {
   )
 }
 
-/** أيام التأخير: التاريخ، بداية الدوام، الوصول، كم دقيقة */
-export function LateDays({ days }) {
-  const late = days.filter((d) => d.status === 'late')
-  if (late.length === 0) return <p className="empty">لا أيام تأخير في هذه الفترة.</p>
+// ═══ سجلّ الحضور: كلّ يومٍ في الفترة بحالته وتفاصيله — عدّاداتٌ تُرشِّح ═══
+// الاعتذار من apologies (بسببه)، والباقي من days. الترتيب بالتاريخ.
+const LOG_KINDS = [
+  ['apology', 'اعتذر'], ['absent', 'غاب'], ['late', 'تأخّر'], ['on_time', 'بالوقت'],
+  ['estimated', 'تقديري'], ['appointments', APPOINTMENTS_LABEL], ['pending', 'لم يُحسم'],
+]
+const longDay = (ymd) => new Date(`${ymd}T12:00:00Z`).toLocaleDateString('ar-SY', { weekday: 'long', timeZone: 'UTC' })
+const T = ({ v }) => <bdi dir="ltr" className="pn-log-t">{v}</bdi>
+
+function LogDetail({ e }) {
+  if (e.status === 'apology') return <>
+    {e.reason ? <span className="pn-log-reason">«{e.reason}»</span> : <span className="muted">بلا سبب مكتوب</span>}
+    {e.upcoming && <span className="badge blue sm">قادم</span>}
+  </>
+  if (e.status === 'late') return <>وصل <T v={e.arrival} /> والدوام <T v={e.start} /> — <strong className="pn-late-n">تأخّر {fmtDuration(e.late)}</strong></>
+  if (e.status === 'on_time') return <>وصل <T v={e.arrival} /> والدوام <T v={e.start} /></>
+  if (e.status === 'absent') return <>لا «وصل الطبيب» ولا مريضٌ خُدم — الدوام <T v={e.start} /></>
+  if (e.status === 'estimated') return <>أوّل نداء <T v={e.arrival} /> بلا «وصل الطبيب» — الدوام <T v={e.start} /></>
+  if (e.status === 'appointments') return <>وصل <T v={e.arrival} /> — {APPOINTMENTS_LABEL}</>
+  return <>اليوم — لم يصل بعد (الدوام <T v={e.start} />)</>
+}
+
+export function AttendanceLog({ days, apologies = [], today }) {
+  const [filter, setFilter] = useState('all')
+  const entries = [
+    ...days.map((d) => ({ ...d })),
+    ...apologies.map((x) => ({ date: x.date, status: 'apology', reason: x.reason, upcoming: !!today && x.date > today })),
+  ].sort((a, b) => a.date.localeCompare(b.date))
+  const count = (k) => entries.filter((e) => e.status === k).length
+  const kinds = LOG_KINDS.filter(([k]) => count(k) > 0)
+  const lateTotal = entries.filter((e) => e.status === 'late').reduce((t, e) => t + (e.late || 0), 0)
+  const shown = filter === 'all' ? entries : entries.filter((e) => e.status === filter)
+  if (entries.length === 0) return <p className="empty">لا أيام دوام ولا اعتذارات في هذه الفترة.</p>
   return (
-    <table className="rtable earn-table pn-late">
-      <thead><tr><th>التاريخ</th><th>بداية الدوام</th><th>الوصول</th><th>التأخير</th></tr></thead>
-      <tbody>
-        {late.map((d) => (
-          <tr key={d.date}>
-            <td className="rt-title"><span dir="ltr">{d.date}</span> <span className="earn-spec">{WEEK_HEAD[(weekdayOf(d.date) + 1) % 7]}</span></td>
-            <td className="num" data-label="بداية الدوام"><span dir="ltr">{d.start}</span></td>
-            <td className="num" data-label="الوصول"><span dir="ltr">{d.arrival}</span></td>
-            <td className="num pn-late-n" data-label="التأخير">{minutes(d.late)}</td>
-          </tr>
+    <div className="pn-log">
+      <div className="pn-log-filters" role="group" aria-label="ترشيح السجلّ">
+        <button type="button" aria-pressed={filter === 'all'} className={filter === 'all' ? 'is-on' : ''}
+          onClick={() => setFilter('all')}>الكل <b>{fmtInt(entries.length)}</b></button>
+        {kinds.map(([k, label]) => (
+          <button key={k} type="button" aria-pressed={filter === k} className={`is-${k}${filter === k ? ' is-on' : ''}`}
+            onClick={() => setFilter(filter === k ? 'all' : k)}>{label} <b>{fmtInt(count(k))}</b></button>
         ))}
-      </tbody>
-    </table>
+      </div>
+      {lateTotal > 0 && (filter === 'all' || filter === 'late') && (
+        <p className="pn-log-total">مجموع التأخير في الفترة: <strong>{fmtDuration(lateTotal)}</strong></p>
+      )}
+      <ul className="pn-log-list">
+        {shown.map((e) => (
+          <li key={`${e.date}-${e.status}`} className={`pn-log-row is-${e.status}`}>
+            <div className="pn-log-date">
+              <strong>{Number(e.date.slice(8)).toLocaleString('ar-SY')}</strong>
+              <span>{MONTHS[Number(e.date.slice(5, 7)) - 1]}</span>
+              <span>{longDay(e.date)}</span>
+            </div>
+            <span className={`pn-log-badge is-${e.status}`}>{e.status === 'apology' ? 'اعتذر' : DAY_LABELS[e.status]}</span>
+            <div className="pn-log-detail"><LogDetail e={e} /></div>
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }

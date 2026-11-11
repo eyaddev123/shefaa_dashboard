@@ -4438,3 +4438,46 @@ a.dr-chip:hover { color: var(--accent-text); border-color: var(--primary); }
   .dr-how dl { grid-template-columns: 1fr; gap: 2px; }
   .dr-how dd { margin-bottom: 8px; }
 }
+
+/* ═══ سجلّ الحضور في لوحة الدكتور (AttendanceLog): عدّاداتٌ تُرشِّح، ويومٌ لكلّ سطر ═══ */
+.pn-log { display: flex; flex-direction: column; gap: 12px; }
+.pn-log-filters { display: flex; flex-wrap: wrap; gap: 6px; }
+.pn-log-filters button { min-height: 0; padding: 6px 14px; border-radius: 999px; font-size: 13px; font-weight: 700; box-shadow: none;
+  background: var(--surface-1); color: var(--text-secondary); border: 1px solid var(--border); cursor: pointer; }
+.pn-log-filters button b { font-variant-numeric: tabular-nums; margin-inline-start: 2px; }
+.pn-log-filters button.is-apology { color: var(--status-bad); border-color: color-mix(in srgb, var(--status-bad) 40%, transparent); }
+.pn-log-filters button.is-absent { color: var(--status-bad); }
+.pn-log-filters button.is-late { color: var(--status-pending); }
+.pn-log-filters button.is-on_time { color: var(--status-good); }
+.pn-log-filters button.is-on { background: var(--primary); border-color: var(--primary); color: #fff; }
+:root[data-theme='dark'] .pn-log-filters button.is-on { color: #06301b; }
+.pn-log-total { margin: 0; font-size: 13px; color: var(--text-secondary); }
+.pn-log-total strong { color: var(--status-pending); }
+.pn-log-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.pn-log-row { display: grid; grid-template-columns: 64px 76px minmax(0, 1fr); align-items: center; gap: 12px;
+  padding: 10px 12px; border-radius: 12px; background: var(--page); border-inline-start: 4px solid var(--grid); }
+.pn-log-row.is-apology { border-inline-start-color: var(--status-bad); background: var(--status-bad-bg); }
+.pn-log-row.is-absent { border-inline-start-color: var(--status-bad); }
+.pn-log-row.is-late { border-inline-start-color: var(--status-pending); }
+.pn-log-row.is-on_time { border-inline-start-color: var(--status-good); }
+.pn-log-row.is-estimated { border-inline-start-color: var(--status-neutral); }
+.pn-log-row.is-appointments { border-inline-start-color: var(--status-review); }
+.pn-log-date { display: flex; flex-direction: column; line-height: 1.25; }
+.pn-log-date strong { font-size: 18px; font-weight: 800; color: var(--text-primary); }
+.pn-log-date span { font-size: 11.5px; color: var(--muted); }
+.pn-log-badge { justify-self: start; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; white-space: nowrap; }
+.pn-log-badge.is-apology { background: var(--status-bad); color: #fff; }
+:root[data-theme='dark'] .pn-log-badge.is-apology { color: #2a0b0b; }
+.pn-log-badge.is-absent { background: var(--status-bad-bg); color: var(--status-bad); box-shadow: inset 0 0 0 1px var(--status-bad); }
+.pn-log-badge.is-late { background: var(--status-pending-bg); color: var(--status-pending); }
+.pn-log-badge.is-on_time { background: var(--status-good-bg); color: var(--status-good); }
+.pn-log-badge.is-estimated, .pn-log-badge.is-pending { background: var(--status-neutral-bg); color: var(--status-neutral); }
+.pn-log-badge.is-appointments { background: var(--status-review-bg); color: var(--status-review); }
+.pn-log-detail { font-size: 13.5px; color: var(--text-secondary); line-height: 1.7; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+.pn-log-reason { color: var(--text-primary); font-weight: 600; }
+.pn-log-t { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--text-primary); }
+@media (max-width: 640px) {
+  .pn-log-row { grid-template-columns: 76px minmax(0, 1fr); gap: 4px 10px; }
+  .pn-log-date { grid-row: span 2; }
+  .pn-log-detail { grid-column: 2; }
+}
