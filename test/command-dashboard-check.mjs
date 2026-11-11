@@ -46,6 +46,9 @@ const ND = { days: 2, doctorsCount: 1, doctors: [{ doctorId: '2', doctor: 'د. �
 const full = { today, doctorsActive: 8, sessions: SESSIONS, day: { ...DAY, apologies: APOLOGIES },
   finance: { fundBalance: 1215000, openingSet: true, receipts: 71000, receiptsPatients: 32 },
   alerts: { unpaid: { n: 2, total: 2500 }, lowStock: LOW, noDeparture: ND } }
+// إحالات اليوم: يرسلها الخادم لقرّاء الإحالات وحدهم (لا الاستقبال)
+full.referrals = { visits: 6, due: 675, sourcesCount: 4, sources: [{ id: '1', name: 'الهلال الأحمر', visits: 3, due: 375 },
+  { id: '2', name: 'جمعية البرّ', visits: 2, due: 225 }, { id: '3', name: 'مفوضية اللاجئين', visits: 1, due: 75 }] }
 const COMMAND = {
   adm: full, mgr: full, chair: full,
   sup: { ...full, finance: { fundBalance: -5000, openingSet: false } },
@@ -116,6 +119,10 @@ const run = async () => {
     ok((await text(page, '.cc-stats')).includes('٢٨'), 'مرضى اليوم بالأرقام')
     ok(await has(page, '.cc-finance') && await has(page, '.cc-alerts') && await has(page, '.cc-scards'), 'المالية والتنبيهات والجلسات (بطاقات)')
     ok((await text(page, '.cc-finance')).includes('من ٣٢ مريضاً'), 'عدد مرضى المقبوضات')
+    const fin = (await text(page, '.cc-finance')).replace(/\s+/g, ' ')
+    ok(/إحالات اليوم/.test(fin) && /٦٧٥/.test(fin) && /مستحقّ على ٤ جهات عن ٦ مرضى/.test(fin), `★ إحالات اليوم بمبلغها وعددها (${fin.slice(-160)})`)
+    ok(/الهلال الأحمر\s*٣ مرضى\s*٣٧٥/.test(fin) && /مفوضية اللاجئين\s*مريض واحد\s*٧٥/.test(fin) && /وجهة واحدة غيرها/.test(fin), `★ الجهات الثلاث الأولى والباقي (${fin.slice(-150)})`)
+    ok(await page.getAttribute('.cc-finance a[href="/clinic/referrals"]', 'href') === '/clinic/referrals', 'رابط الإحالات')
     ok((await text(page, '.cc-alerts')).includes('إجراءان بانتظار المحاسبة'), '★ مثنّى الإجراء')
     ok((await text(page, '.cc-alerts')).includes('مادتان عند الحدّ الأدنى'), '★ مثنّى المادة')
     ok((await text(page, '.cc-alerts')).includes('يومان بلا انصراف'), '★ مثنّى اليوم')
