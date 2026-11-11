@@ -340,6 +340,13 @@ export const api = {
       http('/clinic/patients/lookup', { method: 'POST', body: JSON.stringify(body) }),
     // بيانات المريض بعد اختياره (الاسم والرقم والجنس والسنة — بلا ملاحظات)
     patient: (id) => http(`/clinic/patients/${id}`),
+    // المرضى المكرّرون: { groups: [{ key, patients }], patients } — والدمج والتمييز للمشرفة
+    duplicatePatients: () => http('/clinic/patients/duplicates'),
+    patientIdentityHistory: () => http('/clinic/patients/identity-history'),
+    mergePatients: (keepId, mergeIds) =>
+      http(`/clinic/patients/${keepId}/merge`, { method: 'POST', body: JSON.stringify({ merge_ids: mergeIds }) }),
+    renamePatient: (id, fullName) =>
+      http(`/clinic/patients/${id}/rename`, { method: 'POST', body: JSON.stringify({ full_name: fullName }) }),
     followupCheck: (sessionId, patientId) =>
       http(`/clinic/sessions/${sessionId}/followup-check?patient_id=${encodeURIComponent(patientId)}`),
     prioritize: (appointmentId, priority) =>

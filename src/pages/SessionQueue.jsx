@@ -5,7 +5,7 @@ import { printViaHelper } from '../print-helper.js'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api, APPOINTMENT_STATUSES, BOOKING_TYPES, VISIT_TYPES, REGULAR_VISIT_TYPES, PROCEDURE_ONLY, PRIORITIES, DELAY_CAUSES, WEEKDAYS, addDays, todayLocal, fmtMoney, fmtTime, toLatinDigits, cleanMobile, mobileError } from '../api.js'
 import MobileInput from '../components/MobileInput.jsx'
-import { usePatientSearch, PatientCandidates, SameNameConfirm, MobileUpdateAsk } from '../components/PatientPicker.jsx'
+import { usePatientSearch, PatientCandidates, SameNameConfirm, MobileUpdateAsk, blockedName } from '../components/PatientPicker.jsx'
 import { AttendanceBadge, urgentRowClass, isAttendanceSession, usePolling, fmtClock, FlowModeTag, FLOW_MODE_LABELS,
   AttendanceNumber, turnLabel, fmtTimeOfDay } from '../attendance-ui.jsx'
 import { attendanceBookedMessage } from '../booking-message.js'
@@ -203,9 +203,11 @@ function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel, urgent = f
     patientSearch.byMobile(v)
   }
 
-  // «مريض جديد»: إن طابق الاسمُ مسجَّلاً يُسأل أولاً — والخادم يسأل أيضاً لو فات هنا
+  // «مريض جديد»: الاسم المطابق ممنوع (تختار الموجود أو تعدّل الاسم)، والمشابه يُسأل عنه —
+  // والخادم يفحص الاثنين أيضاً لو فات هنا
   const chooseNew = () => {
-    if (patientSearch.nearNames.length) setSameName({ matches: patientSearch.nearNames, fromSubmit: false })
+    if (patientSearch.exactNames.length) setSameName({ matches: patientSearch.exactNames, blocked: true, fromSubmit: false })
+    else if (patientSearch.nearNames.length) setSameName({ matches: patientSearch.nearNames, fromSubmit: false })
     else { setNewConfirmed(true); patientSearch.dismiss() }
   }
   // «نعم، مريض جديد»: إن جاء السؤال من الحفظ نفسه، يُعاد الحجز بالتأكيد فوراً
@@ -255,6 +257,7 @@ function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel, urgent = f
     } catch (ex) {
       // اسمٌ مطابق لمسجَّل بلا تأكيد: السؤال نفسه بدل رسالة خطأ
       if (ex.data?.code === 'SAME_NAME_EXISTS') { setSameName({ matches: [...(ex.data.matches || []), ...(ex.data.similar || [])], fromSubmit: true }); return }
+      if (blockedName(ex)) { setNewConfirmed(false); setSameName({ matches: blockedName(ex), blocked: true, fromSubmit: true }); return }
       setErr(ex.message)
       // السيرفر يعيد تفاصيل عدم الأهلية — نعرضها ونفتح خانة سبب التجاوز
       if (ex.data?.code === 'FOLLOWUP_NOT_ELIGIBLE') {
@@ -317,7 +320,7 @@ function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel, urgent = f
       {!sameName && (
         <PatientCandidates candidates={patientSearch.candidates} similar={patientSearch.similar} onPick={pick} onNew={chooseNew} disabled={busy} />
       )}
-      <SameNameConfirm matches={sameName?.matches} onPick={pick} onConfirm={confirmNew} disabled={busy} />
+      <SameNameConfirm matches={sameName?.matches} blocked={sameName?.blocked} onPick={pick} onConfirm={confirmNew} disabled={busy} />
       {mobileAsk && picked && (
         <MobileUpdateAsk storedMobile={picked.mobile} disabled={busy}
           onUpdate={() => submit(null, 'update')} onKeep={() => submit(null, 'keep')} />
