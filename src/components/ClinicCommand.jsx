@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { api, dayLabel, fmtTime } from '../api.js'
 import { useRole } from '../RoleContext.jsx'
 import { useToast } from '../action-feedback.jsx'
@@ -25,12 +25,12 @@ function Money({ value }) {
 const plural = (n, one, two, few, many) => (n === 1 ? one : n === 2 ? two : n >= 3 && n <= 10 ? `${fmtNum(n)} ${few}` : `${fmtNum(n)} ${many}`)
 
 const STATE = {
-  open: ['good', 'مفتوحة'], ready: ['blue', 'جاهزة'], done: ['', 'منتهية'],
+  open: ['good', 'شغّالة'], ready: ['blue', 'جاهزة'], done: ['', 'منتهية'],
   apologized: ['bad', 'معتذر'], cancelled: ['', 'ملغاة'],
 }
 
 function SessionsMix({ s }) {
-  const parts = [['open', 'مفتوحة', s.open], ['ready', 'جاهزة', s.ready], ['done', 'منتهية', s.done]]
+  const parts = [['open', 'شغّالة', s.open], ['ready', 'جاهزة', s.ready], ['done', 'منتهية', s.done]]
   return (
     <>
       {s.total > 0 && (
@@ -111,48 +111,66 @@ function EmptyDay({ today, doctorsActive, canGenerate, busy, onGenerate }) {
   )
 }
 
+// ترتيب البطاقات: الشغّالة أوّلاً، ثمّ الجاهزة، ثمّ المنتهية، والمعتذر والملغاة آخراً
+const ORDER = { open: 0, ready: 1, done: 2, apologized: 3, cancelled: 4 }
+
+function SessionCard({ s }) {
+  const [cls, label] = STATE[s.state] || STATE.done
+  const quiet = s.state === 'done' || s.state === 'cancelled' || s.state === 'apologized'
+  const live = s.state === 'open'   // نقطة الشارة تنبض
+  return (
+    <Link to={`/clinic/session/${s.id}`} className={`cc-scard is-${s.state}${quiet ? ' is-quiet' : ''}`}>
+      <div className="cc-scard-top">
+        <div className="cc-scard-who">
+          <strong>{s.doctor}</strong>
+          <span className="cc-sub">{s.specialty && <span>{s.specialty}</span>}<RoomBadge room={s.room} /></span>
+        </div>
+        <span className={`badge ${cls}${live ? ' cc-badge-live' : ''}`}>{label}</span>
+      </div>
+      {s.state === 'apologized' || s.state === 'cancelled' ? (
+        <p className="cc-scard-note">{s.state === 'apologized' ? 'اعتذر الدكتور عن اليوم' : 'الجلسة ملغاة'}</p>
+      ) : (
+        <div className="cc-scard-mid">
+          <div className="cc-scard-turn">
+            <span>الدور الآن</span>
+            <strong className={s.current === null ? 'is-none' : ''}>{s.current === null ? '—' : fmtNum(s.current)}</strong>
+          </div>
+          <div className="cc-scard-wait">
+            <span>بالانتظار</span>
+            <strong className={s.waiting ? '' : 'is-none'}>{s.waiting ? fmtNum(s.waiting) : '—'}</strong>
+          </div>
+          <div className="cc-scard-time"><bdi dir="ltr">{fmtTime(s.start)} – {fmtTime(s.end)}</bdi></div>
+        </div>
+      )}
+      {s.total > 0 && s.state !== 'apologized' && s.state !== 'cancelled' && (
+        <div className="cc-progress">
+          <div className="cc-track"><span style={{ width: `${(s.finished / s.total) * 100}%` }} /></div>
+          <span className="cc-progress-n">{s.finished ? `انتهى ${fmtNum(s.finished)} من ${fmtNum(s.total)}` : `${plural(s.total, 'مريض واحد', 'مريضان', 'مرضى', 'مريضاً')} — لم يبدأ`}</span>
+        </div>
+      )}
+    </Link>
+  )
+}
+
 function SessionsCard({ sessions, today, doctorsActive, canGenerate, busy, onGenerate }) {
-  const navigate = useNavigate()
+  const sorted = [...sessions].sort((a, b) => (ORDER[a.state] ?? 9) - (ORDER[b.state] ?? 9) || a.start.localeCompare(b.start))
+  const count = (st) => sessions.filter((x) => x.state === st).length
   return (
     <div className="card cc-panel cc-sessions">
       <div className="cc-panel-head">
         <h3>جلسات اليوم</h3>
+        {sessions.length > 0 && (
+          <div className="cc-scount">
+            {count('open') > 0 && <span className="is-open"><i className="cc-live" aria-hidden="true" />شغّالة {fmtNum(count('open'))}</span>}
+            {count('ready') > 0 && <span className="is-ready">جاهزة {fmtNum(count('ready'))}</span>}
+            {count('done') > 0 && <span>منتهية {fmtNum(count('done'))}</span>}
+          </div>
+        )}
         {sessions.length > 0 && <Link className="plain" to="/clinic/board">اللوحة اليومية</Link>}
       </div>
       {sessions.length === 0
         ? <EmptyDay today={today} doctorsActive={doctorsActive} canGenerate={canGenerate} busy={busy} onGenerate={onGenerate} />
-        : (
-          <table className="rtable cc-table">
-            <thead><tr><th>الدكتور</th><th>الوقت</th><th>الحالة</th><th>الدور الحالي</th><th>بالانتظار</th><th>التقدّم</th></tr></thead>
-            <tbody>
-              {sessions.map((s) => {
-                const [cls, label] = STATE[s.state] || STATE.done
-                const faded = s.state === 'done' || s.state === 'cancelled'
-                return (
-                  <tr key={s.id} className={`clickable ${faded ? 'cc-faded' : ''}`} onClick={() => navigate(`/clinic/session/${s.id}`)}>
-                    <td className="rt-title">
-                      <Link to={`/clinic/session/${s.id}`} onClick={(e) => e.stopPropagation()}>{s.doctor}</Link>
-                      <span className="cc-sub">{s.specialty && <span>{s.specialty}</span>}<RoomBadge room={s.room} /></span>
-                    </td>
-                    <td className="num" data-label="الوقت"><bdi dir="ltr">{fmtTime(s.start)} – {fmtTime(s.end)}</bdi></td>
-                    <td className="rt-badge"><span className={`badge ${cls}`}>{label}</span></td>
-                    <td data-label="الدور الحالي" className={s.current === null ? 'cc-now none rt-empty' : 'cc-now'}>{s.current === null ? '—' : fmtNum(s.current)}</td>
-                    <td className={`num ${s.waiting ? '' : 'rt-empty'}`} data-label="بالانتظار">{s.waiting ? fmtNum(s.waiting) : '—'}</td>
-                    <td data-label="التقدّم">
-                      {s.state === 'apologized' || s.state === 'cancelled' || s.total === 0 ? <span className="cc-muted">—</span>
-                        : s.finished === 0 ? <span className="cc-muted">لم يبدأ</span> : (
-                          <div className="cc-progress">
-                            <div className="cc-track"><span style={{ width: `${(s.finished / s.total) * 100}%` }} /></div>
-                            <span className="cc-progress-n">{fmtNum(s.finished)} من {fmtNum(s.total)}</span>
-                          </div>
-                        )}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        )}
+        : <div className="cc-scards">{sorted.map((s) => <SessionCard key={s.id} s={s} />)}</div>}
     </div>
   )
 }
@@ -281,7 +299,6 @@ export default function ClinicCommand() {
       </header>
 
       <DayStats d={data.day} />
-      {canSeeHighlights && <Highlights />}
 
       <div className="cc-grid">
         <SessionsCard sessions={data.sessions} today={data.today} doctorsActive={data.doctorsActive}
@@ -291,6 +308,7 @@ export default function ClinicCommand() {
           <AlertsCard a={data.alerts} role={role} />
         </div>
       </div>
+      {canSeeHighlights && <Highlights />}
       {toastNode}
     </div>
   )
