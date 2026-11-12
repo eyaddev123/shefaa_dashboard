@@ -5036,3 +5036,29 @@ input.invx-big-input { min-height: 54px; font-size: 22px; font-weight: 700; }
   .invx-event-after { grid-column: 2; flex-direction: row; align-items: baseline; gap: 6px; justify-content: flex-start; }
   .invx-event-icon { width: 32px; height: 32px; font-size: 16px; }
 }
+
+/* الكارت أصغر (ملاحظة المستخدم 2026-11-12: «الكارت مبين عملاق»): ارتفاعٌ أقلّ، خطٌّ أصغر، والأعمدة متقاربة
+   بعرضٍ ثابت للحالة والسعرين بدل توزيعها على عرض الشاشة كلّه. على الجوال يبقى زرّ الشراء ٤٤ للإصبع. */
+.invx-list { gap: 6px; }
+.invx-row { border-radius: 12px; border-inline-start-width: 4px; }
+button.invx-open {
+  grid-template-columns: minmax(0, 1fr) 210px 160px; gap: 2px 18px; padding: 8px 14px; min-height: 0;
+}
+.invx-name { font-size: 15.5px; }
+.invx-unit { font-size: 12px; }
+.invx-stock { font-size: 14px; gap: 7px; }
+.invx-dot { width: 8px; height: 8px; }
+.invx-price { gap: 0; font-size: 13px; line-height: 1.45; }
+.invx-price strong { font-size: 14px; }
+.invx-cost, .invx-cost strong { font-size: 12.5px; }
+.invx-cost { color: var(--muted); }
+.invx-cost strong { color: var(--text-secondary); font-weight: 700; }
+button.invx-buy { min-height: 36px; min-width: 64px; padding: 4px 14px; margin-inline-end: 10px; font-size: 14px; }
+@media (max-width: 760px) {
+  button.invx-open { grid-template-columns: minmax(0, 1fr) auto; padding: 10px 12px; }
+  button.invx-buy { min-height: 44px; }
+}
+button.invx-counter { min-height: 66px; padding: 9px 14px; border-radius: 14px; }
+.invx-counter-n { font-size: 24px; }
+.invx-counter-label { font-size: 13px; }
+input.invx-search { min-height: 44px; font-size: 15px; }
