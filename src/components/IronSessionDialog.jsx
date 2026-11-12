@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { api, cleanMobile, mobileError } from '../api.js'
 import MobileInput from './MobileInput.jsx'
-import { usePatientSearch, PatientCandidates, SameNameConfirm, MobileUpdateAsk, blockedName } from './PatientPicker.jsx'
+import { usePatientSearch, PatientCandidates, SameNameConfirm, MobileUpdateAsk, blockedName, nameCharsError } from './PatientPicker.jsx'
 import { Modal } from './inventory/shared.jsx'
 import Combobox, { byNameAr } from './Combobox.jsx'
 import { readAmountInput } from '../iron-shares.js'
@@ -123,10 +123,12 @@ export default function IronSessionDialog({ onClose, onSaved }) {
     else { setNewConfirmed(true); patientSearch.dismiss() }
   }
   // «نعم، مريض جديد»: إن جاء السؤال من الحفظ نفسه، يُعاد الحفظ بالتأكيد فوراً
-  const confirmNew = () => {
+  // ومعها سنة الميلاد (إلزامية لـ«شخص آخر» باسمٍ قريب؛ لا خانة لها في هذا النموذج)
+  const [newYear, setNewYear] = useState(null)
+  const confirmNew = (year) => {
     const again = sameName?.fromSubmit
-    setNewConfirmed(true); setSameName(null); patientSearch.dismiss()
-    if (again) submit(null, null, true)
+    setNewYear(year); setNewConfirmed(true); setSameName(null); patientSearch.dismiss()
+    if (again) submit(null, null, true, year)
   }
   // رقمٌ مكتوب يختلف عن رقم المختار؟ (الفارغ ليس تغييراً)
   const pickedMobileDiffers = picked && cleanMobile(mobile) !== '' && cleanMobile(mobile) !== cleanMobile(picked.mobile || '')
@@ -168,10 +170,11 @@ export default function IronSessionDialog({ onClose, onSaved }) {
     confirmLabel: 'تأكيد وحفظ', cancelLabel: 'رجوع للتعديل',
   })
 
-  const submit = async (e, mobileDecision = null, confirmedNew = false) => {
+  const submit = async (e, mobileDecision = null, confirmedNew = false, yearNow = null) => {
     e?.preventDefault?.()
     if (sending.current) return
     setTried(true); setServerField(null); setErr(null)
+    if (!picked && nameCharsError(name)) { setErr(nameCharsError(name)); return }
     const invalid = validate()
     if (Object.keys(invalid).length > 0) { focusFirst(invalid); return }
     // المختار برقمٍ مختلف: لا يتغيّر رقمه من تلقاء نفسه — نسأل، والافتراضي «اتركيه»
@@ -187,7 +190,7 @@ export default function IronSessionDialog({ onClose, onSaved }) {
         ? { patient_id: picked.id,
             ...(mobileDecision === 'update' ? { update_mobile: true, mobile: cleanMobile(mobile) } : {}) }
         : { full_name: name, mobile: cleanMobile(mobile),
-            ...(newConfirmed || confirmedNew ? { confirm_new_patient: true } : {}) }),
+            ...(newConfirmed || confirmedNew ? { confirm_new_patient: true, birth_year: yearNow ?? newYear } : {}) }),
     }
     try {
       let s
@@ -203,7 +206,8 @@ export default function IronSessionDialog({ onClose, onSaved }) {
     } catch (ex) {
       // اسمٌ مطابق لمسجَّل بلا تأكيد: السؤال نفسه بدل رسالة خطأ — ولا شيء حُفظ
       if (ex.data?.code === 'SAME_NAME_EXISTS') { setSameName({ matches: [...(ex.data.matches || []), ...(ex.data.similar || [])], fromSubmit: true }); return }
-      if (blockedName(ex)) { setNewConfirmed(false); setSameName({ matches: blockedName(ex), blocked: true, fromSubmit: true }); return }
+      if (blockedName(ex)) { setNewConfirmed(false); setSameName({ matches: blockedName(ex), blocked: true, message: ex.data.code === 'NAME_EXISTS' ? null : ex.message, fromSubmit: true }); return }
+      if (ex.data?.code === 'SIMILAR_NEEDS_BIRTH_YEAR') { setNewConfirmed(false); setSameName({ matches: patientSearch.nearNames.length ? patientSearch.nearNames : [{ id: 0, full_name: name }], fromSubmit: true }); return }
       const field = SERVER_FIELDS[ex.data?.field]
       if (field) {
         setServerField({ field, msg: ex.message })
@@ -254,7 +258,8 @@ export default function IronSessionDialog({ onClose, onSaved }) {
             {!sameName && (
               <PatientCandidates candidates={patientSearch.candidates} similar={patientSearch.similar} onPick={pick} onNew={chooseNew} disabled={busy} />
             )}
-            <SameNameConfirm matches={sameName?.matches} blocked={sameName?.blocked} onPick={pick} onConfirm={confirmNew} disabled={busy} />
+            <SameNameConfirm key={sameName ? 'open' : 'closed'} matches={sameName?.matches} blocked={sameName?.blocked} message={sameName?.message}
+              defaultYear={newYear || ''} onPick={pick} onConfirm={confirmNew} disabled={busy} />
             {mobileAsk && picked && (
               <MobileUpdateAsk storedMobile={picked.mobile} disabled={busy}
                 onUpdate={() => submit(null, 'update')} onKeep={() => submit(null, 'keep')} />

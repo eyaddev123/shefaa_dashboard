@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { api, cleanMobile } from '../api.js'
+import { api, cleanMobile, toLatinDigits } from '../api.js'
 
 // ═══ البحث عن مريض في الاستقبال — مصدرٌ واحد للحجز وجلسة الحديد وتغيير المريض ═══
 // النتيجة أسماءٌ فقط (الخادم يعيد { matches, similar } من { id, full_name })، سطرٌ لكل مريض:
@@ -107,19 +107,30 @@ export function PatientCandidates({ candidates = [], similar = [], onPick, onNew
 }
 
 // «مريض جديد» باسمٍ لمسجَّل:
-//   • مشابه (فرق حرف، اسم جدّ زائد) ⇒ تأكيدٌ صريح: «لا، هو نفسه» يختاره، و«نعم» يُنشئ جديداً.
+//   • مشابه (فرق حرف، اسم جدّ زائد) ⇒ «لا، هو نفسه» يختاره، و«نعم، شخص آخر» يُنشئ جديداً —
+//     **بسنة ميلاده** (إلزامية: الدليل أنه غيره؛ والخادم يمنع إن طابقت سنة القريب).
 //   • مطابق (blocked) ⇒ منعٌ: «هو نفسه» وحده، أو تعديل الاسم في خانته (يطوي هذا الصندوق).
+//     ومثله «القريب بنفس سنة الميلاد» من الخادم (message رسالته).
 // matches: المطابقون، أو المشابهون (الأقرب أولاً).
+const BLOCKING = ['NAME_EXISTS', 'SIMILAR_SAME_BIRTH_YEAR']
 export function blockedName(ex) {
-  return ex?.data?.code === 'NAME_EXISTS' ? (ex.data.matches || []) : null
+  return BLOCKING.includes(ex?.data?.code) ? (ex.data.matches || []) : null
 }
-export function SameNameConfirm({ matches, blocked = false, onPick, onConfirm, disabled = false }) {
+// اسمٌ يقبله الخادم: أحرفٌ عربية ومسافات فقط (نفس ARABIC_NAME_RE هناك) — للتنبيه أثناء الكتابة
+const ARABIC_NAME_RE = /^[\u0621-\u063A\u0640-\u0652\u0670\u0671\u067E\u0686\u0698\u06A9\u06AF\u06CC ]*$/
+export const nameCharsError = (v) => (ARABIC_NAME_RE.test(String(v || '').replace(/\s+/g, ' '))
+  ? null : 'الاسم أحرف عربية فقط — بلا أرقام ولا رموز ولا أحرف إنكليزية')
+const YEAR_MIN = 1900
+const okYear = (y) => /^\d{4}$/.test(y) && Number(y) >= YEAR_MIN && Number(y) <= new Date().getFullYear()
+
+export function SameNameConfirm({ matches, blocked = false, message = null, defaultYear = '', onPick, onConfirm, disabled = false }) {
+  const [year, setYear] = useState(defaultYear ? String(defaultYear) : '')
   if (!matches?.length) return null
   if (blocked) return (
     <div className="candidates-box name-taken" role="alertdialog" aria-live="assertive">
       <div className="candidates-title">
-        هذا الاسم مسجّل لمريض: <strong>{matches[0].full_name}</strong>. إذا كان هو نفسه اختاريه، وإذا كان شخصاً آخر
-        أضيفي اسم الجد أو الكنية للاسم — لا يُسجَّل مريضان بالاسم نفسه.
+        {message || <>هذا الاسم مسجّل لمريض: <strong>{matches[0].full_name}</strong>. إذا كان هو نفسه اختاريه، وإذا كان شخصاً آخر
+        أضيفي اسم الجد أو الكنية للاسم — لا يُسجَّل مريضان بالاسم نفسه.</>}
       </div>
       {matches.map((c) => (
         <div key={c.id} className="candidate-row">
@@ -132,7 +143,8 @@ export function SameNameConfirm({ matches, blocked = false, onPick, onConfirm, d
   return (
     <div className="candidates-box" role="alertdialog" aria-live="assertive">
       <div className="candidates-title">
-        يوجد مريض مسجّل باسم قريب: {matches[0].full_name}. هل هو شخص آخر؟ إذا كان شخصاً آخر يُفضَّل إضافة اسم الجد.
+        يوجد مريض مسجّل باسم قريب: {matches[0].full_name}. هل هو شخص آخر؟ إذا كان شخصاً آخر اكتبي سنة ميلاده
+        (ويُفضَّل إضافة اسم الجد).
       </div>
       {matches.length > 1 && matches.map((c) => (
         <div key={c.id} className="candidate-row">
@@ -144,7 +156,13 @@ export function SameNameConfirm({ matches, blocked = false, onPick, onConfirm, d
         {matches.length === 1 && (
           <button type="button" className="ghost" disabled={disabled} onClick={() => onPick(matches[0])}>لا، هو نفسه</button>
         )}
-        <button type="button" disabled={disabled} onClick={onConfirm}>نعم، مريض جديد</button>
+        <label className="similar-year">
+          سنة ميلاده
+          <input value={year} inputMode="numeric" placeholder="1990" maxLength={4} disabled={disabled}
+            aria-label="سنة ميلاد المريض الجديد" onChange={(e) => setYear(toLatinDigits(e.target.value).replace(/\D/g, ''))} />
+        </label>
+        <button type="button" disabled={disabled || !okYear(year)} onClick={() => onConfirm(Number(year))}
+          title={okYear(year) ? '' : 'اكتبي سنة الميلاد أوّلاً'}>نعم، شخص آخر</button>
       </div>
     </div>
   )

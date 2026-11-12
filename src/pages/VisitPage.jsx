@@ -578,7 +578,7 @@ function SwapPatient({ appt, onToast, onDone, onCancel }) {
       onToast('تغيّر المريض', 'success'); onDone() }
     catch (ex) {
       if (ex.data?.code === 'SAME_NAME_EXISTS') setSameName({ matches: [...(ex.data.matches || []), ...(ex.data.similar || [])] })
-      else if (blockedName(ex)) setSameName({ matches: blockedName(ex), blocked: true })
+      else if (blockedName(ex)) setSameName({ matches: blockedName(ex), blocked: true, message: ex.data.code === 'NAME_EXISTS' ? null : ex.message })
       else onToast(ex.message)
     } finally { setBusy(false) }
   }
@@ -620,9 +620,10 @@ function SwapPatient({ appt, onToast, onDone, onCancel }) {
         <button className="ghost" disabled={busy || !reasonOk || !newPt.full_name.trim()}
           onClick={() => linkNew()}>مريض جديد</button>
       </div>
-      <SameNameConfirm matches={sameName?.matches} blocked={sameName?.blocked} disabled={busy || !reasonOk}
+      <SameNameConfirm key={sameName ? 'open' : 'closed'} matches={sameName?.matches} blocked={sameName?.blocked} message={sameName?.message}
+        disabled={busy || !reasonOk}
         onPick={(c) => { setSameName(null); link({ patient_id: c.id }) }}
-        onConfirm={() => { setSameName(null); linkNew({ confirm_new_patient: true }) }} />
+        onConfirm={(year) => { setSameName(null); linkNew({ confirm_new_patient: true, birth_year: year }) }} />
     </div>
   )
 }

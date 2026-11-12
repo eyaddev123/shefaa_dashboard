@@ -84,10 +84,6 @@ export const inventoryView = (role) => (role === 'board' ? 'catalog' : 'full')
 // الطبيب لا يرى شيئاً.
 export const canSeeReferralsPage = (role) => role === 'clinic_admin' || role === SUPER_ADMIN || role === MANAGER
 export const canWriteReferralSources = (role) => role === 'clinic_admin'
-// المرضى المكرّرون (الاسم الثلاثي نفسه قبل منع التكرار): المشرفة تدمج وتميّز، والمشرف العام يطالع
-// — يطابق DUP_READERS وrequireRole('clinic_admin') في الخادم.
-export const canSeeDuplicatePatients = (role) => role === 'clinic_admin' || role === SUPER_ADMIN
-export const canFixDuplicatePatients = (role) => role === 'clinic_admin'
 export const canEditReferral = (role) => role === 'clinic_admin' || role === 'clinic_reception'
 
 // جرد الصندوق (الشاشة والملفّ): الاستقبال والمشرفة والمدير — يطابق CASH_REPORT_ROLES في الخادم.

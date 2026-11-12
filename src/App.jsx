@@ -3,7 +3,7 @@ import { Navigate, NavLink, Route, Routes, useLocation, useNavigate } from 'reac
 import { RoleProvider, useRole } from './RoleContext.jsx'
 import {
   canManageUsers, canReadAid, canSearchAid, canSeeClinicBoard, canSeeCashReport, canSeeDoctorsPage,
-  canSeeDoctorScreen, canSeeSettings, canSeeProceduresPage, canSeePrinterSetup, canSeeInventory, canWriteInventory, canSeeReferralsPage, canSeeDuplicatePatients, homePathFor,
+  canSeeDoctorScreen, canSeeSettings, canSeeProceduresPage, canSeePrinterSetup, canSeeInventory, canWriteInventory, canSeeReferralsPage, homePathFor,
   canTakePayment, canSeeClinicFunds, canReadClinic, canSeeEarnings, canSeeDoctorDashboard, canSeeIronLog,
 } from './permissions.js'
 import { ROLE_LABELS } from './api.js'
@@ -33,7 +33,6 @@ import Users from './pages/Users.jsx'
 import ClinicBoard from './pages/ClinicBoard.jsx'
 import CashReport from './pages/CashReport.jsx'
 import ClinicReferrals from './pages/ClinicReferrals.jsx'
-import DuplicatePatients from './pages/DuplicatePatients.jsx'
 import ClinicProcedures from './pages/ClinicProcedures.jsx'
 import Inventory from './pages/Inventory.jsx'
 import ClinicFunds from './pages/ClinicFunds.jsx'
@@ -138,7 +137,6 @@ function Sidebar({ onNavigate }) {
         {canSeeProceduresPage(clinicRole) && canSeeEarnings(clinicRole) && <NavLink to="/clinic/procedures">{I.clinic} الإجراءات والمستحقات</NavLink>}
         {canSeeProceduresPage(clinicRole) && !canSeeEarnings(clinicRole) && <NavLink to="/clinic/procedures">{I.clinic} الإجراءات</NavLink>}
         {canSeeReferralsPage(clinicRole) && <NavLink to="/clinic/referrals">{I.clinic} الإحالات</NavLink>}
-        {canSeeDuplicatePatients(clinicRole) && <NavLink to="/clinic/duplicate-patients">{I.clinic} المرضى المكرّرون</NavLink>}
         {canSeeInventory(clinicRole) && <NavLink to="/inventory">{I.inventory} المخزون</NavLink>}
         {canSeeClinicFunds(clinicRole) && <NavLink to="/clinic/fund">{I.treasury} صندوق العيادات</NavLink>}
         {canSeeDoctorDashboard(clinicRole) && <NavLink to="/clinic/doctor-reports">{I.chart} تقارير الدكاترة</NavLink>}
@@ -248,8 +246,6 @@ function Shell() {
             <Guard allow={canSeeClinicFunds}><ClinicFunds /></Guard>} />
           <Route path="/clinic/referrals" element={
             <Guard allow={canSeeReferralsPage}><ClinicReferrals /></Guard>} />
-          <Route path="/clinic/duplicate-patients" element={
-            <Guard allow={canSeeDuplicatePatients}><DuplicatePatients /></Guard>} />
           <Route path="/clinic/board" element={
             <Guard allow={canSeeClinicBoard}><ClinicBoard /></Guard>} />
           <Route path="/clinic/cash-report" element={
