@@ -564,11 +564,11 @@ function SwapPatient({ appt, onToast, onDone, onCancel }) {
   const doSearch = async () => {
     const q = search.trim()
     if (q.length < 2) return
-    // أرقامٌ وحدها (بعد التنظيف) ⇒ بحثٌ بالرقم، وإلّا بالاسم الثلاثي
-    const asMobile = /^\d+$/.test(cleanMobile(q))
+    // بالاسم وحده (2026-11-12): الرقم ليس فريداً ولا يُبحث به
+    if (/^[\d\s+\-٠-٩]+$/.test(q)) { onToast('البحث بالاسم الثلاثي فقط'); return }
     setBusy(true)
     try {
-      const r = await api.clinic.lookupPatientBy(asMobile ? { mobile: cleanMobile(q) } : { full_name: q })
+      const r = await api.clinic.lookupPatientBy({ full_name: q })
       setFound({ matches: r?.matches || [], similar: r?.similar || [] })
     } catch (ex) { onToast(ex.message) } finally { setBusy(false) }
   }
@@ -590,7 +590,7 @@ function SwapPatient({ appt, onToast, onDone, onCancel }) {
   return (
     <div className="ad-swap">
       <div className="ad-swap-row">
-        <input placeholder="ابحث بالاسم الثلاثي أو الموبايل…" value={search}
+        <input placeholder="ابحث بالاسم الثلاثي…" value={search}
           onChange={(e) => setSearch(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); doSearch() } }} />
         <button className="ghost" disabled={busy} onClick={doSearch}>بحث</button>

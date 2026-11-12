@@ -1,27 +1,25 @@
 import { useRef, useState } from 'react'
-import { api, cleanMobile, toLatinDigits } from '../api.js'
+import { api, toLatinDigits } from '../api.js'
 
 // ═══ البحث عن مريض في الاستقبال — مصدرٌ واحد للحجز وجلسة الحديد وتغيير المريض ═══
 // النتيجة أسماءٌ فقط (الخادم يعيد { matches, similar } من { id, full_name })، سطرٌ لكل مريض:
 // المطابقون، ثمّ تحت عنوان «أسماء مشابهة» ما يقرب بغلطةٍ إملائية أو اسم جدّ زائد. ولا تعبئة
-// قبل أن تكبس الموظفة «هو نفسه» — ولو طلع مريضٌ واحد: الرقم قد يكون رقم الأم (والرقم ليس
-// فريداً — العائلة كلّها برقمٍ واحد). النظام لا يختار ولا يدمج.
+// قبل أن تكبس الموظفة «هو نفسه». النظام لا يختار ولا يدمج.
+// والبحث **بالاسم وحده** (2026-11-12، قرار المستخدم): الرقم ليس فريداً ولا يُبحث به — خانة الرقم تُكتب فقط.
 // والاسم الثلاثي المطابق لا يتكرّر (2026-11-11): «مريض جديد» به ممنوع — تختار الموجود أو تضيف للاسم.
 
 const threeWords = (v) => String(v || '').trim().split(/\s+/).filter(Boolean).length >= 3
-const isFullMobile = (v) => /^09[0-9]{8}$/.test(cleanMobile(v))
 
 export function usePatientSearch() {
   const [nameMatches, setNameMatches] = useState([])
   const [nameSimilar, setNameSimilar] = useState([])
-  const [mobileMatches, setMobileMatches] = useState([])
   const [picked, setPicked] = useState(null)       // بيانات المختار بعد «هو نفسه»
   const [pending, setPending] = useState(0)
   const [dismissed, setDismissed] = useState(false) // اختارت «مريض جديد» — تُطوى القائمة
   const [pickError, setPickError] = useState(null)
   const [nameDone, setNameDone] = useState(false)   // بحثٌ بالاسم الثلاثي انتهى (لـ«غير موجود»)
   // ردٌّ متأخّر لبحثٍ قديم لا يطمس نتيجة أحدث (الكتابة أسرع من الشبكة)
-  const seq = useRef({ name: 0, mobile: 0 })
+  const seq = useRef({ name: 0 })
 
   const run = async (kind, body, set) => {
     const n = ++seq.current[kind]
@@ -40,43 +38,37 @@ export function usePatientSearch() {
     if (!threeWords(v)) { seq.current.name++; setNameMatches([]); setNameSimilar([]); return }
     run('name', { full_name: v }, (r) => { setNameMatches(r.matches); setNameSimilar(r.similar); setNameDone(true) })
   }
-  const byMobile = (v) => {
-    if (picked) return
-    if (!isFullMobile(v)) { seq.current.mobile++; setMobileMatches([]); return }
-    setDismissed(false)
-    run('mobile', { mobile: cleanMobile(v) }, (r) => setMobileMatches(r.matches))
-  }
 
   // «هو نفسه»: الآن فقط تُقرأ بيانات المريض
   const pick = async (c) => {
     setPickError(null)
     try {
       const p = await api.clinic.patient(c.id)
-      setPicked(p); setNameMatches([]); setNameSimilar([]); setMobileMatches([])
+      setPicked(p); setNameMatches([]); setNameSimilar([])
       return p
     } catch (ex) { setPickError(ex.message); return null }
   }
   const reset = () => {
-    seq.current.name++; seq.current.mobile++
-    setPicked(null); setNameMatches([]); setNameSimilar([]); setMobileMatches([]); setDismissed(false); setPickError(null); setNameDone(false)
+    seq.current.name++
+    setPicked(null); setNameMatches([]); setNameSimilar([]); setDismissed(false); setPickError(null); setNameDone(false)
   }
   const dismiss = () => setDismissed(true)
 
-  // الرقم أولاً ثمّ الاسم، بلا تكرار مريض
+  // المطابقون ثمّ المشابهون، بلا تكرار مريض
   const seen = new Set()
   const uniq = (c) => (seen.has(String(c.id)) ? false : seen.add(String(c.id)))
-  const candidates = picked || dismissed ? [] : [...mobileMatches, ...nameMatches].filter(uniq)
+  const candidates = picked || dismissed ? [] : nameMatches.filter(uniq)
   const similar = picked || dismissed ? [] : nameSimilar.filter(uniq)
-  // من يُسأل عنه عند «مريض جديد»: المطابقون بالاسم ثمّ المشابهون (الرقم وحده لا يعني الاسم)
+  // من يُسأل عنه عند «مريض جديد»: المطابقون بالاسم ثمّ المشابهون
   const nearNames = [...nameMatches, ...nameSimilar]
   // والمطابقون وحدهم يمنعون «مريض جديد» منعاً (لا «نعم، مريض جديد»)
   const exactNames = nameMatches
 
-  // «غير موجود عندنا»: بحث الاسم انتهى بلا أحد، ولا مطابق بالرقم
+  // «غير موجود عندنا»: بحث الاسم انتهى بلا أحد
   const noMatch = !picked && nameDone && pending === 0 && nameMatches.length === 0
-    && nameSimilar.length === 0 && mobileMatches.length === 0
+    && nameSimilar.length === 0
   return { candidates, similar, nearNames, exactNames, picked, checking: pending > 0, noMatch, pickError,
-    byName, byMobile, pick, reset, dismiss }
+    byName, pick, reset, dismiss }
 }
 
 // قائمة النتائج: سطرٌ لكل مريض فيه الاسم الثلاثي وحده، و«هو نفسه» لكل سطر، و«مريض جديد».
