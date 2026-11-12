@@ -65,7 +65,7 @@ export default function Stocktake({ materials, onDone, onAddMaterial }) {
     const setR = (id, patch) => setReasons({ ...reasons, [id]: { ...reasons[id], ...patch } })
     return (
       <div className="card">
-        <h3>الفروقات</h3>
+        <h3>الفروقات — شو الفرق بين الرف والنظام</h3>
         {diffs.diffs.length === 0 ? (
           <EmptyState text="لا فروق — العدد الفعلي يطابق رصيد النظام."
             hint={`${materialsCount(diffs.unchanged)} مطابقة.`}>
@@ -75,7 +75,7 @@ export default function Stocktake({ materials, onDone, onAddMaterial }) {
           <>
             <p className="inv-modal-sub">
               {materialsCount(diffs.diffs.length)} فيها فرق{diffs.unchanged ? `، و${materialsCount(diffs.unchanged)} مطابقة` : ''}.
-              السبب إلزاميّ لكلّ مادة.
+              اختاري سبب الفرق لكل مادة.
             </p>
             <table className="inv-table">
               <thead><tr><th>المادة</th><th>رصيد النظام</th><th>الفعلي</th><th>الفرق</th><th>السبب</th></tr></thead>
@@ -120,37 +120,34 @@ export default function Stocktake({ materials, onDone, onAddMaterial }) {
   // ═══ الخطوة الأولى: العدد الفعلي ═══
   return (
     <div className="card">
-      <div className="inv-toolbar">
-        <h3 style={{ margin: 0 }}>العدد الفعلي</h3>
-        <input type="search" className="inv-search" value={query} placeholder="ابحث في المواد…" aria-label="ابحث في المواد"
+      <div className="invx-searchbar">
+        <input type="search" className="invx-search" value={query} placeholder="دوّري على مادة بالاسم…" aria-label="دوّري على مادة بالاسم"
           onChange={(e) => setQuery(e.target.value)} />
       </div>
-      <p className="inv-modal-sub">اكتب العدد للمواد التي عددتها فقط — السطور الفارغة لا تُحسب.</p>
-      <table className="inv-table">
-        <thead><tr><th>المادة</th><th>الوحدة</th><th>رصيد النظام</th><th>العدد الفعلي</th></tr></thead>
+      <table className="inv-table rtable">
+        <thead><tr><th>المادة</th><th>المسجّل بالنظام</th><th>عدّيتي كم؟</th></tr></thead>
         <tbody>
           {shown.map((m) => {
             const v = counts[m.id] ?? ''
             const invalid = v.trim() !== '' && Number.isNaN(parseNum(v))
             return (
               <tr key={m.id}>
-                <td>{m.name}</td>
-                <td>{m.unit}</td>
-                <td className={`num${m.balance < 0 ? ' neg' : ''}`} dir="ltr">{fmtQty(m.balance)}</td>
-                <td><input className={`inv-count${invalid ? ' is-bad' : ''}`} value={v} inputMode="decimal"
+                <td className="rt-title">{m.name} <span className="inv-muted">— {m.unit}</span></td>
+                <td className={`num${m.balance < 0 ? ' neg' : ''}`} data-label="المسجّل بالنظام"><bdi dir="ltr">{fmtQty(m.balance)}</bdi></td>
+                <td data-label="عدّيتي كم؟"><input className={`inv-count${invalid ? ' is-bad' : ''}`} value={v} inputMode="decimal"
                   aria-label={`العدد الفعلي لـ${m.name}`} aria-invalid={invalid}
                   onChange={(e) => setCounts({ ...counts, [m.id]: e.target.value })} /></td>
               </tr>
             )
           })}
-          {shown.length === 0 && <tr><td colSpan={4} className="empty">لا مادة بهذا الاسم.</td></tr>}
+          {shown.length === 0 && <tr><td colSpan={3} className="empty">ما في مادة بهالاسم.</td></tr>}
         </tbody>
       </table>
       {err && <p className="error">{err}</p>}
       <div className="bf-actions inv-actions">
-        <span className="inv-muted">{filled.length ? `عُبّئ ${materialsCount(filled.length)}` : ''}</span>
+        <span className="inv-muted">{filled.length ? `عدّيتي ${materialsCount(filled.length)}` : 'اكتبي العدد جنب المواد اللي عدّيتيها'}</span>
         <button type="button" disabled={busy || filled.length === 0 || bad.length > 0} onClick={compute}>
-          {busy ? 'جارٍ الحساب…' : 'احسب الفروقات'}
+          {busy ? 'لحظة…' : 'شوفي الفروقات'}
         </button>
       </div>
     </div>

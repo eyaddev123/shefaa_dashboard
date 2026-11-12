@@ -3,7 +3,7 @@ import { api, fmtMoney, todayLocal } from '../../api.js'
 import { matchesAr } from '../../arabic-search.js'
 import { useDialogs } from '../../dialogs.jsx'
 import {
-  Modal, UnitSelect, unitPayload, unitChosen, fmtQty, fmtPct, parseNum, materialsCount,
+  Modal, UnitSelect, unitPayload, unitChosen, fmtQty, fmtPct, parseNum, materialsCount, REASONS,
 } from './shared.jsx'
 
 const opt = <span className="opt">(اختياري)</span>
@@ -82,11 +82,11 @@ export function MaterialDialog({ material, units, onClose, onSaved }) {
           <div className="inv-kind">
             <label className={kind === 'counted' ? 'is-on' : undefined}>
               <input type="radio" name="md-kind" value="counted" checked={!consumable} onChange={() => setKind('counted')} />
-              معدودة <span className="hint">لها رصيد، وتُختار على الإجراء بكمّيتها</span>
+              بتنعدّ <span className="hint">إلها كمية على الرف، وبتنضاف على الإجراء بعددها (أمبولات، سيرنغات، جبائر…)</span>
             </label>
             <label className={consumable ? 'is-on' : undefined}>
               <input type="radio" name="md-kind" value="consumable" checked={consumable} onChange={() => setKind('consumable')} />
-              استهلاكية <span className="hint">قطن، شاش، بيتادين — بلا رصيد، قيمتها مقدّرة على نوع الإجراء</span>
+              استهلاكية <span className="hint">قطن، شاش، بيتادين — ما بتنعدّ، قيمتها محسوبة على نوع الإجراء</span>
             </label>
           </div>
         </div>
@@ -107,19 +107,19 @@ export function MaterialDialog({ material, units, onClose, onSaved }) {
           <p className="hint inv-note">بلا رصيد ولا حدّ أدنى: مشترياتها تُسجَّل من «تسجيل شراء» فتُخصم من صندوق العيادات،
             ويقابلها «المستردّ» من الإجراءات في تقرير المستهلكات (صندوق العيادات).</p>
         ) : (
-          <div className="field"><label htmlFor="md-min">الحدّ الأدنى {opt}</label>
+          <div className="field"><label htmlFor="md-min">نبّهيني لما توصل لـ {opt}</label>
             <input id="md-min" value={min} inputMode="decimal" placeholder="بلا تنبيه"
               onChange={(e) => setMin(e.target.value)} />
-            <span className="hint">حين يصل الرصيد إليه أو دونه تظهر المادة «تحتاج شراء» ويصلك إشعار.</span></div>
+            <span className="hint">لما يوصل الموجود لهالعدد أو أقلّ، بتطلع «قرّبت تخلص» وبيوصلك إشعار.</span></div>
         )}
         {editing && (
           <div className="field-check"><label>
-            <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> مفعّلة
-          </label><span className="hint">المعطّلة لا تظهر للاستقبال، ورصيدها باقٍ.</span></div>
+            <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> شغّالة
+          </label><span className="hint">إذا شلتي الإشارة بتنوقف: ما بتظهر للاستقبال، والموجود منها وقصّتها بيضلّوا.</span></div>
         )}
         {!editing && !consumable && (
           <details className="inv-optional">
-            <summary>كمّية موجودة الآن {opt}</summary>
+            <summary>في منها هلأ على الرف؟ {opt}</summary>
             <div className="inv-form-row">
               <div className="field"><label htmlFor="md-qty">الكمّية</label>
                 <input id="md-qty" value={qty} inputMode="decimal" placeholder="0" onChange={(e) => setQty(e.target.value)} /></div>
@@ -128,10 +128,10 @@ export function MaterialDialog({ material, units, onClose, onSaved }) {
             </div>
             <div className="field"><label htmlFor="md-sup">المورّد {opt}</label>
               <input id="md-sup" value={supplier} maxLength={150} onChange={(e) => setSupplier(e.target.value)} /></div>
-            <span className="hint">تُسجَّل رصيداً افتتاحياً للمادة.</span>
+            <span className="hint">بتنسجّل رصيد بداية — ما بتنخصم من الصندوق.</span>
           </details>
         )}
-        {editing && !consumable && <p className="hint inv-note">سعر البيع يُعدَّل من كرت المادة («تعديل سعر البيع») ليُحفظ في سجلّ الأسعار.</p>}
+        {editing && !consumable && <p className="hint inv-note">السعر والتنبيه بيتغيّروا من مربّعاتهم بصفحة المادة («تغيير السعر») — وكل تغيير بينحفظ بـ«شو صار عليها».</p>}
         {err && <p className="error">{err}</p>}
         <div className="bf-actions inv-actions">
           <button type="button" className="ghost" disabled={busy} onClick={onClose}>إلغاء</button>
@@ -279,7 +279,7 @@ export function PurchaseDialog({ materials, units, initialId, onClose, onDone, o
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// تعديل سعر البيع — يسري على ما يُضاف بعده، ويُحفظ في سجلّ الأسعار
+// تغيير سعر البيع — يسري على ما يُضاف بعده، ويُحفظ في «شو صار عليها»
 // ═══════════════════════════════════════════════════════════════════
 export function PriceDialog({ material, onClose, onSaved }) {
   const [price, setPrice] = useState('')
@@ -287,34 +287,184 @@ export function PriceDialog({ material, onClose, onSaved }) {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState(null)
   const p = parseNum(price)
-  const belowCost = material.last_cost !== null && p !== null && !Number.isNaN(p) && p <= material.last_cost
+  const cost = material.purchase_price ?? material.last_cost
+  const belowCost = cost !== null && cost !== undefined && p !== null && !Number.isNaN(p) && p <= cost
 
   const submit = async (e) => {
     e.preventDefault()
-    setErr(null); setBusy(true)
+    setErr(null)
+    if (p === null) return setErr('اكتبي السعر الجديد')
+    if (Number.isNaN(p)) return setErr('السعر رقم بس — مثال: 250')
+    setBusy(true)
     try { onSaved(await api.inventory.setPrice(material.id, { price, note })) }
-    catch (ex) { setErr(ex.message) } finally { setBusy(false) }
+    catch (ex) { setErr(ex.data?.code === 'SAME_PRICE' ? 'هاد نفس السعر الحالي — ما تغيّر شي' : ex.message) } finally { setBusy(false) }
   }
   return (
-    <Modal title="تعديل سعر البيع" subtitle={material.name} onClose={onClose} busy={busy}>
-      <form onSubmit={submit} className="inv-form">
-        <dl className="inv-facts">
-          <div><dt>السعر الحالي</dt><dd>{fmtMoney(material.unit_price)}</dd></div>
-          <div><dt>آخر سعر شراء</dt><dd>{material.last_cost === null ? '—' : fmtMoney(material.last_cost)}</dd></div>
-        </dl>
-        <div className="field"><label htmlFor="pr-new">السعر الجديد (ل.س)</label>
-          <input id="pr-new" value={price} inputMode="decimal" autoFocus onChange={(e) => setPrice(e.target.value)} />
-          {belowCost && <span className="hint inv-hint-bad">لا يغطّي آخر سعر شراء ({fmtMoney(material.last_cost)}).</span>}
+    <Modal title="تغيير سعر البيع" subtitle={material.name} onClose={onClose} busy={busy}>
+      <form onSubmit={submit} className="inv-form invx-form">
+        <div className="invx-now">
+          <span>السعر هلأ</span><strong>{fmtMoney(material.unit_price)}</strong>
+          {cost !== null && cost !== undefined && <span className="invx-muted">سعر شرائها {fmtMoney(cost)}</span>}
         </div>
-        <div className="field"><label htmlFor="pr-note">ملاحظة {opt}</label>
+        <div className="field"><label htmlFor="pr-new">السعر الجديد للمريض (ل.س)</label>
+          <input id="pr-new" className="invx-big-input" value={price} inputMode="decimal" autoFocus placeholder="مثال: 250"
+            onChange={(e) => setPrice(e.target.value)} />
+          {belowCost && <span className="hint inv-hint-bad">⚠ هالسعر أقلّ من سعر شرائها ({fmtMoney(cost)}) — رح تنباع بخسارة.</span>}
+        </div>
+        <div className="field"><label htmlFor="pr-note">ليش تغيّر؟ {opt}</label>
           <input id="pr-note" value={note} placeholder="مثال: غلاء السوق" onChange={(e) => setNote(e.target.value)} /></div>
-        <p className="hint inv-note">يسري على ما يُضاف للإجراءات بعد الحفظ — الإجراءات المسجّلة تبقى بسعرها.</p>
+        <p className="hint inv-note">السعر الجديد بيمشي على اللي بينضاف للإجراءات من هلأ. اللي انسجّل قبل بيضل بسعره القديم.</p>
         {err && <p className="error">{err}</p>}
         <div className="bf-actions inv-actions">
           <button type="button" className="ghost" disabled={busy} onClick={onClose}>إلغاء</button>
-          <button type="submit" disabled={busy || !price.trim()}>{busy ? 'جارٍ الحفظ…' : 'حفظ السعر'}</button>
+          <button type="submit" disabled={busy}>{busy ? 'جارٍ الحفظ…' : 'حفظ السعر الجديد'}</button>
         </div>
       </form>
+    </Modal>
+  )
+}
+
+// ═══ تغيير سعر الشراء (للواحدة) — يُكتب باليد بلا حركة في الصندوق، ويُحفظ في السجلّ ═══
+export function CostDialog({ material, onClose, onSaved }) {
+  const [price, setPrice] = useState(material.purchase_price === null ? '' : String(material.purchase_price))
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState(null)
+  const submit = async (e) => {
+    e.preventDefault()
+    setErr(null)
+    const v = parseNum(price)
+    if (v === null) return setErr('اكتبي سعر الشراء')
+    if (Number.isNaN(v)) return setErr('السعر رقم بس — مثال: 180')
+    if (v === material.purchase_price) return setErr('هاد نفس السعر الحالي — ما تغيّر شي')
+    setBusy(true)
+    try { await api.inventory.setPurchasePrices([{ material_id: material.id, price }]); onSaved(v) }
+    catch (ex) { setErr(ex.message) } finally { setBusy(false) }
+  }
+  return (
+    <Modal title={material.purchase_price === null ? 'كتابة سعر الشراء' : 'تغيير سعر الشراء'} subtitle={material.name} onClose={onClose} busy={busy}>
+      <form onSubmit={submit} className="inv-form invx-form">
+        <div className="invx-now">
+          <span>سعر الشراء هلأ</span><strong>{material.purchase_price === null ? 'ما انكتب' : fmtMoney(material.purchase_price)}</strong>
+          {material.last_cost !== null && <span className="invx-muted">آخر شراء بـ {fmtMoney(material.last_cost)}</span>}
+        </div>
+        <div className="field"><label htmlFor="cs-new">بكم اشترينا الواحدة؟ (ل.س)</label>
+          <input id="cs-new" className="invx-big-input" value={price} inputMode="decimal" autoFocus placeholder="مثال: 180"
+            onChange={(e) => setPrice(e.target.value)} /></div>
+        <p className="hint inv-note">هاد بس تسجيل للسعر — ما بينخصم شي من صندوق العيادات. لما تسجّلي شراء جديد، السعر بيتحدّث لحاله.</p>
+        {err && <p className="error">{err}</p>}
+        <div className="bf-actions inv-actions">
+          <button type="button" className="ghost" disabled={busy} onClick={onClose}>إلغاء</button>
+          <button type="submit" disabled={busy}>{busy ? 'جارٍ الحفظ…' : 'حفظ'}</button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
+// ═══ «نبّهيني لما توصل لـ» — الحدّ الأدنى بالكلام العادي؛ الفارغ أو الصفر = بلا تنبيه ═══
+export function AlertDialog({ material, onClose, onSaved }) {
+  const [min, setMin] = useState(material.min_quantity ? String(material.min_quantity) : '')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState(null)
+  const submit = async (e) => {
+    e.preventDefault()
+    setErr(null)
+    if (min.trim() !== '' && Number.isNaN(parseNum(min))) return setErr('العدد رقم بس — مثال: 5')
+    setBusy(true)
+    try { onSaved(await api.inventory.updateMaterial(material.id, { min_quantity: min.trim() === '' ? 0 : min })) }
+    catch (ex) { setErr(ex.message) } finally { setBusy(false) }
+  }
+  return (
+    <Modal title="إيمتى ننبّهك؟" subtitle={material.name} onClose={onClose} busy={busy}>
+      <form onSubmit={submit} className="inv-form invx-form">
+        <div className="field"><label htmlFor="al-min">نبّهيني لما يوصل الموجود لـ ({material.unit})</label>
+          <input id="al-min" className="invx-big-input" value={min} inputMode="decimal" autoFocus placeholder="مثال: 5"
+            onChange={(e) => setMin(e.target.value)} />
+          <span className="hint">لما يوصل الموجود لهالعدد أو أقلّ، المادة بتطلع «قرّبت تخلص» وبيوصلك إشعار. خلّيه فاضي إذا ما بدّك تنبيه.</span></div>
+        <p className="invx-muted">الموجود هلأ: <bdi dir="ltr">{fmtQty(material.balance)}</bdi> {material.unit}</p>
+        {err && <p className="error">{err}</p>}
+        <div className="bf-actions inv-actions">
+          <button type="button" className="ghost" disabled={busy} onClick={onClose}>إلغاء</button>
+          <button type="submit" disabled={busy}>{busy ? 'جارٍ الحفظ…' : 'حفظ'}</button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
+// ═══ «عدّيتي الرف؟» — جرد مادةٍ واحدة من صفحتها، بمسار الجرد نفسه (معاينة ثمّ تأكيد بالرصيد المرئيّ) ═══
+export function CountDialog({ material, onClose, onSaved }) {
+  const [counted, setCounted] = useState('')
+  const [diff, setDiff] = useState(null)          // سطر الفرق من المعاينة
+  const [reason, setReason] = useState('')
+  const [note, setNote] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState(null)
+
+  const check = async (e) => {
+    e.preventDefault()
+    setErr(null)
+    const v = parseNum(counted)
+    if (v === null) return setErr('اكتبي كم عدّيتي على الرف')
+    if (Number.isNaN(v)) return setErr('العدد رقم بس — مثال: 12')
+    setBusy(true)
+    try {
+      const r = await api.inventory.stocktakePreview([{ material_id: material.id, counted }])
+      if (r.diffs.length === 0) { onSaved(`العدد مطابق — الموجود ${fmtQty(v)} ${material.unit} متل ما هو مسجّل، ما في شي يتصحّح`); return }
+      setDiff(r.diffs[0])
+    } catch (ex) { setErr(ex.message) } finally { setBusy(false) }
+  }
+  const confirm = async () => {
+    setErr(null)
+    if (!reason) return setErr('اختاري سبب الفرق')
+    if (reason === 'other' && !note.trim()) return setErr('اكتبي السبب')
+    setBusy(true)
+    try {
+      await api.inventory.stocktake([{ material_id: material.id, counted: diff.counted, expected: diff.system, reason, reason_note: note }])
+      onSaved(`انصحّح العدد — الموجود من «${material.name}» صار ${fmtQty(diff.counted)} ${material.unit}`)
+    } catch (ex) {
+      if (ex.data?.code === 'STOCK_CHANGED' && ex.data.diffs?.[0]) setDiff(ex.data.diffs[0])
+      setErr(ex.message)
+    } finally { setBusy(false) }
+  }
+  const delta = diff ? diff.counted - diff.system : 0
+  return (
+    <Modal title="عدّيتي الرف؟" subtitle={material.name} onClose={onClose} busy={busy}>
+      {!diff ? (
+        <form onSubmit={check} className="inv-form invx-form">
+          <div className="invx-now"><span>المسجّل بالنظام</span><strong><bdi dir="ltr">{fmtQty(material.balance)}</bdi> {material.unit}</strong></div>
+          <div className="field"><label htmlFor="ct-n">كم {material.unit} لقيتي فعلاً على الرف؟</label>
+            <input id="ct-n" className="invx-big-input" value={counted} inputMode="decimal" autoFocus placeholder="العدد"
+              onChange={(e) => setCounted(e.target.value)} /></div>
+          {err && <p className="error">{err}</p>}
+          <div className="bf-actions inv-actions">
+            <button type="button" className="ghost" disabled={busy} onClick={onClose}>إلغاء</button>
+            <button type="submit" disabled={busy}>{busy ? 'لحظة…' : 'التالي'}</button>
+          </div>
+        </form>
+      ) : (
+        <div className="inv-form invx-form">
+          <div className={`invx-diff ${delta < 0 ? 'is-less' : 'is-more'}`}>
+            المسجّل <strong><bdi dir="ltr">{fmtQty(diff.system)}</bdi></strong> — لقيتي <strong><bdi dir="ltr">{fmtQty(diff.counted)}</bdi></strong>
+            <span>{delta < 0 ? `ناقص ${fmtQty(-delta)}` : `زايد ${fmtQty(delta)}`} {material.unit}</span>
+          </div>
+          <fieldset className="invx-reasons">
+            <legend>ليش في فرق؟</legend>
+            {REASONS.map(([k, label]) => (
+              <label key={k} className={reason === k ? 'is-on' : undefined}>
+                <input type="radio" name="ct-reason" value={k} checked={reason === k} onChange={() => setReason(k)} /> {label}
+              </label>
+            ))}
+          </fieldset>
+          <div className="field"><label htmlFor="ct-note">ملاحظة {reason === 'other' ? '' : opt}</label>
+            <input id="ct-note" value={note} maxLength={200} onChange={(e) => setNote(e.target.value)} /></div>
+          {err && <p className="error">{err}</p>}
+          <div className="bf-actions inv-actions">
+            <button type="button" className="ghost" disabled={busy} onClick={() => { setDiff(null); setErr(null) }}>رجوع</button>
+            <button type="button" disabled={busy} onClick={confirm}>{busy ? 'جارٍ الحفظ…' : `صحّحي الموجود لـ ${fmtQty(diff.counted)}`}</button>
+          </div>
+        </div>
+      )}
     </Modal>
   )
 }
@@ -330,7 +480,7 @@ export function LossDialog({ name, unit, warning, onEditPrice, onLater }) {
           <span className="inv-up"> · زيادة {fmtPct(w.increase_pct)}</span>}</dd></div>
         <div><dt>سعر البيع الحالي</dt><dd className="neg">{fmtMoney(w.sale_price)}</dd></div>
       </dl>
-      <p className="inv-note">كلّ {unit} تُضاف لإجراءٍ بهذا السعر تُحسب بأقلّ من كلفتها.</p>
+      <p className="inv-note">كل {unit} بتنضاف لإجراء بهالسعر بتنحسب بأقلّ من كلفتها. غيّري السعر هلأ أو بعدين من صفحة المادة.</p>
       <div className="bf-actions inv-actions">
         <button type="button" className="ghost" onClick={onLater}>لاحقاً</button>
         <button type="button" onClick={onEditPrice}>تعديل السعر الآن</button>

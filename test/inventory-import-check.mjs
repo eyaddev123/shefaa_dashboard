@@ -84,7 +84,8 @@ async function open(browser, { w = 1366, h = 900, theme = 'light', role = 'clini
   return { ctx, page, errors, st }
 }
 const startPreview = async (page) => {
-  await page.getByRole('button', { name: 'استيراد Excel' }).first().click()
+  // بعد «نفض» المخزون: الاستيراد تحت «المزيد» (زرّان فقط فوق)
+  await page.click('.invx-more-btn'); await page.getByRole('menuitem', { name: /استيراد من Excel/ }).click()
   await page.setInputFiles('input[type=file]', FILE)
   await page.waitForSelector('.inv-imp-table')
 }
@@ -106,14 +107,16 @@ const browser = await chromium.launch()
 console.log('\n── ١) تنزيل القالب ──')
 {
   const { ctx, page, st } = await open(browser)
-  const actions = await page.$$eval('.inv-actions-top button', (b) => b.map((x) => x.innerText.trim()))
-  const iImp = actions.indexOf('استيراد Excel'), iTpl = actions.findIndex((t) => t.includes('تنزيل القالب'))
-  ok(iImp >= 0 && iTpl === iImp + 1, `جنب زرّ الاستيراد: ${actions}`)
-  const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'تنزيل القالب' }).click()])
+  await page.click('.invx-more-btn')
+  const actions = await page.$$eval('.invx-more-menu [role=menuitem] .invx-more-label', (b) => b.map((x) => x.innerText.trim()))
+  const iImp = actions.indexOf('استيراد من Excel'), iTpl = actions.indexOf('تنزيل قالب Excel')
+  ok(iImp >= 0 && iTpl === iImp + 1, `تحت «المزيد» جنب الاستيراد: ${actions}`)
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('menuitem', { name: /تنزيل قالب Excel/ }).click()])
   ok(st.templates === 1 && dl.suggestedFilename() === 'قالب استيراد المواد.xlsx', `الملف ${dl.suggestedFilename()}`)
   await ctx.close()
   const mgr = await open(browser, { role: 'manager' })
-  ok(await mgr.page.getByRole('button', { name: 'تنزيل القالب' }).count() === 0, 'المدير لا يراه')
+  await mgr.page.click('.invx-more-btn')
+  ok(await mgr.page.getByRole('menuitem', { name: /تنزيل قالب Excel|استيراد/ }).count() === 0, 'المدير لا يراه')
   await mgr.ctx.close()
 }
 

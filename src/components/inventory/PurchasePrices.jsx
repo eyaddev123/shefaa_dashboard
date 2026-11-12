@@ -37,24 +37,18 @@ export default function PurchasePrices({ materials, canWrite, onSaved, initialOn
 
   return (
     <div className="card">
-      <div className="inv-toolbar">
-        <h3 style={{ margin: 0 }}>أسعار الشراء</h3>
-        <input type="search" className="inv-search" value={query} placeholder="ابحث في المواد…" aria-label="ابحث في المواد"
+      <div className="invx-searchbar">
+        <input type="search" className="invx-search" value={query} placeholder="دوّري على مادة بالاسم…" aria-label="دوّري على مادة بالاسم"
           onChange={(e) => setQuery(e.target.value)} />
       </div>
-      <p className="inv-modal-sub">
-        سعر شراء القطعة (متوسّط مرجّح). به تُطرح المواد من سعر جلسة الحديد لحظة صرفها (الإجراءات بسعر البيع) —
-        والمادة بلا سعر شراء تُطرح بسعر البيع حتى يُكتب. كتابته هنا للمواد الموجودة لا تُخصم من صندوق
-        العيادات، والشراء الجديد يُحدّثه وحده ويخصم مبلغه. ما صُرف قبل كتابته يبقى بحسابه.
-      </p>
       {missing > 0 && (
         <button type="button" className={`rev-flag${onlyMissing ? ' is-on' : ''}`} aria-pressed={onlyMissing}
           onClick={() => setOnlyMissing(!onlyMissing)}>
-          بلا سعر شراء <span className="rev-flag-n">{missing.toLocaleString('ar-SY')}</span>
+          بس اللي بلا سعر شراء <span className="rev-flag-n">{missing.toLocaleString('ar-SY')}</span>
         </button>
       )}
       <table className="inv-table rtable" style={{ marginTop: 10 }}>
-        <thead><tr><th>المادة</th><th>سعر البيع</th><th>الرصيد</th><th>سعر الشراء (القطعة)</th></tr></thead>
+        <thead><tr><th>المادة</th><th>سعر البيع</th><th>الموجود</th><th>سعر شراء الواحدة</th></tr></thead>
         <tbody>
           {shown.map((m) => {
             const v = vals[m.id] ?? (m.purchase_price === null ? '' : String(m.purchase_price))
@@ -73,7 +67,7 @@ export default function PurchasePrices({ materials, canWrite, onSaved, initialOn
                       onChange={(e) => setVals({ ...vals, [m.id]: e.target.value })} />
                   ) : (m.purchase_price === null ? '—' : fmtMoney(m.purchase_price))}
                   {loss && <span className="badge bad sm" style={{ marginInlineStart: 6 }}
-                    title="سعر البيع لا يغطّي سعر الشراء">بخسارة</span>}
+                    title="سعر البيع أقلّ من سعر الشراء">عم تنباع بخسارة</span>}
                 </td>
               </tr>
             )
@@ -84,7 +78,7 @@ export default function PurchasePrices({ materials, canWrite, onSaved, initialOn
       {err && <p className="error">{err}</p>}
       {canWrite && (
         <div className="bf-actions inv-actions">
-          <span className="inv-muted">{changed.length ? `تغيّر ${materialsCount(changed.length)}` : ''}</span>
+          <span className="inv-muted">{changed.length ? `غيّرتي ${materialsCount(changed.length)}` : 'اكتبي السعر جنب كل مادة، وبعدين احفظي مرّة وحدة'}</span>
           <button type="button" disabled={busy || changed.length === 0 || bad.length > 0} onClick={save}>
             {busy ? 'جارٍ الحفظ…' : 'حفظ الأسعار'}
           </button>

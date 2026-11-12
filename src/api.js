@@ -509,6 +509,8 @@ export const api = {
     updateMaterial: (id, body) => http(`/inventory/materials/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
     setPrice: (id, body) => http(`/inventory/materials/${id}/price`, { method: 'POST', body: JSON.stringify(body) }),
     prices: (id) => http(`/inventory/materials/${id}/prices`),
+    // سجلّ سعر الشراء اليدوي — يُدمج مع سجلّ سعر البيع والحركات في «شو صار عليها»
+    costChanges: (id) => http(`/inventory/materials/${id}/cost-changes`),
     movements: (id, page = 1, per = 20) => http(`/inventory/materials/${id}/movements?page=${page}&per=${per}`),
     purchase: (body) => http('/inventory/purchases', { method: 'POST', body: JSON.stringify(body) }),
     // سعر الشراء يدوياً للمواد الموجودة — بلا حركة في الصندوق: [{material_id, price}]

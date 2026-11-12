@@ -4840,3 +4840,194 @@ a.dr-chip:hover { color: var(--accent-text); border-color: var(--primary); }
   text-decoration: underline; text-underline-offset: 3px; cursor: pointer; box-shadow: none; }
 .dc-state-btn:hover { color: var(--accent-text); filter: none; }
 .dc-actions .dc-btn { flex: 1 1 0; min-width: 0; padding-inline: 6px; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   المخزون بعد «النفض» (2026-11-12) — لمستعملين غير تقنيين: خطٌّ أكبر، كلامٌ عادي، زرّ كلّ رقمٍ جنبه.
+   الألوان للحالات وحدها: أخضر متوفّرة · كهرماني قرّبت تخلص · أحمر خلصت · أزرق معلومة · رمادي موقوفة.
+   ═══════════════════════════════════════════════════════════════════ */
+.invx-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px 20px; margin-bottom: 16px; }
+.invx-head h2 { margin-bottom: 4px; }
+.invx-head .subtitle { margin: 0; max-width: 60ch; }
+.invx-head-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.invx-head-actions > button, .invx-more-btn { min-height: 46px; padding-inline: 18px; font-size: 15px; }
+button.invx-primary { min-height: 46px; padding-inline: 22px; font-size: 15px; font-weight: 700; }
+
+/* «المزيد» */
+.invx-more { position: relative; }
+.invx-more-menu {
+  position: absolute; inset-inline-end: 0; top: calc(100% + 6px); z-index: 30; min-width: 250px;
+  display: flex; flex-direction: column; padding: 6px; border-radius: 14px; background: var(--surface-1);
+  border: 1px solid var(--border); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.16);
+}
+.invx-more-menu button {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; padding: 10px 12px;
+  border: 0; border-radius: 10px; background: transparent; color: var(--text-primary); text-align: start; min-height: 44px; box-shadow: none;
+}
+.invx-more-menu button:hover, .invx-more-menu button:focus-visible { background: var(--primary-soft); }
+.invx-more-label { font-size: 14.5px; font-weight: 700; }
+.invx-more-hint { font-size: 12.5px; font-weight: 400; color: var(--text-secondary); }
+
+/* العدّادات = فلاتر */
+.invx-counters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+button.invx-counter {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-height: 84px; padding: 12px 16px;
+  border-radius: 16px; border: 2px solid var(--border); background: var(--surface-1); color: var(--text-primary);
+  box-shadow: var(--shadow-card); text-align: start; cursor: pointer;
+}
+.invx-counter-n { font-size: 30px; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.invx-counter-label { font-size: 14px; font-weight: 600; color: var(--text-secondary); }
+button.invx-counter.tone-warn .invx-counter-n { color: var(--status-pending); }
+button.invx-counter.tone-bad .invx-counter-n { color: var(--status-bad); }
+button.invx-counter.tone-info .invx-counter-n { color: var(--status-review); }
+button.invx-counter.is-zero .invx-counter-n { color: var(--muted); }
+button.invx-counter:hover { border-color: var(--primary); }
+button.invx-counter.is-on { border-color: var(--primary); background: var(--primary-soft); }
+button.invx-counter.tone-warn.is-on { border-color: var(--status-pending); background: var(--status-pending-bg); }
+button.invx-counter.tone-bad.is-on { border-color: var(--status-bad); background: var(--status-bad-bg); }
+button.invx-counter.tone-info.is-on { border-color: var(--status-review); background: var(--status-review-bg); }
+
+/* البحث والفلاتر الثانوية */
+.invx-card { padding-top: 16px; }
+.invx-searchbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; }
+input.invx-search { flex: 1 1 280px; min-height: 50px; font-size: 16px; padding-inline: 16px; border-radius: 12px; }
+.invx-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+button.invx-chip {
+  min-height: 40px; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-1);
+  color: var(--text-secondary); font-size: 13.5px; font-weight: 600; box-shadow: none;
+}
+button.invx-chip.is-on { border-color: var(--primary); background: var(--primary-soft); color: var(--accent-text); }
+.invx-chip-n { margin-inline-start: 4px; font-weight: 800; }
+.invx-explain { margin: 0 0 12px; padding: 10px 14px; border-radius: 12px; background: var(--primary-soft); color: var(--text-primary); font-size: 14px; line-height: 1.7; }
+.invx-explain-card { margin-bottom: 14px; }
+.invx-muted { color: var(--muted); }
+
+/* السطور: سطرٌ كبير لكلّ مادة، كلّه زرّ يفتحها، وزرّ الشراء جنبه */
+.invx-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.invx-row {
+  display: flex; align-items: stretch; gap: 8px; border: 1px solid var(--border); border-radius: 14px;
+  background: var(--surface-1); border-inline-start: 5px solid var(--border); transition: border-color .15s, box-shadow .15s;
+}
+.invx-row.tone-good { border-inline-start-color: var(--status-good); }
+.invx-row.tone-warn { border-inline-start-color: var(--status-pending); }
+.invx-row.tone-bad { border-inline-start-color: var(--status-bad); }
+.invx-row.tone-muted { opacity: .78; }
+.invx-row:hover { box-shadow: var(--shadow-card); border-color: var(--primary); }
+button.invx-open {
+  flex: 1; min-width: 0; display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.2fr) auto; grid-template-areas: "name stock price" "flags flags flags";
+  align-items: center; gap: 4px 16px; padding: 14px 16px; border: 0; background: transparent; color: var(--text-primary);
+  text-align: start; box-shadow: none; min-height: 64px; cursor: pointer; font-weight: 400;
+}
+button.invx-open:focus-visible { outline: 3px solid var(--primary); outline-offset: -3px; border-radius: 12px; }
+.invx-name { grid-area: name; font-size: 17px; font-weight: 700; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
+.invx-unit { font-size: 12.5px; font-weight: 500; color: var(--muted); }
+.invx-stock { grid-area: stock; display: inline-flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; }
+.invx-dot { width: 10px; height: 10px; border-radius: 50%; background: currentColor; flex: none; }
+.tone-good > .invx-dot, .invx-stock.tone-good, .invx-pill.tone-good { color: var(--status-good); }
+.invx-stock.tone-warn, .invx-pill.tone-warn { color: var(--status-pending); }
+.invx-stock.tone-bad, .invx-pill.tone-bad { color: var(--status-bad); }
+.invx-stock.tone-muted, .invx-pill.tone-muted { color: var(--status-neutral); }
+.invx-price { grid-area: price; font-size: 14.5px; color: var(--text-secondary); white-space: nowrap; }
+.invx-price strong { font-size: 16px; color: var(--text-primary); }
+.invx-flags { grid-area: flags; display: flex; flex-wrap: wrap; gap: 6px; }
+.invx-flag { font-size: 12.5px; font-weight: 600; padding: 2px 10px; border-radius: 999px; }
+.invx-flag.info { color: var(--status-review); background: var(--status-review-bg); }
+.invx-flag.bad { color: var(--status-bad); background: var(--status-bad-bg); }
+button.invx-buy { align-self: center; margin-inline-end: 12px; min-height: 44px; min-width: 76px; font-weight: 700; }
+.invx-footnote { margin: 14px 2px 0; font-size: 14px; color: var(--text-secondary); }
+.invx-footnote strong { color: var(--text-primary); }
+
+/* الشاشات الفرعية */
+button.invx-back { display: inline-flex; align-items: center; min-height: 44px; margin-bottom: 4px; font-size: 15px; font-weight: 700; }
+.invx-sub-title { margin-top: 2px; }
+
+/* صفحة المادة */
+.invx-mhead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px 20px; }
+.invx-mtitle { margin: 0 0 6px; font-size: 26px; }
+.invx-mtags { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; font-size: 14px; }
+.invx-pill { display: inline-flex; align-items: center; gap: 7px; padding: 4px 12px; border-radius: 999px; font-weight: 700; font-size: 14px; background: var(--status-neutral-bg); }
+.invx-pill.tone-good { background: var(--status-good-bg); }
+.invx-pill.tone-warn { background: var(--status-pending-bg); }
+.invx-pill.tone-bad { background: var(--status-bad-bg); }
+.invx-mhead-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.invx-mhead-actions > button { min-height: 46px; padding-inline: 18px; font-size: 15px; }
+
+.invx-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 14px 0 6px; }
+.invx-tiles.is-few { grid-template-columns: minmax(0, 340px); }
+.invx-tile {
+  display: flex; flex-direction: column; gap: 6px; padding: 16px; border-radius: 16px; background: var(--surface-1);
+  border: 1px solid var(--border); box-shadow: var(--shadow-card); min-width: 0;
+}
+.invx-tile.is-big.tone-good { border-top: 4px solid var(--status-good); }
+.invx-tile.is-big.tone-warn { border-top: 4px solid var(--status-pending); }
+.invx-tile.is-big.tone-bad { border-top: 4px solid var(--status-bad); }
+.invx-tile-label { font-size: 14px; font-weight: 600; color: var(--text-secondary); }
+.invx-tile-value { font-size: 28px; font-weight: 800; line-height: 1.15; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.invx-tile-value small { font-size: 15px; font-weight: 600; color: var(--text-secondary); }
+.invx-tile.is-big.tone-warn .invx-tile-value { color: var(--status-pending); }
+.invx-tile.is-big.tone-bad .invx-tile-value { color: var(--status-bad); }
+.invx-tile-none { font-size: 18px; font-weight: 700; color: var(--muted); }
+.invx-tile-sub { font-size: 13px; color: var(--text-secondary); line-height: 1.6; }
+.invx-tile-warn { font-size: 13px; font-weight: 600; color: var(--status-bad); line-height: 1.6; }
+button.invx-tile-btn { margin-top: auto; align-self: stretch; min-height: 44px; font-size: 14.5px; font-weight: 700; }
+.invx-mvalue { margin: 4px 2px 14px; }
+
+/* «شو صار عليها» */
+.invx-story-title { margin: 0; font-size: 19px; }
+.invx-story-hint { margin: 4px 0 14px; font-size: 13.5px; }
+.invx-story { list-style: none; margin: 0; padding: 0; position: relative; }
+.invx-event { position: relative; display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+.invx-event:last-child { border-bottom: 0; }
+.invx-event-icon {
+  width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-size: 18px; font-weight: 800;
+  background: var(--status-neutral-bg); color: var(--status-neutral);
+}
+.invx-event.tone-good .invx-event-icon { background: var(--status-good-bg); color: var(--status-good); }
+.invx-event.tone-out .invx-event-icon { background: var(--status-pending-bg); color: var(--status-pending); }
+.invx-event.tone-warn .invx-event-icon { background: var(--status-bad-bg); color: var(--status-bad); }
+.invx-event.tone-info .invx-event-icon { background: var(--status-review-bg); color: var(--status-review); }
+.invx-event-title { font-size: 15.5px; font-weight: 700; line-height: 1.6; }
+.invx-event-detail { font-size: 14px; color: var(--text-secondary); line-height: 1.6; }
+.invx-event-meta { margin-top: 2px; font-size: 12.5px; color: var(--muted); }
+.invx-event-after { display: flex; flex-direction: column; align-items: flex-end; gap: 0; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.invx-event-after strong { font-size: 18px; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.invx-event-after.neg strong { color: var(--status-bad); }
+button.invx-older { display: block; margin: 12px auto 0; min-height: 44px; }
+.invx-story-empty { padding: 18px 0; text-align: center; }
+.invx-story-empty p { margin: 0 0 6px; font-size: 15px; }
+
+/* النوافذ */
+.invx-form .invx-now { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 12px 14px; border-radius: 12px; background: var(--primary-soft); font-size: 14px; }
+.invx-now strong { font-size: 22px; font-weight: 800; color: var(--text-primary); }
+input.invx-big-input { min-height: 54px; font-size: 22px; font-weight: 700; }
+.invx-diff { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 12px 14px; border-radius: 12px; font-size: 15px; }
+.invx-diff.is-less { background: var(--status-bad-bg); }
+.invx-diff.is-more { background: var(--status-review-bg); }
+.invx-diff strong { font-size: 20px; }
+.invx-diff span { font-weight: 700; }
+.invx-reasons { border: 0; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.invx-reasons legend { font-size: 14px; font-weight: 700; margin-bottom: 8px; }
+.invx-reasons label { display: flex; align-items: center; gap: 8px; min-height: 46px; padding: 8px 12px; border-radius: 12px; border: 1px solid var(--border); cursor: pointer; font-size: 14.5px; }
+.invx-reasons label.is-on { border-color: var(--primary); background: var(--primary-soft); font-weight: 700; }
+
+/* الجوال والأجهزة المتوسّطة */
+@media (max-width: 1100px) {
+  .invx-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 760px) {
+  .invx-head-actions { width: 100%; }
+  .invx-head-actions > .invx-primary { flex: 1 1 100%; }
+  .invx-head-actions > button.ghost, .invx-more { flex: 1 1 0; }
+  .invx-more-btn { width: 100%; }
+  .invx-counters { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  button.invx-counter { min-height: 72px; padding: 10px 12px; }
+  .invx-counter-n { font-size: 26px; }
+  button.invx-open { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name price" "stock stock" "flags flags"; padding: 12px; }
+  button.invx-buy { margin-inline-end: 8px; min-width: 64px; }
+  .invx-mhead-actions { width: 100%; }
+  .invx-mhead-actions > button { flex: 1 1 auto; }
+  .invx-mtitle { font-size: 22px; }
+  .invx-tiles { grid-template-columns: minmax(0, 1fr); }
+  .invx-event { grid-template-columns: 34px minmax(0, 1fr); }
+  .invx-event-after { grid-column: 2; flex-direction: row; align-items: baseline; gap: 6px; justify-content: flex-start; }
+  .invx-event-icon { width: 32px; height: 32px; font-size: 16px; }
+}

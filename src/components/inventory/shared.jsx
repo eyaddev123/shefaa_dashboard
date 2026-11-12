@@ -112,3 +112,46 @@ export function EmptyState({ text, hint, children }) {
     </div>
   )
 }
+
+// ═══ الحالة بالكلام العادي — لغير التقنيين (نفض المخزون 2026-11-12) ═══
+// tone: good · warn · bad · muted — لونٌ للحالة لا للزينة. filter: أيّ عدّادٍ تقع تحته المادة.
+export function stockWords(m) {
+  const q = `${fmtQty(Math.abs(m.balance))} ${m.unit}`
+  if (!m.is_active) return { tone: 'muted', label: 'موقوفة', text: 'موقوفة — ما بتظهر للاستقبال', filter: 'inactive' }
+  if (m.material_kind === 'consumable') return { tone: 'muted', label: 'استهلاكية', text: 'استهلاكية — ما بتنعدّ', filter: 'consumable' }
+  if (m.balance < 0) return { tone: 'bad', label: 'خلصت', text: `خلصت — ناقص ${q}`, filter: 'out' }
+  if (m.balance === 0) return { tone: 'bad', label: 'خلصت', text: 'خلصت — ما في ولا وحدة', filter: 'out' }
+  if (m.needs_purchase) return { tone: 'warn', label: 'قرّبت تخلص', text: `باقي ${q} — قرّبت تخلص`, filter: 'low' }
+  return { tone: 'good', label: 'متوفّرة', text: `موجود ${q}`, filter: 'ok' }
+}
+
+/** «المزيد ▾» — قائمةٌ صغيرة لما لا يُحتاج كلّ يوم. items: [{label, hint?, onClick}] */
+export function MoreMenu({ items, label = 'المزيد' }) {
+  const [open, setOpen] = useState(false)
+  const id = useId()
+  useEffect(() => {
+    if (!open) return undefined
+    const close = (e) => { if (!e.target.closest?.(`[data-menu="${id}"]`)) setOpen(false) }
+    const esc = (e) => { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('mousedown', close); window.addEventListener('keydown', esc)
+    return () => { document.removeEventListener('mousedown', close); window.removeEventListener('keydown', esc) }
+  }, [open, id])
+  if (!items.length) return null
+  return (
+    <div className="invx-more" data-menu={id}>
+      <button type="button" className="ghost invx-more-btn" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+        {label} <span aria-hidden="true">▾</span>
+      </button>
+      {open && (
+        <div className="invx-more-menu" role="menu">
+          {items.map((it) => (
+            <button key={it.label} type="button" role="menuitem" onClick={() => { setOpen(false); it.onClick() }}>
+              <span className="invx-more-label">{it.label}</span>
+              {it.hint && <span className="invx-more-hint">{it.hint}</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}

@@ -5,9 +5,9 @@ import { matchesAr } from '../arabic-search.js'
 import { useToast } from '../action-feedback.jsx'
 import { useRole } from '../RoleContext.jsx'
 import { canWriteInventory, inventoryView } from '../permissions.js'
-import { EmptyState, fmtQty, materialsCount, stockStatus } from '../components/inventory/shared.jsx'
+import { EmptyState, MoreMenu, fmtQty, materialsCount, stockWords } from '../components/inventory/shared.jsx'
 import {
-  ImportDialog, LossDialog, MaterialDialog, PriceDialog, PurchaseDialog,
+  AlertDialog, CostDialog, CountDialog, ImportDialog, LossDialog, MaterialDialog, PriceDialog, PurchaseDialog,
 } from '../components/inventory/InventoryDialogs.jsx'
 import MaterialCard from '../components/inventory/MaterialCard.jsx'
 import Stocktake from '../components/inventory/Stocktake.jsx'
@@ -15,6 +15,9 @@ import Reports from '../components/inventory/Reports.jsx'
 import PurchasePrices from '../components/inventory/PurchasePrices.jsx'
 
 // ═══ المخزون — دفتر حركات المواد، والمكان الوحيد لإدارة الكتالوج ═══
+// «نفض» 2026-11-12 لمستعملين غير تقنيين: عدّاداتٌ تصير فلاتر، وكلّ مادة سطرٌ واحد بالكلام العادي
+// («قرّبت تخلص» · «خلصت»)، وزرّان فقط فوق (تسجيل شراء · مادة جديدة) والباقي تحت «المزيد». الجرد
+// وأسعار الشراء والتقارير شاشاتٌ فرعية برجوعٍ واحد (?view=) بدل التبويبات، والمادة صفحتها (?material=).
 // الرصيد مجموع الحركات: الشراء يُدخل، ومواد الإجراءات تُخرج تلقائياً، والجرد يصحّح.
 // ثلاث عيون على الصفحة نفسها (والخادم هو الحارس — هنا إخفاء ما لا يُفيد الضغط عليه):
 // · المشرفة تكتب كلّ شيء.
@@ -23,121 +26,139 @@ import PurchasePrices from '../components/inventory/PurchasePrices.jsx'
 //   تبويبَي «المواد» و«استهلاك المواد» بصفحة الإجراءات قبل نقلهما إلى هنا.
 
 const TABS = [['materials', 'المواد'], ['costs', 'أسعار الشراء'], ['stocktake', 'تسوية جرد'], ['reports', 'التقارير']]
-const FILTERS = [['all', 'الكل'], ['low', 'تحتاج شراء'], ['consumable', 'استهلاكية'], ['inactive', 'غير مفعّلة']]
 const isConsumable = (m) => m.material_kind === 'consumable'
 
-function MaterialsTable({ data, canWrite, onOpen, onPurchase, onEdit, onAdd, onImport, onTemplate, onBuyAny, onShowMissingCost }) {
-  const [query, setQuery] = useState('')
-  const [filter, setFilter] = useState('all')
-  const { materials, summary } = data
+// ═══ العدّادات: كلّ عدّادٍ فلتر بضغطة ═══
+// «قرّبت تخلص» و«خلصت» منفصلان: الثاني أعجل. والاستهلاكية والموقوفة فلتران ثانويان تحتها.
+const COUNTERS = [
+  ['all', 'كل المواد', ''],
+  ['low', 'قرّبت تخلص', 'warn'],
+  ['out', 'خلصت', 'bad'],
+  ['nocost', 'بلا سعر شراء', 'info'],
+]
+const matches = (m, f) => (f === 'all' ? true : f === 'nocost' ? m.no_purchase_price : stockWords(m).filter === f)
+const EMPTY_TEXT = {
+  low: 'ولا مادة قرّبت تخلص — كلّه تمام.', out: 'ولا مادة خلصت.', nocost: 'كلّ المواد إلها سعر شراء.',
+  consumable: 'ما في مواد استهلاكية.', inactive: 'ما في مواد موقوفة.', all: 'ما في مادة بهالاسم.',
+}
 
-  const shown = materials.filter((m) => matchesAr(m.name, query)
-    && (filter === 'all' || (filter === 'low' ? m.needs_purchase : filter === 'consumable' ? isConsumable(m) : !m.is_active)))
-
+function MaterialRow({ m, canWrite, onOpen, onPurchase }) {
+  const w = stockWords(m)
+  const cons = isConsumable(m)
   return (
-    <div className="card">
-      <div className="inv-toolbar">
-        {canWrite && (
-          <div className="inv-actions-top">
-            <button type="button" onClick={onBuyAny}>تسجيل شراء</button>
-            <button type="button" className="ghost" onClick={onAdd}>+ مادة</button>
-            <button type="button" className="ghost" onClick={onImport}>استيراد Excel</button>
-            <button type="button" className="ghost" onClick={onTemplate}>⬇ تنزيل القالب</button>
-          </div>
+    <li className={`invx-row tone-${w.tone}`}>
+      <button type="button" className="invx-open" onClick={() => onOpen(m.id)} aria-label={`${m.name} — ${w.text}`}>
+        <span className="invx-name">{m.name}<span className="invx-unit">{m.unit}</span></span>
+        <span className={`invx-stock tone-${w.tone}`}><span className="invx-dot" aria-hidden="true" />{w.text}</span>
+        <span className="invx-price">
+          {cons ? <span className="invx-muted">بلا سعر بيع</span> : <>يُباع بـ <strong>{fmtMoney(m.unit_price)}</strong></>}
+        </span>
+        {(m.no_purchase_price || (m.selling_at_loss && m.is_active)) && (
+          <span className="invx-flags">
+            {m.no_purchase_price && <span className="invx-flag info">بلا سعر شراء</span>}
+            {m.selling_at_loss && m.is_active && <span className="invx-flag bad">عم تنباع بأقلّ من سعر شرائها</span>}
+          </span>
         )}
-        {materials.length > 0 && (
-          <div className="inv-filters">
-            <input type="search" className="inv-search" value={query} placeholder="ابحث بالاسم…" aria-label="ابحث بالاسم"
-              onChange={(e) => setQuery(e.target.value)} />
-            <div className="inv-chips" role="group" aria-label="تصفية">
-              {FILTERS.map(([k, label]) => (
-                <button key={k} type="button" aria-pressed={filter === k}
-                  className={`rev-flag${filter === k ? ' is-on' : ''}`} onClick={() => setFilter(k)}>
-                  {label}
-                  {k === 'low' && summary.needs_purchase > 0 && <span className="rev-flag-n">{summary.needs_purchase.toLocaleString('ar-SY')}</span>}
-                  {k === 'inactive' && summary.inactive > 0 && <span className="rev-flag-n">{summary.inactive.toLocaleString('ar-SY')}</span>}
+      </button>
+      {canWrite && m.is_active && (
+        <button type="button" className="ghost invx-buy" onClick={() => onPurchase(m)}>شراء</button>
+      )}
+    </li>
+  )
+}
+
+function MaterialsList({ data, canWrite, onOpen, onPurchase, onAdd, onImport }) {
+  const [params, setParams] = useSearchParams()
+  const [query, setQuery] = useState('')
+  const filter = params.get('show') || 'all'
+  const setFilter = (f) => setParams(f === 'all' ? {} : { show: f }, { replace: true })
+  const { materials, summary } = data
+  const count = (f) => materials.filter((m) => matches(m, f)).length
+  const secondary = [['consumable', 'استهلاكية'], ['inactive', 'موقوفة']].filter(([k]) => count(k) > 0)
+  const shown = materials.filter((m) => matchesAr(m.name, query) && matches(m, filter))
+
+  if (materials.length === 0) {
+    return (
+      <div className="card">
+        {canWrite ? (
+          <EmptyState text="ما في مواد لسّا." hint="ضيفي المواد واحدة واحدة، أو كلّها مرّة وحدة من ملف Excel.">
+            <button type="button" onClick={onAdd}>+ مادة جديدة</button>
+            <button type="button" className="ghost" onClick={onImport}>استيراد من Excel</button>
+          </EmptyState>
+        ) : <EmptyState text="ما في مواد لسّا." hint="بتضيفها مشرفة العيادات من هالصفحة." />}
+      </div>
+    )
+  }
+  return (
+    <>
+      <div className="invx-counters" role="group" aria-label="عرض">
+        {COUNTERS.map(([k, label, tone]) => {
+          const n = k === 'all' ? materials.length : count(k)
+          return (
+            <button key={k} type="button" aria-pressed={filter === k}
+              className={`invx-counter${tone ? ` tone-${tone}` : ''}${filter === k ? ' is-on' : ''}${n === 0 && k !== 'all' ? ' is-zero' : ''}`}
+              onClick={() => setFilter(filter === k ? 'all' : k)}>
+              <span className="invx-counter-n">{n.toLocaleString('ar-SY')}</span>
+              <span className="invx-counter-label">{label}</span>
+            </button>
+          )
+        })}
+      </div>
+
+      <div className="card invx-card">
+        <div className="invx-searchbar">
+          <input type="search" className="invx-search" value={query} placeholder="دوّري على مادة بالاسم…" aria-label="دوّري على مادة بالاسم"
+            onChange={(e) => setQuery(e.target.value)} />
+          {secondary.length > 0 && (
+            <div className="invx-chips" role="group" aria-label="عرض ثانوي">
+              {secondary.map(([k, label]) => (
+                <button key={k} type="button" aria-pressed={filter === k} className={`invx-chip${filter === k ? ' is-on' : ''}`}
+                  onClick={() => setFilter(filter === k ? 'all' : k)}>
+                  {label} <span className="invx-chip-n">{count(k).toLocaleString('ar-SY')}</span>
                 </button>
               ))}
             </div>
-          </div>
+          )}
+        </div>
+        {filter === 'nocost' && shown.length > 0 && (
+          <p className="invx-explain">
+            سعر الشراء بيلزم لنعرف ربح المواد، ولتنحسب المواد بجلسات الحديد صح. فوتي على المادة واضغطي «تغيير» جنب سعر الشراء —
+            {canWrite ? ' أو عبّيهم كلّهم مرّة وحدة من «المزيد ← أسعار الشراء».' : ''}
+          </p>
         )}
-      </div>
+        {filter === 'low' && shown.length > 0 && (
+          <p className="invx-explain">هدول وصلوا للعدد اللي طلبتي ننبّهك عنده. سجّلي شراء لما توصل البضاعة.</p>
+        )}
 
-      {summary.needs_purchase > 0 && filter !== 'low' && (
-        <button type="button" className="inv-banner" onClick={() => setFilter('low')}>
-          {materialsCount(summary.needs_purchase)} {summary.needs_purchase === 1 ? 'وصلت' : summary.needs_purchase === 2 ? 'وصلتا' : 'وصلت'} للحدّ الأدنى
-          <span className="inv-banner-link">اعرضها</span>
-        </button>
-      )}
-
-      {/* سعر الشراء هو ما يُطرح للمواد من جلسات الحديد (الإجراءات بسعر البيع) — بدونه تُطرح بسعر البيع */}
-      {summary.no_purchase_price > 0 && (
-        <button type="button" className="inv-banner" onClick={onShowMissingCost}>
-          <span>
-            ⚠ {materialsCount(summary.no_purchase_price)} بلا سعر شراء — تُطرح من جلسات الحديد بسعر البيع حتى {canWrite ? 'تعبّئي' : 'يُعبَّأ'} سعر شرائها
-            {summary.issued_at_sale > 0 && <> (صُرفت منها {summary.issued_at_sale.toLocaleString('ar-SY')} مرّة بسعر البيع)</>}
-          </span>
-          <span className="inv-banner-link">{canWrite ? 'عبّئيها' : 'اعرضها'}</span>
-        </button>
-      )}
-
-      {materials.length === 0 ? (canWrite ? (
-        <EmptyState text="لا مواد بعد."
-          hint="عرّف المواد واحدةً واحدة، أو استوردها كلّها من ملف Excel بأرصدتها الحالية.">
-          <button type="button" onClick={onImport}>استيراد Excel</button>
-          <button type="button" className="ghost" onClick={onAdd}>+ مادة</button>
-        </EmptyState>
-      ) : <EmptyState text="لا مواد بعد." hint="تعرّفها مشرفة العيادات من هذه الصفحة." />
-      ) : shown.length === 0 ? (
-        <EmptyState text={filter === 'low' ? 'لا مادة تحتاج شراء الآن.' : filter === 'inactive' ? 'لا مواد غير مفعّلة.'
-          : filter === 'consumable' ? 'لا مواد استهلاكية — عرّفها من «+ مادة» باختيار «استهلاكية».' : 'لا مادة بهذا الاسم.'}>
-          <button type="button" className="ghost" onClick={() => { setQuery(''); setFilter('all') }}>عرض الكل</button>
-        </EmptyState>
-      ) : (
-        <table className="inv-table inv-materials rtable">
-          <thead><tr>
-            <th>المادة</th><th>النوع</th><th>الوحدة</th><th>الرصيد</th><th>القيمة</th><th>سعر البيع</th><th>الحدّ الأدنى</th><th>الحالة</th><th></th>
-          </tr></thead>
-          <tbody>
-            {shown.map((m) => {
-              const st = stockStatus(m)
-              const cons = isConsumable(m)
-              return (
-                <tr key={m.id} className={`clickable${m.is_active ? '' : ' proc-inactive'}`} onClick={() => onOpen(m.id)}>
-                  <td className="inv-name rt-title">{m.name}</td>
-                  <td data-label="النوع">{cons ? <span className="badge sm kind-badge">استهلاكية</span> : 'معدودة'}</td>
-                  <td data-label="الوحدة">{m.unit}</td>
-                  {/* الاستهلاكية بلا رصيد ولا سعر بيع ولا حدّ — مشترياتها في الدفتر وحده */}
-                  <td className={`num inv-balance${!cons && m.balance < 0 ? ' neg' : ''}`} data-label="الرصيد">
-                    {cons ? '—' : <bdi dir="ltr">{fmtQty(m.balance)}</bdi>}</td>
-                  <td className="num" data-label="القيمة">{m.stock_value === null ? '—' : fmtMoney(m.stock_value)}</td>
-                  <td className="num" data-label="سعر البيع">{cons ? '—' : fmtMoney(m.unit_price)}</td>
-                  <td className="num" data-label="الحدّ الأدنى">{!cons && m.min_quantity ? fmtQty(m.min_quantity) : '—'}</td>
-                  <td className="rt-badge">
-                    <div className="inv-status">
-                      <span className={`badge sm ${st.cls}`}>{st.label}</span>
-                      {m.selling_at_loss && m.is_active && <span className="badge sm bad">بيع بخسارة</span>}
-                      {m.no_purchase_price && <span className="badge sm warn" title="تُطرح من جلسات الحديد بسعر البيع">بلا سعر شراء</span>}
-                    </div>
-                  </td>
-                  <td className="inv-row-actions rt-actions" onClick={(e) => e.stopPropagation()}>
-                    {canWrite && m.is_active && <button type="button" className="ghost" onClick={() => onPurchase(m)}>شراء</button>}
-                    <button type="button" className="ghost" onClick={() => onOpen(m.id)}>الكرت</button>
-                    {canWrite && <button type="button" className="ghost" onClick={() => onEdit(m)}>تعديل</button>}
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      )}
-      {materials.length > 0 && (
-        <p className="inv-footnote">
-          قيمة المخزون بسعر آخر شراء: <strong>{fmtMoney(summary.stock_value)}</strong>
-          <span className="inv-muted"> — المواد بلا سعر شراء لا تدخل فيها.</span>
+        {shown.length === 0 ? (
+          <EmptyState text={query ? 'ما في مادة بهالاسم.' : EMPTY_TEXT[filter]}>
+            {(query || filter !== 'all') && (
+              <button type="button" className="ghost" onClick={() => { setQuery(''); setFilter('all') }}>عرض كل المواد</button>
+            )}
+          </EmptyState>
+        ) : (
+          <ul className="invx-list">
+            {shown.map((m) => <MaterialRow key={m.id} m={m} canWrite={canWrite} onOpen={onOpen} onPurchase={onPurchase} />)}
+          </ul>
+        )}
+        <p className="invx-footnote">
+          قيمة الموجود بسعر الشراء: <strong>{fmtMoney(summary.stock_value)}</strong>
+          {summary.no_purchase_price > 0 && <span className="invx-muted"> — من غير المواد اللي ما إلها سعر شراء</span>}
         </p>
-      )}
-    </div>
+      </div>
+    </>
+  )
+}
+
+/** رأس شاشةٍ فرعية (جرد · أسعار الشراء · التقارير): رجوعٌ واحد واضح بدل التبويبات */
+function SubView({ title, hint, onBack, children }) {
+  return (
+    <>
+      <button type="button" className="link-btn invx-back" onClick={onBack}>→ كل المواد</button>
+      <h2 className="invx-sub-title">{title}</h2>
+      {hint && <p className="subtitle">{hint}</p>}
+      {children}
+    </>
   )
 }
 
@@ -230,10 +251,14 @@ function InventoryCatalogView() {
   )
 }
 
+const VIEWS = {
+  stocktake: { title: 'جرد الرفوف', hint: 'عدّي الموجود فعلاً على الرف واكتبيه جنب كل مادة عدّيتيها — الفاضي ما بيتحسب. منحسبلك الفرق قبل ما نصحّح.' },
+  costs: { title: 'أسعار الشراء', hint: 'سعر شراء الواحدة لكل مادة — عبّيهم كلّهم مرّة وحدة. كتابتهم هون ما بتخصم شي من الصندوق.' },
+  reports: { title: 'التقارير', hint: 'شو انصرف من المواد وشو انشرى، لفترة بتختاريها.' },
+}
+
 function InventoryFull({ canWrite }) {
   const [params, setParams] = useSearchParams()
-  const [tab, setTab] = useState('materials')
-  const [costsMissingOnly, setCostsMissingOnly] = useState(false)
   const [data, setData] = useState(null)
   const [units, setUnits] = useState([])
   const [err, setErr] = useState(null)
@@ -241,6 +266,7 @@ function InventoryFull({ canWrite }) {
   const [refreshKey, setRefreshKey] = useState(0)
   const [toast, showToast] = useToast()
   const openId = params.get('material')
+  const view = VIEWS[params.get('view')] ? params.get('view') : null
 
   // الوحدات لنوافذ الكتابة وحدها
   const load = useCallback(() => Promise.all([api.inventory.materials(), canWrite ? api.inventory.units() : []])
@@ -250,12 +276,13 @@ function InventoryFull({ canWrite }) {
 
   const refresh = () => { load(); setRefreshKey((k) => k + 1) }
   const close = () => setDialog(null)
-  const openCard = (id) => { setTab('materials'); setParams({ material: String(id) }) }
-  const backToList = () => setParams({})
+  const go = (next) => { setParams(next); window.scrollTo({ top: 0 }) }
+  const openCard = (id) => go({ material: String(id) })
+  const backToList = () => go({})
 
   const afterPurchase = (r, m) => {
     refresh()
-    showToast(`سُجّل الشراء — رصيد «${r.material_name}» صار ${fmtQty(r.balance)} ${r.unit}`, 'success', 5000)
+    showToast(`انسجّل الشراء — «${r.material_name}» صار الموجود منها ${fmtQty(r.balance)} ${r.unit}`, 'success', 5000)
     if (r.loss_warning) setDialog({ kind: 'loss', material: m, warning: r.loss_warning, name: r.material_name, unit: r.unit })
     else close()
   }
@@ -263,57 +290,72 @@ function InventoryFull({ canWrite }) {
   if (err && !data) return <><h2>المخزون</h2><p className="error">{err}</p></>
   if (!data) return <><h2>المخزون</h2><p className="empty">جارٍ التحميل…</p></>
 
+  const more = [
+    ...(canWrite ? [
+      { label: 'جرد الرفوف', hint: 'عدّيتي الرفوف؟ صحّحي الكميات', onClick: () => go({ view: 'stocktake' }) },
+      { label: 'أسعار الشراء', hint: 'عبّي أسعار الشراء كلّها مرّة وحدة', onClick: () => go({ view: 'costs' }) },
+    ] : [{ label: 'أسعار الشراء', hint: 'سعر شراء كل مادة', onClick: () => go({ view: 'costs' }) }]),
+    { label: 'التقارير', hint: 'شو انصرف وشو انشرى', onClick: () => go({ view: 'reports' }) },
+    ...(canWrite ? [
+      { label: 'استيراد من Excel', hint: 'ضيفي مواد كثيرة مرّة وحدة', onClick: () => setDialog({ kind: 'import' }) },
+      { label: 'تنزيل قالب Excel', hint: 'الملف الفاضي اللي بتعبّيه', onClick: () => api.inventory.template().catch((ex) => showToast(ex.message)) },
+    ] : []),
+  ]
+
   return (
     <>
-      <h2>المخزون</h2>
-      <p className="subtitle">
-        الرصيد مجموع حركات كلّ مادة: الشراء يُدخل، والمواد المضافة على الإجراءات تُخرج تلقائياً، والجرد يصحّح.
-        {!canWrite && ' للاطّلاع فقط — تديره مشرفة العيادات.'}
-      </p>
       {toast}
-
-      <div className="inline proc-tabs inv-tabs" role="tablist">
-        {TABS.filter(([k]) => canWrite || k !== 'stocktake').map(([k, label]) => (
-          <button key={k} type="button" role="tab" aria-selected={tab === k}
-            className={tab === k ? '' : 'ghost'}
-            onClick={() => { setTab(k); setCostsMissingOnly(false); if (openId) backToList() }}>{label}</button>
-        ))}
-      </div>
-
-      {tab === 'materials' && (openId ? (
+      {openId ? (
         <MaterialCard id={openId} refreshKey={refreshKey} onBack={backToList} canWrite={canWrite}
           onPurchase={(m) => setDialog({ kind: 'purchase', material: m })}
           onEdit={(m) => setDialog({ kind: 'edit', material: m })}
-          onEditPrice={(m) => setDialog({ kind: 'price', material: m })} />
+          onEditPrice={(m) => setDialog({ kind: 'price', material: m })}
+          onEditCost={(m) => setDialog({ kind: 'cost', material: m })}
+          onEditAlert={(m) => setDialog({ kind: 'alert', material: m })}
+          onCount={(m) => setDialog({ kind: 'count', material: m })} />
+      ) : view ? (
+        <SubView title={VIEWS[view].title} hint={view === 'costs' && !canWrite ? 'سعر شراء الواحدة لكل مادة — للاطّلاع.' : VIEWS[view].hint} onBack={backToList}>
+          {view === 'stocktake' && canWrite && (
+            <Stocktake materials={data.materials} onAddMaterial={() => setDialog({ kind: 'add' })}
+              onDone={(r) => { refresh(); showToast(`انصحّح العدد ${r.count === 1 ? 'لمادة وحدة' : r.count === 2 ? 'لمادتين' : `لـ ${materialsCount(r.count)}`} — الموجود صار متل الرف`, 'success', 5000) }} />
+          )}
+          {view === 'costs' && (
+            <PurchasePrices materials={data.materials} canWrite={canWrite} initialOnlyMissing={data.summary.no_purchase_price > 0}
+              onSaved={(r) => { refresh(); showToast(r.changed ? `انحفظ سعر شراء ${materialsCount(r.changed)}` : 'ما تغيّر شي', 'success', 4000) }} />
+          )}
+          {view === 'reports' && <Reports showToast={showToast} withCost />}
+        </SubView>
       ) : (
-        <MaterialsTable data={data} canWrite={canWrite} onOpen={openCard}
-          onPurchase={(m) => setDialog({ kind: 'purchase', material: m })}
-          onBuyAny={() => setDialog({ kind: 'purchase' })}
-          onEdit={(m) => setDialog({ kind: 'edit', material: m })}
-          onAdd={() => setDialog({ kind: 'add' })}
-          onImport={() => setDialog({ kind: 'import' })}
-          onShowMissingCost={() => { setCostsMissingOnly(true); setTab('costs') }}
-          onTemplate={() => api.inventory.template().catch((ex) => showToast(ex.message))} />
-      ))}
-      {tab === 'stocktake' && canWrite && (
-        <Stocktake materials={data.materials} onAddMaterial={() => setDialog({ kind: 'add' })}
-          onDone={(r) => { refresh(); showToast(`سُجّلت ${r.count === 1 ? 'تسويةٌ واحدة' : r.count === 2 ? 'تسويتان' : `${r.count.toLocaleString('ar-SY')} تسويات`} — الأرصدة صارت العدد الفعلي`, 'success', 5000) }} />
+        <>
+          <div className="invx-head">
+            <div>
+              <h2>المخزون</h2>
+              <p className="subtitle">
+                كل مواد العيادات: شو موجود منها، وبكم بتنباع، وبكم انشرت. اضغطي على أيّ مادة لتشوفي كل شي عنها.
+                {!canWrite && ' للاطّلاع فقط — بتديره مشرفة العيادات.'}
+              </p>
+            </div>
+            <div className="invx-head-actions">
+              {canWrite && <button type="button" className="invx-primary" onClick={() => setDialog({ kind: 'purchase' })}>تسجيل شراء</button>}
+              {canWrite && <button type="button" className="ghost" onClick={() => setDialog({ kind: 'add' })}>+ مادة جديدة</button>}
+              <MoreMenu items={more} />
+            </div>
+          </div>
+          <MaterialsList data={data} canWrite={canWrite} onOpen={openCard}
+            onPurchase={(m) => setDialog({ kind: 'purchase', material: m })}
+            onAdd={() => setDialog({ kind: 'add' })}
+            onImport={() => setDialog({ kind: 'import' })} />
+        </>
       )}
-      {tab === 'costs' && (
-        <PurchasePrices key={costsMissingOnly ? 'missing' : 'all'} materials={data.materials} canWrite={canWrite}
-          initialOnlyMissing={costsMissingOnly}
-          onSaved={(r) => { refresh(); showToast(r.changed ? `حُفظ سعر شراء ${materialsCount(r.changed)}` : 'لا تغيير', 'success', 4000) }} />
-      )}
-      {tab === 'reports' && <Reports showToast={showToast} withCost />}
 
       {dialog?.kind === 'add' && (
         <MaterialDialog units={units} onClose={close}
-          onSaved={(m) => { close(); refresh(); showToast(`أُضيفت «${m.name}»`, 'success', 3000) }} />
+          onSaved={(m) => { close(); refresh(); showToast(`انضافت «${m.name}»`, 'success', 3000) }} />
       )}
       {dialog?.kind === 'edit' && (
         <MaterialDialog material={data.materials.find((x) => String(x.id) === String(dialog.material.id)) || dialog.material}
           units={units} onClose={close}
-          onSaved={() => { close(); refresh(); showToast('حُفظ التعديل', 'success', 3000) }} />
+          onSaved={() => { close(); refresh(); showToast('انحفظ التعديل', 'success', 3000) }} />
       )}
       {dialog?.kind === 'purchase' && (
         <PurchaseDialog materials={data.materials} units={units} initialId={dialog.material?.id}
@@ -321,7 +363,19 @@ function InventoryFull({ canWrite }) {
       )}
       {dialog?.kind === 'price' && (
         <PriceDialog material={dialog.material} onClose={close}
-          onSaved={(m) => { close(); refresh(); showToast(`سعر «${m.name}» صار ${fmtMoney(m.unit_price)}`, 'success', 4000) }} />
+          onSaved={(m) => { close(); refresh(); showToast(`سعر بيع «${m.name}» صار ${fmtMoney(m.unit_price)}`, 'success', 4000) }} />
+      )}
+      {dialog?.kind === 'cost' && (
+        <CostDialog material={dialog.material} onClose={close}
+          onSaved={(price) => { close(); refresh(); showToast(`سعر شراء «${dialog.material.name}» صار ${fmtMoney(price)}`, 'success', 4000) }} />
+      )}
+      {dialog?.kind === 'alert' && (
+        <AlertDialog material={dialog.material} onClose={close}
+          onSaved={(m) => { close(); refresh(); showToast(m.min_quantity ? `رح ننبّهك لما «${m.name}» توصل لـ ${fmtQty(m.min_quantity)}` : `ما في تنبيه على «${m.name}»`, 'success', 4000) }} />
+      )}
+      {dialog?.kind === 'count' && (
+        <CountDialog material={dialog.material} onClose={close}
+          onSaved={(msg) => { close(); refresh(); showToast(msg, 'success', 5000) }} />
       )}
       {dialog?.kind === 'loss' && (
         <LossDialog name={dialog.name} unit={dialog.unit} warning={dialog.warning} onLater={close}
