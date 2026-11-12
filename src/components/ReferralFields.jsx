@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, fmtMoney, toLatinDigits } from '../api.js'
+import Combobox from './Combobox.jsx'
 import { DISCOUNT_TYPES, DISCOUNT_SCOPES, MAX_REFERRALS, availableScopes, coverageFull,
   blankReferral, draftDiscount } from '../referral.js'
 
@@ -21,10 +22,13 @@ export function useReferralOptions(enabled) {
 
 /**
  * سطر إحالةٍ واحدة: الجهة · النوع والقيمة · النطاق · الورقة · ملاحظة — ثمّ خصمه الفعليّ.
- * scopes: النطاقات المسموحة لهذا السطر. keep: {id, name} جهةٌ موقوفة قائمة على السطر.
+ * scopes: النطاقات المسموحة لهذا السطر (null: بلا نطاق — جلسة الحديد سعرٌ واحد).
+ * keep: {id, name} جهةٌ موقوفة قائمة على السطر.
+ * combo: قوائم بثيم النظام (Combobox) بدل <select> — نوافذ الحديد (بلا <select> خام فيها)، والحجز كما كان.
  */
-export function ReferralRow({ value, onChange, scopes, options, optionsErr, keep = null, discount, onRemove, disabled = false }) {
+export function ReferralRow({ value, onChange, scopes, options, optionsErr, keep = null, discount, onRemove, disabled = false, idPrefix = null, combo = false }) {
   const set = (k) => (e) => onChange({ ...value, [k]: e.target.value })
+  const setV = (k) => (v) => onChange({ ...value, [k]: v })
   const list = options ? [...options] : []
   if (keep && !list.some((o) => String(o.id) === String(keep.id))) list.push({ id: keep.id, name: `${keep.name} (موقوفة)` })
   const pctTooBig = value.discount_type === 'percent' && Number(value.discount_value) > 100
@@ -33,32 +37,45 @@ export function ReferralRow({ value, onChange, scopes, options, optionsErr, keep
       <div className="bf-row ref-row">
         <div className="field ref-source">
           <label>الجهة المحيلة</label>
-          <select value={value.referral_source_id} onChange={set('referral_source_id')} required disabled={disabled}>
-            <option value="">{options === null && !optionsErr ? 'جارٍ التحميل…' : '— اختر الجهة —'}</option>
-            {list.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
-          </select>
+          {combo ? (
+            <Combobox id={idPrefix ? `${idPrefix}-source` : undefined} value={String(value.referral_source_id)} onChange={setV('referral_source_id')}
+              placeholder={options === null && !optionsErr ? 'جارٍ التحميل…' : '— اختاري الجهة —'} emptyText="لا جهات فعّالة — تضيفها مشرفة العيادات"
+              options={list.map((o) => ({ value: String(o.id), label: o.name }))} />
+          ) : (
+            <select id={idPrefix ? `${idPrefix}-source` : undefined} value={value.referral_source_id} onChange={set('referral_source_id')} required disabled={disabled}>
+              <option value="">{options === null && !optionsErr ? 'جارٍ التحميل…' : '— اختر الجهة —'}</option>
+              {list.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+            </select>
+          )}
           {optionsErr && <small className="hint warn-hint">{optionsErr}</small>}
         </div>
         <div className="field">
           <label>نوع الخصم</label>
-          <select value={value.discount_type} onChange={set('discount_type')} disabled={disabled}>
-            {Object.entries(DISCOUNT_TYPES).map(([k, t]) => <option key={k} value={k}>{t}</option>)}
-          </select>
+          {combo ? (
+            <Combobox id={idPrefix ? `${idPrefix}-type` : undefined} value={value.discount_type} onChange={setV('discount_type')}
+              options={Object.entries(DISCOUNT_TYPES).map(([k, t]) => ({ value: k, label: t }))} />
+          ) : (
+            <select value={value.discount_type} onChange={set('discount_type')} disabled={disabled}>
+              {Object.entries(DISCOUNT_TYPES).map(([k, t]) => <option key={k} value={k}>{t}</option>)}
+            </select>
+          )}
         </div>
         <div className="field">
           <label>{value.discount_type === 'percent' ? 'النسبة %' : 'المبلغ (ل.س)'}</label>
           {/* نصّ لا number: حقل الرقم يبتلع الأرقام العربية */}
-          <input value={value.discount_value} inputMode="decimal" required disabled={disabled}
+          <input id={idPrefix ? `${idPrefix}-value` : undefined} value={value.discount_value} inputMode="decimal" required disabled={disabled}
             placeholder={value.discount_type === 'percent' ? '50' : '10,000'}
             onChange={(e) => onChange({ ...value, discount_value: toLatinDigits(e.target.value) })} />
           {pctTooBig && <small className="hint warn-hint">النسبة حتى ١٠٠٪</small>}
         </div>
-        <div className="field">
-          <label>تغطّي</label>
-          <select value={value.discount_scope} onChange={set('discount_scope')} disabled={disabled || scopes.length <= 1}>
-            {scopes.map((k) => <option key={k} value={k}>{DISCOUNT_SCOPES[k]}</option>)}
-          </select>
-        </div>
+        {scopes && (
+          <div className="field">
+            <label>تغطّي</label>
+            <select value={value.discount_scope} onChange={set('discount_scope')} disabled={disabled || scopes.length <= 1}>
+              {scopes.map((k) => <option key={k} value={k}>{DISCOUNT_SCOPES[k]}</option>)}
+            </select>
+          </div>
+        )}
         <div className="field">
           <label>رقم الورقة <span className="opt">(اختياري)</span></label>
           <input value={value.referral_doc_number} maxLength={60} onChange={set('referral_doc_number')} disabled={disabled} />

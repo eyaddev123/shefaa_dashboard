@@ -69,6 +69,20 @@ export const referralPayload = (f) => ({
   discount_value: f.discount_value, discount_scope: f.discount_scope,
   referral_doc_number: f.referral_doc_number || null, referral_note: f.referral_note || null,
 })
+// جلسة الحديد: الورقة نفسها بلا نطاق
+export const ironReferralPayload = (f) => {
+  const { discount_scope: _s, ...rest } = referralPayload(f)
+  return rest
+}
+// مسوّدةٌ من إحالة جلسة في السجلّ (بلا نطاق: يُثبَّت «الكشف» ليحسب draftDiscount على السعر كلّه)
+export const draftFromIronReferral = (r) => ({
+  key: `iron-ref-${r.id}`, id: r.id, referral_source_id: String(r.referral_source_id), discount_type: r.discount_type,
+  discount_value: String(r.discount_value), discount_scope: 'visit_only',
+  referral_doc_number: r.referral_doc_number || '', referral_note: r.referral_note || '',
+})
+/** خصم جلسة الحديد كما يحسبه الخادم (computeIronReferral): نسبةٌ من السعر أو مبلغٌ حتى سقفه */
+export const ironDraftDiscount = (f, price) =>
+  (f && price != null ? draftDiscount({ ...f, discount_scope: 'visit_only' }, { fee: price, lines: [] }).total : 0)
 // هل تكفي الورقة للإرسال؟ (الخادم يتحقّق ثانيةً — هذا لإطفاء الزرّ وحده)
 export const referralReady = (f) => {
   const v = parseAmount(f.discount_value)

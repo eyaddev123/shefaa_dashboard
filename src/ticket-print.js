@@ -304,6 +304,8 @@ export const ticketFrom = (appt, session) => ({
 
 // ═══ إيصال جلسة الحديد ═══
 // بلا رقم دور ولا عيادة: البطاقة نفسها بقالبها، و receipt يبدّل رأسها ويكتب «المبلغ المقبوض».
+// ★ الإحالة كبطاقة الزيارة: المقبوض فعلاً (paid = السعر − الخصم) بلا كلمة «خصم» ولا اسم الجهة.
+//   وردٌّ بلا paid (قديم) يُطبع بسعره كما كان.
 // لا حصص فيه: يذهب للمريض. s: ردّ التسجيل أو سطر السجلّ — كلاهما بالاسم والسعر.
 export const ironReceiptFrom = (s) => ({
   receipt: {
@@ -311,7 +313,7 @@ export const ironReceiptFrom = (s) => ({
     lines: [(s.with_drug ?? s.withDrug) ? 'مع دواء' : 'بلا دواء', s.doctor, s.by && `القابضة: ${s.by}`].filter(Boolean),
   },
   full_name: s.patient,
-  fee: s.price,
+  fee: s.paid ?? s.price,
   now: s.collected_at || (s.date ? `${s.date}T${s.time}:00` : undefined),
 })
 

@@ -228,8 +228,10 @@ function DoctorBlock({ d, open, onToggle, onLog }) {
   )
 }
 
-// جلسات الحديد: كتلةٌ مستقلّة بلا دكتورٍ تُنسب إليه — مبلغها داخل المجموع الكلي
+// جلسات الحديد: كتلةٌ مستقلّة بلا دكتورٍ تُنسب إليه — مبلغها داخل المجموع الكلي.
+// وعليها إحالة: السعر والخصم بجانب المقبوض (السعر − الخصم)، كأعمدة الزيارة
 function IronBlock({ iron }) {
+  const anyRef = iron.rows.some((r) => r.discount > 0)
   return (
     <section className="card cash-doc is-open iron-cash">
       <div className="iron-cash-head">
@@ -239,7 +241,8 @@ function IronBlock({ iron }) {
       </div>
       <div className="cash-doc-body">
         <table className="rtable earn-table">
-          <thead><tr><th>الوقت</th><th>المريض</th><th>النوع</th><th>الممرضة</th><th>الدكتور</th><th>القابضة</th><th>المقبوض</th></tr></thead>
+          <thead><tr><th>الوقت</th><th>المريض</th><th>النوع</th><th>الممرضة</th><th>الدكتور</th><th>القابضة</th>
+            {anyRef && <><th>السعر</th><th>إحالة</th><th>خصم الإحالة</th></>}<th>المقبوض</th></tr></thead>
           <tbody>
             {iron.rows.map((r) => (
               <tr key={r.id}>
@@ -249,6 +252,11 @@ function IronBlock({ iron }) {
                 <td data-label="الممرضة">{r.nurse}</td>
                 <td data-label="الدكتور">{r.doctor || <span className="muted">بلا دكتور</span>}</td>
                 <td data-label="القابضة">{r.by}</td>
+                {anyRef && <>
+                  <td className="num" data-label="السعر">{fmtNum(r.price)}</td>
+                  <td data-label="إحالة">{r.referral || <span className="muted">—</span>}</td>
+                  <td className="num" data-label="خصم الإحالة">{r.discount > 0 ? fmtNum(r.discount) : <span className="muted">—</span>}</td>
+                </>}
                 <td className="num cash-due" data-label="المقبوض">{fmtNum(r.total)}</td>
               </tr>
             ))}

@@ -232,6 +232,9 @@ export const api = {
     addIronSession: (body) => http('/clinic/iron/sessions', { method: 'POST', body: JSON.stringify(body) }),
     setIronShares: (id, body) => http(`/clinic/iron/sessions/${id}/shares`, { method: 'PATCH', body: JSON.stringify(body) }),
     cancelIronSession: (id, reason) => http(`/clinic/iron/sessions/${id}/cancel`, { method: 'POST', body: JSON.stringify({ reason }) }),
+    // إحالة جلسة قائمة: PUT يضيف أو يعدّل (واحدةٌ للجلسة)، و DELETE يحذف — السبب اختياريّ
+    setIronReferral: (id, body) => http(`/clinic/iron/sessions/${id}/referral`, { method: 'PUT', body: JSON.stringify(body) }),
+    removeIronReferral: (id, reason) => http(`/clinic/iron/sessions/${id}/referral`, { method: 'DELETE', body: JSON.stringify({ reason: reason || null }) }),
     ironSessions: ({ period, from, to }) => http(`/clinic/iron/sessions?${new URLSearchParams(period ? { period } : { from, to: to || from })}`),
     ironDues: ({ period, from, to }) => http(`/clinic/iron/dues?${new URLSearchParams(period ? { period } : { from, to: to || from })}`),
     ironSettings: () => http('/clinic/iron/settings'),

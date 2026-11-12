@@ -11,6 +11,8 @@ import { useRole } from '../RoleContext.jsx'
 import { canSeeInventory, canWriteIronSettings } from '../permissions.js'
 import { ironReceiptFrom, loadPrinter, printTicket } from '../ticket-print.js'
 import { printViaHelper } from '../print-helper.js'
+import { ReferralRow, useReferralOptions } from './ReferralFields.jsx'
+import { blankReferral, referralReady, ironReferralPayload, ironDraftDiscount } from '../referral.js'
 
 // ═══ تسجيل جلسة حديد — نافذة الاستقبال ═══
 // تسجيلٌ وقبضٌ بضغطةٍ واحدة: لا دور ولا عيادة ولا حجز. «مع/بلا دوا» يحدّد السعر وحده، والخادم هو من
@@ -22,6 +24,8 @@ import { printViaHelper } from '../print-helper.js'
 // ★ الترتيب مجموعاتٌ بالتسلسل: المريض ⇐ الطاقم ⇐ النوع ⇐ المواد ⇐ الحفظ، والمبلغ ظاهرٌ بجانب الزرّ.
 // الحفظ لا يُعطَّل بنقصٍ: الضغط يبيّن الناقص تحت حقله. والنجاح يغلق النافذة (الرسالة والطباعة عند الصفحة)،
 // والخطأ أو سؤال التأكيد يُبقيها مفتوحة.
+// الإحالة اختيارية ومطويّة: ورقةٌ واحدة بلا نطاق (السعر كلّه). التوزيع من السعر الكامل لا يتغيّر، والمبلغ
+// بجانب الزرّ هو ما يُقبض فعلاً (السعر − الخصم)؛ والخادم هو الحاسب — المعاينة هنا مرآته.
 
 const fmtNum = (n) => Number(n || 0).toLocaleString('ar-SY')
 const NO_DOCTOR = 'بلا دكتور / محوّل من خارج الجمعية'
@@ -29,10 +33,11 @@ const NO_DOCTOR = 'بلا دكتور / محوّل من خارج الجمعية'
 const MIN_CLOSE_MS = 300
 const isThreePart = (v) => v.trim().split(/\s+/).filter(Boolean).length >= 3
 // حقول الخادم (field في ردّ الخطأ) بأسماء النموذج
-const SERVER_FIELDS = { full_name: 'name', mobile: 'mobile', nurse_id: 'nurse', doctor_id: 'doctor', with_drug: 'with_drug', reason: 'ov_reason', doctor_share: 'ov_doctor', nurse_share: 'ov_nurse' }
+const SERVER_FIELDS = { full_name: 'name', mobile: 'mobile', nurse_id: 'nurse', doctor_id: 'doctor', with_drug: 'with_drug', reason: 'ov_reason', doctor_share: 'ov_doctor', nurse_share: 'ov_nurse',
+  'referral.referral_source_id': 'referral', 'referral.discount_type': 'referral', 'referral.discount_value': 'referral' }
 // بترتيب ظهورها: التركيز ينزل لأوّل ناقص
 const FOCUS_ORDER = [['name', '#iron-name'], ['mobile', '#iron-mobile'], ['nurse', '#iron-nurse'], ['doctor', '#iron-doctor'], ['with_drug', '.iron-choice'],
-  ['materials', '.mat-qty.is-bad'], ['ov_doctor', '#iron-ov-doctor'], ['ov_nurse', '#iron-ov-nurse'], ['ov_reason', '#iron-ov-reason']]
+  ['materials', '.mat-qty.is-bad'], ['referral', '#iron-ref-source'], ['ov_doctor', '#iron-ov-doctor'], ['ov_nurse', '#iron-ov-nurse'], ['ov_reason', '#iron-ov-reason']]
 
 async function printReceipt(session, copies) {
   const printer = loadPrinter()
@@ -81,6 +86,8 @@ export default function IronSessionDialog({ onClose, onSaved }) {
   const [catalog, setCatalog] = useState(null)
   const [items, setItems] = useState([])
   const [override, setOverride] = useState(null)    // null | {doctor_share, nurse_share, reason}: للمشرفة وحدها
+  const [referral, setReferral] = useState(null)    // null = بلا إحالة · مسوّدة ورقة (بلا نطاق)
+  const refOpts = useReferralOptions(referral !== null)
   const [loadErr, setLoadErr] = useState(null)
   const [withDrug, setWithDrug] = useState(null)
   const [nurseId, setNurseId] = useState('')
@@ -134,6 +141,8 @@ export default function IronSessionDialog({ onClose, onSaved }) {
   const pickedMobileDiffers = picked && cleanMobile(mobile) !== '' && cleanMobile(mobile) !== cleanMobile(picked.mobile || '')
 
   const price = opts && withDrug !== null ? (withDrug ? opts.prices.with_drug : opts.prices.without_drug) : null
+  const discount = referral ? ironDraftDiscount(referral, price) : 0
+  const pay = price === null ? null : Math.max(0, price - discount)
 
   const validate = () => {
     const e = {}
@@ -143,6 +152,8 @@ export default function IronSessionDialog({ onClose, onSaved }) {
     if (!nurseId) e.nurse = 'اختاري الممرضة'
     if (withDrug === null) e.with_drug = 'اختاري النوع: مع دوا أو بلا دوا — منه يتحدّد المبلغ'
     if (!qtyValid(items)) e.materials = 'صحّحي الكمّية المعلَّمة: رقمٌ أكبر من صفر'
+    if (referral && !referralReady(referral))
+      e.referral = !referral.referral_source_id ? 'اختاري الجهة المحيلة — أو ألغي «معه إحالة؟»' : 'قيمة الخصم رقمٌ أكبر من صفر (النسبة حتى ١٠٠٪)'
     if (override) {
       const d = doctorId ? readAmountInput(override.doctor_share) : { empty: true }
       const n = readAmountInput(override.nurse_share)
@@ -166,7 +177,7 @@ export default function IronSessionDialog({ onClose, onSaved }) {
 
   const confirmLow = (message) => dialogs.confirm({
     title: 'تأكيد قبل الحفظ',
-    body: `${message}\n\nإن أكّدتِ: تُحفظ الجلسة ويُقبض ${fmtNum(price)} ل.س، ${items.length === 0 ? 'ولا يُخصم شيء من المخزون' : 'ولا يُخصم من المخزون إلا ما أضفتِه'}، وتراها مشرفة العيادات معلَّمة «مع دوا بمواد قليلة — مؤكَّدة».\nإن رجعتِ: لا يُحفظ شيء، ويبقى ما كتبتِه لتعديله.`,
+    body: `${message}\n\nإن أكّدتِ: تُحفظ الجلسة ويُقبض ${fmtNum(pay)} ل.س، ${items.length === 0 ? 'ولا يُخصم شيء من المخزون' : 'ولا يُخصم من المخزون إلا ما أضفتِه'}، وتراها مشرفة العيادات معلَّمة «مع دوا بمواد قليلة — مؤكَّدة».\nإن رجعتِ: لا يُحفظ شيء، ويبقى ما كتبتِه لتعديله.`,
     confirmLabel: 'تأكيد وحفظ', cancelLabel: 'رجوع للتعديل',
   })
 
@@ -185,6 +196,7 @@ export default function IronSessionDialog({ onClose, onSaved }) {
     const startedAt = Date.now()
     const body = {
       with_drug: withDrug, nurse_id: nurseId, doctor_id: doctorId || null, materials: toPayload(items),
+      ...(referral ? { referral: ironReferralPayload(referral) } : {}),
       ...(override ? { share_override: { ...override, doctor_share: doctorId ? override.doctor_share : '' } } : {}),
       ...(picked
         ? { patient_id: picked.id,
@@ -299,6 +311,27 @@ export default function IronSessionDialog({ onClose, onSaved }) {
             </div>
           </Section>
 
+          <Section n="٥" title="الإحالة" note="اختياري">
+            <div className={`ref-box iron-ref${referral ? ' open' : ''}`}>
+              <label className="ref-toggle">
+                <input type="checkbox" checked={referral !== null} disabled={busy}
+                  onChange={(e) => { setReferral(e.target.checked ? blankReferral() : null); setServerField(null) }} />
+                معه إحالة؟
+              </label>
+              {referral && (
+                <>
+                  <ReferralRow value={referral} onChange={setReferral} scopes={null} idPrefix="iron-ref" combo
+                    options={refOpts.options} optionsErr={refOpts.err} discount={{ total: discount }} disabled={busy} />
+                  <p className="ref-due" aria-live="polite">
+                    {price === null ? 'اختاري النوع ليظهر الخصم.' : <>السعر {fmtNum(price)} ← خصم الإحالة {fmtNum(discount)} ← المطلوب من المريض <strong>{fmtNum(pay)}</strong></>}
+                  </p>
+                  <small className="hint">الخصم على الجهة المحيلة — حصص الممرضة والدكتور والشفاء تبقى من السعر الكامل.</small>
+                </>
+              )}
+              <FieldError id="iron-err-referral" msg={errors.referral} />
+            </div>
+          </Section>
+
           {canOverride && (override === null ? (
             <button type="button" className="ghost iron-override-open" onClick={() => setOverride({ doctor_share: '', nurse_share: '', reason: '' })}>
               تعديل الحصّة لهذه الجلسة
@@ -327,7 +360,8 @@ export default function IronSessionDialog({ onClose, onSaved }) {
               <span className="iron-pay-label">المبلغ الذي سيُقبض</span>
               {price === null
                 ? <span className="iron-pay-none">اختاري النوع أولاً</span>
-                : <strong className="iron-pay-amount">{fmtNum(price)} <small>ل.س</small></strong>}
+                : <strong className="iron-pay-amount">{fmtNum(pay)} <small>ل.س</small></strong>}
+              {price !== null && discount > 0 && <small className="iron-pay-ref">بعد خصم الإحالة {fmtNum(discount)} من {fmtNum(price)}</small>}
             </div>
             <button type="submit" className="iron-save" disabled={busy}>{busy ? 'جارٍ التسجيل…' : 'سجّل واقبض'}</button>
             <button type="button" className="ghost iron-close" disabled={busy} onClick={onClose}>إغلاق</button>

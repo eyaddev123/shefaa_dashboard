@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { api, fmtDateTime } from '../api.js'
+import { api, fmtDateTime, todayLocal } from '../api.js'
 import { useRole } from '../RoleContext.jsx'
 import { useToast } from '../action-feedback.jsx'
 import { useDialogs } from '../dialogs.jsx'
@@ -11,6 +11,8 @@ import { Modal, fmtQty } from '../components/inventory/shared.jsx'
 import { loadPrinter } from '../ticket-print.js'
 import { usePeriod, PeriodPicker, useLoad } from './ClinicFunds.jsx'
 import { fundOf, previewShareEdit } from '../iron-shares.js'
+import { ReferralRow, useReferralOptions } from '../components/ReferralFields.jsx'
+import { blankReferral, draftFromIronReferral, ironDraftDiscount, ironReferralPayload, referralReady, amountText } from '../referral.js'
 
 // ═══ جلسات الحديد ═══
 // خدمةٌ مباشرة تُقبض لحظة تسجيلها: بلا دور ولا عيادة ولا حجز. ثلاثة تبويبات:
@@ -18,6 +20,8 @@ import { fundOf, previewShareEdit } from '../iron-shares.js'
 //   المستحقات   الممرضات والدكاترة، وما ذهب للشفاء وللصندوق
 //   الإعدادات   الأسعار والحصص وسقف الشفاء وقائمة الممرضات — تكتبها المشرفة وحدها
 // الحساب كلّه في الخادم (iron-sessions.js)، وكلّ جلسةٍ لقطتها: تغيير سعرٍ لا يمسّ القديم.
+// الإحالة على السطر: «المبلغ» هو المقبوض (السعر − الخصم) والسعر تحته، وزرّ «إحالة» يضيف أو يعدّل أو يحذف —
+// للاستقبال يوم الجلسة وحده وللمشرفة أيّ وقت (والخادم يحرس الاثنين).
 
 const fmtNum = (n) => Number(n || 0).toLocaleString('ar-SY', { maximumFractionDigits: 2 })
 function Money({ value }) {
@@ -115,6 +119,81 @@ function EditSharesDialog({ row, onClose, onSaved }) {
   )
 }
 
+// ═══════ إحالة جلسة قائمة: إضافة · تعديل · حذف ═══════
+// ورقةٌ واحدة بلا نطاق. التوزيع لا يتغيّر: الخصم وحده، والمقبوض يُقرأ بعده — والفرق على الجهة.
+const REF_ACTION = { add: 'أُضيفت', edit: 'عُدّلت', remove: 'حُذفت' }
+function ReferralDialog({ row, onClose, onSaved }) {
+  const dialogs = useDialogs()
+  const existing = row.referral
+  const [draft, setDraft] = useState(() => (existing ? draftFromIronReferral(existing) : blankReferral()))
+  const [reason, setReason] = useState('')
+  const [tried, setTried] = useState(false)
+  const [err, setErr] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const sending = useRef(false)
+  const { options, err: optErr } = useReferralOptions(true)
+  const discount = ironDraftDiscount(draft, row.price)
+  const keep = existing && !existing.source_active ? { id: existing.referral_source_id, name: existing.source } : null
+  const ready = referralReady(draft)
+  const run = async (fn, done) => {
+    if (sending.current) return
+    sending.current = true
+    setBusy(true); setErr(null)
+    try { const out = await fn(); onSaved(done(out)) } catch (ex) { setErr(ex.message); setBusy(false) } finally { sending.current = false }
+  }
+  const save = (e) => {
+    e.preventDefault()
+    setTried(true)
+    if (!ready) return
+    run(() => api.clinic.setIronReferral(row.id, { ...ironReferralPayload(draft), reason: reason.trim() || null }),
+      (out) => (out.changed === false ? 'لم يتغيّر شيء في الإحالة' : `${existing ? 'عُدّلت' : 'أُضيفت'} الإحالة — المقبوض ${fmtNum(out.paid)} ل.س`))
+  }
+  const remove = async () => {
+    const ok = await dialogs.confirm({
+      title: `حذف إحالة ${row.patient}`,
+      body: `تُحذف إحالة «${existing.source}» ويصير المطلوب من المريض ${fmtNum(row.price)} ل.س — والفرق لم يعد على الجهة. يبقى الحذف في أثر الجلسة.`,
+      confirmLabel: 'حذف الإحالة', cancelLabel: 'رجوع', danger: true,
+    })
+    if (ok) run(() => api.clinic.removeIronReferral(row.id, reason.trim()), () => 'حُذفت الإحالة')
+  }
+  return (
+    <Modal title={`${existing ? 'تعديل إحالة' : 'إحالة على'} جلسة ${row.patient}`} subtitle={`${row.withDrug ? 'مع دوا' : 'بلا دوا'} — السعر ${fmtNum(row.price)} ل.س`} onClose={onClose} busy={busy} wide sheet>
+      <form onSubmit={save} className="iron-form" noValidate>
+        <div className="ref-box open iron-ref">
+          <ReferralRow value={draft} onChange={setDraft} scopes={null} idPrefix="iron-ref" combo options={options} optionsErr={optErr}
+            keep={keep} discount={{ total: discount }} disabled={busy} />
+          <p className="ref-due" aria-live="polite">
+            السعر {fmtNum(row.price)} ← خصم الإحالة {fmtNum(discount)} ← المطلوب من المريض <strong>{fmtNum(Math.max(0, row.price - discount))}</strong>
+          </p>
+          <small className="hint">توزيع الجلسة (الممرضة والدكتور والشفاء والصندوق) لا يتغيّر — الخصم وحده على الجهة.</small>
+        </div>
+        {tried && !ready && <p className="iron-err" role="alert">{!draft.referral_source_id ? 'اختاري الجهة المحيلة' : 'قيمة الخصم رقمٌ أكبر من صفر (النسبة حتى ١٠٠٪)'}</p>}
+        <div className="field">
+          <label htmlFor="iron-ref-reason">السبب <span className="opt">(اختياري — يبقى في أثر الجلسة)</span></label>
+          <input id="iron-ref-reason" value={reason} maxLength={300} onChange={(e) => setReason(e.target.value)} />
+        </div>
+        {err && <p className="error" role="alert">{err}</p>}
+        <div className="inline iron-actions">
+          <button type="submit" disabled={busy}>{busy ? 'جارٍ الحفظ…' : existing ? 'حفظ التعديل' : 'إضافة الإحالة'}</button>
+          {existing && <button type="button" className="ghost iron-cancel-btn" disabled={busy} onClick={remove}>حذف الإحالة</button>}
+          <button type="button" className="ghost" disabled={busy} onClick={onClose}>رجوع</button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
+/** المبلغ على السطر: المقبوض، وتحته السعر والجهة إن كانت إحالة */
+function PaidCell({ r }) {
+  if (!r.referral) return <>{fmtNum(r.price)}</>
+  return (
+    <>
+      {fmtNum(r.paid)}
+      <small className="iron-ref-note">من <bdi>{fmtNum(r.price)}</bdi> — إحالة {r.referral.source} <bdi dir="rtl">− {fmtNum(r.discount)}</bdi></small>
+    </>
+  )
+}
+
 // ═══════ تفاصيل جلسة: لمن يرى التوزيع وحده ═══════
 // كلّ رقمٍ من لقطة الجلسة (iron_session_materials وأعمدة iron_sessions) لا من أسعار المخزون الحالية.
 // «مؤكَّدة»: الخادم يحفظ العلَم وحده، ومؤكِّدته هي من أرسل طلب التسجيل نفسه: القابضة.
@@ -135,7 +214,8 @@ function SessionDetailsDialog({ row: r, canEdit, onEdit, onClose }) {
   const profitTotal = r.materials.reduce((t, m) => t + (m.costBasis === 'purchase' ? m.cost - m.deduct : 0), 0)
   const legacy = r.materials.some((m) => m.costBasis === 'legacy')
   const s = r.split
-  const hasFlags = r.lowMaterialsConfirmed || r.overPrice || r.edits.length > 0 || r.cancelled
+  const refLog = r.referralLog || []
+  const hasFlags = r.lowMaterialsConfirmed || r.overPrice || r.edits.length > 0 || r.cancelled || refLog.length > 0
   return (
     <Modal title={`تفاصيل جلسة ${r.patient}`} onClose={onClose} wide sheet>
       <div className="iron-details">
@@ -145,7 +225,12 @@ function SessionDetailsDialog({ row: r, canEdit, onEdit, onClose }) {
           <div><dt>الممرضة</dt><dd>{r.nurse}</dd></div>
           <div><dt>الدكتور</dt><dd>{r.doctor || 'بلا دكتور'}</dd></div>
           <div><dt>القابضة</dt><dd>{r.by}</dd></div>
-          <div className="iron-facts-price"><dt>المبلغ المقبوض</dt><dd><Money value={r.price} /></dd></div>
+          {r.referral && <>
+            <div><dt>السعر</dt><dd><Money value={r.price} /></dd></div>
+            <div><dt>الإحالة</dt><dd>{r.referral.source} — {amountText(r.referral)}{r.referral.referral_doc_number && <> — ورقة <bdi>{r.referral.referral_doc_number}</bdi></>}
+              <> — خصم <bdi>{fmtNum(r.discount)}</bdi> على الجهة</>{r.referral.referral_note && <> — {r.referral.referral_note}</>}</dd></div>
+          </>}
+          <div className="iron-facts-price"><dt>المبلغ المقبوض</dt><dd><Money value={r.paid ?? r.price} /></dd></div>
         </dl>
 
         <section aria-label="المواد">
@@ -203,6 +288,10 @@ function SessionDetailsDialog({ row: r, canEdit, onEdit, onClose }) {
                 <li key={i}><span className="badge blue sm">حصّة معدَّلة</span>{' '}
                   <span>{EDIT_STAGE[e.stage] || ''}: <EditChanges e={e} />— السبب: {e.reason} — {e.by} — {fmtDateTime(e.at)}</span></li>
               ))}
+              {refLog.map((e, i) => (
+                <li key={`ref-${i}`}><span className="badge blue sm">إحالة {REF_ACTION[e.action]}</span>{' '}
+                  <span>{e.old && <><bdi>{e.old}</bdi>{e.new && ' ← '}</>}{e.new && <bdi>{e.new}</bdi>}{e.reason && <> — السبب: {e.reason}</>} — {e.by} — {fmtDateTime(e.at)}</span></li>
+              ))}
             </ul>
           )}
         </section>
@@ -222,6 +311,9 @@ function LogTab({ split, canPrint, canCancel, reload, showToast }) {
   const dialogs = useDialogs()
   const [cancelled, setCancelled] = useState(0)
   const [editing, setEditing] = useState(null)
+  const [refFor, setRefFor] = useState(null)        // سطر نافذة الإحالة
+  // الاستقبال يوم الجلسة وحده، والمشرفة أيّ وقت (canCancel = المشرفة) — والخادم يحرس الاثنين
+  const canRefer = (r) => !r.cancelled && canPrint && (canCancel || r.date === todayLocal())
   const [detailId, setDetailId] = useState(null)    // من السطر الحيّ: يتحدّث بعد تعديل الحصّة
   const [data, err] = useLoad(() => api.clinic.ironSessions(p.query), p.key, reload + cancelled)
   const cancel = async (r) => {
@@ -254,7 +346,8 @@ function LogTab({ split, canPrint, canCancel, reload, showToast }) {
             <div className="tile"><div className="label">عدد الجلسات</div><div className="value">{fmtNum(data.totals.count)}</div>
               <div className="hint">مع دوا: {fmtNum(data.totals.withDrug)}{data.totals.cancelled > 0 && ` — ملغاة خارج المجموع: ${fmtNum(data.totals.cancelled)}`}</div>
               {data.totals.overPrice > 0 && <div className="hint iron-over-count">المواد فوق السعر: {fmtNum(data.totals.overPrice)}</div>}</div>
-            <div className="tile earn-hero"><div className="label">مجموع المقبوض</div><div className="value"><Money value={data.totals.price} /></div></div>
+            <div className="tile earn-hero"><div className="label">مجموع المقبوض</div><div className="value"><Money value={data.totals.paid ?? data.totals.price} /></div>
+              {data.totals.discount > 0 && <div className="hint">خصومات الإحالات {fmtNum(data.totals.discount)} على الجهات ({sessionsText(data.totals.referrals)})</div>}</div>
             {split && (
               <div className="tile"><div className="label">حصّة الشفاء</div><div className="value"><Money value={data.totals.split.shifa} /></div></div>
             )}
@@ -274,6 +367,7 @@ function LogTab({ split, canPrint, canCancel, reload, showToast }) {
                     {r.overPrice && <span className="badge bad sm iron-cancel-badge iron-over-badge">المواد فوق السعر</span>}
                     {r.lowMaterialsConfirmed && <span className="badge sm iron-cancel-badge iron-low-badge">مع دوا بمواد قليلة — مؤكَّدة</span>}
                     {r.edits?.length > 0 && <span className="badge blue sm iron-cancel-badge iron-edited-badge">حصّة معدَّلة</span>}
+                    {r.referral && <span className="badge blue sm iron-cancel-badge iron-ref-badge">إحالة</span>}
                     {r.cancelled && (
                       <span className="iron-cancel-note">{r.cancelled.reason} — {r.cancelled.by} — {fmtDateTime(r.cancelled.at)}</span>
                     )}
@@ -282,13 +376,14 @@ function LogTab({ split, canPrint, canCancel, reload, showToast }) {
                   <td data-label="الدكتور">{r.doctor || <span className="muted">بلا دكتور</span>}</td>
                   <td data-label="النوع">{r.withDrug ? 'مع دوا' : 'بلا دوا'}</td>
                   <td className="iron-mats" data-label="المواد">{r.materials.length ? materialsSummary(r.materials) : <span className="muted">—</span>}</td>
-                  <td className="num earn-doc" data-label="المبلغ">{fmtNum(r.price)}</td>
+                  <td className="num earn-doc" data-label="المبلغ"><PaidCell r={r} /></td>
                   <td data-label="القابضة">{r.by}</td>
                   {split && <td className="rt-full" data-label="التوزيع"><SplitChips s={r.split} /></td>}
                   {(canPrint || canCancel || split) && (
                     <td className="rt-actions">
                       {split && <button type="button" className="ghost iron-details-btn" onClick={() => setDetailId(r.id)}>التفاصيل</button>}
                       {!r.cancelled && canPrint && <button type="button" className="ghost iron-print" onClick={() => print(r)}>🖨 إيصال</button>}
+                      {canRefer(r) && <button type="button" className="ghost iron-ref-btn" onClick={() => setRefFor(r)}>{r.referral ? 'الإحالة' : '+ إحالة'}</button>}
                       {!r.cancelled && canCancel && <button type="button" className="ghost iron-print iron-cancel-btn" onClick={() => cancel(r)}>إلغاء</button>}
                     </td>
                   )}
@@ -299,6 +394,8 @@ function LogTab({ split, canPrint, canCancel, reload, showToast }) {
         </>
       )}
       {/* نافذةٌ واحدة في كلّ لحظة: التعديل يفتح من التفاصيل، والرجوع منه إليها */}
+      {refFor && <ReferralDialog row={refFor} onClose={() => setRefFor(null)}
+        onSaved={(msg) => { setRefFor(null); showToast(msg, 'success', 3500); setCancelled((n) => n + 1) }} />}
       {editing ? <EditSharesDialog row={editing} onClose={() => setEditing(null)}
         onSaved={() => { setEditing(null); showToast('عُدّلت الحصّة وأُعيد الحساب', 'success', 3500); setCancelled((n) => n + 1) }} />
         : detail && <SessionDetailsDialog row={detail} canEdit={canCancel && !detail.cancelled && detail.version === 2} onEdit={() => setEditing(detail)} onClose={() => setDetailId(null)} />}
@@ -368,7 +465,8 @@ function DuesTab() {
         {err ? <p className="error">{err}</p> : !data ? <p className="empty">جارٍ التحميل…</p>
           : data.totals.count === 0 ? <p className="empty">لا جلسات حديد في هذه الفترة.</p> : (
           <div className="tiles earn-tiles">
-            <div className="tile"><div className="label">المقبوض ({sessionsText(data.totals.count)})</div><div className="value"><Money value={data.totals.price} /></div></div>
+            <div className="tile"><div className="label">المقبوض ({sessionsText(data.totals.count)})</div><div className="value"><Money value={data.totals.paid ?? data.totals.price} /></div>
+              {data.totals.discount > 0 && <div className="hint">والسعر الكامل {fmtNum(data.totals.price)} — الفرق على الجهات المحيلة</div>}</div>
             <div className="tile earn-hero"><div className="label">مستحقات الممرضات</div><div className="value"><Money value={t.nurse} /></div></div>
             <div className="tile"><div className="label">مستحقات الدكاترة</div><div className="value"><Money value={t.doctor} /></div></div>
             <div className="tile"><div className="label">إيرادات الشفاء</div><div className="value"><Money value={t.shifa} /></div></div>
@@ -551,7 +649,7 @@ export default function IronSessions() {
     ]
     const say = (extra = []) => {
       const all = [...notes, ...extra]
-      const head = `سُجّلت جلسة ${s.patient} وقُبض ${fmtNum(s.price)} ل.س`
+      const head = `سُجّلت جلسة ${s.patient} وقُبض ${fmtNum(s.paid ?? s.price)} ل.س${s.discount > 0 ? ` (بعد خصم إحالة ${fmtNum(s.discount)})` : ''}`
       if (all.length === 0) showToast(head, 'success', 4000)
       else showToast(`${head} — ⚠ ${all.join(' ')}`, 'warning', 15000)
     }

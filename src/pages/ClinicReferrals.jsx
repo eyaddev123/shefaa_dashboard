@@ -208,7 +208,7 @@ function DuesTab({ showToast, initialSource }) {
               </thead>
               <tbody>
                 {data.lines.map((l, i) => (
-                  <tr key={`${l.appointment_id}-${i}`}>
+                  <tr key={`${l.visit_key || l.appointment_id}-${i}`}>
                     <td dir="ltr" className="num rt-badge">{l.date}</td>
                     {all && <td data-label="الجهة">{l.source}</td>}
                     <td className="rt-title">{l.patient}</td>
