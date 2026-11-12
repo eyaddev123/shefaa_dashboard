@@ -137,7 +137,7 @@ export function ShareRuleDialog({ doctor, rule, rules, catalog, onClose, onSaved
                       onChange={() => { setProcId(String(p.id)); setErr(null) }} />
                     <span className="pick-name">{p.name}</span>
                     <span className="pick-meta">{fmtMoney(p.price)}</span>
-                    {ex && <span className="badge">له قاعدة</span>}
+                    {ex && <span className="badge">{ex.paused_at ? 'له قاعدة موقوفة' : 'له قاعدة'}</span>}
                   </label>
                 )
               })}
@@ -294,7 +294,7 @@ export function DistributeRuleDialog({ procedure, onClose, onDone }) {
                         <input type="checkbox" checked={picked.has(String(d.id))} onChange={() => toggle(String(d.id))} />
                         <span className="pick-name">{d.name}</span>
                         <span className="pick-meta">{specOf(d) || 'بلا اختصاص'}</span>
-                        {ex && <span className="badge warn" title="له قاعدة على هذا الإجراء">له قاعدة: {ruleText(ex)}</span>}
+                        {ex && <span className="badge warn" title="له قاعدة على هذا الإجراء">له قاعدة: {ruleText(ex)}{ex.paused_at ? ' (موقوفة)' : ''}</span>}
                       </label>
                     )
                   })}
@@ -322,7 +322,9 @@ export function DistributeRuleDialog({ procedure, onClose, onDone }) {
                   <li key={d.id}>
                     <span className="pick-name">{d.name}</span>
                     <span className="muted">{ruleText(existing.get(String(d.id)))}
-                      {onExisting === 'replace' ? <> ← <strong>{ruleText(form)}</strong></> : ' — تبقى كما هي'}</span>
+                      {existing.get(String(d.id)).paused_at && ' (موقوفة)'}
+                      {onExisting === 'replace' ? <> ← <strong>{ruleText(form)}</strong>
+                        {existing.get(String(d.id)).paused_at && ' — وتبقى موقوفة'}</> : ' — تبقى كما هي'}</span>
                   </li>
                 ))}
               </ul>

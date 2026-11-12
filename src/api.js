@@ -284,6 +284,11 @@ export const api = {
       http(`/clinic/doctors/${id}/procedure-shares/${procId}`, { method: 'PUT', body: JSON.stringify(body) }),
     removeDoctorProcedureShare: (id, procId) =>
       http(`/clinic/doctors/${id}/procedure-shares/${procId}`, { method: 'DELETE' }),
+    // إيقاف القاعدة بلا حذفها: الموقوفة لا تُطبَّق على القادم (النسبة العامّة)، والقائم لا يتغيّر
+    pauseDoctorProcedureShare: (id, procId, paused) =>
+      http(`/clinic/doctors/${id}/procedure-shares/${procId}/${paused ? 'pause' : 'resume'}`, { method: 'POST' }),
+    pauseAllDoctorProcedureShares: (id, paused) =>
+      http(`/clinic/doctors/${id}/procedure-shares/${paused ? 'pause' : 'resume'}-all`, { method: 'POST' }),
     reopenSession: (id) => http(`/clinic/sessions/${id}/reopen`, { method: 'POST' }),
     // جرد الصندوق: الشاشة (format=json) والملفّ من المسار نفسه والحساب نفسه — كلّه في الخادم
     cashReportData: ({ date }) => http(`/reception/cash-report?${new URLSearchParams({ date, format: 'json' })}`),

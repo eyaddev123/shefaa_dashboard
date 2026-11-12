@@ -39,6 +39,13 @@ export function afterDeleteText(doctor) {
   return 'بعد الحذف لن يُقبل إجراءٌ من هذا النوع له — لا نسبة عامّة له'
 }
 
+/** ما يقوله «الإيقاف» عن مصير الإجراءات القادمة — كالحذف، والقاعدة تبقى محفوظة */
+export function afterPauseText(doctor) {
+  if (doctor.share_kind === 'percent') return `الإجراءات القادمة تُحسب بالنسبة العامّة ${Number(doctor.share_value)}٪`
+  if (doctor.share_kind === 'fixed') return `الإجراءات القادمة تُحسب بقاعدته العامّة: مبلغ ثابت ${fmtMoney(doctor.share_value)}`
+  return '⚠ لا نسبة عامّة له: لن يُقبل له إجراءٌ قاعدته موقوفة حتى تُضبط النسبة'
+}
+
 // ═══ نصّ سطر تاريخ التسعيرة — من جهة الإجراء (اسم الدكتور) أو من جهة الدكتور (اسم الإجراء) ═══
 // القيم JSON من الخادم: القاعدة {kind, value}، والسعر {price}.
 export const doctorsCount = (n) => (n === 1 ? 'دكتور واحد' : n === 2 ? 'دكتورَين'
@@ -59,6 +66,8 @@ export function pricingText(h, side) {
     case 'rule_add': return `${who}أُضيفت قاعدة ${ruleText(n)}${batch}`
     case 'rule_edit': return `${who}${ruleText(o)} ← ${ruleText(n)}${batch}`
     case 'rule_delete': return `${who}حُذفت القاعدة (كانت ${ruleText(o)}) — يُحسب بالنسبة العامّة`
+    case 'rule_pause': return `${who}أُوقفت القاعدة (${ruleText(o)}) — يُحسب بالنسبة العامّة`
+    case 'rule_resume': return `${who}شُغّلت القاعدة من جديد (${ruleText(o)})`
     case 'distribute': {
       const parts = [n.added && `أُضيفت عند ${doctorsCount(n.added)}`, n.replaced && `استُبدلت عند ${doctorsCount(n.replaced)}`,
         n.skipped && `تُخطّي ${doctorsCount(n.skipped)} لهم قاعدة`].filter(Boolean)

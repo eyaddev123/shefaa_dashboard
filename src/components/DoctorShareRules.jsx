@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { api, fmtMoney, toLatinDigits } from '../api.js'
+import { api, fmtMoney, fmtDateTime, toLatinDigits } from '../api.js'
 import { useDialogs } from '../dialogs.jsx'
 import { ShareRuleDialog } from './ShareRuleDialogs.jsx'
-import { ruleText, afterDeleteText } from '../share-rule.js'
+import { ruleText, afterDeleteText, afterPauseText } from '../share-rule.js'
 
 // ═══ حصّة الدكتور من الإجراءات ═══
 // نسبةٌ عامّة لكل إجراءاته (تُحسب **بعد** خصم المواد)، وحالاتٌ خاصّة لإجراءٍ بعينه
@@ -15,6 +15,9 @@ import { ruleText, afterDeleteText } from '../share-rule.js'
 //
 // ★ تغيير قاعدةٍ هنا يسري على الإجراءات **القادمة** وحدها: كلُّ سطرٍ قائم يحمل
 //   لقطة القاعدة لحظة إضافته، ولا يتغيّر ولو عُدّلت موادّه لاحقاً.
+//
+// «إيقاف» (2026-11-12): القاعدة تبقى بقيمتها ولا تُطبَّق — يُحسب الإجراء القادم بالنسبة العامّة —
+// و«تشغيل» يُرجعها. لكلّ قاعدةٍ زرّها، و«إيقاف الكل»/«تشغيل الكل» لقواعد الدكتور كلّها.
 const generalOf = (d) => (d.share_kind === 'percent' ? String(Number(d.share_value)) : '')
 export default function DoctorShareRules({ doctor, canEdit, onSaved, showToast }) {
   const dlg = useDialogs()
@@ -55,10 +58,45 @@ export default function DoctorShareRules({ doctor, canEdit, onSaved, showToast }
     } catch (e) { setMsg({ text: e.message }) }
     finally { setBusy(false) }
   }
+  // الإيقاف يُرجَع عنه بزرّ، فالقاعدة الواحدة بلا تأكيد؛ و«الكل» بتأكيدٍ يقول العدد والمصير
+  const togglePause = async (r) => {
+    const paused = !r.paused_at
+    setBusy(true); setMsg(null)
+    try {
+      await api.clinic.pauseDoctorProcedureShare(doctor.id, r.procedure_id, paused)
+      notify(paused ? `أُوقفت قاعدة «${r.procedure_name}» — ${afterPauseText(doctor)}`
+        : `شُغّلت قاعدة «${r.procedure_name}» من جديد: ${ruleText(r)}`)
+      load(); if (onSaved) onSaved()
+    } catch (e) { setMsg({ text: e.message }) }
+    finally { setBusy(false) }
+  }
+  const pauseAll = async (paused) => {
+    const n = (rules || []).filter((r) => !r.paused_at === paused).length
+    const ok = await dlg.confirm(paused ? {
+      title: `إيقاف كل الحالات الخاصّة (${n})`,
+      body: `${afterPauseText(doctor)}.\nالقواعد تبقى محفوظة بقيمها وتُشغَّل متى شئتم.\n`
+        + 'يسري على الإجراءات القادمة وحدها — المسجَّل قبلها لا يتغيّر.',
+      confirmLabel: 'إيقاف الكل',
+    } : {
+      title: `تشغيل كل الحالات الخاصّة (${n})`,
+      body: 'ترجع كل قاعدةٍ موقوفة بقيمتها المحفوظة.\nيسري على الإجراءات القادمة وحدها — المسجَّل قبلها لا يتغيّر.',
+      confirmLabel: 'تشغيل الكل',
+    })
+    if (!ok) return
+    setBusy(true); setMsg(null)
+    try {
+      const out = await api.clinic.pauseAllDoctorProcedureShares(doctor.id, paused)
+      notify(paused ? `أُوقفت ${out.changed} ${out.changed === 1 ? 'قاعدة' : 'قواعد'} — الإجراءات القادمة بالنسبة العامّة`
+        : `شُغّلت ${out.changed} ${out.changed === 1 ? 'قاعدة' : 'قواعد'} من جديد`)
+      load(); if (onSaved) onSaved()
+    } catch (e) { setMsg({ text: e.message }) }
+    finally { setBusy(false) }
+  }
   const removeRule = async (r) => {
     const ok = await dlg.confirm({
       title: `حذف قاعدة «${r.procedure_name}»`,
-      body: `القاعدة الحالية: ${ruleText(r)}.\n${afterDeleteText(doctor)}.\nيسري على الإجراءات القادمة وحدها.`,
+      body: `القاعدة الحالية: ${ruleText(r)}.\n${afterDeleteText(doctor)}.\nيسري على الإجراءات القادمة وحدها.`
+        + (r.paused_at ? '' : '\nلتعليقها مؤقّتاً بلا حذف استعملوا «إيقاف» — تبقى محفوظة وتُشغَّل لاحقاً.'),
       confirmLabel: 'حذف القاعدة', danger: true,
     })
     if (!ok) return
@@ -71,6 +109,8 @@ export default function DoctorShareRules({ doctor, canEdit, onSaved, showToast }
     finally { setBusy(false) }
   }
 
+  const pausedN = (rules || []).filter((r) => r.paused_at).length
+  const activeN = (rules || []).length - pausedN
   const generalText = !doctor.share_kind ? null
     : doctor.share_kind === 'percent' ? (Number(doctor.share_value) === 0 ? '0٪ — كامل المبلغ للشفاء'
       : `${Number(doctor.share_value)}٪ بعد خصم المواد والمستهلكات`)
@@ -110,9 +150,23 @@ export default function DoctorShareRules({ doctor, canEdit, onSaved, showToast }
       )}
 
       <div className="share-rules-head">
-        <h4>حالات خاصّة لإجراءات بعينها{rules ? ` (${rules.length})` : ''}</h4>
-        {canEdit && <button type="button" disabled={busy || !catalog} onClick={() => setDialog({ rule: null })}>+ إضافة قاعدة</button>}
+        <h4>حالات خاصّة لإجراءات بعينها{rules ? ` (${rules.length}${pausedN ? `، منها ${pausedN} موقوفة` : ''})` : ''}</h4>
+        {canEdit && (
+          <div className="share-rules-head-actions">
+            {activeN > 0 && <button type="button" className="ghost" disabled={busy}
+              onClick={() => pauseAll(true)}>إيقاف الكل</button>}
+            {pausedN > 0 && <button type="button" className="ghost" disabled={busy}
+              onClick={() => pauseAll(false)}>تشغيل الكل</button>}
+            <button type="button" disabled={busy || !catalog} onClick={() => setDialog({ rule: null })}>+ إضافة قاعدة</button>
+          </div>
+        )}
       </div>
+      {pausedN > 0 && (
+        <p className="share-paused-note" role="status">
+          {pausedN === rules.length ? 'كل الحالات الخاصّة موقوفة' : `${pausedN} من ${rules.length} موقوفة`} —
+          {' '}{afterPauseText(doctor)}. القواعد محفوظة بقيمها، والإجراءات المسجَّلة قبل الإيقاف لا تتغيّر.
+        </p>
+      )}
       {!rules ? <p className="empty">جارٍ التحميل…</p>
         : rules.length === 0 ? <p className="empty">لا حالات خاصّة — تُطبَّق النسبة العامّة على كل إجراءاته.</p>
         : (
@@ -121,18 +175,24 @@ export default function DoctorShareRules({ doctor, canEdit, onSaved, showToast }
             <tbody>
               {rules.map((r) => {
                 const above = r.share_kind === 'fixed' && Number(r.share_value) > Number(r.price)
+                const paused = !!r.paused_at
                 return (
-                  <tr key={r.id}>
+                  <tr key={r.id} className={paused ? 'rule-paused' : undefined}>
                     <td className="rt-title">{r.procedure_name}
                       {!r.procedure_active && <span className="badge" style={{ marginInlineStart: 6 }}>معطَّل</span>}</td>
                     <td className="num" data-label="سعره الحالي">{fmtMoney(r.price)}</td>
                     <td data-label="القاعدة">{ruleText(r)}
-                      {above && <span className="badge bad" style={{ marginInlineStart: 6 }}
+                      {paused && <span className="badge warn" style={{ marginInlineStart: 6 }}
+                        title={`موقوفة منذ ${fmtDateTime(r.paused_at)}${r.paused_by_name ? ` — ${r.paused_by_name}` : ''}`}>موقوفة</span>}
+                      {above && !paused && <span className="badge bad" style={{ marginInlineStart: 6 }}
                         title="المبلغ الثابت أعلى من سعر الإجراء — يأخذ الدكتور ما يبقى والشفاء صفر">أعلى من السعر</span>}</td>
                     {canEdit && (
                       <td className="rt-actions share-rule-actions">
                         <button type="button" className="ghost" disabled={busy}
                           onClick={() => setDialog({ rule: r })}>تعديل</button>
+                        <button type="button" className="ghost" disabled={busy}
+                          aria-label={`${paused ? 'تشغيل' : 'إيقاف'} قاعدة ${r.procedure_name}`}
+                          onClick={() => togglePause(r)}>{paused ? 'تشغيل' : 'إيقاف'}</button>
                         <button type="button" className="ghost danger-text" disabled={busy}
                           onClick={() => removeRule(r)}>حذف</button>
                       </td>
