@@ -62,101 +62,103 @@ function ProfileForm({ doctor, globalBuffer, onSaved, readOnly = false }) {
     ? Math.ceil(wantBuffer / visitMinutes) * visitMinutes : 0
 
   return (
-    <form onSubmit={submit}>
+    <form onSubmit={submit} className="pf-form">
       {/* المطالِع (المجلس، المشرف العام، المدير) يرى الحقول معطَّلة بلا زرّ حفظ */}
       <fieldset className="ro-fieldset" disabled={readOnly}>
-      <div className="inline" style={{ flexWrap: 'wrap' }}>
-        <div className="field"><label>اسم الدكتور</label><input value={form.name} onChange={set('name')} required /></div>
-        <SpecialtyPicker value={form.specialty_id} canAdd={!readOnly}
-          onChange={(v) => setForm((f) => ({ ...f, specialty_id: v }))} />
-        <div className="field"><label>الجوال</label><input value={form.phone} onChange={set('phone')} dir="ltr" /></div>
-        {/* رقم الغرفة يظهر ويُنطَق على شاشة الصالة، ويُشتقّ منه اسم المقطع الصوتي
-            (room-3.mp3) — الخادم يطبّع الأرقام العربية والمسافات (AUDIO.md) */}
-        <div className="field"><label>الغرفة</label><input value={form.room} onChange={set('room')} placeholder="مثال: 3" />
-          <small className="hint">بالأرقام اللاتينية (3 لا ٣) — يُنطق على شاشة النداء</small></div>
-        {/* إطفاؤه يُخفي زرّي الحجز الفوري والترقية عند هذا الدكتور، والخادم يرفضهما أيضاً.
-            الحجوزات الإسعافية القائمة عنده لا تتأثر — العلم يمنع الجديد فقط. */}
-        <div className="field field-check">
-          <label>
-            <input type="checkbox" checked={form.accepts_urgent} onChange={setBool('accepts_urgent')} />
-            يقبل الحالات الإسعافية
-          </label>
-          <small className="hint">أطفئه للاختصاصات التي لا تأتيها حالات إسعافية (تخاطب، علاج فيزيائي)</small>
+        <div className="pf-group">
+          <div className="pf-group-head"><h4>البيانات الأساسية</h4></div>
+          <div className="pf-grid">
+            <div className="field"><label>اسم الدكتور</label><input value={form.name} onChange={set('name')} required /></div>
+            <SpecialtyPicker value={form.specialty_id} canAdd={!readOnly}
+              onChange={(v) => setForm((f) => ({ ...f, specialty_id: v }))} />
+            <div className="field"><label>الجوال</label><input value={form.phone} onChange={set('phone')} dir="ltr" /></div>
+            {/* رقم الغرفة يظهر ويُنطَق على شاشة الصالة، ويُشتقّ منه اسم المقطع الصوتي
+                (room-3.mp3) — الخادم يطبّع الأرقام العربية والمسافات (AUDIO.md) */}
+            <div className="field"><label>الغرفة</label><input value={form.room} onChange={set('room')} placeholder="مثال: 3" />
+              <small className="hint">بالأرقام اللاتينية (3 لا ٣) — يُنطق على شاشة النداء</small></div>
+          </div>
         </div>
-        {/* مسؤول العيادات وحده يكتبه (الخادم 403 لغيره). بأثرٍ رجعي: التأخير يُحسب لحظة العرض لا يُخزَّن،
-            فالتقارير القديمة تتبع القيمة الحالية. «وصل الطبيب» والحضور واليومية لا تتأثّر. */}
-        <div className="field field-check">
-          <label>
-            <input type="checkbox" checked={form.appointments_based} onChange={setBool('appointments_based')} />
-            بمواعيد خاصة
-          </label>
-          <small className="hint">يعطي مرضاه مواعيد بنفسه: لا يُحسب عليه تأخير ولا نسبة التزام — حتى في التقارير السابقة.
-            يوم حضوره يُحسب كالمعتاد بـ«وصل الطبيب».</small>
-        </div>
-      </div>
 
-      <h4 style={{ marginTop: 18, marginBottom: 0 }}>التسعيرة</h4>
-      <p className="subtitle" style={{ marginTop: 4 }}>
-        سعران مستقلان: المعاينة (الزيارة الأولى) والمراجعة (خلال المدة المسموحة بعدها).
-        السعر يُنسخ نسخة ثابتة على كل حجز، فتعديله هنا لا يؤثر على الحجوزات السابقة.
-      </p>
-      <div className="inline" style={{ flexWrap: 'wrap' }}>
-        <div className="field">
-          <label>سعر المعاينة (ل.س)</label>
-          <input type="number" min="0" value={form.consultation_fee} onChange={set('consultation_fee')} required />
+        <div className="pf-group" id="pf-pricing">
+          <div className="pf-group-head">
+            <h4>التسعيرة</h4>
+            <p>المعاينة للزيارة الأولى، والمراجعة خلال المدة المسموحة بعدها. السعر يُنسخ على كل حجز، فتعديله لا يغيّر الحجوزات السابقة.</p>
+          </div>
+          <div className="pf-grid">
+            <div className="field">
+              <label>سعر المعاينة (ل.س)</label>
+              <input type="number" min="0" value={form.consultation_fee} onChange={set('consultation_fee')} required />
+            </div>
+            <div className="field">
+              <label>سعر المراجعة (ل.س)</label>
+              <input type="number" min="0" value={form.followup_fee} onChange={set('followup_fee')} required />
+            </div>
+            <div className="field">
+              <label>مدة صلاحية المراجعة (يوم)</label>
+              <input type="number" min="1" value={form.followup_window_days} onChange={set('followup_window_days')} required />
+              <small className="hint">بعد هذه المدة تلزم معاينة جديدة</small>
+            </div>
+          </div>
         </div>
-        <div className="field">
-          <label>سعر المراجعة (ل.س)</label>
-          <input type="number" min="0" value={form.followup_fee} onChange={set('followup_fee')} required />
-        </div>
-        <div className="field">
-          <label>مدة صلاحية المراجعة (يوم)</label>
-          <input type="number" min="1" value={form.followup_window_days} onChange={set('followup_window_days')} required />
-          <span style={{ fontSize: 11, color: 'var(--muted)' }}>
-            بعد هذه المدة تلزم معاينة جديدة
-          </span>
-        </div>
-      </div>
 
-      <h4 style={{ marginTop: 18, marginBottom: 0 }}>مدة الكشف</h4>
-      <p className="subtitle" style={{ marginTop: 4 }}>
-        على أساسها يُقسَّم دوام الدكتور إلى خانات زمنية متساوية ابتداءً من بداية الدوام،
-        وعليها يُحسب الانتظار المتوقع لكل مريض.
-      </p>
-      <div className="inline">
-        <div className="field">
-          <label>مدة الكشف المتوقعة (دقيقة)</label>
-          <input type="number" min="1" value={form.expected_visit_minutes} onChange={set('expected_visit_minutes')} required />
+        <div className="pf-group">
+          <div className="pf-group-head">
+            <h4>الكشف والخانات</h4>
+            <p>على مدة الكشف يُقسَّم الدوام خاناتٍ متساوية من بدايته، وعليها يُحسب انتظار كل مريض.</p>
+          </div>
+          <div className="pf-grid">
+            <div className="field">
+              <label>مدة الكشف المتوقعة (دقيقة)</label>
+              <input type="number" min="1" value={form.expected_visit_minutes} onChange={set('expected_visit_minutes')} required />
+            </div>
+            <div className="field">
+              <label>فراغ آخر الساعة (دقيقة)</label>
+              <input type="number" min="0" step={form.expected_visit_minutes || 1}
+                value={form.hourly_buffer_minutes} onChange={set('hourly_buffer_minutes')}
+                placeholder={`عام: ${globalBuffer ?? '—'}`} />
+              <small className="hint">فارغ = الإعداد العام. يُقرَّب لأقرب مضاعف لمدة الكشف.</small>
+            </div>
+          </div>
+          {/* الفراغ الفعلي بعد التقريب — يوضّح للمستخدم أن 10 د مع كشف 15 د تصير 15 د */}
+          {effectiveBuffer > 0 && (
+            <p className="pf-note">
+              الفراغ المطبَّق فعلياً: <strong>{effectiveBuffer} دقيقة</strong> آخر كل ساعة
+              {effectiveBuffer !== Number(form.hourly_buffer_minutes || globalBuffer) &&
+                ' (مقرَّب لمضاعف مدة الكشف حتى لا تضيع دقائق لا تكفي مريضاً)'}
+            </p>
+          )}
         </div>
-        <div className="field">
-          <label>فراغ آخر الساعة (دقيقة)</label>
-          <input type="number" min="0" step={form.expected_visit_minutes || 1}
-            value={form.hourly_buffer_minutes} onChange={set('hourly_buffer_minutes')}
-            placeholder={`عام: ${globalBuffer ?? '—'}`} />
-          <span style={{ fontSize: 11, color: 'var(--muted)' }}>
-            اتركه فارغاً لاتّباع الإعداد العام. يُقرَّب لأقرب مضاعف لمدة الكشف.
-          </span>
-        </div>
-        <div className="field" style={{ flex: 1, minWidth: 180 }}>
-          <label>ملاحظات</label>
-          <input value={form.notes} onChange={set('notes')} />
-        </div>
-      </div>
-      {/* الفراغ الفعلي بعد التقريب — يوضّح للمستخدم أن 10 د مع كشف 15 د تصير 15 د */}
-      {effectiveBuffer > 0 && (
-        <p className="subtitle" style={{ marginTop: 6 }}>
-          الفراغ المطبَّق فعلياً: <strong>{effectiveBuffer} دقيقة</strong> آخر كل ساعة
-          {effectiveBuffer !== Number(form.hourly_buffer_minutes || globalBuffer) &&
-            ' (مقرَّب لمضاعف مدة الكشف حتى لا تضيع دقائق لا تكفي مريضاً)'}
-        </p>
-      )}
 
+        <div className="pf-group">
+          <div className="pf-group-head"><h4>خيارات</h4></div>
+          <div className="pf-toggles">
+            {/* إطفاؤه يُخفي زرّي الحجز الفوري والترقية عند هذا الدكتور، والخادم يرفضهما أيضاً.
+                الحجوزات الإسعافية القائمة عنده لا تتأثر — العلم يمنع الجديد فقط. */}
+            <label className="pf-toggle">
+              <input type="checkbox" checked={form.accepts_urgent} onChange={setBool('accepts_urgent')} />
+              <span><strong>يقبل الحالات الإسعافية</strong>
+                <small>أطفئه للاختصاصات التي لا تأتيها حالات إسعافية (تخاطب، علاج فيزيائي)</small></span>
+            </label>
+            {/* مسؤول العيادات وحده يكتبه (الخادم 403 لغيره). بأثرٍ رجعي: التأخير يُحسب لحظة العرض لا يُخزَّن،
+                فالتقارير القديمة تتبع القيمة الحالية. «وصل الطبيب» والحضور واليومية لا تتأثّر. */}
+            <label className="pf-toggle">
+              <input type="checkbox" checked={form.appointments_based} onChange={setBool('appointments_based')} />
+              <span><strong>بمواعيد خاصة</strong>
+                <small>يعطي مرضاه مواعيد بنفسه: لا يُحسب عليه تأخير ولا نسبة التزام — حتى في التقارير السابقة.
+                  يوم حضوره يُحسب كالمعتاد بـ«وصل الطبيب».</small></span>
+            </label>
+          </div>
+          <div className="field pf-notes">
+            <label>ملاحظات</label>
+            <input value={form.notes} onChange={set('notes')} />
+          </div>
+        </div>
       </fieldset>
-      {!readOnly && <div style={{ marginTop: 16, display: 'flex', gap: 10, alignItems: 'center' }}>
+      {!readOnly && <div className="pf-savebar">
+        {err ? <p className="error">{err}</p> : saved ? <span className="badge good">تم الحفظ</span> : <span className="muted">التعديلات لا تُحفظ إلا بالزرّ</span>}
         <button type="submit" disabled={busy}>{busy ? 'جارٍ الحفظ…' : 'حفظ التعديلات'}</button>
-        {saved && <span className="badge good">تم الحفظ</span>}
       </div>}
-      {err && <p className="error">{err}</p>}
+      {readOnly && err && <p className="error">{err}</p>}
     </form>
   )
 }
@@ -173,9 +175,8 @@ function SlotPreview({ schedule, minutes }) {
     slots.push(toStr(t))
   }
   return (
-    <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>
-      {slots.length} خانة ({minutes} د لكل خانة)
-      {slots.length > 0 && <> · تبدأ {slots[0]} وتنتهي {slots[slots.length - 1]}</>}
+    <span className="pf-slots" title={slots.length ? `تبدأ ${slots[0]} وتنتهي ${slots[slots.length - 1]}` : undefined}>
+      {slots.length} خانة × {minutes} د
     </span>
   )
 }
@@ -217,11 +218,17 @@ function ChangeLog({ doctorId, reloadKey }) {
   useEffect(() => {
     api.clinic.doctorHistory(doctorId).then(setRows).catch((e) => setErr(e.message))
   }, [doctorId, reloadKey])
-  if (err) return <div className="card"><h3>سجلّ التعديلات</h3><p className="error">{err}</p></div>
+  if (err) return <section className="card pf-card" id="pf-log"><h3>سجلّ التعديلات</h3><p className="error">{err}</p></section>
   if (!rows) return null
   return (
-    <div className="card">
-      <h3>سجلّ التعديلات</h3>
+    <section className="card pf-card" id="pf-log" aria-labelledby="pf-log-h">
+      <header className="pf-card-head">
+        <div>
+          <h3 id="pf-log-h">سجلّ التعديلات</h3>
+          <p className="pf-card-sub">الغرفة والتسعيرة وسطور الدوام وقواعد الحصّة — من عدّلها ومتى.</p>
+        </div>
+        {rows.length > 0 && <span className="badge">{rows.length}</span>}
+      </header>
       {rows.length === 0
         ? <p className="empty">لا تعديلات مسجَّلة على الغرفة أو سطور الدوام أو قواعد الحصّة بعد.</p>
         : (
@@ -235,9 +242,17 @@ function ChangeLog({ doctorId, reloadKey }) {
             ))}
           </ul>
         )}
-    </div>
+    </section>
   )
 }
+
+const initialOf = (name) => String(name || '').replace(/^د\.?\s*/, '').trim().charAt(0) || '؟'
+const shiftMinutes = (s) => {
+  const m = (t) => { const [h, mm] = t.split(':').map(Number); return h * 60 + mm }
+  const br = s.break_start ? m(s.break_end) - m(s.break_start) : 0
+  return m(s.end_time) - m(s.start_time) - br
+}
+const hoursText = (min) => { const h = Math.floor(min / 60), r = min % 60; return r ? `${h}:${String(r).padStart(2, '0')} س` : `${h} س` }
 
 export default function DoctorProfile() {
   const { id } = useParams()
@@ -261,68 +276,107 @@ export default function DoctorProfile() {
   if (err) return <p className="error">{err}</p>
   if (!doctor) return <p className="empty">جارٍ التحميل…</p>
 
+  const active = doctor.schedules.filter((x) => x.is_active)
+  const weekDays = new Set(active.map((x) => x.weekday)).size
+  const weekMinutes = active.reduce((t, x) => t + (x.repeat_weeks === 2 ? shiftMinutes(x) / 2 : shiftMinutes(x)), 0)
+  const canPay = canSeeClinicFunds(role)
+  const canShares = SHARE_VIEWERS.includes(role)
+  const sections = [
+    ['pf-info', 'المعلومات'], ['pf-sched', 'الدوام'],
+    ...(canShares ? [['pf-shares', 'الحصص']] : []), ...(canPay ? [['pf-pay', 'الراتب']] : []),
+    ...(canShares ? [['pf-log', 'السجلّ']] : []),
+  ]
+
   return (
-    <>
-      <p className="subtitle"><Link to="/clinic/doctors">← كل الدكاترة</Link>
-        {canSeeDoctorDashboard(role) && <> · <Link to={`/clinic/doctors/${doctor.id}/dashboard`}>لوحة التحكم ←</Link></>}</p>
-      <h2>{doctor.name}</h2>
+    <div className="pf-page">
+      <p className="subtitle pf-crumbs"><Link to="/clinic/doctors">← كل الدكاترة</Link></p>
       {toast}
-      <p className="subtitle">
-        {doctor.specialty || 'بلا اختصاص محدد'} ·
-        معاينة {fmtMoney(doctor.consultation_fee)} · مراجعة {fmtMoney(doctor.followup_fee)} ·
-        كشف {doctor.expected_visit_minutes} د ·{' '}
-        {doctor.is_active ? <span className="badge good">فعّال</span> : <span className="badge">موقوف</span>}
-      </p>
+      <section className="pf-hero" aria-label="الدكتور">
+        <div className="pf-hero-top">
+          <div className="pf-avatar" aria-hidden="true">{initialOf(doctor.name)}</div>
+          <div className="pf-id">
+            <h2>{doctor.name}</h2>
+            <div className="pf-spec">{doctor.specialty || 'بلا اختصاص محدد'}</div>
+            <div className="pf-badges">
+              {doctor.is_active ? <span className="badge good">فعّال</span> : <span className="badge">موقوف</span>}
+              <span className="badge blue">{doctor.room ? `العيادة ${doctor.room}` : 'بلا غرفة'}</span>
+              {doctor.appointments_based && <span className="badge">بمواعيد خاصة</span>}
+              {doctor.accepts_urgent === false && <span className="badge">لا يقبل الإسعافي</span>}
+            </div>
+          </div>
+          {canSeeDoctorDashboard(role) && (
+            <Link className="pf-hero-link" to={`/clinic/doctors/${doctor.id}/dashboard`}>لوحة التحكم ←</Link>
+          )}
+        </div>
+        <dl className="pf-stats">
+          <div><dt>المعاينة</dt><dd>{fmtMoney(doctor.consultation_fee)}</dd></div>
+          <div><dt>المراجعة</dt><dd>{fmtMoney(doctor.followup_fee)}</dd><small>خلال {doctor.followup_window_days} يوم</small></div>
+          <div><dt>مدة الكشف</dt><dd>{doctor.expected_visit_minutes} د</dd></div>
+          <div><dt>الدوام الأسبوعي</dt><dd>{weekDays ? `${weekDays} ${weekDays >= 3 && weekDays <= 10 ? 'أيام' : weekDays === 2 ? 'يومان' : 'يوم'}` : '—'}</dd>
+            {weekMinutes > 0 && <small>{hoursText(Math.round(weekMinutes))} بالأسبوع</small>}</div>
+        </dl>
+      </section>
 
-      <div className="card">
-        <h3>معلومات الدكتور والتسعيرة</h3>
+      <nav className="pf-nav" aria-label="أقسام البروفايل">
+        {sections.map(([id, label]) => <a key={id} href={`#${id}`}>{label}</a>)}
+      </nav>
+
+      <section className="card pf-card" id="pf-info" aria-labelledby="pf-info-h">
+        <header className="pf-card-head">
+          <div>
+            <h3 id="pf-info-h">معلومات الدكتور والتسعيرة</h3>
+            <p className="pf-card-sub">{role === 'clinic_admin' ? 'كل ما في هذه البطاقة يُحفظ معاً بزرّ «حفظ التعديلات».' : 'اطّلاعٌ فقط — مشرفة العيادات تعدّلها.'}</p>
+          </div>
+        </header>
         <ProfileForm doctor={doctor} globalBuffer={globalBuffer} onSaved={load} readOnly={role !== 'clinic_admin'} />
-      </div>
+      </section>
 
-      <div className="card">
-        <h3>جدول الدوام الأسبوعي</h3>
-        <p className="subtitle" style={{ marginTop: -6 }}>
-          الخانات تُحسب تلقائياً من مدة الكشف ({doctor.expected_visit_minutes} دقيقة) — تعديل المدة أعلاه يعيد تقسيم كل الخانات.
-        </p>
+      <section className="card pf-card" id="pf-sched" aria-labelledby="pf-sched-h">
+        <header className="pf-card-head">
+          <div>
+            <h3 id="pf-sched-h">جدول الدوام الأسبوعي</h3>
+            <p className="pf-card-sub">الخانات تُحسب تلقائياً من مدة الكشف ({doctor.expected_visit_minutes} دقيقة) — تعديل المدة يعيد تقسيمها كلّها.</p>
+          </div>
+          {role === 'clinic_admin' && <Link className="pf-head-link" to="/clinic/doctors">تعديل الدوام ←</Link>}
+        </header>
         {doctor.schedules.length === 0
           ? <p className="empty">لا يوجد جدول دوام بعد — أضفه من صفحة الدكاترة.</p>
           : (
-            <table className="rtable" style={{ marginTop: 10 }}>
-              <thead><tr><th>اليوم</th><th>من</th><th>إلى</th><th>الاستراحة</th><th>الخانات الناتجة</th></tr></thead>
-              <tbody>
-                {doctor.schedules.map((s) => (
-                  <tr key={s.id} className={s.is_active ? undefined : 'sched-off ro'}>
-                    <td className="rt-title">
-                      <span className="sched-day">{WEEKDAYS[s.weekday]}</span>
-                      {!s.is_active && (
-                        <span className="badge" style={{ marginInlineStart: 6 }}
-                          title={s.toggled_by_name ? `أوقفه ${s.toggled_by_name} — ${fmtDateTime(s.toggled_at)}` : undefined}>
-                          موقوف
-                        </span>
-                      )}
-                    </td>
-                    <td data-label="من">{fmtTime(s.start_time)}</td>
-                    <td data-label="إلى">{fmtTime(s.end_time)}</td>
-                    <td data-label="الاستراحة">{s.break_start ? `${fmtTime(s.break_start)} – ${fmtTime(s.break_end)}` : '—'}</td>
-                    <td className="rt-full" data-label="الخانات الناتجة"><SlotPreview schedule={s} minutes={doctor.expected_visit_minutes} /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="pf-shifts">
+              {doctor.schedules.map((s) => (
+                <article key={s.id} className={`pf-shift${s.is_active ? '' : ' sched-off'}`}>
+                  <header>
+                    <span className="sched-day">{WEEKDAYS[s.weekday]}</span>
+                    {s.repeat_weeks === 2 && <span className="badge sm">كل أسبوعين</span>}
+                    {!s.is_active && (
+                      <span className="badge sm"
+                        title={s.toggled_by_name ? `أوقفه ${s.toggled_by_name} — ${fmtDateTime(s.toggled_at)}` : undefined}>
+                        موقوف
+                      </span>
+                    )}
+                  </header>
+                  <div className="pf-shift-time" dir="ltr">{fmtTime(s.start_time)} – {fmtTime(s.end_time)}</div>
+                  <div className="pf-shift-meta">
+                    {s.break_start ? <span>استراحة {ltr(`${fmtTime(s.break_start)}–${fmtTime(s.break_end)}`)}</span> : <span>بلا استراحة</span>}
+                    <SlotPreview schedule={s} minutes={doctor.expected_visit_minutes} />
+                  </div>
+                </article>
+              ))}
+            </div>
           )}
-      </div>
+      </section>
 
-      {SHARE_VIEWERS.includes(role) && (
-        <DoctorShareRules doctor={doctor} canEdit={role === 'clinic_admin'} onSaved={load} showToast={showToast} />
+      {canShares && (
+        <div id="pf-shares" className="pf-anchor">
+          <DoctorShareRules doctor={doctor} canEdit={role === 'clinic_admin'} onSaved={load} showToast={showToast} />
+        </div>
       )}
 
       {/* الراتب: المشرفة والمدير والمشرف العام وحدهم (FUND_* بالخادم) — لا المجلس ولا الطبيب */}
-      {canSeeClinicFunds(role) && (
-        <DoctorPayCard doctorId={doctor.id} canEdit={canWriteClinicFunds(role)} showToast={showToast} />
-      )}
+      {canPay && <DoctorPayCard doctorId={doctor.id} canEdit={canWriteClinicFunds(role)} showToast={showToast} />}
 
       {/* نفس من يرى «دكاترة اليوم» (APOLOGY_VIEWERS بالخادم) — والخادم يردّ غيرهم 403 */}
-      {SHARE_VIEWERS.includes(role) && <ChangeLog doctorId={doctor.id} reloadKey={reloadKey} />}
-    </>
+      {canShares && <ChangeLog doctorId={doctor.id} reloadKey={reloadKey} />}
+    </div>
   )
 }

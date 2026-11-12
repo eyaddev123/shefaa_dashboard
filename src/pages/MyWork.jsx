@@ -3,6 +3,7 @@ import { api, fmtMoney, openStaffStream } from '../api.js'
 import { useDialogs } from '../dialogs.jsx'
 import { useToast } from '../action-feedback.jsx'
 import { PunctualityTiles, DutyCalendar, fmtMinutes, fmtDuration, fmtClock, clockTitle } from '../components/Punctuality.jsx'
+import { partLines, partsOf } from '../pay-parts.js'
 
 // ═══════════════════════════════════════════════════════════════════
 // «أعمالي» — صفحة الطبيب المستقلّة في القائمة الجانبية (تحت «شاشتي»)
@@ -183,8 +184,7 @@ const shiftMonth = (m, by) => {
 }
 
 function SalaryLines({ s }) {
-  if (s.kind === 'per_patient') return <p className="dk-sal-line">{fmtInt(s.patients)} مريض × {fmtInt(s.rate)} ل.س</p>
-  if (s.kind !== 'daily_hourly') return <p className="dk-sal-line">راتب شهري ثابت</p>
+  if (!partsOf(s)) return <p className="dk-sal-line">راتب شهري ثابت</p>
   return null
 }
 
@@ -201,7 +201,8 @@ function MySalary() {
   }, [month])
   const shown = data && (month === null || data.month === month) ? data : null
   const a = shown?.attendance, s = shown?.salary
-  const dh = s?.kind === 'daily_hourly'
+  const parts = partsOf(s)
+  const hourly = !!parts?.includes('hours')
   return (
     <div className="card dk-salary">
       <div className="dk-sal-head">
@@ -234,16 +235,18 @@ function MySalary() {
             </div>
           </div>
           {!s && <p className="dk-sal-unset">لم تُحدد إعدادات الراتب بعد</p>}
-          {s && dh && (
+          {parts && (
             <ul className="dk-sal-calc">
-              {s.dailyRate > 0 && <li><span>{daysText(a.days)} × {fmtInt(s.dailyRate)}</span><b>{fmtInt(s.salaryDays)} ل.س</b></li>}
-              {s.hourlyRate > 0 && <li><span><span title={clockTitle(a.minutes)}>{fmtClock(a.minutes)} ساعة</span> × {fmtInt(s.hourlyRate)}</span><b>{fmtInt(s.salaryHours)} ل.س</b></li>}
+              {partLines(parts, s, { patients: s.patients, days: a.days, minutes: a.minutes }).map((l) => (
+                <li key={l.key}><span><span title={l.key === 'hours' ? clockTitle(a.minutes) : undefined}>{l.qty}</span> × {fmtInt(l.rate)}</span>
+                  <b>{fmtInt(l.value)} ل.س</b></li>
+              ))}
             </ul>
           )}
           {s && <SalaryLines s={s} />}
           {a.noDeparture > 0 && (
             <p className="share-warn acc-warn" role="alert">
-              {daysText(a.noDeparture)} «انصراف غير مسجَّل»: {dh && s.hourlyRate > 0 ? 'اليومية محسوبة والساعات لا، ' : ''}وتصحّحها المشرفة.
+              {daysText(a.noDeparture)} «انصراف غير مسجَّل»: {hourly ? 'ساعاتها لا تُحسب، ' : ''}وتصحّحها المشرفة.
             </p>
           )}
           {shown.days.length === 0 ? <p className="empty">لا حضور مسجَّل في هذا الشهر.</p> : (

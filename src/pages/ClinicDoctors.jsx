@@ -194,7 +194,32 @@ function ScheduleForm({ doctorId, schedule, onSaved, onCancel }) {
   )
 }
 
-function DoctorRow({ doctor, onChanged, onSchedulesChanged }) {
+// ═══ أسبوع الدكتور: سبعة أيام من السبت، والمضيء يوم دوام (week من قائمة الدكاترة) ═══
+const WEEK_ORDER = [6, 0, 1, 2, 3, 4, 5]
+const DAY_SHORT = { 0: 'أحد', 1: 'اثنين', 2: 'ثلاثاء', 3: 'أربعاء', 4: 'خميس', 5: 'جمعة', 6: 'سبت' }
+const initialOf = (name) => String(name || '').replace(/^د\.?\s*/, '').trim().charAt(0) || '؟'
+function WeekStrip({ week }) {
+  const byDay = {}
+  for (const w of week || []) (byDay[w.weekday] ||= []).push(w)
+  const days = Object.keys(byDay).length
+  return (
+    <div className="dc-week" aria-label={days ? `أيام الدوام: ${WEEK_ORDER.filter((d) => byDay[d]).map((d) => WEEKDAYS[d]).join('، ')}` : 'بلا دوام'}>
+      {WEEK_ORDER.map((d) => {
+        const lines = byDay[d]
+        const title = lines ? lines.map((l) => `${l.start}–${l.end}${l.repeat === 2 ? ' (كل أسبوعين)' : ''}`).join(' · ') : 'لا دوام'
+        return (
+          <span key={d} className={`dc-day${lines ? ' on' : ''}${lines?.every((l) => l.repeat === 2) ? ' alt' : ''}`}
+            title={`${WEEKDAYS[d]}: ${title}`} aria-hidden="true">
+            <b>{DAY_SHORT[d]}</b>
+            {lines && <small dir="ltr">{lines[0].start}</small>}
+          </span>
+        )
+      })}
+    </div>
+  )
+}
+
+function DoctorCard({ doctor, onChanged, onSchedulesChanged }) {
   const dlg = useDialogs()
   const { clinicRole: role } = useRole()
   const canEdit = role === 'clinic_admin'
@@ -210,6 +235,12 @@ function DoctorRow({ doctor, onChanged, onSchedulesChanged }) {
   }
 
   const toggleActive = async () => {
+    if (doctor.is_active) {
+      const ok = await dlg.confirm({ title: `إيقاف ${doctor.name}؟`,
+        body: 'لا تُولَّد له جلساتٌ جديدة ولا يظهر للحجز، وكلّ ما سبق يبقى. تقدرين تفعّليه متى شئتِ.',
+        confirmLabel: 'إيقاف', danger: true })
+      if (!ok) return
+    }
     try { await api.clinic.updateDoctor(doctor.id, { is_active: !doctor.is_active }); onChanged() }
     catch (ex) { await dlg.alert({ title: 'تعذّر التنفيذ', body: ex.message }) }
   }
@@ -247,114 +278,114 @@ function DoctorRow({ doctor, onChanged, onSchedulesChanged }) {
 
   const editing = schedules?.find((s) => s.id === editingId)
   const afterSave = () => { setEditingId(null); loadSchedules(); onSchedulesChanged() }
+  const spec = doctor.specialty_name || doctor.specialty
+  const profile = `/clinic/doctors/${doctor.id}`
 
   return (
-    <>
-      <tr style={doctor.is_active ? undefined : { opacity: 0.5 }}>
-        <td className="rt-title"><Link to={`/clinic/doctors/${doctor.id}`}>{doctor.name}</Link></td>
-        <td data-label="الاختصاص">
-          {doctor.specialty_name || doctor.specialty || <span className="muted">—</span>}
-          {/* بلا اختصاص ⇒ يرى الإجراءات العامّة وحدها — تحذيرٌ ظاهر لا صمت */}
-          {!doctor.specialty_id && (
-            <span className="badge warn" style={{ marginInlineStart: 5 }}
-              title="سيرى الإجراءات العامّة وحدها حتى يُختار اختصاصه">بلا اختصاص</span>
-          )}
-          {doctor.appointments_based && (
-            <span className="badge blue sm" style={{ marginInlineStart: 5 }}
-              title="يعطي مرضاه مواعيد بنفسه — لا يُحسب عليه تأخير ولا يدخل نسبة الالتزام">بمواعيد خاصة</span>
-          )}
-        </td>
-        <td data-label="الجوال" dir={doctor.phone ? 'ltr' : undefined}>{doctor.phone || '—'}</td>
-        <td className="num" data-label="سعر المعاينة">{fmtMoney(doctor.consultation_fee)}</td>
-        <td className="num" data-label="سعر المراجعة">{fmtMoney(doctor.followup_fee)}</td>
-        <td className="num" data-label="مدة الكشف">{doctor.expected_visit_minutes} د</td>
-        <td className="rt-badge">
-          {doctor.is_active ? <span className="badge good">فعّال</span> : <span className="badge">موقوف</span>}
-        </td>
-        <td className="rt-actions">
-          <Link to={`/clinic/doctors/${doctor.id}`} className="ghost"
-            style={{ padding: '3px 10px', fontSize: 11.5, display: 'inline-block' }}>البروفايل</Link>{' '}
-          {canSeeDoctorDashboard(role) && <><Link to={`/clinic/doctors/${doctor.id}/dashboard`} className="ghost"
-            style={{ padding: '3px 10px', fontSize: 11.5, display: 'inline-block' }}>لوحة التحكم</Link>{' '}</>}
-          <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }} onClick={toggle}>
-            {expanded ? 'إخفاء الدوام' : 'جدول الدوام'}
-          </button>{' '}
-          {/* المطالِع (المجلس، المشرف العام، المدير) يرى الدوام بلا أزرار كتابة */}
-          {canEdit && <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }} onClick={toggleActive}>
+    <article className={`dc-card${doctor.is_active ? '' : ' off'}${expanded ? ' open' : ''}`}>
+      <header className="dc-card-head">
+        <Link to={profile} className="dc-avatar" aria-hidden="true" tabIndex={-1}>{initialOf(doctor.name)}</Link>
+        <div className="dc-who">
+          <Link to={profile} className="dc-name">{doctor.name}</Link>
+          <div className="dc-spec">
+            {spec || <span className="muted">بلا اختصاص</span>}
+            {doctor.room && <span className="dc-room">العيادة {doctor.room}</span>}
+          </div>
+        </div>
+        <div className="dc-state">
+          {doctor.is_active ? <span className="badge good sm">فعّال</span> : <span className="badge sm">موقوف</span>}
+          {/* المطالِع (المجلس، المشرف العام، المدير) يرى الحالة بلا زرّ */}
+          {canEdit && <button type="button" className="dc-state-btn" onClick={toggleActive}>
             {doctor.is_active ? 'إيقاف' : 'تفعيل'}
           </button>}
-        </td>
-      </tr>
-      {expanded && (
-        <tr className="rt-sub">
-          <td colSpan={8} className="rt-full" style={{ background: 'var(--bg-soft, rgba(0,0,0,0.02))' }}>
-            {!schedules ? (
-              <p className="empty">جارٍ التحميل…</p>
-            ) : (
-              <>
-                {schedules.length === 0
-                  ? <p className="empty">لا يوجد جدول دوام بعد لهذا الدكتور.</p>
-                  : (
-                    <table className="rtable" style={{ marginTop: 6 }}>
-                      <thead><tr><th>اليوم</th><th>التكرار</th><th>من</th><th>إلى</th><th>السعة</th><th></th></tr></thead>
-                      <tbody>
-                        {schedules.map((s) => (
-                          <tr key={s.id} className={[s.is_active ? '' : 'sched-off', s.id === editingId ? 'sched-editing' : '']
-                            .filter(Boolean).join(' ') || undefined}>
-                            <td className="rt-title">
-                              <span className="sched-day">{WEEKDAYS[s.weekday]}</span>
-                              {!s.is_active && (
-                                <span className="badge" style={{ marginInlineStart: 6 }}
-                                  title={s.toggled_by_name ? `أوقفه ${s.toggled_by_name} — ${fmtDateTime(s.toggled_at)}` : undefined}>
-                                  موقوف
-                                </span>
-                              )}
-                            </td>
-                            <td className="rt-badge">
-                              {s.repeat_weeks === 2
-                                ? <span className="badge warn">كل أسبوعين</span>
-                                : <span className="muted">كل أسبوع</span>}
-                            </td>
-                            <td data-label="من">{fmtTime(s.start_time)}</td>
-                            <td data-label="إلى">{fmtTime(s.end_time)}</td>
-                            <td className="num" data-label="السعة">{s.capacity || '—'}</td>
-                            <td className="rt-actions" style={{ whiteSpace: 'nowrap' }}>
-                              {canEdit && (
-                                <label className="sched-switch" style={{ marginInlineEnd: 10 }}
-                                  title={s.is_active ? 'إيقاف مؤقّت: لا تُولَّد منه جلسات حتى يُفعَّل' : 'تفعيل: تُولَّد منه الجلسات من جديد'}>
-                                  <input type="checkbox" role="switch" checked={s.is_active}
-                                    disabled={toggling === s.id} onChange={() => toggleSchedule(s)}
-                                    aria-label={`${WEEKDAYS[s.weekday]} ${fmtTime(s.start_time)} — ${s.is_active ? 'مفعّل' : 'موقوف'}`} />
-                                  {s.is_active ? 'مفعّل' : 'موقوف'}
-                                </label>
-                              )}
-                              {canEdit && (
-                                <button className="ghost" style={{ padding: '2px 8px', fontSize: 11, marginInlineEnd: 6 }}
-                                  aria-pressed={s.id === editingId}
-                                  aria-label={`تعديل دوام ${WEEKDAYS[s.weekday]} ${fmtTime(s.start_time)}`}
-                                  onClick={() => setEditingId(s.id === editingId ? null : s.id)}>تعديل</button>
-                              )}
-                              {canEdit && <button className="ghost" style={{ padding: '2px 8px', fontSize: 11 }} onClick={() => removeSchedule(s)}>حذف</button>}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                {/* التعديل يحلّ محلّ نموذج الإضافة (نفس الحقول معبّأة) حتى يُحفظ أو يُلغى */}
-                {!canEdit ? null : editing
-                  ? <ScheduleForm key={editing.id} schedule={editing} onSaved={afterSave} onCancel={() => setEditingId(null)} />
-                  : <ScheduleForm doctorId={doctor.id} onSaved={afterSave} />}
-                {/* حصّته من الإجراءات (النسبة العامّة والحالات الخاصّة) في بروفايله */}
-                <p className="subtitle" style={{ marginTop: 10 }}>
-                  حصّة الدكتور من الإجراءات: <Link to={`/clinic/doctors/${doctor.id}`}>في بروفايله</Link>
-                </p>
-              </>
-            )}
-          </td>
-        </tr>
+        </div>
+      </header>
+
+      {(!doctor.specialty_id || doctor.appointments_based || doctor.accepts_urgent === false) && (
+        <div className="dc-flags">
+          {/* بلا اختصاص ⇒ يرى الإجراءات العامّة وحدها — تحذيرٌ ظاهر لا صمت */}
+          {!doctor.specialty_id && (
+            <span className="badge warn sm" title="سيرى الإجراءات العامّة وحدها حتى يُختار اختصاصه">بلا اختصاص</span>
+          )}
+          {doctor.appointments_based && (
+            <span className="badge blue sm" title="يعطي مرضاه مواعيد بنفسه — لا يُحسب عليه تأخير ولا يدخل نسبة الالتزام">بمواعيد خاصة</span>
+          )}
+          {doctor.accepts_urgent === false && <span className="badge sm">لا يقبل الإسعافي</span>}
+        </div>
       )}
-    </>
+
+      <WeekStrip week={doctor.week} />
+
+      <dl className="dc-facts">
+        <div><dt>المعاينة</dt><dd>{fmtMoney(doctor.consultation_fee)}</dd></div>
+        <div><dt>المراجعة</dt><dd>{fmtMoney(doctor.followup_fee)}</dd></div>
+        <div><dt>الكشف</dt><dd>{doctor.expected_visit_minutes} د</dd></div>
+      </dl>
+      {doctor.phone && <div className="dc-phone" dir="ltr">{doctor.phone}</div>}
+
+      <footer className="dc-actions">
+        <Link to={profile} className="dc-btn primary">البروفايل</Link>
+        {canSeeDoctorDashboard(role) && <Link to={`${profile}/dashboard`} className="dc-btn">لوحة التحكم</Link>}
+        <button type="button" className="dc-btn" aria-expanded={expanded} onClick={toggle}>
+          {expanded ? 'إخفاء الدوام' : 'جدول الدوام'}
+        </button>
+      </footer>
+
+      {expanded && (
+        <section className="dc-sched" aria-label={`دوام ${doctor.name}`}>
+          {!schedules ? <p className="empty">جارٍ التحميل…</p> : (
+            <>
+              {schedules.length === 0
+                ? <p className="empty">لا يوجد جدول دوام بعد لهذا الدكتور.</p>
+                : (
+                  <ul className="dc-sched-list">
+                    {schedules.map((s) => (
+                      <li key={s.id} className={['dc-sched-row', s.is_active ? '' : 'sched-off', s.id === editingId ? 'sched-editing' : '']
+                        .filter(Boolean).join(' ')}>
+                        <div className="dc-sched-main">
+                          <span className="sched-day">{WEEKDAYS[s.weekday]}</span>
+                          <bdi className="dc-sched-time" dir="ltr">{fmtTime(s.start_time)} – {fmtTime(s.end_time)}</bdi>
+                          {s.repeat_weeks === 2 && <span className="badge warn sm">كل أسبوعين</span>}
+                          {s.break_start && <span className="dc-sched-meta">استراحة <bdi dir="ltr">{fmtTime(s.break_start)}–{fmtTime(s.break_end)}</bdi></span>}
+                          {s.capacity && <span className="dc-sched-meta">السعة {s.capacity}</span>}
+                          {!s.is_active && (
+                            <span className="badge sm"
+                              title={s.toggled_by_name ? `أوقفه ${s.toggled_by_name} — ${fmtDateTime(s.toggled_at)}` : undefined}>
+                              موقوف
+                            </span>
+                          )}
+                        </div>
+                        {canEdit && (
+                          <div className="dc-sched-actions">
+                            <label className="sched-switch"
+                              title={s.is_active ? 'إيقاف مؤقّت: لا تُولَّد منه جلسات حتى يُفعَّل' : 'تفعيل: تُولَّد منه الجلسات من جديد'}>
+                              <input type="checkbox" role="switch" checked={s.is_active}
+                                disabled={toggling === s.id} onChange={() => toggleSchedule(s)}
+                                aria-label={`${WEEKDAYS[s.weekday]} ${fmtTime(s.start_time)} — ${s.is_active ? 'مفعّل' : 'موقوف'}`} />
+                              {s.is_active ? 'مفعّل' : 'موقوف'}
+                            </label>
+                            <button type="button" className="ghost sm-btn" aria-pressed={s.id === editingId}
+                              aria-label={`تعديل دوام ${WEEKDAYS[s.weekday]} ${fmtTime(s.start_time)}`}
+                              onClick={() => setEditingId(s.id === editingId ? null : s.id)}>تعديل</button>
+                            <button type="button" className="ghost sm-btn danger-text" onClick={() => removeSchedule(s)}>حذف</button>
+                          </div>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              {/* التعديل يحلّ محلّ نموذج الإضافة (نفس الحقول معبّأة) حتى يُحفظ أو يُلغى */}
+              {!canEdit ? null : editing
+                ? <ScheduleForm key={editing.id} schedule={editing} onSaved={afterSave} onCancel={() => setEditingId(null)} />
+                : <ScheduleForm doctorId={doctor.id} onSaved={afterSave} />}
+              <p className="dc-sched-note">
+                التسعيرة ومدة الكشف وحصّة الإجراءات والراتب: <Link to={profile}>في بروفايله</Link>
+              </p>
+            </>
+          )}
+        </section>
+      )}
+    </article>
   )
 }
 
@@ -374,87 +405,100 @@ function SchedulePreview({ version }) {
   }, [open, data])
 
   return (
-    <div className="card">
-      <div className="inline" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-        <h3 style={{ margin: 0 }}>معاينة التواريخ القادمة</h3>
-        <button type="button" className="ghost" style={{ padding: '4px 12px', fontSize: 12 }}
-          onClick={() => setOpen((v) => !v)}>
+    <section className="card dc-preview">
+      <header className="dc-preview-head">
+        <div>
+          <h3>معاينة الأيام القادمة</h3>
+          <p>من يعمل في كل تاريخ — يكشف خطأ التناوب كل أسبوعين وتشارك الغرف قبل أن يراه المرضى.</p>
+        </div>
+        <button type="button" className="ghost" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
           {open ? 'إخفاء' : 'عرض من يعمل في كل تاريخ'}
         </button>
-      </div>
+      </header>
       {open && (
         err ? <p className="error">{err}</p>
         : !data ? <p className="empty">جارٍ التحميل…</p>
         : data.days.length === 0 ? <p className="empty">لا دوامات مُعرَّفة بعد.</p>
         : (
-          <table className="rtable" style={{ marginTop: 10 }}>
-            <thead><tr><th>التاريخ</th><th>اليوم</th><th>الدكاترة العاملون</th></tr></thead>
-            <tbody>
-              {data.days.map((d) => (
-                <tr key={d.date}>
-                  <td className="rt-title num">{d.date}</td>
-                  <td className="rt-badge">{WEEKDAYS[d.weekday]}</td>
-                  <td className="rt-full">
-                    {d.doctors.length === 0
-                      ? <span className="muted">لا أحد</span>
-                      : d.doctors.map((x) => (
-                        <span key={x.doctor_id} style={{ marginInlineEnd: 10 }}>
-                          {x.doctor_name}
-                          {x.room && <span className="muted"> (غرفة {x.room})</span>}
-                          {x.repeat_weeks === 2 && <span className="badge warn" style={{ marginInlineStart: 4 }}>٢ أسبوع</span>}
-                        </span>
-                      ))}
-                    {/* تحذيرٌ لا منع: قد يكون التشارك مقصوداً (دوامان متتاليان) */}
-                    {d.room_clashes.length > 0 && (
-                      <span className="badge bad" style={{ marginInlineStart: 6 }}>
-                        ⚠ غرفة مشتركة: {d.room_clashes.join('، ')}
+          <ol className="dc-days">
+            {data.days.map((d) => (
+              <li key={d.date} className={d.doctors.length ? undefined : 'none'}>
+                <div className="dc-days-date">
+                  <strong>{WEEKDAYS[d.weekday]}</strong>
+                  <span dir="ltr">{d.date}</span>
+                </div>
+                <div className="dc-days-docs">
+                  {d.doctors.length === 0
+                    ? <span className="muted">لا أحد</span>
+                    : d.doctors.map((x) => (
+                      <span key={x.doctor_id} className="dc-chip">
+                        {x.doctor_name}
+                        {x.room && <small>غرفة {x.room}</small>}
+                        {x.repeat_weeks === 2 && <small className="alt">كل أسبوعين</small>}
                       </span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    ))}
+                  {/* تحذيرٌ لا منع: قد يكون التشارك مقصوداً (دوامان متتاليان) */}
+                  {d.room_clashes.length > 0 && (
+                    <span className="badge bad">⚠ غرفة مشتركة: {d.room_clashes.join('، ')}</span>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ol>
         )
       )}
-    </div>
+    </section>
   )
 }
+
+const FILTERS = [['all', 'الكل'], ['active', 'فعّال'], ['off', 'موقوف']]
 
 export default function ClinicDoctors() {
   const { clinicRole: role } = useRole()
   const [doctors, setDoctors] = useState(null)
   const [err, setErr] = useState(null)
   const [query, setQuery] = useState('')
+  const [filter, setFilter] = useState('all')
   const [adding, setAdding] = useState(false)
   const [toast, showToast] = useToast()
   const [schedVersion, setSchedVersion] = useState(0)
-  const bumpSchedules = () => setSchedVersion((v) => v + 1)
 
   const load = () => api.clinic.doctors().then(setDoctors).catch((e) => setErr(e.message))
   useEffect(() => { load() }, [])
+  // تغيّر سطر دوام ⇒ تُعاد المعاينة المفتوحة، ويُعاد أسبوع البطاقة (week من القائمة)
+  const bumpSchedules = () => { setSchedVersion((v) => v + 1); load() }
 
   if (err) return <p className="error">{err}</p>
   if (!doctors) return <p className="empty">جارٍ التحميل…</p>
-  const shown = doctors.filter((d) => doctorMatches(d, query))
+  const active = doctors.filter((d) => d.is_active)
+  const noSpec = active.filter((d) => !d.specialty_id).length
+  const noWeek = active.filter((d) => Array.isArray(d.week) && d.week.length === 0).length
+  const byFilter = doctors.filter((d) => filter === 'all' || (filter === 'active' ? d.is_active : !d.is_active))
+  const shown = byFilter.filter((d) => doctorMatches(d, query))
   const searching = query.trim() !== ''
+  const narrowed = searching || filter !== 'all'
 
   return (
-    <>
-      <h2>قسم العيادات — الدكاترة والدوام</h2>
-      <p className="subtitle">
-        إضافة الدكاترة الزائرين وتسعيرة كل منهم ومدة الكشف المتوقعة، وجدول دوامهم الأسبوعي
-        الذي تُولَّد منه جلسات كل يوم.
-      </p>
+    <div className="dc-page">
+      <header className="dc-head">
+        <div>
+          <h2>الدكاترة والدوام</h2>
+          <p className="subtitle">كل دكتور ببطاقة: أيام دوامه وأسعاره، ومنها بروفايله وجدول دوامه.</p>
+        </div>
+        {/* الإضافة لمشرف العيادات وحده — الخادم يرفضها لغيره أصلاً */}
+        {role === 'clinic_admin' && <button type="button" className="dc-add" onClick={() => setAdding(true)}>+ إضافة دكتور</button>}
+      </header>
 
       {toast}
-      <div className="card">
-        <div className="doctors-head">
-          <h3>الدكاترة ({doctors.length})</h3>
-          {/* الإضافة لمشرف العيادات وحده — الخادم يرفضها لغيره أصلاً */}
-          {role === 'clinic_admin' && <button type="button" onClick={() => setAdding(true)}>+ إضافة دكتور</button>}
-        </div>
-        {doctors.length > 0 && (
+      <div className="dc-summary">
+        <div className="dc-stat"><strong>{active.length}</strong><span>دكتور فعّال</span></div>
+        <div className="dc-stat"><strong>{doctors.length - active.length}</strong><span>موقوف</span></div>
+        <div className={`dc-stat${noWeek ? ' warn' : ''}`}><strong>{noWeek}</strong><span>فعّال بلا دوام</span></div>
+        <div className={`dc-stat${noSpec ? ' warn' : ''}`}><strong>{noSpec}</strong><span>بلا اختصاص</span></div>
+      </div>
+
+      {doctors.length > 0 && (
+        <div className="dc-toolbar">
           <div className="doctors-search" role="search">
             <div className="doctors-search-box">
               <input type="search" value={query} onChange={(e) => setQuery(e.target.value)}
@@ -464,32 +508,39 @@ export default function ClinicDoctors() {
                   onClick={() => setQuery('')}>×</button>
               )}
             </div>
-            <span className="doctors-count" aria-live="polite">
-              {searching ? `${shown.length} من ${doctors.length} دكتور` : `${doctors.length} دكتور`}
-            </span>
           </div>
-        )}
-        {shown.length === 0 && searching ? (
-          <EmptyState text="ما في دكتور بهالاسم" hint={`لا نتائج لـ «${query.trim()}» في الاسم ولا الاختصاص ولا الجوال.`}>
-            <button type="button" className="ghost" onClick={() => setQuery('')}>مسح البحث</button>
+          <div className="seg dc-filter" role="radiogroup" aria-label="الحالة">
+            {FILTERS.map(([k, label]) => (
+              <label key={k} className={filter === k ? 'on' : undefined}>
+                <input type="radio" name="dc-filter" checked={filter === k} onChange={() => setFilter(k)} />{label}
+              </label>
+            ))}
+          </div>
+          <span className="doctors-count" aria-live="polite">
+            {narrowed ? `${shown.length} من ${doctors.length} دكتور` : `${doctors.length} دكتور`}
+          </span>
+        </div>
+      )}
+
+      {shown.length === 0 && narrowed ? (
+        <div className="card">
+          <EmptyState text="ما في دكتور بهالاسم" hint={searching ? `لا نتائج لـ «${query.trim()}» في الاسم ولا الاختصاص ولا الجوال.` : 'لا دكاترة بهذه الحالة.'}>
+            <button type="button" className="ghost" onClick={() => { setQuery(''); setFilter('all') }}>مسح البحث</button>
           </EmptyState>
-        ) : (
-        <table className="rtable" style={{ marginTop: 14 }}>
-          <thead>
-            <tr><th>الاسم</th><th>الاختصاص</th><th>الجوال</th><th>سعر المعاينة</th><th>سعر المراجعة</th><th>مدة الكشف</th><th>الحالة</th><th></th></tr>
-          </thead>
-          <tbody>
-            {shown.map((d) => <DoctorRow key={d.id} doctor={d} onChanged={load} onSchedulesChanged={bumpSchedules} />)}
-          </tbody>
-        </table>
-        )}
-      </div>
+        </div>
+      ) : doctors.length === 0 ? (
+        <div className="card"><p className="empty">لا دكاترة بعد{role === 'clinic_admin' ? ' — أضيفي أوّلهم من «+ إضافة دكتور».' : '.'}</p></div>
+      ) : (
+        <div className="dc-grid">
+          {shown.map((d) => <DoctorCard key={d.id} doctor={d} onChanged={load} onSchedulesChanged={bumpSchedules} />)}
+        </div>
+      )}
       {adding && (
         <NewDoctorDialog onClose={() => setAdding(false)}
           onCreated={(name) => { setAdding(false); load(); showToast(`أُضيف ${name}`, 'success', 3500) }} />
       )}
 
       <SchedulePreview version={schedVersion} />
-    </>
+    </div>
   )
 }

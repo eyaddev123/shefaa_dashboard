@@ -82,10 +82,11 @@ async function open(browser, { w, h = 844, theme = 'light', role, postFail } = {
   page.on('pageerror', (e) => errors.push(e.message))
   const st = await mockApi(page, { role, postFail })
   await page.goto(`${BASE}/clinic/doctors`, { waitUntil: 'load' })
-  await page.waitForSelector('table.rtable tbody tr', { timeout: 8000 })
+  await page.waitForSelector('.dc-grid .dc-card', { timeout: 8000 })
   return { ctx, page, errors, st }
 }
-const rows = (page) => page.$$eval('.card table.rtable > tbody > tr:not(.rt-sub)', (trs) => trs.map((t) => t.querySelector('td')?.innerText.trim()))
+// البطاقات (2026-11-12): اسم كلّ دكتورٍ ظاهر بترتيبه
+const rows = (page) => page.$$eval('.dc-grid .dc-card .dc-name', (els) => els.map((e) => e.innerText.trim()))
 const count = (page) => page.$eval('.doctors-count', (e) => e.innerText.trim())
 const noHScroll = (page) => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
 
@@ -126,7 +127,7 @@ const run = async () => {
       ok((await page.getByRole('button', { name: 'مسح البحث' }).count()) === 0, `${tag}: × يختفي حين لا بحث`)
       await search.fill('زززز')
       const empty = await page.$('.inv-empty')
-      ok(!!empty && (await empty.innerText()).includes('ما في دكتور بهالاسم') && (await page.$$('.card table.rtable')).length === 0,
+      ok(!!empty && (await empty.innerText()).includes('ما في دكتور بهالاسم') && (await page.$$('.dc-grid')).length === 0,
         `${tag}: حالة «لا نتائج» بدل جدولٍ فارغ`)
       ok(await noHScroll(page), `${tag}: بلا تمرير أفقي (لا نتائج)`)
       await page.locator('.inv-empty').getByRole('button', { name: 'مسح البحث' }).click()
@@ -199,7 +200,7 @@ const run = async () => {
       await modal.getByRole('button', { name: 'إضافة دكتور' }).click()
       await modal.waitFor({ state: 'detached', timeout: 3000 }).catch(() => {})
       ok(await modal.count() === 0, `${tag}: النجاح يُغلق النافذة`)
-      await page.waitForFunction((n) => document.querySelectorAll('.card table.rtable > tbody > tr').length >= 1, 1, { timeout: 3000 }).catch(() => {})
+      await page.waitForFunction((n) => document.querySelectorAll('.dc-grid .dc-card').length >= 1, 1, { timeout: 3000 }).catch(() => {})
       ok(JSON.stringify(await rows(page)) === JSON.stringify(['د. سامي الجديد']) && (await count(page)) === `1 من ${total + 1} دكتور`,
         `${tag}: الجديد في القائمة فوراً ومرشَّحٌ بالبحث (${await rows(page)} · ${await count(page)})`)
       ok((await page.locator('.toast').innerText().catch(() => '')).includes('أُضيف د. سامي الجديد'), `${tag}: إشعار التأكيد`)
