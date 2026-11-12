@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, fmtDateTime, fmtMoney, toLatinDigits } from '../api.js'
-import { PAY_PARTS, partsTitle, ratesText } from '../pay-parts.js'
+import { PATIENT_SCOPES, PAY_PARTS, partsTitle, patientsLabel, ratesText } from '../pay-parts.js'
 
 // ═══ راتب الدكتور: مكوّنات تختارها المشرفة — مرضى · أيام · ساعات (2026-11-12) ═══
 // الراتب = مجموع المكوّنات المختارة، ولكلٍّ سعره: المريض المنتهي كشفه · يوم الحضور · ساعة الدوام
@@ -14,28 +14,32 @@ const CYCLES = [['daily', 'يومي'], ['monthly', 'شهري']]
 const cycleText = (c) => (c === 'daily' ? 'يومي' : c === 'monthly' ? 'شهري' : null)
 const EXAMPLE = { patients: 20, days: 4, minutes: 12 * 60 }
 const EXAMPLE_QTY = { patients: '٢٠ مريضاً', days: '٤ أيام', hours: '١٢ ساعة' }
+const SCOPE_NOTE = {
+  all: 'كل المرضى: كلّ زيارةٍ انتهت في الفترة — معاينة ومراجعة و«إجراء فقط».',
+  consultation: 'المعاينات فقط: لا تُعدّ المراجعات ولا زيارات «إجراء فقط».',
+}
 const str = (v) => (v == null || Number(v) === 0 ? '' : String(v))
 const toNum = (v) => { const n = Number(String(v || '').replace(/[,،٬\s]/g, '')); return Number.isFinite(n) ? n : NaN }
 
-// إعدادٌ (من GET أو من سطر سجلّ) ⇒ { parts, patientRate, dailyRate, hourlyRate }
-function partsOf(kind, amount, daily, hourly) {
+// إعدادٌ (من GET أو من سطر سجلّ) ⇒ { parts, patientRate, dailyRate, hourlyRate, patientScope }
+function partsOf(kind, amount, daily, hourly, scope) {
   if (!kind || kind === 'fixed') return null
   const r = {
     patientRate: kind === 'daily_hourly' ? 0 : Number(amount || 0),
     dailyRate: kind === 'per_patient' ? 0 : Number(daily || 0),
     hourlyRate: kind === 'per_patient' ? 0 : Number(hourly || 0),
   }
-  return { ...r, parts: PAY_PARTS.filter((p) => r[p.rate] > 0).map((p) => p.key) }
+  return { ...r, patientScope: scope || 'all', parts: PAY_PARTS.filter((p) => r[p.rate] > 0).map((p) => p.key) }
 }
-function settingText(kind, amount, daily, hourly) {
+function settingText(kind, amount, daily, hourly, scope) {
   if (!kind) return 'بلا'
   if (kind === 'fixed') return `راتب شهري ثابت ${fmtMoney(amount)}`
-  const p = partsOf(kind, amount, daily, hourly)
-  return p.parts.length ? `${partsTitle(p.parts)}: ${ratesText(p.parts, p)}` : 'بلا أسعار'
+  const p = partsOf(kind, amount, daily, hourly, scope)
+  return p.parts.length ? `${partsTitle(p.parts, p.patientScope)}: ${ratesText(p.parts, p)}` : 'بلا أسعار'
 }
 const historyText = (h, side) => {
   const k = h[`${side}_kind`]
-  const t = settingText(k, h[`${side}_amount`], h[`${side}_daily_rate`], h[`${side}_hourly_rate`])
+  const t = settingText(k, h[`${side}_amount`], h[`${side}_daily_rate`], h[`${side}_hourly_rate`], h[`${side}_patient_scope`])
   const c = k && cycleText(h[`${side}_cycle`])
   return c ? `${t} · ${c}` : t
 }
@@ -45,12 +49,14 @@ export default function DoctorPayCard({ doctorId, canEdit, showToast }) {
   const [on, setOn] = useState({ patients: false, days: false, hours: false })
   const [rate, setRate] = useState({ patients: '', days: '', hours: '' })
   const [cycle, setCycle] = useState('monthly')
+  const [scope, setScope] = useState('all')
   const [removing, setRemoving] = useState(false)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState(null)
 
   const fromData = (d) => {
-    const p = partsOf(d.pay_kind, d.amount, d.daily_rate, d.hourly_rate)
+    const p = partsOf(d.pay_kind, d.amount, d.daily_rate, d.hourly_rate, d.patient_scope)
+    setScope(d.patient_scope || 'all')
     setOn({ patients: !!p?.parts.includes('patients'), days: !!p?.parts.includes('days'), hours: !!p?.parts.includes('hours') })
     setRate({ patients: str(p?.patientRate), days: str(p?.dailyRate), hours: str(p?.hourlyRate) })
     setCycle(d.settle_cycle || 'monthly'); setRemoving(false)
@@ -59,13 +65,15 @@ export default function DoctorPayCard({ doctorId, canEdit, showToast }) {
     .catch((e) => setErr(e.message))
   useEffect(() => { load() }, [doctorId])
 
-  const saved = data && partsOf(data.pay_kind, data.amount, data.daily_rate, data.hourly_rate)
+  const saved = data && partsOf(data.pay_kind, data.amount, data.daily_rate, data.hourly_rate, data.patient_scope)
   const legacy = data?.pay_kind === 'fixed'
   const chosen = PAY_PARTS.filter((p) => on[p.key])
   const value = (k) => (on[k] ? toNum(rate[k]) : 0)
   const bad = chosen.filter((p) => !(value(p.key) > 0))
+  // الخيار يخصّ سعر المريض وحده — بلا مريضٍ في الراتب لا يُعدّ تغييراً
+  const scopeChanged = !!saved && on.patients && saved.parts.includes('patients') && scope !== saved.patientScope
   const dirty = !!data && !removing && (legacy || !saved
-    || cycle !== (data.settle_cycle || 'monthly')
+    || cycle !== (data.settle_cycle || 'monthly') || scopeChanged
     || value('patients') !== saved.patientRate || value('days') !== saved.dailyRate || value('hours') !== saved.hourlyRate)
   const canSave = chosen.length > 0 && bad.length === 0 && dirty
   const example = chosen.length > 0 && bad.length === 0
@@ -75,16 +83,17 @@ export default function DoctorPayCard({ doctorId, canEdit, showToast }) {
     setBusy(true); setErr(null)
     try {
       const body = remove ? { pay_kind: null }
-        : { pay_kind: 'mixed', amount: value('patients'), daily_rate: value('days'), hourly_rate: value('hours'), settle_cycle: cycle }
+        : { pay_kind: 'mixed', amount: value('patients'), daily_rate: value('days'), hourly_rate: value('hours'), settle_cycle: cycle,
+            patient_scope: on.patients ? scope : 'all' }
       const r = await api.clinic.setDoctorPay(doctorId, body)
-      showToast(r.pay_kind ? `حُفظ الراتب: ${settingText(r.pay_kind, r.amount, r.daily_rate, r.hourly_rate)}` : 'أُزيل الراتب', 'success', 3500)
+      showToast(r.pay_kind ? `حُفظ الراتب: ${settingText(r.pay_kind, r.amount, r.daily_rate, r.hourly_rate, r.patient_scope)}` : 'أُزيل الراتب', 'success', 3500)
       load()
     } catch (e) { setErr(e.message) } finally { setBusy(false) }
   }
 
   const summary = !data?.pay_kind ? null : legacy
     ? <>راتب شهري ثابت <strong>{fmtMoney(data.amount)}</strong></>
-    : <><strong>{partsTitle(saved.parts)}</strong> — {ratesText(saved.parts, saved)}</>
+    : <><strong>{partsTitle(saved.parts, saved.patientScope)}</strong> — {ratesText(saved.parts, saved)}</>
 
   return (
     <section className="card pf-card pay-card" id="pf-pay" aria-labelledby="pf-pay-h">
@@ -95,7 +104,7 @@ export default function DoctorPayCard({ doctorId, canEdit, showToast }) {
             : 'ما يُحسب منه راتب الدكتور. لا يراه الدكتور، ولا يُسحب من أيّ صندوق.'}</p>
         </div>
         {data?.pay_kind
-          ? <span className="badge good">{legacy ? 'راتب ثابت (قديم)' : partsTitle(saved.parts)}</span>
+          ? <span className="badge good">{legacy ? 'راتب ثابت (قديم)' : partsTitle(saved.parts, saved.patientScope)}</span>
           : data && <span className="badge warn">لم يُضبط بعد</span>}
       </header>
       {err && <p className="error">{err}</p>}
@@ -129,6 +138,17 @@ export default function DoctorPayCard({ doctorId, canEdit, showToast }) {
                       <span className="pay-part-cur">ل.س</span>
                     </div>
                   )}
+                  {isOn && p.key === 'patients' && (
+                    <div className="pay-scope">
+                      <span id={`pay-scope-${doctorId}`}>يُحسب على:</span>
+                      <div className="seg" role="radiogroup" aria-labelledby={`pay-scope-${doctorId}`}>
+                        {PATIENT_SCOPES.map(([s, label]) => (
+                          <label key={s} className={scope === s ? 'on' : undefined}><input type="radio" name={`scope-${doctorId}`}
+                            checked={scope === s} disabled={busy} onChange={() => setScope(s)} />{label}</label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )
             })}
@@ -142,17 +162,20 @@ export default function DoctorPayCard({ doctorId, canEdit, showToast }) {
                   <div className="pay-formula-main">
                     <span className="pay-formula-lbl">الراتب =</span>
                     {chosen.map((p, i) => (
-                      <span key={p.key} className="pay-term">{i > 0 && <i>+</i>}{p.label} × {fmtMoney(value(p.key))}</span>
+                      <span key={p.key} className="pay-term">{i > 0 && <i>+</i>}{p.key === 'patients' ? patientsLabel(scope) : p.label} × {fmtMoney(value(p.key))}</span>
                     ))}
                   </div>
                   <div className="pay-example">
-                    مثلاً {chosen.map((p) => EXAMPLE_QTY[p.key]).join(' و')} ⇐ <strong>{fmtMoney(example)}</strong>
+                    مثلاً {chosen.map((p) => (p.key === 'patients' && scope === 'consultation' ? '٢٠ معاينة' : EXAMPLE_QTY[p.key])).join(' و')} ⇐ <strong>{fmtMoney(example)}</strong>
                   </div>
                 </>
               )}
           </div>
           {on.hours && <p className="pf-note">الساعات من «وصل الطبيب» إلى «انصرف» — يومٌ بلا انصراف مسجَّل لا ساعات له حتى يُصحَّح.</p>}
-          {on.patients && <p className="pf-note">المرضى: الكشوف المنتهية في الفترة — الإجراءات وحدها لا تُعدّ.</p>}
+          {on.patients && <p className="pf-note">{SCOPE_NOTE[scope]}</p>}
+          {scopeChanged && (
+            <p className="share-warn">الراتب يُحسب من جديد كلّ مرّة — تغيير «يُحسب على» يغيّر حساب الأشهر الماضية أيضاً، لا القادمة وحدها.</p>
+          )}
 
           <div className="pay-foot">
             <div className="pay-cycle">

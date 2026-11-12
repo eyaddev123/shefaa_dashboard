@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { api, todayLocal } from '../api.js'
 import { matchesAr } from '../arabic-search.js'
 import { fmtClock, clockTitle } from '../components/Punctuality.jsx'
-import { partsFormula, partsOf } from '../pay-parts.js'
+import { partsFormula, partsOf, salaryPatientsOf } from '../pay-parts.js'
 
 // ═══ حسابات الدكاترة — لشهر أو يوم أو فترة ═══
 // صفحة «تقارير الدكاترة» وتبويب «حسابات الدكاترة» في صندوق العيادات يعرضان هذا نفسه.
@@ -304,7 +304,7 @@ function DoctorCard({ d, share, link }) {
             <span className="dr-pay-val">
               <strong>{fmtNum(d.salary)}</strong>
               {partsOf(d)
-                ? <small>{partsFormula(partsOf(d), d, { patients: d.patients, days: a.days, minutes: a.minutes })}</small>
+                ? <small>{partsFormula(partsOf(d), d, { patients: salaryPatientsOf(d), days: a.days, minutes: a.minutes })}</small>
                 : pay && <small>{pay}</small>}
             </span>
           )}

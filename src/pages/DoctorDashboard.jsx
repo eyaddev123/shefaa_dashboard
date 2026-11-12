@@ -3,7 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { api, todayLocal } from '../api.js'
 import { PunctualityTiles, DutyCalendar, AttendanceLog, fmtMinutes, AppointmentsBadge, fmtClock, clockTitle } from '../components/Punctuality.jsx'
 import DoctorTimesCard from '../components/DoctorTimesCard.jsx'
-import { partLines, partsOf } from '../pay-parts.js'
+import { partLines, partsOf, salaryPatientsOf } from '../pay-parts.js'
 import { useRole } from '../RoleContext.jsx'
 
 // ═══ لوحة تحكم الدكتور ═══
@@ -24,7 +24,7 @@ const rangeText = (d) => (d.from === d.to ? d.from : `${d.from} ← ${d.to}`)
 function FinanceCard({ f }) {
   const a = f.attendance
   const salaryNote = f.noPay ? 'بلا نوع حساب — الراتب صفر'
-    : partsOf(f) ? partLines(partsOf(f), f, { patients: f.patients, days: a.days, minutes: a.minutes }).map((l, i) => (
+    : partsOf(f) ? partLines(partsOf(f), f, { patients: salaryPatientsOf(f), days: a.days, minutes: a.minutes }).map((l, i) => (
         <span key={l.key}>{i > 0 && <br />}<span title={l.key === 'hours' ? clockTitle(a.minutes) : undefined}>{l.qty}</span>
           {' '}× {fmtNum(l.rate)} = {fmtNum(l.value)}</span>))
     : f.salary === null ? `راتب شهري ثابت ${fmtNum(f.payAmount)} — يُحسب للشهر الكامل` : 'راتب شهري ثابت'

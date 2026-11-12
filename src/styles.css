@@ -4678,6 +4678,12 @@ a.dr-chip:hover { color: var(--accent-text); border-color: var(--primary); }
 .pay-part-rate input { flex: 1; min-width: 0; font-size: 16px; font-weight: 700; direction: ltr; text-align: right; }
 .pay-part-rate input[aria-invalid] { border-color: var(--status-bad); }
 .pay-part-cur { font-size: 12.5px; color: var(--text-secondary); font-weight: 700; }
+/* «يُحسب على: كل المرضى | المعاينات فقط» تحت سعر المريض */
+.pay-scope { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 0 16px 14px; font-size: 12.5px;
+  color: var(--text-secondary); font-weight: 700; }
+.pay-scope .seg { flex: 1 1 auto; }
+.pay-scope .seg > label { flex: 1 1 0; justify-content: center; padding: 7px 10px; white-space: nowrap; position: relative; }
+@media (max-width: 760px) { .pay-scope .seg > label { min-height: 44px; } }
 .pay-formula { margin-top: 14px; padding: 14px 16px; border-radius: 14px; background: var(--page); border: 1px solid var(--grid);
   font-size: 13.5px; line-height: 1.9; }
 .pay-formula.muted-box { color: var(--text-secondary); }
