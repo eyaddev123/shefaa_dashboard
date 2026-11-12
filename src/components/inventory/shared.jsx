@@ -155,3 +155,6 @@ export function MoreMenu({ items, label = 'المزيد' }) {
     </div>
   )
 }
+
+/** سعر الشراء للعرض: المتوسّط المرجّح قد يكون بكسور (١٩٧٫١٤) — يُقرَّب بكلمة «حوالي» كي لا يبدو خطأً */
+export const costText = (v) => (Number.isInteger(v) ? fmtMoney(v) : `حوالي ${fmtMoney(Math.round(v))}`)

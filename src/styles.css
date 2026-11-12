@@ -4928,6 +4928,11 @@ button.invx-open:focus-visible { outline: 3px solid var(--primary); outline-offs
 .invx-stock.tone-muted, .invx-pill.tone-muted { color: var(--status-neutral); }
 .invx-price { grid-area: price; font-size: 14.5px; color: var(--text-secondary); white-space: nowrap; }
 .invx-price strong { font-size: 16px; color: var(--text-primary); }
+.invx-price { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.invx-price-line { display: block; }
+.invx-cost { font-size: 13.5px; }
+.invx-cost strong { font-size: 14.5px; }
+.invx-cost-none { color: var(--status-review); font-weight: 600; }
 .invx-flags { grid-area: flags; display: flex; flex-wrap: wrap; gap: 6px; }
 .invx-flag { font-size: 12.5px; font-weight: 600; padding: 2px 10px; border-radius: 999px; }
 .invx-flag.info { color: var(--status-review); background: var(--status-review-bg); }

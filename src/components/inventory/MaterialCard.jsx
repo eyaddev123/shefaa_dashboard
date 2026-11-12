@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, fmtMoney, fmtDateTime } from '../../api.js'
-import { fmtDay, fmtQty, stockWords } from './shared.jsx'
+import { costText, fmtDay, fmtQty, stockWords } from './shared.jsx'
 
 // ═══ صفحة المادة — «نفض» 2026-11-12 (قرار المستخدم: مربّعات + قصّة واحدة) ═══
 // فوق: مربّعاتٌ كبيرة بكلّ رقمٍ يهمّ، وجنب كلّ رقمٍ يُعدَّل زرّه ظاهراً («تغيير السعر» لا رابطٌ صغير).
@@ -196,7 +196,7 @@ export default function MaterialCard({ id, refreshKey, canWrite, onBack, onPurch
         {/* المتوسّط المرجّح قد يكون بكسور (١٩٧٫١٤): يُعرض مقرّباً بكلمة «حوالي» كي لا يبدو خطأً */}
         <Tile label="سعر الشراء (للواحدة)"
           value={m.purchase_price === null ? <span className="invx-tile-none">ما انكتب</span>
-            : Number.isInteger(m.purchase_price) ? fmtMoney(m.purchase_price) : <><small>حوالي</small> {fmtMoney(Math.round(m.purchase_price))}</>}
+            : costText(m.purchase_price)}
           sub={[m.purchase_price !== null && !Number.isInteger(m.purchase_price) && 'متوسّط الشراءات',
             m.last_cost === null ? 'ما في شراء مسجّل لسّا' : `آخر شراء بـ ${fmtMoney(m.last_cost)}${m.last_cost_date ? ` — ${fmtDay(m.last_cost_date)}` : ''}`].filter(Boolean).join(' — ')}
           warn={m.purchase_price === null && !cons && m.is_active ? 'بيلزم لنعرف الربح ولتنحسب بجلسات الحديد صح' : null}

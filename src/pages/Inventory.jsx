@@ -5,7 +5,7 @@ import { matchesAr } from '../arabic-search.js'
 import { useToast } from '../action-feedback.jsx'
 import { useRole } from '../RoleContext.jsx'
 import { canWriteInventory, inventoryView } from '../permissions.js'
-import { EmptyState, MoreMenu, fmtQty, materialsCount, stockWords } from '../components/inventory/shared.jsx'
+import { EmptyState, MoreMenu, costText, fmtQty, materialsCount, stockWords } from '../components/inventory/shared.jsx'
 import {
   AlertDialog, CostDialog, CountDialog, ImportDialog, LossDialog, MaterialDialog, PriceDialog, PurchaseDialog,
 } from '../components/inventory/InventoryDialogs.jsx'
@@ -50,12 +50,17 @@ function MaterialRow({ m, canWrite, onOpen, onPurchase }) {
       <button type="button" className="invx-open" onClick={() => onOpen(m.id)} aria-label={`${m.name} — ${w.text}`}>
         <span className="invx-name">{m.name}<span className="invx-unit">{m.unit}</span></span>
         <span className={`invx-stock tone-${w.tone}`}><span className="invx-dot" aria-hidden="true" />{w.text}</span>
+        {/* السعران معاً (طلب المستخدم 2026-11-12): بكم بتنباع، وبكم اشتريناها — بقيمة مربّع صفحة المادة نفسها */}
         <span className="invx-price">
-          {cons ? <span className="invx-muted">بلا سعر بيع</span> : <>يُباع بـ <strong>{fmtMoney(m.unit_price)}</strong></>}
+          <span className="invx-price-line">{cons ? <span className="invx-muted">بلا سعر بيع</span> : <>يُباع بـ <strong>{fmtMoney(m.unit_price)}</strong></>}</span>
+          <span className="invx-price-line invx-cost">
+            {m.purchase_price === null
+              ? <span className={m.no_purchase_price ? 'invx-cost-none' : 'invx-muted'}>بلا سعر شراء</span>
+              : <>اشتريناها بـ <strong>{costText(m.purchase_price)}</strong></>}
+          </span>
         </span>
-        {(m.no_purchase_price || (m.selling_at_loss && m.is_active)) && (
+        {m.selling_at_loss && m.is_active && (
           <span className="invx-flags">
-            {m.no_purchase_price && <span className="invx-flag info">بلا سعر شراء</span>}
             {m.selling_at_loss && m.is_active && <span className="invx-flag bad">عم تنباع بأقلّ من سعر شرائها</span>}
           </span>
         )}
