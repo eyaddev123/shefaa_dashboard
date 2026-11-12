@@ -200,7 +200,6 @@ function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel, urgent = f
   }
   const onMobile = (v) => {
     setForm((f) => ({ ...f, mobile: v })); setMobileAsk(false)
-    patientSearch.byMobile(v)
   }
 
   // «مريض جديد»: الاسم المطابق ممنوع (تختار الموجود أو تعدّل الاسم)، والمشابه يُسأل عنه —

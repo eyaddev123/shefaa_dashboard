@@ -116,7 +116,7 @@ export default function IronSessionDialog({ onClose, onSaved }) {
   }
   const undoPick = () => { patientSearch.reset(); setName(''); setMobile(''); setMobileAsk(false) }
   const onName = (v) => { setName(v); setNewConfirmed(false); setSameName(null); patientSearch.byName(v) }
-  const onMobile = (v) => { setMobile(v); setMobileAsk(false); patientSearch.byMobile(v) }
+  const onMobile = (v) => { setMobile(v); setMobileAsk(false) }
   const chooseNew = () => {
     if (patientSearch.exactNames.length) setSameName({ matches: patientSearch.exactNames, blocked: true, fromSubmit: false })
     else if (patientSearch.nearNames.length) setSameName({ matches: patientSearch.nearNames, fromSubmit: false })
