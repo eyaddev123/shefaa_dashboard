@@ -3318,6 +3318,11 @@ button.spec-chip-btn[aria-pressed='true'] { background: var(--primary); border-c
 .share-rule-actions { white-space: nowrap; }
 .share-rule-actions > button { padding: 3px 10px; font-size: 11.5px; }
 .share-rule-actions > button + button { margin-inline-start: 4px; }
+/* الإيقاف: القاعدة محفوظة ولا تُطبَّق — السطر باهت، والشارة والأزرار بلونها */
+.share-rules-head-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.share-paused-note { margin: 0 0 10px; padding: 8px 12px; border-radius: 10px; font-size: 13px;
+  color: var(--text-secondary); background: var(--status-neutral-bg); }
+tr.rule-paused > td:not(.rt-actions) { color: var(--muted); }
 
 .pricing-log .pricing-names { display: block; margin-top: 2px; font-size: 12px; color: var(--text-secondary); }
 .pricing-log li > span:first-of-type { flex: 1 1 280px; min-width: 0; }
@@ -3336,7 +3341,9 @@ button.spec-chip-btn[aria-pressed='true'] { background: var(--primary); border-c
   .dialog-actions > .error { padding: 8px 10px; border-radius: 10px; background: var(--status-bad-bg); }
   .share-general > .field { flex: 1 1 auto; }
   .share-general > .field > input { width: 100%; box-sizing: border-box; min-height: 44px; }
-  .share-general > button, .share-rules-head > button { min-height: 44px; }
+  .share-general > button, .share-rules-head > button, .share-rules-head-actions > button { min-height: 44px; }
+  .share-rules-head-actions { width: 100%; }
+  .share-rules-head-actions > button { flex: 1 1 auto; white-space: nowrap; }
   .proc-edit-actions > button { flex: 1 1 0; min-height: 44px; }
 }
 
