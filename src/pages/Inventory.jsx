@@ -49,7 +49,12 @@ function MaterialRow({ m, canWrite, onOpen, onPurchase }) {
     <li className={`invx-row tone-${w.tone}`}>
       <button type="button" className="invx-open" onClick={() => onOpen(m.id)} aria-label={`${m.name} — ${w.text}`}>
         <span className="invx-name">{m.name}<span className="invx-unit">{m.unit}</span></span>
-        <span className={`invx-stock tone-${w.tone}`}><span className="invx-dot" aria-hidden="true" />{w.text}</span>
+        {/* بلا «برقعة ألوان» (ملاحظة المستخدم 2026-11-12): الكمّية نصٌّ عادي، وشارةٌ صغيرة هادئة للمشكلة وحدها */}
+        <span className={`invx-stock tone-${w.tone}`}>
+          {w.tone === 'warn' || w.tone === 'bad'
+            ? <>{w.tone === 'bad' ? 'ما بقي شي' : <>باقي <bdi dir="ltr">{fmtQty(m.balance)}</bdi> {m.unit}</>} <span className={`invx-tag is-${w.tone}`}>{w.label}</span></>
+            : w.text}
+        </span>
         {/* السعران معاً (طلب المستخدم 2026-11-12): بكم بتنباع، وبكم اشتريناها — بقيمة مربّع صفحة المادة نفسها */}
         <span className="invx-price">
           <span className="invx-price-line">{cons ? <span className="invx-muted">بلا سعر بيع</span> : <>يُباع بـ <strong>{fmtMoney(m.unit_price)}</strong></>}</span>
@@ -308,7 +313,7 @@ function InventoryFull({ canWrite }) {
   ]
 
   return (
-    <>
+    <div className="invx-page">
       {toast}
       {openId ? (
         <MaterialCard id={openId} refreshKey={refreshKey} onBack={backToList} canWrite={canWrite}
@@ -402,6 +407,6 @@ function InventoryFull({ canWrite }) {
               + (r.rejected ? ` — وتُجوهل ${r.rejected.toLocaleString('ar-SY')} سطراً مرفوضاً` : ''), 'success', 6000)
           }} />
       )}
-    </>
+    </div>
   )
 }

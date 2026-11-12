@@ -5071,3 +5071,31 @@ button.invx-open {
   gap: 3px 14px; padding: 9px 12px;
 }
 .invx-price { align-items: flex-end; text-align: end; }
+
+
+/* ═══ الشبكة بلا «برقعة ألوان» (ملاحظة المستخدم 2026-11-12: «رجعوا متل ما كان جريد فيو وبس بلا ألوان») ═══
+   الكارت محايد: لا شريط ملوّن على الجانب، والكمّية والحالة بنصٍّ عادي؛ شارةٌ صغيرة هادئة للمشكلة وحدها. */
+.invx-page { max-width: 1100px; }
+.invx-row, .invx-row.tone-good, .invx-row.tone-warn, .invx-row.tone-bad { border-inline-start: 1px solid var(--border); }
+.invx-row.tone-muted { opacity: .7; }
+.invx-stock, .invx-stock.tone-good, .invx-stock.tone-warn, .invx-stock.tone-bad { color: var(--text-secondary); font-weight: 600; }
+.invx-stock.tone-muted { color: var(--muted); font-weight: 500; }
+.invx-stock .invx-dot { display: none; }
+.invx-tag { font-size: 11.5px; font-weight: 700; padding: 1px 8px; border-radius: 999px; white-space: nowrap; margin-inline-start: 4px; }
+.invx-tag.is-warn { color: var(--status-pending); background: var(--status-pending-bg); }
+.invx-tag.is-bad { color: var(--status-bad); background: var(--status-bad-bg); }
+.invx-cost-none { color: var(--muted); font-weight: 500; }
+.invx-flag.bad { background: transparent; padding: 0; font-weight: 500; }
+/* العدّادات بلا أرقامٍ ملوّنة: رقمٌ داكن ونقطة لونٍ صغيرة جنب التسمية */
+button.invx-counter .invx-counter-n,
+button.invx-counter.tone-warn .invx-counter-n, button.invx-counter.tone-bad .invx-counter-n, button.invx-counter.tone-info .invx-counter-n { color: var(--text-primary); }
+button.invx-counter.is-zero .invx-counter-n { color: var(--muted); }
+button.invx-counter { border-width: 1px; box-shadow: none; }
+button.invx-counter .invx-counter-label { display: inline-flex; align-items: center; gap: 6px; }
+button.invx-counter.tone-warn .invx-counter-label::before, button.invx-counter.tone-bad .invx-counter-label::before,
+button.invx-counter.tone-info .invx-counter-label::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--status-pending); }
+button.invx-counter.tone-bad .invx-counter-label::before { background: var(--status-bad); }
+button.invx-counter.tone-info .invx-counter-label::before { background: var(--status-review); }
+button.invx-counter.is-on, button.invx-counter.tone-warn.is-on, button.invx-counter.tone-bad.is-on, button.invx-counter.tone-info.is-on {
+  border-color: var(--primary); background: var(--primary-soft); }
+
