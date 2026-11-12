@@ -4572,3 +4572,138 @@ a.dr-chip:hover { color: var(--accent-text); border-color: var(--primary); }
 .candidates-box.name-taken { border-color: var(--status-bad); background: var(--status-bad-bg); }
 .similar-year { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-secondary); }
 .similar-year input { width: 84px; }
+
+/* ═══ بروفايل الدكتور (2026-11-12): رأسٌ بالأرقام المهمّة، قائمة أقسام، مجموعات حقول، بطاقات دوام ═══ */
+.pf-page { max-width: 1080px; }
+.pf-crumbs { margin-bottom: 10px; }
+.pf-hero { position: relative; overflow: hidden; border-radius: 20px; padding: 24px 26px 20px; margin-bottom: 14px;
+  background: linear-gradient(135deg, var(--teal-800) 0%, var(--teal-700) 55%, var(--teal-600) 100%); color: #fff;
+  box-shadow: var(--shadow-pop); }
+.pf-hero::after { content: ''; position: absolute; inset-inline-end: -60px; top: -80px; width: 260px; height: 260px;
+  border-radius: 50%; background: radial-gradient(circle, rgba(255, 255, 255, 0.14), transparent 70%); pointer-events: none; }
+.pf-hero-top { display: flex; align-items: center; gap: 18px; position: relative; z-index: 1; }
+.pf-avatar { flex: none; width: 72px; height: 72px; border-radius: 22px; display: grid; place-items: center;
+  font-size: 32px; font-weight: 800; background: rgba(255, 255, 255, 0.16); border: 1px solid rgba(255, 255, 255, 0.28);
+  color: #fff; }
+.pf-id { flex: 1; min-width: 0; }
+.pf-id h2 { color: #fff; font-size: 24px; font-weight: 800; margin: 0; line-height: 1.3; }
+.pf-spec { color: rgba(255, 255, 255, 0.82); font-size: 14px; margin-top: 2px; }
+.pf-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.pf-hero .badge { background: rgba(255, 255, 255, 0.16); color: #fff; border: 1px solid rgba(255, 255, 255, 0.22); }
+.pf-hero .badge.good { background: rgba(127, 214, 184, 0.28); border-color: rgba(127, 214, 184, 0.5); }
+.pf-hero-link { flex: none; align-self: flex-start; color: #fff; text-decoration: none; font-weight: 700; font-size: 13px;
+  padding: 8px 14px; border-radius: 10px; background: rgba(255, 255, 255, 0.14); border: 1px solid rgba(255, 255, 255, 0.25); }
+.pf-hero-link:hover { background: rgba(255, 255, 255, 0.24); }
+.pf-stats { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 20px 0 0; }
+.pf-stats > div { background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 14px; padding: 12px 14px; min-width: 0; }
+.pf-stats dt { font-size: 12px; color: rgba(255, 255, 255, 0.75); font-weight: 600; }
+.pf-stats dd { margin: 4px 0 0; font-size: 19px; font-weight: 800; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pf-stats small { display: block; font-size: 11.5px; color: rgba(255, 255, 255, 0.7); margin-top: 2px; }
+
+.pf-nav { position: sticky; top: 0; z-index: 5; display: flex; gap: 6px; overflow-x: auto; padding: 8px 0 10px; margin-bottom: 6px;
+  background: var(--page); scrollbar-width: none; }
+.pf-nav::-webkit-scrollbar { display: none; }
+.pf-nav a { flex: none; text-decoration: none; color: var(--text-secondary); font-weight: 700; font-size: 13px;
+  padding: 7px 14px; border-radius: 999px; background: var(--surface-1); border: 1px solid var(--border); }
+.pf-nav a:hover { color: var(--accent-text); border-color: color-mix(in srgb, var(--primary) 40%, transparent); }
+.pf-card, .pf-anchor { scroll-margin-top: 60px; }
+.pf-card { border-radius: 18px; padding: 22px 24px; }
+.pf-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+  padding-bottom: 14px; margin-bottom: 16px; border-bottom: 1px solid var(--grid); }
+.pf-card-head h3 { font-size: 16.5px; font-weight: 800; margin: 0; }
+.pf-card-sub { margin: 4px 0 0; font-size: 12.5px; color: var(--text-secondary); line-height: 1.7; }
+.pf-head-link { flex: none; font-size: 13px; font-weight: 700; color: var(--accent-text); text-decoration: none; }
+.pf-note { margin: 10px 0 0; font-size: 12.5px; color: var(--text-secondary); line-height: 1.7; }
+
+.pf-group { padding: 16px 0 18px; border-top: 1px dashed var(--grid); }
+.pf-group:first-child { padding-top: 0; border-top: 0; }
+.pf-group-head { margin-bottom: 12px; }
+.pf-group-head h4 { font-size: 13.5px; font-weight: 800; color: var(--accent-text); margin: 0; }
+.pf-group-head p { margin: 3px 0 0; font-size: 12.5px; color: var(--text-secondary); line-height: 1.7; }
+.pf-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px 16px; }
+.pf-grid .field input, .pf-grid .field select { width: 100%; }
+.pf-grid .hint, .pf-toggle small { font-size: 11.5px; color: var(--muted); line-height: 1.6; }
+.pf-toggles { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.pf-toggle { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border-radius: 12px; cursor: pointer;
+  border: 1px solid var(--grid); background: var(--surface-1); }
+.pf-toggle:has(input:checked) { border-color: color-mix(in srgb, var(--primary) 45%, transparent); background: var(--primary-soft); }
+.pf-toggle input { margin-top: 4px; width: 17px; height: 17px; accent-color: var(--primary); flex: none; }
+.pf-toggle > span { display: flex; flex-direction: column; gap: 2px; }
+.pf-toggle strong { font-size: 13.5px; }
+.pf-notes input { width: 100%; }
+.pf-savebar { position: sticky; bottom: 0; z-index: 4; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin: 6px -24px -22px; padding: 12px 24px; border-top: 1px solid var(--grid); border-radius: 0 0 18px 18px;
+  background: color-mix(in srgb, var(--surface-1) 92%, transparent); backdrop-filter: blur(6px); }
+.pf-savebar .error { margin: 0; }
+.pf-savebar .muted { font-size: 12.5px; }
+
+.pf-shifts { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+.pf-shift { border: 1px solid var(--grid); border-radius: 14px; padding: 14px 16px; background: var(--surface-1);
+  border-inline-start: 4px solid var(--primary); display: flex; flex-direction: column; gap: 6px; }
+.pf-shift header { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.pf-shift .sched-day { font-weight: 800; font-size: 14.5px; }
+.pf-shift-time { font-size: 18px; font-weight: 800; color: var(--accent-text); text-align: start; }
+[dir='rtl'] .pf-shift-time { text-align: right; }
+.pf-shift-meta { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--text-secondary); }
+.pf-slots { color: var(--muted); }
+.pf-shift.sched-off { border-inline-start-color: var(--grid); background: var(--page); }
+.pf-shift.sched-off .pf-shift-time, .pf-shift.sched-off .pf-shift-meta { opacity: 0.55; }
+.pf-history { margin-top: 14px; }
+.pf-history summary { cursor: pointer; font-size: 13px; font-weight: 700; color: var(--text-secondary); }
+.pf-history .change-log { margin-top: 10px; }
+
+/* ═══ الراتب بمكوّنات: مرضى · أيام · ساعات ═══ */
+.pay-parts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.pay-part { border: 1.5px solid var(--grid); border-radius: 14px; background: var(--surface-1); transition: border-color .15s, background .15s; }
+.pay-part.on { border-color: var(--primary); background: var(--primary-soft); }
+.pay-part-toggle { display: flex; align-items: center; gap: 12px; padding: 14px 16px; cursor: pointer; }
+.pay-part-toggle input { position: absolute; opacity: 0; pointer-events: none; }
+.pay-part-check { flex: none; width: 22px; height: 22px; border-radius: 7px; border: 2px solid var(--grid); background: var(--surface-1);
+  display: grid; place-items: center; }
+.pay-part.on .pay-part-check { background: var(--primary); border-color: var(--primary); }
+.pay-part.on .pay-part-check::after { content: ''; width: 6px; height: 11px; border: solid #fff; border-width: 0 2.5px 2.5px 0;
+  transform: rotate(45deg) translate(-1px, -1px); }
+.pay-part-toggle:focus-within .pay-part-check { outline: 2px solid var(--primary); outline-offset: 2px; }
+.pay-part-text { display: flex; flex-direction: column; min-width: 0; }
+.pay-part-name { font-weight: 800; font-size: 15px; }
+.pay-part-unit { font-size: 12px; color: var(--text-secondary); }
+.pay-part-rate { display: flex; align-items: center; gap: 8px; padding: 0 16px 14px; }
+.pay-part-rate input { flex: 1; min-width: 0; font-size: 16px; font-weight: 700; direction: ltr; text-align: right; }
+.pay-part-rate input[aria-invalid] { border-color: var(--status-bad); }
+.pay-part-cur { font-size: 12.5px; color: var(--text-secondary); font-weight: 700; }
+.pay-formula { margin-top: 14px; padding: 14px 16px; border-radius: 14px; background: var(--page); border: 1px solid var(--grid);
+  font-size: 13.5px; line-height: 1.9; }
+.pay-formula.muted-box { color: var(--text-secondary); }
+.pay-formula-main { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-weight: 700; }
+.pay-formula-lbl { color: var(--text-secondary); }
+.pay-term i { font-style: normal; color: var(--muted); margin-inline-end: 8px; }
+.pay-example { font-size: 12.5px; color: var(--text-secondary); margin-top: 2px; }
+.pay-example strong { color: var(--accent-text); font-size: 14px; }
+.pay-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px;
+  padding-top: 14px; border-top: 1px solid var(--grid); }
+.pay-foot .pay-cycle { margin: 0; }
+.pay-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pay-readonly { font-size: 14px; line-height: 1.9; }
+
+@media (max-width: 760px) {
+  .pf-hero { padding: 18px 16px 16px; border-radius: 16px; }
+  .pf-hero-top { flex-wrap: wrap; gap: 14px; }
+  .pf-avatar { width: 56px; height: 56px; font-size: 25px; border-radius: 17px; }
+  .pf-id h2 { font-size: 20px; }
+  .pf-hero-link { order: 3; width: 100%; text-align: center; }
+  .pf-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pf-card { padding: 16px; }
+  .pf-savebar { margin: 6px -16px -16px; padding: 12px 16px; }
+  .pay-parts { grid-template-columns: 1fr; }
+  .pay-foot { flex-direction: column; align-items: stretch; }
+  .pay-actions { justify-content: flex-end; }
+}
+.pay-part { position: relative; }
+/* .card يمرّر أفقياً للجداول — فيصير هو حاوي التمرير ويُبطل «حفظ» اللاصق. البطاقات هنا بلا جداول عريضة */
+.pf-card { overflow: visible; }
+/* راديو «تحاسبيه» المخفيّ مطلقٌ — بلا مرجعٍ يهرب لطرف الصفحة (كان يخفيه تمرير .card) */
+.pf-page .seg > label { position: relative; }
+/* الاختصاص بزرّ «إضافة» يحتاج عرض خانتين في الشبكة، وعلى الموبايل سطراً كاملاً */
+.pf-grid > .field:has(.spec-row) { grid-column: span 2; min-width: 0; }
+.pf-grid .spec-row > select, .pf-grid .spec-row > input { min-width: 0; }
+@media (max-width: 760px) { .pf-grid > .field:has(.spec-row) { grid-column: auto; } .pf-grid .spec-row { flex-wrap: wrap; } }

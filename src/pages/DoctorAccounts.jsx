@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { api, todayLocal } from '../api.js'
 import { matchesAr } from '../arabic-search.js'
 import { fmtClock, clockTitle } from '../components/Punctuality.jsx'
+import { partsFormula, partsOf } from '../pay-parts.js'
 
 // ═══ حسابات الدكاترة — لشهر أو يوم أو فترة ═══
 // صفحة «تقارير الدكاترة» وتبويب «حسابات الدكاترة» في صندوق العيادات يعرضان هذا نفسه.
@@ -302,8 +303,8 @@ function DoctorCard({ d, share, link }) {
           : (
             <span className="dr-pay-val">
               <strong>{fmtNum(d.salary)}</strong>
-              {d.payKind === 'daily_hourly'
-                ? <small>{daysText(a.days)} × {fmtNum(d.dailyRate)} + {hoursText(a.minutes)} × {fmtNum(d.hourlyRate)}</small>
+              {partsOf(d)
+                ? <small>{partsFormula(partsOf(d), d, { patients: d.patients, days: a.days, minutes: a.minutes })}</small>
                 : pay && <small>{pay}</small>}
             </span>
           )}
@@ -364,8 +365,8 @@ export function DoctorsTab({ canWrite, linkDashboard = false }) {
 
             {data.noDeparture > 0 && (
               <p className="dr-note is-warn" role="alert">
-                {data.noDeparture === 1 ? 'دكتورٌ واحد' : `${fmtNum(data.noDeparture)} دكاترة`} على «يومية + ساعة» عندهم أيامٌ بلا
-                انصراف: يوميتها محسوبة وساعاتها لا، فراتبهم أقلّ من المستحقّ حتى يُصحَّح الانصراف
+                {data.noDeparture === 1 ? 'دكتورٌ واحد' : `${fmtNum(data.noDeparture)} دكاترة`} يُحسب لهم بالساعة عندهم أيامٌ بلا
+                انصراف: ساعاتها لا تُحسب، فراتبهم أقلّ من المستحقّ حتى يُصحَّح الانصراف
                 {canWrite ? ' (لوحة الدكتور ← الحضور والانصراف).' : '.'}
               </p>
             )}
@@ -447,7 +448,7 @@ export function DoctorsTab({ canWrite, linkDashboard = false }) {
                 <dt>صافي الربح</dt>
                 <dd>دخل الشفاء من الدكتور ناقص راتبه. للعرض فقط: الراتب لا يُسحب من الإيرادات ولا يمسّ الجرد ولا الصندوق.</dd>
                 <dt>الراتب</dt>
-                <dd>بإعداد الدكتور الحالي. يومية + ساعة = الأيام × اليومية + الساعات × سعر الساعة.</dd>
+                <dd>بإعداد الدكتور الحالي: مجموع ما اختير له من المرضى × سعر المريض، والأيام × اليومية، والساعات × سعر الساعة.</dd>
               </dl>
             </details>
           </>

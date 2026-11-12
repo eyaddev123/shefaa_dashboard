@@ -93,7 +93,7 @@ export default function DoctorTimesCard({ doctorId, period, from, to, canFix, on
           </p>
           {sum.noDeparture > 0 && (
             <p className="share-warn acc-warn">
-              أيام «انصراف غير مسجَّل»: يوميتها محسوبة وساعاتها لا.{canFix ? ' صحّحها من «تصحيح» بجانب اليوم.' : ' تصحّحها المشرفة.'}
+              أيام «انصراف غير مسجَّل»: ساعاتها لا تُحسب في الراتب.{canFix ? ' صحّحها من «تصحيح» بجانب اليوم.' : ' تصحّحها المشرفة.'}
             </p>
           )}
           {shown.sessions.length === 0 ? <p className="empty">لا جلسات في هذه الفترة.</p> : (

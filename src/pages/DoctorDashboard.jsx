@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { api, todayLocal } from '../api.js'
 import { PunctualityTiles, DutyCalendar, AttendanceLog, fmtMinutes, AppointmentsBadge, fmtClock, clockTitle } from '../components/Punctuality.jsx'
 import DoctorTimesCard from '../components/DoctorTimesCard.jsx'
+import { partLines, partsOf } from '../pay-parts.js'
 import { useRole } from '../RoleContext.jsx'
 
 // ═══ لوحة تحكم الدكتور ═══
@@ -23,18 +24,16 @@ const rangeText = (d) => (d.from === d.to ? d.from : `${d.from} ← ${d.to}`)
 function FinanceCard({ f }) {
   const a = f.attendance
   const salaryNote = f.noPay ? 'بلا نوع حساب — الراتب صفر'
-    : f.payKind === 'daily_hourly' ? <>
-        {fmtNum(a.days)} {a.days >= 3 && a.days <= 10 ? 'أيام' : 'يوم'} × {fmtNum(f.dailyRate)} = {fmtNum(f.salaryDays)}
-        <br /><span title={clockTitle(a.minutes)}>{fmtClock(a.minutes)} ساعة</span> × {fmtNum(f.hourlyRate)} = {fmtNum(f.salaryHours)}
-      </>
-    : f.payKind === 'per_patient' ? `${fmtNum(f.payAmount)} للمريض × ${fmtNum(f.patients)}`
+    : partsOf(f) ? partLines(partsOf(f), f, { patients: f.patients, days: a.days, minutes: a.minutes }).map((l, i) => (
+        <span key={l.key}>{i > 0 && <br />}<span title={l.key === 'hours' ? clockTitle(a.minutes) : undefined}>{l.qty}</span>
+          {' '}× {fmtNum(l.rate)} = {fmtNum(l.value)}</span>))
     : f.salary === null ? `راتب شهري ثابت ${fmtNum(f.payAmount)} — يُحسب للشهر الكامل` : 'راتب شهري ثابت'
   return (
     <div className="card earn-card">
       <h3>المال {f.settleCycle && <span className="pn-grace">تحاسبه: {f.settleCycle === 'daily' ? 'يومي' : 'شهري'}</span>}</h3>
-      {f.payKind === 'daily_hourly' && a.noDeparture > 0 && (
+      {f.hourlyRate > 0 && a.noDeparture > 0 && (
         <p className="share-warn acc-warn" role="alert">
-          ⚠ {fmtNum(a.noDeparture)} {a.noDeparture === 1 ? 'يوم' : 'أيام'} «انصراف غير مسجَّل» في الفترة: اليومية محسوبة والساعات لا —
+          ⚠ {fmtNum(a.noDeparture)} {a.noDeparture === 1 ? 'يوم' : 'أيام'} «انصراف غير مسجَّل» في الفترة: الساعات لا تُحسب لها —
           فالراتب أقلّ من المستحقّ حتى يُصحَّح (بطاقة «الحضور والانصراف» تحت).
         </p>
       )}
