@@ -5062,3 +5062,12 @@ button.invx-counter { min-height: 66px; padding: 9px 14px; border-radius: 14px; 
 .invx-counter-n { font-size: 24px; }
 .invx-counter-label { font-size: 13px; }
 input.invx-search { min-height: 44px; font-size: 15px; }
+
+/* الكارت أقصر عرضاً (ملاحظة المستخدم: «ضلّ كتير طويل»): عمودان على الشاشة العريضة بدل سطرٍ ممدود على
+   عرض الصفحة كلّه، وداخل الكارت: الاسم والحالة على جهة، والسعران وزرّ الشراء على الجهة الأخرى. */
+.invx-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(430px, 100%), 1fr)); gap: 8px; }
+button.invx-open {
+  grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name price" "stock price" "flags flags";
+  gap: 3px 14px; padding: 9px 12px;
+}
+.invx-price { align-items: flex-end; text-align: end; }
