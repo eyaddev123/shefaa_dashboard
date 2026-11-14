@@ -5282,3 +5282,27 @@ button.invx-counter.is-on, button.invx-counter.tone-warn.is-on, button.invx-coun
   background: transparent; border: 0; color: var(--text-primary); text-align: start; cursor: pointer; font: inherit; border-radius: 8px; }
 .fo-moves-group:hover, .fo-moves-group:focus-visible { background: var(--page); }
 .fo-moves-group { grid-template-areas: 'text amt'; }
+/* الحركات: فلترة فوق، وسطرٌ واحد لكلّ حركة — المبلغ ثمّ السبب ثمّ من سجّلها */
+.fo-filters { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.fo-filter { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 99px; font-size: 13px; font-weight: 600;
+  border: 1px solid var(--border); background: var(--surface-1); color: var(--text-primary); cursor: pointer; }
+.fo-filter span { font-weight: 800; font-variant-numeric: tabular-nums; color: var(--text-secondary); }
+.fo-filter span.neg { color: var(--status-bad); }
+.fo-filter.on { border-color: var(--primary); background: var(--primary-soft); color: var(--accent-text); }
+.fo-filter-sum { margin: 0 0 8px; font-size: 13px; color: var(--text-secondary); }
+.fo-lines { list-style: none; margin: 0; padding: 0; }
+.fo-line { display: flex; align-items: baseline; gap: 14px; padding: 8px 10px; border-bottom: 1px solid var(--grid); font-size: 14px; }
+.fo-line:last-child { border-bottom: 0; }
+.fo-line-amt { flex: none; min-width: 92px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.fo-line-what { flex: 1 1 auto; min-width: 0; color: var(--text-primary); }
+.fo-line-by { flex: none; font-size: 12px; color: var(--muted); }
+.fo-line.is-sub { padding-inline-start: 28px; font-size: 13px; background: var(--page); }
+.fo-line.is-sub .fo-line-amt { font-weight: 600; }
+.fo-line-toggle { background: transparent; border: 0; padding: 0; font: inherit; text-align: start; cursor: pointer; font-weight: 700; }
+.fo-line-toggle .fo-group-toggle { margin-inline-start: 8px; }
+@media (max-width: 600px) {
+  .fo-line { flex-wrap: wrap; gap: 2px 12px; }
+  .fo-line-amt { min-width: 0; }
+  .fo-line-what { flex-basis: 100%; order: 2; }
+  .fo-line-by { order: 1; margin-inline-start: auto; }
+}

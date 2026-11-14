@@ -106,13 +106,13 @@ function ExpenseDialog({ onClose, onSaved }) {
     catch (ex) { setErr(ex.message) } finally { setBusy(false) }
   }
   return (
-    <Modal title="مصروف جديد" subtitle="يُخصم من صندوق العيادات اليوم — تصليح، أغراض، …" onClose={onClose} busy={busy} sheet>
+    <Modal title="مصروف جديد" subtitle="مصاري سحبناها من الصندوق لشي ما إلو علاقة بالمواد: كرسي، فطور للدكاترة، تصليح…" onClose={onClose} busy={busy} sheet>
       <form onSubmit={submit} className="inv-form">
         <div className="field"><label htmlFor="fx-amt">المبلغ (ل.س)</label>
           <input id="fx-amt" autoFocus value={amount} inputMode="decimal" placeholder="0"
             onChange={(e) => setAmount(toLatinDigits(e.target.value))} /></div>
         <div className="field"><label htmlFor="fx-why">السبب</label>
-          <input id="fx-why" value={reason} maxLength={300} placeholder="مثال: تصليح جهاز التعقيم"
+          <input id="fx-why" value={reason} maxLength={300} placeholder="مثال: فطور للدكاترة"
             onChange={(e) => setReason(e.target.value)} /></div>
         {err && <p className="error">{err}</p>}
         <div className="bf-actions inv-actions">

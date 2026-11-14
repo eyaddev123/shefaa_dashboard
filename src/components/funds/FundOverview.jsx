@@ -172,51 +172,57 @@ export function ProfitCard({ profit, periodLabel, onAll, onOpen }) {
   )
 }
 
-// ═══ ٤) الحركات يوماً بيوم ═══
+// ═══ ٤) الحركات يوماً بيوم — فلترة فوق، وكلّ حركة سطرٌ واحد: «قديش · بسبب شو» (ملاحظة المستخدم) ═══
 const DAYS_SHOWN = 5
-function MoveText({ m }) {
-  if (m.line) return <><b>{m.line.procedure}</b><span className="fo-muted">{m.line.patient}{m.line.doctor && ` · ${m.line.doctor}`}</span></>
-  if (m.purchase) return <><b>شراء {m.purchase.material}</b><span className="fo-muted">{fmtNum(m.purchase.qty)} {m.purchase.unit} × {fmtNum(m.purchase.unitCost)}{m.purchase.supplier && ` · ${m.purchase.supplier}`}</span></>
-  if (m.iron) return <><b>{m.label}</b><span className="fo-muted">{m.iron.patient} · الممرضة {m.iron.nurse}{m.kind.endsWith('_rev') && m.iron.cancelReason ? ` · سبب الإلغاء: ${m.iron.cancelReason}` : ''}</span></>
-  if (m.kind === 'expense') return <><b>{m.reason || 'مصروف'}</b><span className="fo-muted">مصروف</span></>
-  return <><b>{m.label}</b>{m.reason && <span className="fo-muted">{m.reason}</span>}</>
+// أسماء الفلاتر بكلام المسؤولة: الداخل من وين، والمسحوب لأيش
+const FILTER_LABEL = { materials: 'داخل من المواد', iron: 'داخل من الحديد', purchase: 'مسحوب لشراء مواد',
+  expense: 'مصاريف', opening: 'الرصيد الافتتاحي' }
+
+/** سطر الحركة بكلمات: «تجبير — مريم · د. أحمد»، «شراء رايسك: ١٠ × ٢٤٠ من مستودع الأمل»، «مصروف: فطور للدكاترة» */
+function moveText(m) {
+  if (m.line) return `${m.kind === 'material_sale' ? '' : `${m.label}: `}${m.line.procedure} — ${m.line.patient}${m.line.doctor ? ` · ${m.line.doctor}` : ''}`
+  if (m.purchase) return `شراء ${m.purchase.material}: ${fmtNum(m.purchase.qty)} ${m.purchase.unit} × ${fmtNum(m.purchase.unitCost)}${m.purchase.supplier ? ` من ${m.purchase.supplier}` : ''}`
+  if (m.iron) return `${m.label} — ${m.iron.patient}${m.kind.endsWith('_rev') && m.iron.cancelReason ? ` · سبب الإلغاء: ${m.iron.cancelReason}` : ''}`
+  if (m.kind === 'expense') return `مصروف: ${m.reason || '—'}`
+  return m.reason ? `${m.label}: ${m.reason}` : m.label
 }
-// يومٌ فيه عشرات الإجراءات: «مواد الإجراءات» و«جلسات الحديد» سطرٌ واحد بمجموعه يُفتح بكبسة،
-// والشراء والمصاريف والافتتاحي ظاهرةٌ وحدها (قليلةٌ ومهمّة)
-const COLLAPSE = ['materials', 'iron']
-function DayGroup({ day, open, onToggle }) {
-  const rows = []
-  for (const key of COLLAPSE) {
-    const items = day.items.filter((m) => groupOf(m.kind) === key)
-    if (items.length > 1) rows.push({ key, items })
-    else if (items.length === 1) rows.push({ key: items[0].id, single: items[0] })
-  }
-  for (const m of day.items) if (!COLLAPSE.includes(groupOf(m.kind))) rows.push({ key: m.id, single: m })
-  const one = (m) => (
-    <li key={m.id}>
-      <span className="fo-move-text"><MoveText m={m} /></span>
-      <span className={`fo-move-amt${m.amount < 0 ? ' neg' : ''}`}>{signed(m.amount)}</span>
-      {m.by && <span className="fo-move-by fo-muted">{m.by}</span>}
+function Line({ amount, children, by, sub = false }) {
+  return (
+    <li className={`fo-line${sub ? ' is-sub' : ''}`}>
+      <span className={`fo-line-amt${amount < 0 ? ' neg' : ''}`}>{signed(amount)}</span>
+      <span className="fo-line-what">{children}</span>
+      {by && <span className="fo-line-by">{by}</span>}
     </li>
   )
+}
+
+// يومٌ فيه عشرات الإجراءات: «مواد الإجراءات» و«جلسات الحديد» سطرٌ واحد بمجموعه يُفتح بكبسة
+const COLLAPSE = ['materials', 'iron']
+function DayLines({ items, dayKey, open, onToggle, collapse }) {
+  const rows = []
+  for (const key of collapse ? COLLAPSE : []) {
+    const its = items.filter((m) => groupOf(m.kind) === key)
+    if (its.length > 1) rows.push({ key, items: its })
+    else if (its.length === 1) rows.push({ key: its[0].id, single: its[0] })
+  }
+  for (const m of items) if (!collapse || !COLLAPSE.includes(groupOf(m.kind))) rows.push({ key: m.id, single: m })
   return (
-    <ul className="fo-moves">
+    <ul className="fo-lines">
       {rows.map((r) => {
-        if (r.single) return one(r.single)
+        if (r.single) return <Line key={r.key} amount={r.single.amount} by={r.single.by}>{moveText(r.single)}</Line>
         const g = GROUPS.find((x) => x.key === r.key)
         const sum = Math.round(r.items.reduce((t, m) => t + m.amount, 0) * 100) / 100
         const n = r.items.filter((m) => m.kind === g.count).length || r.items.length
-        const isOpen = open.has(`${day.date}:${r.key}`)
-        return (
-          <li key={r.key} className="fo-group-li">
-            <button type="button" className="fo-moves-group" aria-expanded={isOpen} onClick={() => onToggle(`${day.date}:${r.key}`)}>
-              <span className="fo-move-text"><b>{g.label}</b>
-                <span className="fo-muted">{fmtNum(n)} {g.unit} · <span className="fo-group-toggle">{isOpen ? 'خبّي التفاصيل ▴' : 'شوف التفاصيل ▾'}</span></span></span>
-              <span className={`fo-move-amt${sum < 0 ? ' neg' : ''}`}>{signed(sum)}</span>
+        const k = `${dayKey}:${r.key}`, isOpen = open.has(k)
+        return [
+          <li key={r.key} className="fo-line is-group">
+            <span className={`fo-line-amt${sum < 0 ? ' neg' : ''}`}>{signed(sum)}</span>
+            <button type="button" className="fo-line-what fo-line-toggle" aria-expanded={isOpen} onClick={() => onToggle(k)}>
+              {g.label} — {fmtNum(n)} {g.unit} <span className="fo-group-toggle">{isOpen ? '▴ خبّي' : '▾ شوفها'}</span>
             </button>
-            {isOpen && <ul className="fo-moves fo-sub-moves">{r.items.map(one)}</ul>}
-          </li>
-        )
+          </li>,
+          ...(isOpen ? r.items.map((m) => <Line key={m.id} amount={m.amount} by={m.by} sub>{moveText(m)}</Line>) : []),
+        ]
       })}
     </ul>
   )
@@ -226,6 +232,11 @@ export function Movements({ fund, filter, onFilter }) {
   const [allDays, setAllDays] = useState(false)
   const [open, setOpen] = useState(() => new Set())
   const toggle = (k) => setOpen((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n })
+  // الفلاتر: «الكل» ثمّ كلّ نوعٍ فيه حركات بالفترة، بعدده ومجموعه
+  const chips = useMemo(() => GROUPS.map((g) => {
+    const its = fund.movements.filter((m) => g.kinds.includes(m.kind))
+    return { key: g.key, label: FILTER_LABEL[g.key], n: its.length, sum: Math.round(its.reduce((t, m) => t + m.amount, 0) * 100) / 100 }
+  }).filter((c) => c.n > 0), [fund.movements])
   const list = filter ? fund.movements.filter((m) => groupOf(m.kind) === filter) : fund.movements
   const days = useMemo(() => {
     const map = new Map()
@@ -236,25 +247,25 @@ export function Movements({ fund, filter, onFilter }) {
     return [...map.values()]
   }, [list])
   const shown = allDays ? days : days.slice(0, DAYS_SHOWN)
-  const g = GROUPS.find((x) => x.key === filter)
+  const total = Math.round(list.reduce((t, m) => t + m.amount, 0) * 100) / 100
   return (
     <section className="card fo-card" id="fo-moves" aria-label="الحركات">
-      <div className="fo-card-head">
-        <h3 className="fo-h">الحركات يوم بيوم</h3>
-        {g && <button type="button" className="fo-chip" onClick={() => onFilter(null)}>بس «{g.label}» ✕</button>}
+      <h3 className="fo-h">حركة الصندوق</h3>
+      <div className="fo-filters" role="group" aria-label="فلترة الحركات">
+        <button type="button" aria-pressed={!filter} className={`fo-filter${!filter ? ' on' : ''}`} onClick={() => onFilter(null)}>
+          الكل <span>{fmtNum(fund.movements.length)}</span></button>
+        {chips.map((c) => (
+          <button key={c.key} type="button" aria-pressed={filter === c.key} className={`fo-filter${filter === c.key ? ' on' : ''}`}
+            onClick={() => onFilter(filter === c.key ? null : c.key)}>
+            {c.label} <span className={c.sum < 0 ? 'neg' : ''}>{signed(c.sum)}</span></button>
+        ))}
       </div>
+      {filter && <p className="fo-filter-sum">المجموع: <b className={total < 0 ? 'neg' : ''}>{signed(total)}</b> · {fmtNum(list.length)} حركة</p>}
       {days.length === 0 ? <p className="empty">ما في حركات.</p> : shown.map((d) => (
         <div key={d.date} className="fo-day">
           <div className="fo-day-head"><b>{fmtDay(d.date)}</b><span className={d.net < 0 ? 'neg' : ''}>{signed(d.net)}</span></div>
-          {/* مفلترٌ بسطرٍ واحد: الحركات نفسها مفرودة — المسؤولة طلبتها بالاسم */}
-          {filter ? (
-            <ul className="fo-moves">{d.items.map((m) => (
-              <li key={m.id}>
-                <span className="fo-move-text"><MoveText m={m} /></span>
-                <span className={`fo-move-amt${m.amount < 0 ? ' neg' : ''}`}>{signed(m.amount)}</span>
-                {m.by && <span className="fo-move-by fo-muted">{m.by}</span>}
-              </li>))}</ul>
-          ) : <DayGroup day={d} open={open} onToggle={toggle} />}
+          {/* مفلترٌ بنوعٍ واحد: الحركات مفرودة — المسؤولة طلبتها بالاسم */}
+          <DayLines items={d.items} dayKey={d.date} open={open} onToggle={toggle} collapse={!filter} />
         </div>
       ))}
       {days.length > DAYS_SHOWN && (
