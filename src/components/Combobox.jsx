@@ -14,7 +14,8 @@ const PANEL_MAX_H = 340
 
 export const byNameAr = (a, b) => a.name.localeCompare(b.name, 'ar')
 
-function ComboPanel({ anchorRef, onClose, children }) {
+// مُصدَّرة لقائمة المرضى وهي تكتب (PatientPicker) — النتائج من الخادم لا من options، واللوحة نفسها
+export function ComboPanel({ anchorRef, onClose, children }) {
   const [pos, setPos] = useState(null)
   const panelRef = useRef(null)
   const place = () => {

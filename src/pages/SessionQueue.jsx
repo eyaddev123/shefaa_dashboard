@@ -5,7 +5,7 @@ import { printViaHelper } from '../print-helper.js'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api, APPOINTMENT_STATUSES, BOOKING_TYPES, VISIT_TYPES, REGULAR_VISIT_TYPES, PROCEDURE_ONLY, PRIORITIES, DELAY_CAUSES, WEEKDAYS, addDays, todayLocal, fmtMoney, fmtTime, toLatinDigits, cleanMobile, mobileError } from '../api.js'
 import MobileInput from '../components/MobileInput.jsx'
-import { usePatientSearch, PatientCandidates, SameNameConfirm, MobileUpdateAsk, blockedName, nameCharsError } from '../components/PatientPicker.jsx'
+import { usePatientSearch, PatientDropdown, SameNameConfirm, MobileUpdateAsk, blockedName, nameCharsError } from '../components/PatientPicker.jsx'
 import { AttendanceBadge, urgentRowClass, isAttendanceSession, usePolling, fmtClock, FlowModeTag, FLOW_MODE_LABELS,
   AttendanceNumber, turnLabel, fmtTimeOfDay } from '../attendance-ui.jsx'
 import { attendanceBookedMessage } from '../booking-message.js'
@@ -285,15 +285,17 @@ function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel, urgent = f
         <div className="field bf-name">
           <label>الاسم الثلاثي</label>
           {/* المختار: اسمه مسجَّل ولا يتغيّر من الحجز (التصحيح من صفحة الزيارة) */}
+          {/* القائمة المنسدلة وهي تكتب: الكبس على الاسم = «هو نفسه» */}
           <input value={form.full_name} readOnly={!!picked}
-            onChange={(e) => onName(e.target.value)}
+            onChange={(e) => onName(e.target.value)} {...patientSearch.inputProps(pick)}
             required autoFocus placeholder="الاسم واسم الأب والكنية" />
+          {!sameName && <PatientDropdown search={patientSearch} onPick={pick} onNew={chooseNew} disabled={busy} />}
           <small className="hint">
             {!picked && nameCharsError(form.full_name) ? nameCharsError(form.full_name)
               : patientSearch.checking ? 'جارٍ البحث…'
               : picked ? ' '
               : newConfirmed || patientSearch.noMatch ? 'مريض جديد'
-              : 'ثلاث كلمات على الأقل — نبحث بها عن المريض السابق'}
+              : 'المسجّلون يطلعون تحت الخانة وأنتِ تكتبين — والجديد بالاسم الثلاثي'}
           </small>
         </div>
         <div className="field bf-mobile">
@@ -320,10 +322,6 @@ function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel, urgent = f
       )}
       {patientSearch.pickError && <p className="error">{patientSearch.pickError}</p>}
 
-      {/* النتائج: الاسم وحده، والموظفة تقرّر — لا النظام */}
-      {!sameName && (
-        <PatientCandidates candidates={patientSearch.candidates} similar={patientSearch.similar} onPick={pick} onNew={chooseNew} disabled={busy} />
-      )}
       <SameNameConfirm key={sameName ? 'open' : 'closed'} matches={sameName?.matches} blocked={sameName?.blocked} message={sameName?.message}
         defaultYear={form.birth_year} onPick={pick} onConfirm={confirmNew} disabled={busy} />
       {mobileAsk && picked && (

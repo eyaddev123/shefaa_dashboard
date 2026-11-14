@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { api, cleanMobile, mobileError } from '../api.js'
 import MobileInput from './MobileInput.jsx'
-import { usePatientSearch, PatientCandidates, SameNameConfirm, MobileUpdateAsk, blockedName, nameCharsError } from './PatientPicker.jsx'
+import { usePatientSearch, PatientDropdown, SameNameConfirm, MobileUpdateAsk, blockedName, nameCharsError } from './PatientPicker.jsx'
 import { Modal } from './inventory/shared.jsx'
 import Combobox, { byNameAr } from './Combobox.jsx'
 import { readAmountInput } from '../iron-shares.js'
@@ -241,10 +241,11 @@ export default function IronSessionDialog({ onClose, onSaved }) {
               <div className="field">
                 <label htmlFor="iron-name">اسم المريض الثلاثي</label>
                 <input id="iron-name" value={name} disabled={!!picked} placeholder="الاسم واسم الأب والكنية" {...invalidProps('name')}
-                  onChange={(e) => onName(e.target.value)} />
+                  onChange={(e) => onName(e.target.value)} {...patientSearch.inputProps(pick)} />
+                {!sameName && <PatientDropdown search={patientSearch} onPick={pick} onNew={chooseNew} disabled={busy} />}
                 {errors.name ? <FieldError id="iron-err-name" msg={errors.name} /> : (
                   <small className="hint">
-                    {patientSearch.checking ? 'جارٍ البحث…' : picked ? '\u00A0' : newConfirmed || patientSearch.noMatch ? 'مريض جديد' : 'ثلاث كلمات على الأقل — نبحث بها عن المريض السابق'}
+                    {patientSearch.checking ? 'جارٍ البحث…' : picked ? '\u00A0' : newConfirmed || patientSearch.noMatch ? 'مريض جديد' : 'المسجّلون يطلعون تحت الخانة وأنتِ تكتبين — والجديد بالاسم الثلاثي'}
                   </small>
                 )}
               </div>
@@ -267,9 +268,6 @@ export default function IronSessionDialog({ onClose, onSaved }) {
               </div>
             )}
             {patientSearch.pickError && <p className="error">{patientSearch.pickError}</p>}
-            {!sameName && (
-              <PatientCandidates candidates={patientSearch.candidates} similar={patientSearch.similar} onPick={pick} onNew={chooseNew} disabled={busy} />
-            )}
             <SameNameConfirm key={sameName ? 'open' : 'closed'} matches={sameName?.matches} blocked={sameName?.blocked} message={sameName?.message}
               defaultYear={newYear || ''} onPick={pick} onConfirm={confirmNew} disabled={busy} />
             {mobileAsk && picked && (

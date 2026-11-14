@@ -346,6 +346,9 @@ export const api = {
     // ولو مريضاً واحداً: الموظفة تختار «هو نفسه»، ولا تعبئة قبل اختيارها.
     lookupPatientBy: (body) =>
       http('/clinic/patients/lookup', { method: 'POST', body: JSON.stringify(body) }),
+    // القائمة المنسدلة وهي تكتب: { results, matches, similar, complete } — أسماءٌ فقط ({ id, full_name })
+    suggestPatients: (q) =>
+      http('/clinic/patients/suggest', { method: 'POST', body: JSON.stringify({ q }) }),
     // بيانات المريض بعد اختياره (الاسم والرقم والجنس والسنة — بلا ملاحظات)
     patient: (id) => http(`/clinic/patients/${id}`),
     followupCheck: (sessionId, patientId) =>

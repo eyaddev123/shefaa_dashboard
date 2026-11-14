@@ -1,42 +1,50 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api, toLatinDigits } from '../api.js'
+import { ComboPanel } from './Combobox.jsx'
 
 // ═══ البحث عن مريض في الاستقبال — مصدرٌ واحد للحجز وجلسة الحديد وتغيير المريض ═══
-// النتيجة أسماءٌ فقط (الخادم يعيد { matches, similar } من { id, full_name })، سطرٌ لكل مريض:
-// المطابقون، ثمّ تحت عنوان «أسماء مشابهة» ما يقرب بغلطةٍ إملائية أو اسم جدّ زائد. ولا تعبئة
-// قبل أن تكبس الموظفة «هو نفسه». النظام لا يختار ولا يدمج.
-// والبحث **بالاسم وحده** (2026-11-12، قرار المستخدم): الرقم ليس فريداً ولا يُبحث به — خانة الرقم تُكتب فقط.
-// والاسم الثلاثي المطابق لا يتكرّر (2026-11-11): «مريض جديد» به ممنوع — تختار الموجود أو تضيف للاسم.
+// قائمةٌ منسدلة تحت خانة الاسم **وهي تكتب** (2026-11-14، قرار المستخدم): من حرفين، أقرب ٨،
+// الاسم وحده بكلّ سطر. الاسم الأوّل صح والأب والكنية بتسامح، و«البلشة» = «بلشة» (الخادم يرتّب).
+// الكبس على سطر (أو الأسهم ثمّ Enter) = «هو نفسه»: الآن فقط تُقرأ بيانات المريض. النظام لا يختار ولا يدمج.
+// والبحث **بالاسم وحده** (2026-11-12): الرقم ليس فريداً ولا يُبحث به.
+// والاسم الثلاثي المطابق (أو بفرق «ال») لا يتكرّر: «مريض جديد» به ممنوع — تختار الموجود أو تضيف للاسم.
 
-const threeWords = (v) => String(v || '').trim().split(/\s+/).filter(Boolean).length >= 3
+const DEBOUNCE_MS = 180
+const letters = (v) => String(v || '').replace(/\s/g, '').length
 
 export function usePatientSearch() {
-  const [nameMatches, setNameMatches] = useState([])
-  const [nameSimilar, setNameSimilar] = useState([])
+  const [found, setFound] = useState({ results: [], matches: [], similar: [], complete: false })
   const [picked, setPicked] = useState(null)       // بيانات المختار بعد «هو نفسه»
   const [pending, setPending] = useState(0)
-  const [dismissed, setDismissed] = useState(false) // اختارت «مريض جديد» — تُطوى القائمة
+  const [dismissed, setDismissed] = useState(false) // اختارت «مريض جديد» أو Esc — تُطوى القائمة
   const [pickError, setPickError] = useState(null)
-  const [nameDone, setNameDone] = useState(false)   // بحثٌ بالاسم الثلاثي انتهى (لـ«غير موجود»)
+  const [done, setDone] = useState(false)           // آخر بحثٍ انتهى (لـ«غير موجود»)
+  const [focused, setFocused] = useState(false)
+  const [active, setActive] = useState(-1)          // السطر المضاء بالأسهم
   // ردٌّ متأخّر لبحثٍ قديم لا يطمس نتيجة أحدث (الكتابة أسرع من الشبكة)
-  const seq = useRef({ name: 0 })
+  const seq = useRef(0)
+  const timer = useRef(null)
+  const anchorRef = useRef(null)                    // خانة الاسم: اللوحة تُرسم تحتها
+  useEffect(() => () => clearTimeout(timer.current), [])
 
-  const run = async (kind, body, set) => {
-    const n = ++seq.current[kind]
-    setPending((p) => p + 1)
-    try {
-      const r = await api.clinic.lookupPatientBy(body)
-      if (seq.current[kind] === n) set({ matches: r?.matches || [], similar: r?.similar || [] })
-    } catch { if (seq.current[kind] === n) set({ matches: [], similar: [] }) }
-    finally { setPending((p) => p - 1) }
-  }
-
+  const EMPTY = { results: [], matches: [], similar: [], complete: false }
   const byName = (v) => {
     if (picked) return
-    setDismissed(false)
-    setNameDone(false)
-    if (!threeWords(v)) { seq.current.name++; setNameMatches([]); setNameSimilar([]); return }
-    run('name', { full_name: v }, (r) => { setNameMatches(r.matches); setNameSimilar(r.similar); setNameDone(true) })
+    setDismissed(false); setDone(false); setActive(-1)
+    clearTimeout(timer.current)
+    const n = ++seq.current
+    if (letters(v) < 2) { setFound(EMPTY); return }
+    timer.current = setTimeout(async () => {
+      setPending((p) => p + 1)
+      try {
+        const r = await api.clinic.suggestPatients(v)
+        if (seq.current === n) {
+          setFound({ results: r?.results || [], matches: r?.matches || [], similar: r?.similar || [], complete: !!r?.complete })
+          setDone(true)
+        }
+      } catch { if (seq.current === n) { setFound(EMPTY); setDone(true) } }
+      finally { setPending((p) => p - 1) }
+    }, DEBOUNCE_MS)
   }
 
   // «هو نفسه»: الآن فقط تُقرأ بيانات المريض
@@ -44,57 +52,71 @@ export function usePatientSearch() {
     setPickError(null)
     try {
       const p = await api.clinic.patient(c.id)
-      setPicked(p); setNameMatches([]); setNameSimilar([])
+      seq.current++; clearTimeout(timer.current)
+      setPicked(p); setFound(EMPTY); setActive(-1)
       return p
     } catch (ex) { setPickError(ex.message); return null }
   }
   const reset = () => {
-    seq.current.name++
-    setPicked(null); setNameMatches([]); setNameSimilar([]); setDismissed(false); setPickError(null); setNameDone(false)
+    seq.current++; clearTimeout(timer.current)
+    setPicked(null); setFound(EMPTY); setDismissed(false); setPickError(null); setDone(false); setActive(-1)
   }
-  const dismiss = () => setDismissed(true)
+  const dismiss = () => { setDismissed(true); setActive(-1) }
 
-  // المطابقون ثمّ المشابهون، بلا تكرار مريض
-  const seen = new Set()
-  const uniq = (c) => (seen.has(String(c.id)) ? false : seen.add(String(c.id)))
-  const candidates = picked || dismissed ? [] : nameMatches.filter(uniq)
-  const similar = picked || dismissed ? [] : nameSimilar.filter(uniq)
-  // من يُسأل عنه عند «مريض جديد»: المطابقون بالاسم ثمّ المشابهون
-  const nearNames = [...nameMatches, ...nameSimilar]
+  const results = picked || dismissed ? [] : found.results
+  const open = focused && results.length > 0
+  // من يُسأل عنه عند «مريض جديد»: المطابقون ثمّ المشابهون (منهم من فرقه حرفٌ بالاسم الأوّل)
+  const nearNames = [...found.matches, ...found.similar.filter((s) => !found.matches.some((m) => String(m.id) === String(s.id)))]
   // والمطابقون وحدهم يمنعون «مريض جديد» منعاً (لا «نعم، مريض جديد»)
-  const exactNames = nameMatches
+  const exactNames = found.matches
+  // «غير موجود عندنا»: الاسم الثلاثي بحثه انتهى بلا أحد قريب
+  const noMatch = !picked && done && pending === 0 && found.complete && found.results.length === 0 && found.similar.length === 0
 
-  // «غير موجود عندنا»: بحث الاسم انتهى بلا أحد
-  const noMatch = !picked && nameDone && pending === 0 && nameMatches.length === 0
-    && nameSimilar.length === 0
-  return { candidates, similar, nearNames, exactNames, picked, checking: pending > 0, noMatch, pickError,
-    byName, pick, reset, dismiss }
+  // تُنشر على خانة الاسم: الأسهم تتنقّل، وEnter يختار المضاء، وEsc يطوي.
+  // onPick: ما يفعله المستعمل بالاختيار (الحجز يقرأ بياناته، وتغيير المريض يربطه مباشرةً).
+  const inputProps = (onPick) => ({
+    ref: anchorRef, role: 'combobox', 'aria-autocomplete': 'list', 'aria-expanded': open,
+    'aria-controls': 'patient-suggest', autoComplete: 'off',
+    onFocus: () => setFocused(true),
+    onBlur: () => { setFocused(false); setActive(-1) },
+    onKeyDown: (e) => {
+      if (!open) return
+      if (e.key === 'ArrowDown') { e.preventDefault(); setActive((a) => (a + 1) % results.length) }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); setActive((a) => (a <= 0 ? results.length - 1 : a - 1)) }
+      else if (e.key === 'Enter' && active >= 0 && results[active]) { e.preventDefault(); onPick(results[active]) }
+      else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); dismiss() }
+    },
+  })
+  const close = () => { setFocused(false); setActive(-1) }
+  return { results, open, active, setActive, anchorRef, close, complete: found.complete, nearNames, exactNames, picked,
+    checking: pending > 0, noMatch, pickError, byName, pick, reset, dismiss, inputProps }
 }
 
-// قائمة النتائج: سطرٌ لكل مريض فيه الاسم الثلاثي وحده، و«هو نفسه» لكل سطر، و«مريض جديد».
-// المطابقون أولاً، ثمّ عنوانٌ صغير «أسماء مشابهة» — اقتراحٌ لا أكثر، والاختيار للموظفة.
-export function PatientCandidates({ candidates = [], similar = [], onPick, onNew, newLabel = 'مريض جديد', disabled = false }) {
-  if (!candidates.length && !similar.length) return null
-  const row = (c) => (
-    <div key={c.id} className="candidate-row">
-      <div><strong>{c.full_name}</strong></div>
-      <button type="button" className="ghost" disabled={disabled} onClick={() => onPick(c)}>هو نفسه</button>
-    </div>
-  )
+// القائمة المنسدلة نفسها — تُوضع بعد خانة الاسم (التي نُشرت عليها inputProps).
+// سطرٌ لكل مريض فيه الاسم وحده، والكبس يختار. وتحتها «مريض جديد» إن كان الاسم ثلاثياً.
+// اللوحة ComboPanel نفسها (بثيم القوائم، فوق النافذة لا داخلها فلا تُقصّ).
+// ★ onMouseDown + preventDefault: الاختيار قبل أن يخرج التركيز من الخانة فتُطوى القائمة.
+export function PatientDropdown({ search, onPick, onNew, newLabel = 'مريض جديد — ليس من هؤلاء', disabled = false, note = null }) {
+  const listRef = useRef(null)
+  useEffect(() => { listRef.current?.querySelector('li.active')?.scrollIntoView({ block: 'nearest' }) }, [search.active])
+  if (!search.open) return null
+  const choose = (fn) => (e) => { e.preventDefault(); if (!disabled) fn() }
   return (
-    <div className="candidates-box">
-      {candidates.length > 0 && (
-        <div className="candidates-title">
-          {candidates.length === 1 ? 'وُجد مريض مسجّل' : `وُجد ${candidates.length} مرضى مسجّلين`} — اختاري «هو نفسه» أو «{newLabel}»
-        </div>
-      )}
-      {candidates.map(row)}
-      {similar.length > 0 && <div className="candidates-title candidates-similar">أسماء مشابهة</div>}
-      {similar.map(row)}
-      {onNew && (
-        <button type="button" className="ghost candidate-new" disabled={disabled} onClick={onNew}>{newLabel}</button>
-      )}
-    </div>
+    <ComboPanel anchorRef={search.anchorRef} onClose={search.close}>
+      {note && <div className="ps-note">{note}</div>}
+      <ul className="combobox-list combo-list ps-list" role="listbox" id="patient-suggest" aria-label="المرضى المسجّلون" ref={listRef}>
+        {search.results.map((c, i) => (
+          <li key={c.id} role="option" aria-selected={i === search.active}
+            className={[i === search.active && 'active', disabled && 'is-off'].filter(Boolean).join(' ') || undefined}
+            onMouseDown={choose(() => onPick(c))} onMouseEnter={() => search.setActive(i)}>
+            <span className="cb-main">{c.full_name}</span>
+          </li>
+        ))}
+        {onNew && search.complete && (
+          <li className="cb-more ps-new" role="option" aria-selected={false} onMouseDown={choose(onNew)}>{newLabel}</li>
+        )}
+      </ul>
+    </ComboPanel>
   )
 }
 

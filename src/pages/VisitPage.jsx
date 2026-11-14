@@ -11,7 +11,7 @@ import { loadPrinter, printTicket, ticketFrom, MAX_COPIES } from '../ticket-prin
 import { printViaHelper } from '../print-helper.js'
 import { api, APPOINTMENT_STATUSES, BOOKING_TYPES, VISIT_TYPES, PROCEDURE_ONLY, PRIORITIES, fmtMoney, toLatinDigits, cleanMobile, mobileError } from '../api.js'
 import MobileInput from '../components/MobileInput.jsx'
-import { SameNameConfirm, blockedName } from '../components/PatientPicker.jsx'
+import { SameNameConfirm, blockedName, usePatientSearch, PatientDropdown } from '../components/PatientPicker.jsx'
 import { isAttendanceSession, usePolling, fmtClock, turnLabel, fmtTimeOfDay } from '../attendance-ui.jsx'
 import { useRole } from '../RoleContext.jsx'
 import { ProcedureOnlyBadge, isProcedureOnly, endedWithoutProcedure, visitKindLockReason } from '../components/ProcedureOnly.jsx'
@@ -550,28 +550,19 @@ function ReferralSection({ appt, session, onChanged, onToast }) {
 
 // ═══ تغيير المريض — اختير الخطأ عند الحجز ═══
 // يُربط هذا الحجز وحده بمريضٍ آخر؛ سجلّ المريض الحالي لا يُمَسّ. بسببٍ إلزامي.
-// البحث أسماءٌ فقط (سطرٌ لكل مريض) و«هو نفسه» يرسل patient_id. و«مريض جديد» باسمٍ
-// مطابقٍ لمسجَّل ممنوع (الخادم 409 NAME_EXISTS)، وباسمٍ مشابه يُسأل عنه أولاً.
+// البحث كالحجز (2026-11-14): قائمةٌ منسدلة وهي تكتب، أسماءٌ فقط، والكبس على الاسم يربطه
+// (patient_id). و«مريض جديد» باسمٍ مطابقٍ لمسجَّل ممنوع (الخادم 409 NAME_EXISTS)، وباسمٍ مشابه يُسأل عنه أولاً.
 function SwapPatient({ appt, onToast, onDone, onCancel }) {
   const [search, setSearch] = useState('')
-  const [found, setFound] = useState(null)
+  const finder = usePatientSearch()
   const [newPt, setNewPt] = useState({ full_name: '', mobile: '' })
   const [sameName, setSameName] = useState(null)
   const [reason, setReason] = useState('')
   const [busy, setBusy] = useState(false)
   const reasonOk = reason.trim().length >= 3
+  const onSearch = (v) => { setSearch(v); finder.byName(v) }
+  const choose = (p) => { if (!reasonOk) { onToast('اكتب سبب التغيير أولاً'); return } link({ patient_id: p.id }) }
 
-  const doSearch = async () => {
-    const q = search.trim()
-    if (q.length < 2) return
-    // بالاسم وحده (2026-11-12): الرقم ليس فريداً ولا يُبحث به
-    if (/^[\d\s+\-٠-٩]+$/.test(q)) { onToast('البحث بالاسم الثلاثي فقط'); return }
-    setBusy(true)
-    try {
-      const r = await api.clinic.lookupPatientBy({ full_name: q })
-      setFound({ matches: r?.matches || [], similar: r?.similar || [] })
-    } catch (ex) { onToast(ex.message) } finally { setBusy(false) }
-  }
   const link = async (body) => {
     setBusy(true)
     try { await api.clinic.changePatient(appt.id, { ...body, reason: reason.trim() })
@@ -590,28 +581,14 @@ function SwapPatient({ appt, onToast, onDone, onCancel }) {
   return (
     <div className="ad-swap">
       <div className="ad-swap-row">
-        <input placeholder="ابحث بالاسم الثلاثي…" value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); doSearch() } }} />
-        <button className="ghost" disabled={busy} onClick={doSearch}>بحث</button>
         <input placeholder="سبب التغيير (إلزامي)…" value={reason} onChange={(e) => setReason(e.target.value)} />
+        <input placeholder="اكتب اسم المريض الصحيح…" value={search}
+          onChange={(e) => onSearch(e.target.value)} {...finder.inputProps(choose)} />
         <button className="ghost" onClick={onCancel}>إغلاق</button>
       </div>
-      {[['matches', null], ['similar', 'أسماء مشابهة']].map(([k, title]) => found?.[k]?.length > 0 && (
-        <Fragment key={k}>
-          {title && <p className="ad-readonly">{title}</p>}
-          <ul className="ad-swap-results">
-            {found[k].map((p) => (
-              <li key={p.id}>
-                <span>{p.full_name}</span>
-                <button className="ghost" disabled={busy || !reasonOk}
-                  onClick={() => link({ patient_id: p.id })}>هو نفسه</button>
-              </li>
-            ))}
-          </ul>
-        </Fragment>
-      ))}
-      {found && !found.matches.length && !found.similar.length && <p className="ad-readonly">لا نتائج — أنشئ مريضاً جديداً:</p>}
+      <PatientDropdown search={finder} onPick={choose} disabled={busy || !reasonOk}
+        note={reasonOk ? null : 'اكتب سبب التغيير أولاً، ثمّ اختر الاسم'} />
+      {finder.noMatch && <p className="ad-readonly">لا أحد بهذا الاسم — أنشئ مريضاً جديداً:</p>}
       <div className="ad-swap-row">
         <input placeholder="اسم مريض جديد (ثلاثي)" value={newPt.full_name}
           onChange={(e) => { setSameName(null); setNewPt((f) => ({ ...f, full_name: e.target.value })) }} />

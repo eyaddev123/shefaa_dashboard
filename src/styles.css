@@ -5099,3 +5099,9 @@ button.invx-counter.tone-info .invx-counter-label::before { background: var(--st
 button.invx-counter.is-on, button.invx-counter.tone-warn.is-on, button.invx-counter.tone-bad.is-on, button.invx-counter.tone-info.is-on {
   border-color: var(--primary); background: var(--primary-soft); }
 
+
+/* ═══ اسم المريض: قائمة منسدلة وهي تكتب (2026-11-14) ═══
+   اللوحة combo-panel نفسها؛ هنا ما يخصّها وحدها. */
+.ps-list li { font-size: 14.5px; }
+.ps-list li.is-off { opacity: .55; cursor: not-allowed; }
+.ps-note { font-size: 12px; color: var(--status-pending); padding: 2px 6px 0; }
