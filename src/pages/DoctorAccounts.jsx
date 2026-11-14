@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { api, todayLocal } from '../api.js'
 import { matchesAr } from '../arabic-search.js'
 import { fmtClock, clockTitle } from '../components/Punctuality.jsx'
-import { partsFormula, partsOf, salaryPatientsOf } from '../pay-parts.js'
+import { accountLines, partsOf, salaryPatientsOf } from '../pay-parts.js'
 
 // ═══ حسابات الدكاترة — لشهر أو يوم أو فترة ═══
 // صفحة «تقارير الدكاترة» وتبويب «حسابات الدكاترة» في صندوق العيادات يعرضان هذا نفسه.
@@ -23,9 +23,6 @@ const daysText = (n) => (n === 1 ? 'يوم واحد' : n === 2 ? 'يومان' : 
 const hoursText = (m) => `${fmtClock(m)} ساعة`
 const countText = (n, one, two, few, many) => (n === 1 ? one : n === 2 ? two : `${fmtNum(n)} ${n >= 3 && n <= 10 ? few : many}`)
 const procText = (n) => (n ? countText(n, 'إجراء واحد', 'إجراءان', 'إجراءات', 'إجراءً') : 'بلا إجراءات')
-const payText = (d) => (d.payKind === 'daily_hourly' ? 'يومية + ساعة'
-  : d.payKind === 'fixed' ? 'راتب شهري ثابت'
-  : d.payKind === 'per_patient' ? `${fmtNum(d.payAmount)} ل.س للمريض` : null)
 const initial = (name) => String(name || '').replace(/^د\.\s*/, '').trim().charAt(0) || '؟'
 
 const shiftMonth = (m, n) => {
@@ -52,7 +49,7 @@ const SORTS = [
   ['hours', 'الأكثر حضوراً', (a, b) => b.attendance.days - a.attendance.days || b.attendance.minutes - a.attendance.minutes],
   ['name', 'أبجدياً', (a, b) => a.doctor.localeCompare(b.doctor, 'ar')],
 ]
-const hasActivity = (d) => d.patients > 0 || d.procedures > 0 || d.attendance.days > 0 || d.shifa > 0
+const hasActivity = (d) => d.patients > 0 || d.procedures > 0 || d.attendance.days > 0 || d.shifa > 0 || d.ironCount > 0
   || (d.p && (d.p.scheduled > 0 || d.p.apologized > 0))
 const pct = (x) => `${Math.round(x * 100).toLocaleString('ar-SY')}٪`
 const minText = (m) => {
@@ -210,6 +207,14 @@ function Summary({ data, active }) {
         <span className="dr-stat-sub">من الكشوفات {fmtNum(t.visitShifa)}</span>
         <span className="dr-stat-foot">ومن الإجراءات {fmtNum(t.procShifa)}</span>
       </div>
+      <div className="dr-stat">
+        <span className="dr-stat-lbl">المستحقّ للدكاترة</span>
+        <strong className="dr-stat-val">{fmtNum(t.due)}<small> ل.س</small></strong>
+        <span className="dr-stat-sub">رواتب {fmtNum(t.salary)}</span>
+        <span className="dr-stat-foot">{t.procDoctor > 0 || t.ironDoctor > 0
+          ? ['وحصصهم من', t.procDoctor > 0 && `الإجراءات ${fmtNum(t.procDoctor)}`, t.ironDoctor > 0 && `${t.procDoctor > 0 ? 'و' : ''}الحديد ${fmtNum(t.ironDoctor)}`].filter(Boolean).join(' ')
+          : 'بلا حصص من الإجراءات'}</span>
+      </div>
       {data.punct && (
         <div className="dr-stat">
           <span className="dr-stat-lbl">الالتزام بالدوام</span>
@@ -229,11 +234,43 @@ function Summary({ data, active }) {
   )
 }
 
+// ═══ المستحقّ للدكتور: الراتب بمكوّناته + حصّته من الإجراءات والحديد = ما يُدفع له (طلب المستخدم 2026-11-14) ═══
+// سطرٌ لكلّ مكوّن: «الأيام · ٣ أيام × ٥٬٠٠٠ ··· ١٥٬٠٠٠»؛ والراتب الشهري الثابت القديم للشهر الكامل وحده.
+export function DueBlock({ d, title = 'المستحقّ للدكتور' }) {
+  const a = d.attendance
+  const lines = accountLines(d, { patients: salaryPatientsOf(d), days: a.days, minutes: a.minutes })
+  const fixed = !partsOf(d) && d.payKind === 'fixed'
+  return (
+    <footer className="dr-due">
+      <div className="dr-due-head">
+        <span className="dr-due-lbl">{title}</span>
+        {d.settleCycle && <span className="dr-cycle">يُحاسَب {d.settleCycle === 'daily' ? 'يومياً' : 'شهرياً'}</span>}
+        <strong className="dr-due-val">{d.due === null ? '—' : <>{fmtNum(d.due)}<small> ل.س</small></>}</strong>
+      </div>
+      {(lines.length > 0 || d.noPay || fixed) && (
+        <ul className="dr-due-lines">
+          {d.noPay && <li className="is-muted"><span className="dr-due-k">الراتب</span><span className="dr-due-q">لم يُضبط بعد</span><b>—</b></li>}
+          {fixed && <li><span className="dr-due-k">راتب شهري ثابت</span>
+            <span className="dr-due-q">{d.salary === null ? 'يُحسب للشهر الكامل وحده' : `${fmtNum(d.payAmount)} للشهر`}</span>
+            <b>{d.salary === null ? '—' : fmtNum(d.salary)}</b></li>}
+          {lines.map((l) => (
+            <li key={l.key}>
+              <span className="dr-due-k">{l.label}</span>
+              <span className="dr-due-q" title={l.key === 'hours' ? clockTitle(a.minutes) : undefined}>
+                {l.qty}{l.rate != null ? ` × ${fmtNum(l.rate)}` : ' — حصّته'}</span>
+              <b>{l.value ? fmtNum(l.value) : 'صفر'}</b>
+            </li>
+          ))}
+        </ul>
+      )}
+    </footer>
+  )
+}
+
 // البطاقة كلّها تفتح وجهتها (لوحة الدكتور في التقارير، البروفايل في الصندوق) — بالنقر وبـ Enter.
 // الاسم يبقى رابطاً حقيقياً (فتحٌ في تبويب جديد، قارئ الشاشة)؛ ورابطٌ داخل رابط غير صالح فلا <a> حولها.
 function DoctorCard({ d, share, link }) {
   const a = d.attendance
-  const pay = payText(d)
   const navigate = useNavigate()
   const open = (e) => {
     if (!link || e.target.closest('a, button')) return
@@ -296,20 +333,7 @@ function DoctorCard({ d, share, link }) {
         </div>
       )}
 
-      <footer className="dr-pay">
-        <span className="dr-pay-lbl">الراتب</span>
-        {d.noPay ? <span className="dr-pay-none">لم يُضبط بعد</span>
-          : d.salary === null ? <span className="dr-pay-none" title="الراتب الشهري الثابت يُحسب للشهر الكامل وحده">للشهر الكامل وحده</span>
-          : (
-            <span className="dr-pay-val">
-              <strong>{fmtNum(d.salary)}</strong>
-              {partsOf(d)
-                ? <small>{partsFormula(partsOf(d), d, { patients: salaryPatientsOf(d), days: a.days, minutes: a.minutes })}</small>
-                : pay && <small>{pay}</small>}
-            </span>
-          )}
-        {d.settleCycle && <span className="dr-cycle">تحاسبه {d.settleCycle === 'daily' ? 'يومياً' : 'شهرياً'}</span>}
-      </footer>
+      <DueBlock d={d} />
     </article>
   )
 }
@@ -449,6 +473,9 @@ export function DoctorsTab({ canWrite, linkDashboard = false }) {
                 <dd>دخل الشفاء من الدكتور ناقص راتبه. للعرض فقط: الراتب لا يُسحب من الإيرادات ولا يمسّ الجرد ولا الصندوق.</dd>
                 <dt>الراتب</dt>
                 <dd>بإعداد الدكتور الحالي: مجموع ما اختير له من المرضى × سعر المريض، والأيام × اليومية، والساعات × سعر الساعة.</dd>
+                <dt>المستحقّ للدكتور</dt>
+                <dd>ما يُدفع له عن الفترة: راتبه بمكوّناته، ومعه حصّته من كلّ إجراءٍ قُبض في الفترة، وحصّته من جلسات الحديد.
+                  في وضع «يوم» هو حساب ذلك اليوم وحده، وتفصيله يوماً بيوم في لوحة الدكتور.</dd>
               </dl>
             </details>
           </>

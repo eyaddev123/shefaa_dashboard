@@ -3,7 +3,8 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { api, todayLocal } from '../api.js'
 import { PunctualityTiles, DutyCalendar, AttendanceLog, fmtMinutes, AppointmentsBadge, fmtClock, clockTitle } from '../components/Punctuality.jsx'
 import DoctorTimesCard from '../components/DoctorTimesCard.jsx'
-import { partLines, partsOf, salaryPatientsOf } from '../pay-parts.js'
+import { partLines, partsOf, salaryPatientsOf, accountLines } from '../pay-parts.js'
+import { DueBlock } from './DoctorAccounts.jsx'
 import { useRole } from '../RoleContext.jsx'
 
 // ═══ لوحة تحكم الدكتور ═══
@@ -56,10 +57,75 @@ function FinanceCard({ f }) {
           </div>
         )}
       </div>
+      <div className="dd-due"><DueBlock d={f} /></div>
       <p className="earn-note">
         من حسابات الدكاترة الشهرية نفسها: الكشوف = رسم كلّ زيارةٍ حضرت، والإجراءات = حصّة الشفاء من كلّ إجراءٍ قُبض في
-        الفترة. الراتب عرضٌ لا يُسحب من أيّ صندوق.
+        الفترة. «المستحقّ للدكتور» = راتبه + حصّته من الإجراءات والحديد، وهو عرضٌ لا يُسحب من أيّ صندوق.
       </p>
+    </div>
+  )
+}
+
+// ═══ الحساب يوماً بيوم: ما يُستحقّ له كلّ يوم وبماذا (طلب المستخدم 2026-11-14) ═══
+// سطرٌ لكلّ يومٍ فيه حضورٌ أو مريضٌ أو إجراءٌ أو حديد؛ الضغط يفتح تفصيله: مكوّنات الراتب وكلّ إجراءٍ بمريضه وحصّته.
+const dayName = (d) => new Date(`${d}T12:00:00Z`).toLocaleDateString('ar-SY', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' })
+function DayAccounts({ days, f }) {
+  const [open, setOpen] = useState(null)
+  if (!days?.length) return <p className="empty">لا حضور ولا مرضى ولا إجراءات في هذه الفترة.</p>
+  const daily = f.settleCycle === 'daily'
+  const total = days.reduce((t, d) => t + (d.due ?? 0), 0)
+  return (
+    <div className="dd-days">
+      <div className="dd-days-head" aria-hidden="true">
+        <span>اليوم</span><span>الحضور</span><span>المرضى</span><span>الإجراءات</span><span>{daily ? 'يُدفع له' : 'المستحقّ'}</span>
+      </div>
+      {days.map((d) => {
+        const a = d.attendance
+        const isOpen = open === d.date
+        const lines = accountLines({ ...f, ...d }, { patients: salaryPatientsOf({ ...f, ...d }), days: a.days, minutes: a.minutes })
+        return (
+          <div key={d.date} className={`dd-day${isOpen ? ' is-open' : ''}`}>
+            <button type="button" className="dd-day-row" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : d.date)}>
+              <span className="dd-day-date">{dayName(d.date)}</span>
+              <span title={a.minutes ? clockTitle(a.minutes) : undefined}>
+                {a.days ? (a.minutes ? `${fmtClock(a.minutes)} ساعة` : a.onDuty ? 'في الدوام' : 'بلا انصراف') : '—'}</span>
+              <span>{d.patients ? fmtNum(d.patients) : '—'}</span>
+              <span>{d.procedures || d.ironCount ? fmtNum(d.procedures + d.ironCount) : '—'}</span>
+              <strong>{d.due === null ? '—' : fmtNum(d.due)}</strong>
+            </button>
+            {isOpen && (
+              <div className="dd-day-body">
+                <ul className="dr-due-lines">
+                  {f.noPay && <li className="is-muted"><span className="dr-due-k">الراتب</span><span className="dr-due-q">لم يُضبط بعد</span><b>—</b></li>}
+                  {!partsOf(f) && f.payKind === 'fixed' && <li className="is-muted"><span className="dr-due-k">راتب شهري ثابت</span>
+                    <span className="dr-due-q">لا يُقسَم على الأيام</span><b>—</b></li>}
+                  {lines.map((l) => (
+                    <li key={l.key}><span className="dr-due-k">{l.label}</span>
+                      <span className="dr-due-q">{l.qty}{l.rate != null ? ` × ${fmtNum(l.rate)}` : ' — حصّته'}</span>
+                      <b>{l.value ? fmtNum(l.value) : 'صفر'}</b></li>
+                  ))}
+                </ul>
+                {d.items.length > 0 && (
+                  <ul className="dd-items">
+                    {d.items.map((it) => (
+                      <li key={`${it.kind}-${it.id}`}>
+                        <span>{it.name}</span><span className="muted">{it.patient}</span><b>{it.share ? fmtNum(it.share) : 'صفر'}</b>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </div>
+        )
+      })}
+      <div className="dd-days-foot">
+        <span>المجموع — {days.length === 1 ? 'يوم واحد' : days.length === 2 ? 'يومان' : `${fmtNum(days.length)} ${days.length <= 10 ? 'أيام' : 'يوماً'}`}</span>
+        <strong>{f.due === null ? '—' : <Money value={f.due} />}</strong>
+      </div>
+      {f.due !== null && Math.abs(total - f.due) >= 1 && (
+        <p className="earn-note">الفرق بين مجموع الأيام ومستحقّ الفترة من تقريب الساعات لكلّ يومٍ وحده.</p>
+      )}
     </div>
   )
 }
@@ -151,6 +217,12 @@ export default function DoctorDashboard() {
           </>} />
 
           <FinanceCard f={shown.finance} />
+
+          <div className="card">
+            <h3>الحساب يوماً بيوم
+              {shown.finance.settleCycle === 'daily' && <span className="pn-grace">يُحاسَب يومياً — ما يُدفع له في كلّ يوم</span>}</h3>
+            <DayAccounts days={shown.accountDays} f={shown.finance} />
+          </div>
 
           <DoctorTimesCard doctorId={id} period={period} from={from} to={to} canFix={role === 'clinic_admin'}
             onChanged={() => setReload((n) => n + 1)} />

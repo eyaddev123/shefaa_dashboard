@@ -1,25 +1,25 @@
 import { useEffect, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Navigate, useSearchParams } from 'react-router-dom'
 import { api, fmtDateTime, todayLocal, toLatinDigits } from '../api.js'
 import { useRole } from '../RoleContext.jsx'
 import { useToast } from '../action-feedback.jsx'
 import { canWriteClinicFunds } from '../permissions.js'
 import { Modal, fmtDay, parseNum } from '../components/inventory/shared.jsx'
-import { DoctorsTab } from './DoctorAccounts.jsx'
 import { MaterialsView, MaterialProfitDialog } from '../components/funds/ProfitBoard.jsx'
 import { NowCard, PeriodCard, ProfitCard, Movements, MovesStrip, GROUPS } from '../components/funds/FundOverview.jsx'
 
-// ═══ صندوق العيادات · ربح المواد · حسابات الدكاترة ═══
-// صفحةٌ واحدة بثلاثة تبويبات، لجمهورٍ واحد: المشرفة تكتب، والمدير والمشرف العام يطالعان
+// ═══ صندوق العيادات · ربح المواد ═══
+// صفحةٌ واحدة بتبويبين، لجمهورٍ واحد: المشرفة تكتب، والمدير والمشرف العام يطالعان
 // (FUND_* في الخادم). الحساب كلّه في الخادم — هنا عرضٌ وحده، والفترة تُحلّ هناك بتوقيت دمشق.
 //
 // «صندوق العيادات» غير «إيرادات الشفاء»: داخله ثمن المواد المباعة، وخارجه شراء المواد
-// والمصاريف. والراتب في تبويب الدكاترة عرضٌ لا يُسحب من أيّ صندوق.
+// والمصاريف. حسابات الدكاترة ليست من الصندوق: في «تقارير الدكاترة» وحدها (طلب المستخدم 2026-11-14).
 // التبويب والفترة في الرابط: زرّ الرجوع في الجوال يعود إلى ما كان.
 
 // تبويبان للصندوق، لكلٍّ فترته (طلب المستخدم 2026-11-14): «حركة الصندوق» أوّلاً ثمّ «ملخّص الصندوق».
-// «المستهلكات» أُزيل من هنا (قراره: تُتابَع من المخزون، وشراؤها يظهر في الحركة). ?tab=profit القديم يفتح الملخّص.
-const TABS = [['fund', 'حركة الصندوق'], ['summary', 'ملخّص الصندوق'], ['doctors', 'حسابات الأطباء']]
+// «المستهلكات» أُزيل من هنا (قراره: تُتابَع من المخزون، وشراؤها يظهر في الحركة). ?tab=profit القديم يفتح الملخّص،
+// و?tab=doctors القديم ينقل إلى «تقارير الدكاترة» بفترته.
+const TABS = [['fund', 'حركة الصندوق'], ['summary', 'ملخّص الصندوق']]
 const PERIODS = [
   { key: 'today', label: 'اليوم' },
   { key: 'week', label: 'هالأسبوع' },
@@ -259,8 +259,6 @@ function SummaryTab({ onShowMoves }) {
   )
 }
 
-// ═══════ ٣) حسابات الدكاترة — في DoctorAccounts.jsx (يعرضه هذا التبويب وصفحة «تقارير الدكاترة») ═══════
-
 export default function ClinicFunds() {
   const { clinicRole: role } = useRole()
   const canWrite = canWriteClinicFunds(role)
@@ -272,6 +270,13 @@ export default function ClinicFunds() {
   const pickTab = (k) => setParams(k === 'fund' ? {} : { tab: k })
   // من «الملخّص»: الضغط على مصدرٍ أو وجه يفتح «حركة الصندوق» بالفترة نفسها مصفّاةً به
   const showMoves = (filter, p) => setParams({ ...(p.period === 'custom' ? { period: 'custom', from: p.from, to: p.to } : { period: p.period }), filter })
+
+  if (params.get('tab') === 'doctors') {
+    const keep = new URLSearchParams()
+    for (const k of ['month', 'day', 'from', 'to']) if (params.get(k)) keep.set(k, params.get(k))
+    const q = keep.toString()
+    return <Navigate to={`/clinic/doctor-reports${q ? `?${q}` : ''}`} replace />
+  }
 
   return (
     <>
@@ -289,7 +294,6 @@ export default function ClinicFunds() {
       </div>
       {tab === 'fund' && <MovesTab canWrite={canWrite} showToast={showToast} />}
       {tab === 'summary' && <SummaryTab onShowMoves={showMoves} />}
-      {tab === 'doctors' && <DoctorsTab canWrite={canWrite} />}
     </>
   )
 }

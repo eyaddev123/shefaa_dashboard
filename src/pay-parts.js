@@ -69,3 +69,19 @@ export const ratesText = (parts, src) => PAY_PARTS.filter((p) => parts?.includes
 
 /** مَن يُضرب بسعر المريض في سطر حساب: المعاينات وحدها أو كلّ المنتهين */
 export const salaryPatientsOf = (d) => d.salaryPatientCount ?? d.patients
+
+/**
+ * حساب الدكتور كاملاً لفترة أو يوم (طلب المستخدم 2026-11-14: «الإجراءات والساعات والأيام كلّها من ضمن الراتب»):
+ * أسطر الراتب بمكوّناته، ثمّ حصّته من الإجراءات ومن الحديد — [{ key, label, qty, rate?, value }].
+ * src: سطر حساب (procedures/procDoctor/ironCount/ironDoctor مع حقول الراتب)، q كما في partLines.
+ * الإجراء والحديد يظهران حين وقعا فقط؛ المجموع = src.due من الخادم.
+ */
+export function accountLines(src, q) {
+  const parts = partsOf(src)
+  const out = parts ? partLines(parts, src, q) : []
+  if (src.procedures > 0) out.push({ key: 'procedures', label: 'الإجراءات',
+    qty: countText(src.procedures, 'إجراء واحد', 'إجراءان', 'إجراءات', 'إجراءً'), value: src.procDoctor })
+  if (src.ironCount > 0) out.push({ key: 'iron', label: 'الحديد',
+    qty: countText(src.ironCount, 'جلسة واحدة', 'جلستان', 'جلسات', 'جلسة'), value: src.ironDoctor })
+  return out
+}
