@@ -29,16 +29,6 @@ function Money({ value }) {
 }
 const sessionsText = (n) => `${fmtNum(n)} ${n === 1 ? 'جلسة' : 'جلسات'}`
 
-// فواصل خطّية لا «·»: الصفر العربي نقطةٌ هو الآخر فيلتبس بها
-function SplitChips({ s }) {
-  const parts = [['المواد', s.materials], ['الممرضة', s.nurse], ['الدكتور', s.doctor], ['الشفاء', s.shifa], ['الفاضل', s.surplus]]
-  return (
-    <span className="iron-split">
-      {parts.filter(([, v]) => v > 0).map(([k, v]) => <span key={k}>{k} <bdi>{fmtNum(v)}</bdi></span>)}
-    </span>
-  )
-}
-
 // ═══════ تعديل حصّة جلسة: بسبب، وبلا مساس بالإعدادات ═══════
 // المعاينة تحسب بأرقام الجلسة نفسها قبل الحفظ، والخادم يعيد الحساب ويقرّر
 function EditSharesDialog({ row, onClose, onSaved }) {
@@ -157,7 +147,7 @@ function ReferralDialog({ row, onClose, onSaved }) {
     if (ok) run(() => api.clinic.removeIronReferral(row.id, reason.trim()), () => 'حُذفت الإحالة')
   }
   return (
-    <Modal title={`${existing ? 'تعديل إحالة' : 'إحالة على'} جلسة ${row.patient}`} subtitle={`${row.withDrug ? 'مع دوا' : 'بلا دوا'} — السعر ${fmtNum(row.price)} ل.س`} onClose={onClose} busy={busy} wide sheet>
+    <Modal title={`${existing ? 'تعديل إحالة' : 'إحالة على'} جلسة ${row.patient}`} subtitle={`${row.withDrug ? 'مع دواء' : 'بلا دواء'} — السعر ${fmtNum(row.price)} ل.س`} onClose={onClose} busy={busy} wide sheet>
       <form onSubmit={save} className="iron-form" noValidate>
         <div className="ref-box open iron-ref">
           <ReferralRow value={draft} onChange={setDraft} scopes={null} idPrefix="iron-ref" combo options={options} optionsErr={optErr}
@@ -183,21 +173,9 @@ function ReferralDialog({ row, onClose, onSaved }) {
   )
 }
 
-/** المبلغ على السطر: المقبوض، وتحته السعر والجهة إن كانت إحالة */
-function PaidCell({ r }) {
-  if (!r.referral) return <>{fmtNum(r.price)}</>
-  return (
-    <>
-      {fmtNum(r.paid)}
-      <small className="iron-ref-note">من <bdi>{fmtNum(r.price)}</bdi> — إحالة {r.referral.source} <bdi dir="rtl">− {fmtNum(r.discount)}</bdi></small>
-    </>
-  )
-}
-
-// ═══════ تفاصيل جلسة: لمن يرى التوزيع وحده ═══════
-// كلّ رقمٍ من لقطة الجلسة (iron_session_materials وأعمدة iron_sessions) لا من أسعار المخزون الحالية.
-// «مؤكَّدة»: الخادم يحفظ العلَم وحده، ومؤكِّدته هي من أرسل طلب التسجيل نفسه: القابضة.
-const EDIT_STAGE = { register: 'عند التسجيل', review: 'بعد التسجيل' }
+// ═══════ السجلّ: سطرٌ لكلّ جلسة، والضغط يفتح ورقتها (2026-11-14) ═══════
+// أسئلة من يفتح السجلّ بترتيبها: كم جلسة اليوم وكم قبضنا (وللمشرفة: أين ذهب المال) ⇐ الجلسات واحدةً واحدة
+// (من، أيّ نوع، من الطاقم، كم) ⇐ جلسةٌ بعينها: كلّ ما فيها وما جرى عليها، وما يُفعل بها (تعديل، إحالة، إيصال، إلغاء).
 function EditChanges({ e }) {
   return (
     <>
@@ -206,199 +184,267 @@ function EditChanges({ e }) {
     </>
   )
 }
+const drugText = (v) => (v ? 'مع دواء' : 'بلا دواء')
+const isToday = (r) => r.date === todayLocal()
 
-function SessionDetailsDialog({ row: r, canEdit, onEdit, onClose }) {
-  // ما طُرح للمواد من سعر الجلسة: بسعر الشراء لحظة الصرف (القديم وما بلا سعر شراء: بسعر البيع)
-  const itemsTotal = r.materials.reduce((t, m) => t + m.deduct, 0)
-  const saleTotal = r.materials.reduce((t, m) => t + m.cost, 0)
-  const profitTotal = r.materials.reduce((t, m) => t + (m.costBasis === 'purchase' ? m.cost - m.deduct : 0), 0)
-  const legacy = r.materials.some((m) => m.costBasis === 'legacy')
-  const s = r.split
-  const refLog = r.referralLog || []
-  const hasFlags = r.lowMaterialsConfirmed || r.overPrice || r.edits.length > 0 || r.cancelled || refLog.length > 0
+/** شارات الجلسة على سطرها وفي ورقتها */
+function SessionBadges({ r }) {
+  const edited = (r.changeLog?.length || 0) + (r.edits?.length || 0)
   return (
-    <Modal title={`تفاصيل جلسة ${r.patient}`} onClose={onClose} wide sheet>
-      <div className="iron-details">
-        <dl className="iron-facts">
-          <div><dt>التاريخ</dt><dd><bdi dir="ltr">{r.date} {r.time}</bdi></dd></div>
-          <div><dt>النوع</dt><dd>{r.withDrug ? 'مع دوا' : 'بلا دوا'}</dd></div>
-          <div><dt>الممرضة</dt><dd>{r.nurse}</dd></div>
-          <div><dt>الدكتور</dt><dd>{r.doctor || 'بلا دكتور'}</dd></div>
-          <div><dt>القابضة</dt><dd>{r.by}</dd></div>
-          {r.referral && <>
-            <div><dt>السعر</dt><dd><Money value={r.price} /></dd></div>
-            <div><dt>الإحالة</dt><dd>{r.referral.source} — {amountText(r.referral)}{r.referral.referral_doc_number && <> — ورقة <bdi>{r.referral.referral_doc_number}</bdi></>}
-              <> — خصم <bdi>{fmtNum(r.discount)}</bdi> على الجهة</>{r.referral.referral_note && <> — {r.referral.referral_note}</>}</dd></div>
-          </>}
-          <div className="iron-facts-price"><dt>المبلغ المقبوض</dt><dd><Money value={r.paid ?? r.price} /></dd></div>
-        </dl>
+    <>
+      {r.cancelled && <span className="badge bad sm">ملغاة</span>}
+      {edited > 0 && <span className="badge blue sm iron-edited-badge">معدَّلة</span>}
+      {r.referral && <span className="badge blue sm iron-ref-badge">إحالة</span>}
+      {r.overPrice && <span className="badge bad sm iron-over-badge">المواد فوق السعر</span>}
+      {r.lowMaterialsConfirmed && <span className="badge sm iron-low-badge">مع دواء بمواد قليلة — مؤكَّدة</span>}
+    </>
+  )
+}
 
-        <section aria-label="المواد">
-          <h4 className="iron-details-head">المواد</h4>
-          {r.materials.length === 0 ? <p className="empty">لا مواد في هذه الجلسة.</p> : (
+function SessionRow({ r, multiDay, onOpen, onPrint }) {
+  return (
+    <li className={`ir-row${r.cancelled ? ' is-cancelled' : ''}`}>
+      <button type="button" className="ir-row-main" onClick={onOpen} aria-label={`جلسة ${r.patient} — تفاصيل`}>
+        <span className="ir-when" dir="ltr">{multiDay && <small>{r.date.slice(5)}</small>}{r.time}</span>
+        <span className="ir-who">
+          <strong className="ir-patient">{r.patient}</strong>
+          <span className="ir-meta">
+            <span className={`ir-type${r.withDrug ? ' is-drug' : ''}`}>{drugText(r.withDrug)}</span>
+            <span>{r.nurse}</span>
+            {r.doctor && <span>{r.doctor}</span>}
+          </span>
+          {r.materials.length > 0 && <span className="ir-mats">{materialsSummary(r.materials)}</span>}
+          <span className="ir-badges"><SessionBadges r={r} /></span>
+        </span>
+        <span className="ir-amount">
+          <strong>{fmtNum(r.paid ?? r.price)}</strong>
+          {r.referral && <small>من {fmtNum(r.price)}</small>}
+        </span>
+        <span className="ir-chev" aria-hidden="true">‹</span>
+      </button>
+      {onPrint && !r.cancelled && <button type="button" className="ghost ir-print" onClick={onPrint} title="طباعة الإيصال" aria-label={`طباعة إيصال ${r.patient}`}>🖨</button>}
+    </li>
+  )
+}
+
+/** سجلّ ما جرى على الجلسة بالترتيب: التسجيل ⇐ التعديلات (الجلسة والحصص والإحالة) ⇐ الإلغاء */
+function SessionTimeline({ r }) {
+  const events = [
+    ...(r.changeLog || []).map((e) => ({ at: e.at, kind: 'edit', e })),
+    ...(r.edits || []).filter((e) => e.stage === 'review').map((e) => ({ at: e.at, kind: 'share', e })),
+    ...(r.referralLog || []).map((e) => ({ at: e.at, kind: 'ref', e })),
+  ].sort((a, b) => String(a.at).localeCompare(String(b.at)))
+  const registerShare = (r.edits || []).find((e) => e.stage === 'register')
+  return (
+    <ol className="ir-timeline">
+      <li><span className="ir-tl-dot" /><div>
+        <strong>سُجّلت وقُبضت</strong> <span className="muted">— {r.by} — <bdi dir="ltr">{r.date} {r.time}</bdi></span>
+        {registerShare && <p className="ir-tl-sub">بحصّةٍ معدَّلة عند التسجيل: <EditChanges e={registerShare} />— {registerShare.reason}</p>}
+      </div></li>
+      {events.map((x, i) => (
+        <li key={i}><span className={`ir-tl-dot is-${x.kind}`} /><div>
+          {x.kind === 'edit' && <>
+            <strong>عُدّلت الجلسة</strong> <span className="muted">— {x.e.by} — {fmtDateTime(x.e.at)}</span>
+            <ul className="iron-chg">
+              {x.e.changes.map((c, k) => (
+                <li key={k}><span className="iron-chg-k">{c.label}</span>
+                  {c.old === null ? <span className="iron-chg-add">أُضيف: {c.new}</span>
+                    : c.new === null ? <span className="iron-chg-del">حُذف ({c.old})</span>
+                    : <><del>{c.old}</del><span aria-hidden="true">←</span><ins>{c.new}</ins></>}</li>
+              ))}
+            </ul>
+            <p className="ir-tl-sub">السبب: {x.e.reason}</p>
+          </>}
+          {x.kind === 'share' && <>
+            <strong>عُدّلت الحصّة</strong> <span className="muted">— {x.e.by} — {fmtDateTime(x.e.at)}</span>
+            <p className="ir-tl-sub"><EditChanges e={x.e} />— السبب: {x.e.reason}</p>
+          </>}
+          {x.kind === 'ref' && <>
+            <strong>الإحالة {REF_ACTION[x.e.action]}</strong> <span className="muted">— {x.e.by} — {fmtDateTime(x.e.at)}</span>
+            <p className="ir-tl-sub">{x.e.old && <><bdi>{x.e.old}</bdi>{x.e.new && ' ← '}</>}{x.e.new && <bdi>{x.e.new}</bdi>}{x.e.reason && <> — السبب: {x.e.reason}</>}</p>
+          </>}
+        </div></li>
+      ))}
+      {r.cancelled && (
+        <li><span className="ir-tl-dot is-cancel" /><div>
+          <strong>أُلغيت</strong> <span className="muted">— {r.cancelled.by} — {fmtDateTime(r.cancelled.at)}</span>
+          <p className="ir-tl-sub">السبب: {r.cancelled.reason}</p>
+        </div></li>
+      )}
+    </ol>
+  )
+}
+
+// ═══════ ورقة الجلسة: لكلّ من يرى السجلّ — والأرقام الداخلية (الكلفة والتوزيع) لمن يراها وحده ═══════
+// كلّ رقمٍ من لقطة الجلسة لا من أسعار المخزون الحالية. المواد منذ 2026-11-14 بسعر البيع (ما دخل الصندوق)،
+// وكلفتها بسعر الشراء لحظة الصرف، والفرق ربحها؛ والأقدم بسعر الشراء (ربحها صفر) أو بسعر البيع القديم.
+function SessionSheet({ r, split, actions, onClose }) {
+  const s = r.split
+  const mats = r.materials.map((m) => {
+    if (!split) return m
+    const cost = m.costBasis === 'sale' ? (m.unitCost === null ? null : Math.round(m.qty * m.unitCost)) : m.costBasis === 'purchase' ? m.deduct : null
+    return { ...m, fundIn: m.deduct, costTotal: cost, profit: cost === null ? null : m.deduct - cost }
+  })
+  const sum = (k) => mats.reduce((t, m) => t + (m[k] ?? 0), 0)
+  const oldBasis = split && r.materials.some((m) => m.costBasis !== 'sale')
+  return (
+    <Modal title={r.patient} subtitle={`جلسة حديد — ${r.date} الساعة ${r.time}`} onClose={onClose} wide sheet>
+      <div className="ir-sheet">
+        <div className="ir-sheet-badges"><SessionBadges r={r} /></div>
+        <div className="ir-facts">
+          <div className="ir-fact is-money">
+            <span>{r.referral ? 'دفعه المريض' : 'المبلغ المقبوض'}</span>
+            <strong><Money value={r.paid ?? r.price} /></strong>
+            {r.referral && <small>من {fmtNum(r.price)} — خصم {fmtNum(r.discount)} على {r.referral.source}{r.referral.referral_doc_number && <> (ورقة <bdi>{r.referral.referral_doc_number}</bdi>)</>}</small>}
+          </div>
+          <div className="ir-fact"><span>النوع</span><strong>{drugText(r.withDrug)}</strong></div>
+          <div className="ir-fact"><span>الممرضة</span><strong>{r.nurse}</strong></div>
+          <div className="ir-fact"><span>الدكتور</span><strong>{r.doctor || 'بلا دكتور'}</strong></div>
+          <div className="ir-fact"><span>القابضة</span><strong>{r.by}</strong></div>
+        </div>
+
+        <section className="ir-block" aria-label="المواد">
+          <h4>المواد</h4>
+          {mats.length === 0 ? <p className="empty">لا مواد في هذه الجلسة.</p> : !split ? (
+            <ul className="ir-mat-list">{mats.map((m) => <li key={m.material_id}><span>{m.name}</span><b>{fmtNum(m.qty)} {m.unit}</b></li>)}</ul>
+          ) : (
             <>
-              <table className="iron-mat-table">
-                <thead><tr><th>المادة</th><th className="num">الكمية</th><th className="num col-unit">سعر البيع</th><th className="num">قيمة البيع</th><th className="num col-unit">سعر الشراء</th><th className="num">المطروح</th><th className="num">الربح</th></tr></thead>
+              <table className="ir-mat-table">
+                <thead><tr><th>المادة</th><th className="num">الكمية</th><th className="num">للصندوق</th><th className="num">الكلفة</th><th className="num">الربح</th></tr></thead>
                 <tbody>
-                  {r.materials.map((m) => (
+                  {mats.map((m) => (
                     <tr key={m.material_id}>
-                      <td>{m.name}{m.costBasis === 'sale' && <> <span className="badge warn sm" title="لم يكن لها سعر شراء لحظة الصرف">بلا سعر شراء</span></>}</td>
+                      <td>{m.name}{m.costBasis === 'sale' && m.unitCost === null && <> <span className="badge warn sm" title="لم يكن لها سعر شراء لحظة الصرف">بلا سعر شراء</span></>}</td>
                       <td className="num">{fmtNum(m.qty)} <small>{m.unit}</small></td>
-                      <td className="num col-unit">{fmtNum(m.unit_price)}</td>
-                      <td className="num">{fmtNum(m.cost)}</td>
-                      {/* سعر الوحدة الذي طُرح به: سعر الشراء المجمّد — وما بلا سعر شراء (أو القديم) فلا سعر شراء له */}
-                      <td className="num col-unit">{m.costBasis === 'purchase' ? fmtNum(m.deductUnit) : '—'}</td>
-                      <td className="num">{fmtNum(m.deduct)}</td>
-                      {/* الربح = قيمة البيع − المطروح، لما طُرح بسعر الشراء وحده (غيره طُرح بسعر البيع: لا ربح) */}
-                      <td className="num">{m.costBasis === 'purchase' ? fmtNum(m.cost - m.deduct) : '—'}</td>
+                      <td className="num">{fmtNum(m.fundIn)}</td>
+                      <td className="num">{m.costTotal === null ? '—' : fmtNum(m.costTotal)}</td>
+                      <td className="num">{m.profit === null ? '—' : fmtNum(m.profit)}</td>
                     </tr>
                   ))}
                 </tbody>
-                <tfoot><tr><td colSpan={2}>المجموع</td><td className="col-unit"></td><td className="num">{fmtNum(saleTotal)}</td><td className="col-unit"></td>
-                  <td className="num"><small>المطروح للمواد</small> {fmtNum(itemsTotal)}</td><td className="num">{fmtNum(profitTotal)}</td></tr></tfoot>
+                <tfoot><tr><td colSpan={2}>المجموع</td><td className="num">{fmtNum(sum('fundIn'))}</td><td className="num">{fmtNum(sum('costTotal'))}</td><td className="num">{fmtNum(sum('profit'))}</td></tr></tfoot>
               </table>
               <p className="earn-note">
-                {legacy ? 'جلسة قبل الطرح بسعر الشراء: موادّها طُرحت بسعر البيع كما حُسبت يومها.'
-                  : 'المطروح بسعر الشراء لحظة التسجيل مقرّباً لأقرب ليرة (والمادة بلا سعر شراء بسعر البيع).'}
-                {' '}تغيير الأسعار في المخزون لا يمسّها.
+                المواد بسعر البيع كالإجراءات: «للصندوق» ثمن بيعها، و«الكلفة» بسعر الشراء لحظة الصرف، والفرق ربحٌ للصندوق.
+                {oldBasis && ' هذه الجلسة أقدم: موادّها طُرحت بسعر الشراء (أو بسعر البيع قبله) كما حُسبت يومها.'}
               </p>
             </>
           )}
         </section>
 
-        <section aria-label="التوزيع">
-          <h4 className="iron-details-head">التوزيع</h4>
-          <div className="iron-dist">
-            {[['المواد', s.materials], ['الدكتور', s.doctor], ['الممرضة', s.nurse], ['الشفاء', s.shifa], ['الفاضل للصندوق', s.surplus]].map(([k, v]) => (
-              <div key={k} className="iron-dist-cell"><span>{k}</span><strong><Money value={v} /></strong></div>
-            ))}
-          </div>
-          <p className="earn-note">يذهب لصندوق العيادات: <bdi>{fmtNum(fundOf(s))}</bdi> ل.س (المواد والفاضل).{r.shifaCap !== null && <> سقف الشفاء لهذه الجلسة <bdi>{fmtNum(r.shifaCap)}</bdi>.</>}</p>
-          {r.version !== 2 && <p className="earn-note">جلسة قبل نظام السقف: أرقامها مجمّدة ولا تُعدَّل.</p>}
+        {split && s && (
+          <section className="ir-block" aria-label="التوزيع">
+            <h4>أين ذهب المبلغ</h4>
+            <div className="ir-dist">
+              {[['المواد', s.materials, 'للصندوق'], ['الدكتور', s.doctor], ['الممرضة', s.nurse], ['الشفاء', s.shifa], ['الفاضل', s.surplus, 'للصندوق']].map(([k, v, note]) => (
+                <div key={k} className="ir-dist-cell"><span>{k}{note && <small> {note}</small>}</span><strong>{fmtNum(v)}</strong></div>
+              ))}
+            </div>
+            <p className="earn-note">يدخل صندوق العيادات <bdi>{fmtNum(fundOf(s))}</bdi> ل.س (المواد والفاضل).{r.shifaCap !== null && <> سقف الشفاء لهذه الجلسة <bdi>{fmtNum(r.shifaCap)}</bdi>.</>}
+              {r.overPrice && ' المواد فوق ما بقي بعد الحصص: سُقّفت والشفاء صفر.'}{r.version !== 2 && ' جلسة قبل نظام السقف: أرقامها مجمّدة.'}</p>
+          </section>
+        )}
+
+        <section className="ir-block" aria-label="ما جرى على الجلسة">
+          <h4>ما جرى على الجلسة</h4>
+          <SessionTimeline r={r} />
         </section>
 
-        <section aria-label="العلامات">
-          <h4 className="iron-details-head">العلامات</h4>
-          {!hasFlags ? <p className="empty">لا علامات على هذه الجلسة.</p> : (
-            <ul className="iron-flags">
-              {r.cancelled && <li><span className="badge bad sm">ملغاة</span> <span>{r.cancelled.reason} — {r.cancelled.by} — {fmtDateTime(r.cancelled.at)}</span></li>}
-              {r.lowMaterialsConfirmed && <li><span className="badge warn sm">جلسة مؤكَّدة</span> <span>مع دوا بمواد قليلة — أكّدتها {r.by} عند التسجيل</span></li>}
-              {r.overPrice && <li><span className="badge bad sm">المواد فوق السعر</span> <span>سُقّفت من <bdi>{fmtNum(itemsTotal)}</bdi> إلى <bdi>{fmtNum(s.materials)}</bdi> والشفاء صفر</span></li>}
-              {r.edits.map((e, i) => (
-                <li key={i}><span className="badge blue sm">حصّة معدَّلة</span>{' '}
-                  <span>{EDIT_STAGE[e.stage] || ''}: <EditChanges e={e} />— السبب: {e.reason} — {e.by} — {fmtDateTime(e.at)}</span></li>
-              ))}
-              {refLog.map((e, i) => (
-                <li key={`ref-${i}`}><span className="badge blue sm">إحالة {REF_ACTION[e.action]}</span>{' '}
-                  <span>{e.old && <><bdi>{e.old}</bdi>{e.new && ' ← '}</>}{e.new && <bdi>{e.new}</bdi>}{e.reason && <> — السبب: {e.reason}</>} — {e.by} — {fmtDateTime(e.at)}</span></li>
-              ))}
-            </ul>
-          )}
-        </section>
-
-        <div className="inline iron-actions">
-          {canEdit && <button type="button" className="iron-details-edit" onClick={onEdit}>تعديل الحصص</button>}
+        <div className="ir-actions">
+          {actions.edit && <button type="button" className="ir-act-edit" onClick={actions.edit}>تعديل الجلسة</button>}
+          {actions.refer && <button type="button" className="ghost" onClick={actions.refer}>{r.referral ? 'الإحالة' : '+ إحالة'}</button>}
+          {actions.print && <button type="button" className="ghost" onClick={actions.print}>🖨 إيصال</button>}
+          {actions.shares && <button type="button" className="ghost" onClick={actions.shares}>تعديل الحصص</button>}
+          <span className="ir-actions-gap" />
+          {actions.cancel && <button type="button" className="ghost danger ir-act-cancel" onClick={actions.cancel}>إلغاء الجلسة</button>}
           <button type="button" className="ghost" onClick={onClose}>إغلاق</button>
         </div>
+        {actions.lockedNote && <p className="earn-note">{actions.lockedNote}</p>}
       </div>
     </Modal>
   )
 }
 
-// ═══════ السجلّ ═══════
 function LogTab({ split, canPrint, canCancel, reload, showToast }) {
   const p = usePeriod('today')
   const dialogs = useDialogs()
-  const [cancelled, setCancelled] = useState(0)
-  const [editing, setEditing] = useState(null)
-  const [refFor, setRefFor] = useState(null)        // سطر نافذة الإحالة
+  const [bump, setBump] = useState(0)
+  const [openId, setOpenId] = useState(null)       // الورقة من السطر الحيّ: تتحدّث بعد كلّ حفظ
+  const [mode, setMode] = useState(null)           // null | 'edit' | 'shares' | 'refer' — نافذةٌ واحدة فوق الورقة
+  const [data, err] = useLoad(() => api.clinic.ironSessions(p.query), p.key, reload + bump)
+  const r = openId && data?.rows.find((x) => x.id === openId)
+  const refresh = () => setBump((n) => n + 1)
   // الاستقبال يوم الجلسة وحده، والمشرفة أيّ وقت (canCancel = المشرفة) — والخادم يحرس الاثنين
-  const canRefer = (r) => !r.cancelled && canPrint && (canCancel || r.date === todayLocal())
-  const [detailId, setDetailId] = useState(null)    // من السطر الحيّ: يتحدّث بعد تعديل الحصّة
-  const [data, err] = useLoad(() => api.clinic.ironSessions(p.query), p.key, reload + cancelled)
-  const cancel = async (r) => {
+  const inTime = (x) => canCancel || isToday(x)
+  const editable = (x) => !x.cancelled && canPrint && inTime(x) && (x.version === undefined || x.version === 2)
+  const print = async (x) => {
+    const out = await printIronReceipt(x, 1)
+    if (!out.ok) showToast(`تعذّرت الطباعة${out.reason ? ` (${out.reason})` : ''}`)
+  }
+  const cancel = async (x) => {
     const reason = await dialogs.prompt({
-      title: `إلغاء جلسة ${r.patient}`,
-      body: `تُعكس حركات الصندوق${r.materials.length > 0 ? ' وترجع كلّ المواد للمخزون بكمّياتها' : ''}، وتنزل المستحقات وحصّة الشفاء. الإلغاء لا رجعة عنه، والجلسة تبقى في السجلّ معلَّمة.`,
+      title: `إلغاء جلسة ${x.patient}`,
+      body: `تُعكس حركات الصندوق${x.materials.length > 0 ? ' وترجع كلّ المواد للمخزون بكمّياتها' : ''}، وتنزل المستحقات وحصّة الشفاء. الإلغاء لا رجعة عنه، والجلسة تبقى في السجلّ معلَّمة.`,
       placeholder: 'سبب الإلغاء', confirmLabel: 'إلغاء الجلسة', cancelLabel: 'رجوع', required: true, danger: true,
     })
     if (reason == null) return
     try {
-      await api.clinic.cancelIronSession(r.id, reason)
+      await api.clinic.cancelIronSession(x.id, reason)
       showToast('أُلغيت الجلسة وعُكست حركاتها', 'success', 3500)
-      setCancelled((n) => n + 1)
+      refresh()
     } catch (ex) { showToast(ex.message) }
   }
-  const multiDay = data && data.from !== data.to
-  const detail = detailId && data?.rows.find((r) => r.id === detailId)
-  const print = async (r) => {
-    const out = await printIronReceipt(r, 1)
-    if (!out.ok) showToast(`تعذّرت الطباعة${out.reason ? ` (${out.reason})` : ''}`)
+  const edited = (out) => {
+    setMode(null); refresh()
+    const diff = out.paid - ((r?.paid ?? r?.price) || 0)
+    const money = diff > 0 ? ` — اقبضي ${fmtNum(diff)} ل.س إضافية` : diff < 0 ? ` — رُدّي للمريض ${fmtNum(-diff)} ل.س` : ''
+    const warns = (out.stock_warnings || []).map((w) => `رصيد «${w.name}» صار ${fmtQty(w.after)} ${w.unit}.`)
+    showToast(`عُدّلت الجلسة${money}${warns.length ? ` — ⚠ ${warns.join(' ')}` : ''}`, warns.length || diff !== 0 ? 'warning' : 'success', diff !== 0 ? 9000 : 4000)
   }
+  const t = data?.totals
   return (
-    <div className="card earn-card">
-      <div className="earn-head"><h3>سجلّ الجلسات</h3></div>
-      <PeriodPicker p={p} data={data} />
+    <div className="card earn-card ir-log">
+      <PeriodPicker p={p} data={data} formal />
       {err ? <p className="error">{err}</p> : !data ? <p className="empty">جارٍ التحميل…</p>
         : data.rows.length === 0 ? <p className="empty">لا جلسات حديد في هذه الفترة.</p> : (
         <>
-          <div className="tiles earn-tiles">
-            <div className="tile"><div className="label">عدد الجلسات</div><div className="value">{fmtNum(data.totals.count)}</div>
-              <div className="hint">مع دوا: {fmtNum(data.totals.withDrug)}{data.totals.cancelled > 0 && ` — ملغاة خارج المجموع: ${fmtNum(data.totals.cancelled)}`}</div>
-              {data.totals.overPrice > 0 && <div className="hint iron-over-count">المواد فوق السعر: {fmtNum(data.totals.overPrice)}</div>}</div>
-            <div className="tile earn-hero"><div className="label">مجموع المقبوض</div><div className="value"><Money value={data.totals.paid ?? data.totals.price} /></div>
-              {data.totals.discount > 0 && <div className="hint">خصومات الإحالات {fmtNum(data.totals.discount)} على الجهات ({sessionsText(data.totals.referrals)})</div>}</div>
-            {split && (
-              <div className="tile"><div className="label">حصّة الشفاء</div><div className="value"><Money value={data.totals.split.shifa} /></div></div>
-            )}
+          <div className="ir-strip">
+            <div className="ir-stat"><span>الجلسات</span><strong>{fmtNum(t.count)}</strong>
+              <small>{t.withDrug > 0 ? `منها ${fmtNum(t.withDrug)} مع دواء` : 'كلّها بلا دواء'}{t.cancelled > 0 && ` · ملغاة ${fmtNum(t.cancelled)}`}</small></div>
+            <div className="ir-stat is-hero"><span>المقبوض</span><strong><Money value={t.paid ?? t.price} /></strong>
+              {t.discount > 0 && <small>بعد خصم إحالات {fmtNum(t.discount)} على الجهات</small>}</div>
+            {split && t.split && <>
+              <div className="ir-stat"><span>للشفاء</span><strong>{fmtNum(t.split.shifa)}</strong></div>
+              <div className="ir-stat"><span>للصندوق</span><strong>{fmtNum(fundOf(t.split))}</strong><small>المواد والفاضل</small></div>
+              <div className="ir-stat"><span>للطاقم</span><strong>{fmtNum(t.split.nurse + t.split.doctor)}</strong>
+                <small>ممرضات {fmtNum(t.split.nurse)}{t.split.doctor > 0 && ` · دكاترة ${fmtNum(t.split.doctor)}`}</small></div>
+            </>}
           </div>
-          <table className="rtable earn-table iron-table">
-            <thead>
-              <tr><th>الوقت</th><th>المريض</th><th>الممرضة</th><th>الدكتور</th><th>النوع</th><th>المواد</th><th>المبلغ</th><th>القابضة</th>
-                {split && <th>التوزيع</th>}{(canPrint || canCancel || split) && <th />}</tr>
-            </thead>
-            <tbody>
-              {data.rows.map((r) => (
-                <tr key={r.id} className={r.cancelled ? 'iron-cancelled' : undefined}>
-                  <td className="rt-badge earn-when" dir="ltr">{multiDay && <span className="earn-date">{r.date}</span>}<span>{r.time}</span></td>
-                  <td className="rt-title">
-                    {r.patient}
-                    {r.cancelled && <span className="badge bad sm iron-cancel-badge">ملغاة</span>}
-                    {r.overPrice && <span className="badge bad sm iron-cancel-badge iron-over-badge">المواد فوق السعر</span>}
-                    {r.lowMaterialsConfirmed && <span className="badge sm iron-cancel-badge iron-low-badge">مع دوا بمواد قليلة — مؤكَّدة</span>}
-                    {r.edits?.length > 0 && <span className="badge blue sm iron-cancel-badge iron-edited-badge">حصّة معدَّلة</span>}
-                    {r.referral && <span className="badge blue sm iron-cancel-badge iron-ref-badge">إحالة</span>}
-                    {r.cancelled && (
-                      <span className="iron-cancel-note">{r.cancelled.reason} — {r.cancelled.by} — {fmtDateTime(r.cancelled.at)}</span>
-                    )}
-                  </td>
-                  <td data-label="الممرضة">{r.nurse}</td>
-                  <td data-label="الدكتور">{r.doctor || <span className="muted">بلا دكتور</span>}</td>
-                  <td data-label="النوع">{r.withDrug ? 'مع دوا' : 'بلا دوا'}</td>
-                  <td className="iron-mats" data-label="المواد">{r.materials.length ? materialsSummary(r.materials) : <span className="muted">—</span>}</td>
-                  <td className="num earn-doc" data-label="المبلغ"><PaidCell r={r} /></td>
-                  <td data-label="القابضة">{r.by}</td>
-                  {split && <td className="rt-full" data-label="التوزيع"><SplitChips s={r.split} /></td>}
-                  {(canPrint || canCancel || split) && (
-                    <td className="rt-actions">
-                      {split && <button type="button" className="ghost iron-details-btn" onClick={() => setDetailId(r.id)}>التفاصيل</button>}
-                      {!r.cancelled && canPrint && <button type="button" className="ghost iron-print" onClick={() => print(r)}>🖨 إيصال</button>}
-                      {canRefer(r) && <button type="button" className="ghost iron-ref-btn" onClick={() => setRefFor(r)}>{r.referral ? 'الإحالة' : '+ إحالة'}</button>}
-                      {!r.cancelled && canCancel && <button type="button" className="ghost iron-print iron-cancel-btn" onClick={() => cancel(r)}>إلغاء</button>}
-                    </td>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          {t.overPrice > 0 && <p className="ir-alert">جلسات موادّها فوق السعر: {fmtNum(t.overPrice)} — الشفاء فيها صفر. افتحي الجلسة لمراجعتها.</p>}
+          <ul className="ir-list">
+            {data.rows.map((x) => (
+              <SessionRow key={x.id} r={x} multiDay={data.from !== data.to} onOpen={() => { setOpenId(x.id); setMode(null) }}
+                onPrint={canPrint ? () => print(x) : null} />
+            ))}
+          </ul>
+          <p className="earn-note">اضغطي على الجلسة لرؤية تفاصيلها وما جرى عليها، ولتعديلها{canCancel ? '' : ' (يوم الجلسة)'} أو طباعة إيصالها.</p>
         </>
       )}
-      {/* نافذةٌ واحدة في كلّ لحظة: التعديل يفتح من التفاصيل، والرجوع منه إليها */}
-      {refFor && <ReferralDialog row={refFor} onClose={() => setRefFor(null)}
-        onSaved={(msg) => { setRefFor(null); showToast(msg, 'success', 3500); setCancelled((n) => n + 1) }} />}
-      {editing ? <EditSharesDialog row={editing} onClose={() => setEditing(null)}
-        onSaved={() => { setEditing(null); showToast('عُدّلت الحصّة وأُعيد الحساب', 'success', 3500); setCancelled((n) => n + 1) }} />
-        : detail && <SessionDetailsDialog row={detail} canEdit={canCancel && !detail.cancelled && detail.version === 2} onEdit={() => setEditing(detail)} onClose={() => setDetailId(null)} />}
+      {r && mode === null && (
+        <SessionSheet r={r} split={split} onClose={() => setOpenId(null)} actions={{
+          edit: editable(r) ? () => setMode('edit') : null,
+          refer: !r.cancelled && canPrint && inTime(r) ? () => setMode('refer') : null,
+          print: canPrint && !r.cancelled ? () => print(r) : null,
+          shares: canCancel && !r.cancelled && r.version === 2 ? () => setMode('shares') : null,
+          cancel: canCancel && !r.cancelled ? () => { setOpenId(null); cancel(r) } : null,
+          lockedNote: !r.cancelled && canPrint && !inTime(r) ? 'جلسة يومٍ سابق: يعدّلها ويضيف إحالتها مشرفة العيادات.' : null,
+        }} />
+      )}
+      {r && mode === 'edit' && <IronSessionDialog session={r} onClose={() => setMode(null)} onSaved={edited} />}
+      {r && mode === 'refer' && <ReferralDialog row={r} onClose={() => setMode(null)}
+        onSaved={(msg) => { setMode(null); showToast(msg, 'success', 3500); refresh() }} />}
+      {r && mode === 'shares' && <EditSharesDialog row={r} onClose={() => setMode(null)}
+        onSaved={() => { setMode(null); showToast('عُدّلت الحصّة وأُعيد الحساب', 'success', 3500); refresh() }} />}
     </div>
   )
 }
@@ -444,7 +490,7 @@ function FragmentRows({ g, open, onToggle }) {
       {open && g.lines.map((l) => (
         <tr key={l.id} className="iron-line">
           <td className="rt-title">{l.patient}</td>
-          <td data-label="التاريخ"><bdi dir="ltr">{l.date} {l.time}</bdi> — {l.withDrug ? 'مع دوا' : 'بلا دوا'}</td>
+          <td data-label="التاريخ"><bdi dir="ltr">{l.date} {l.time}</bdi> — {l.withDrug ? 'مع دواء' : 'بلا دواء'}</td>
           <td className="num" data-label="الحصّة">{fmtNum(l.share)}</td>
           <td className="rt-actions" />
         </tr>
@@ -495,7 +541,7 @@ const FIELDS = [
   ['shifa_share', 'سقف حصّة الشفاء'],
 ]
 const HISTORY_LABELS = { ...Object.fromEntries(FIELDS), drug_material: 'مادة الدواء (سابقاً)' }
-const scenarioText = (s) => `${s.with_drug ? 'مع دوا' : 'بلا دوا'} ${s.with_doctor ? '+ دكتور' : '— بلا دكتور'}`
+const scenarioText = (s) => `${s.with_drug ? 'مع دواء' : 'بلا دواء'} ${s.with_doctor ? '+ دكتور' : '— بلا دكتور'}`
 
 function SettingsTab({ canWrite, showToast }) {
   const dialogs = useDialogs()

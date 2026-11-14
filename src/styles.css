@@ -5352,3 +5352,85 @@ button.invx-counter.is-on, button.invx-counter.tone-warn.is-on, button.invx-coun
   .dd-items li .muted { grid-column: 1; grid-row: 2; font-size: 11.5px; }
   .dr-due-lines li { grid-template-columns: 64px 1fr auto; }
 }
+
+/* ═══ جلسات الحديد: السجلّ سطوراً، وورقة الجلسة، والتعديل (2026-11-14) ═══ */
+.ir-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 6px 0 14px; }
+.ir-stat { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; background: var(--surface-1);
+  border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow-card); min-width: 0; }
+.ir-stat > span { color: var(--muted); font-size: 12.5px; font-weight: 700; }
+.ir-stat strong { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.ir-stat small { color: var(--muted); font-size: 12px; }
+.ir-stat.is-hero { border-color: var(--primary); background: var(--primary-soft); }
+.ir-alert { margin: 0 0 12px; padding: 8px 12px; border-radius: 10px; background: var(--status-bad-bg); color: var(--status-bad); font-size: 13.5px; font-weight: 600; }
+.ir-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--grid); }
+.ir-row { display: flex; align-items: stretch; border-bottom: 1px solid var(--grid); }
+.ir-row-main { flex: 1; min-width: 0; display: grid; grid-template-columns: 54px 1fr auto 18px; align-items: center; gap: 12px;
+  padding: 12px 8px; background: none; border: 0; border-radius: 0; color: inherit; font: inherit; text-align: start; cursor: pointer; min-height: 0; }
+.ir-row-main:hover, .ir-row-main:focus-visible { background: var(--primary-soft); }
+.ir-when { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; display: flex; flex-direction: column; align-items: flex-start; }
+.ir-when small { font-size: 11px; }
+.ir-who { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.ir-patient { font-size: 15px; font-weight: 700; }
+.ir-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; color: var(--text-secondary); font-size: 13px; }
+.ir-type { font-weight: 700; color: var(--text-secondary); }
+.ir-type.is-drug { color: var(--accent-text); }
+.ir-mats { color: var(--muted); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ir-badges { display: flex; flex-wrap: wrap; gap: 4px; }
+.ir-badges:empty { display: none; }
+.ir-amount { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+.ir-amount strong { font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.ir-amount small { color: var(--muted); font-size: 11.5px; }
+.ir-chev { color: var(--muted); font-size: 18px; }
+.ir-print { align-self: center; margin-inline-start: 4px; padding: 6px 10px; min-height: 0; font-size: 16px; }
+.ir-row.is-cancelled .ir-patient, .ir-row.is-cancelled .ir-amount strong { text-decoration: line-through; color: var(--muted); }
+.ir-sheet { display: grid; gap: 16px; }
+.ir-sheet-badges { display: flex; flex-wrap: wrap; gap: 6px; }
+.ir-sheet-badges:empty { display: none; }
+.ir-facts { display: grid; grid-template-columns: 1.6fr repeat(4, minmax(0, 1fr)); gap: 10px; }
+.ir-fact { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; min-width: 0; }
+.ir-fact > span { color: var(--muted); font-size: 12px; font-weight: 700; }
+.ir-fact strong { font-size: 15px; }
+.ir-fact small { color: var(--muted); font-size: 12px; }
+.ir-fact.is-money { border-color: var(--primary); background: var(--primary-soft); }
+.ir-fact.is-money strong { font-size: 22px; font-weight: 800; }
+.ir-block h4 { margin: 0 0 8px; font-size: 14px; }
+.ir-mat-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.ir-mat-list li { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px dashed var(--grid); }
+.ir-mat-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.ir-mat-table th { color: var(--muted); font-size: 12px; font-weight: 700; text-align: start; padding: 6px 8px; border-bottom: 1px solid var(--grid); }
+.ir-mat-table td { padding: 7px 8px; border-bottom: 1px solid var(--grid); }
+.ir-mat-table .num { text-align: end; font-variant-numeric: tabular-nums; }
+.ir-mat-table tfoot td { font-weight: 800; border-bottom: 0; }
+.ir-dist { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.ir-dist-cell { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 10px; background: var(--page); }
+.ir-dist-cell span { color: var(--muted); font-size: 12px; font-weight: 700; }
+.ir-dist-cell small { font-weight: 500; }
+.ir-dist-cell strong { font-size: 16px; font-variant-numeric: tabular-nums; }
+.ir-timeline { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.ir-timeline > li { display: grid; grid-template-columns: 14px 1fr; gap: 10px; font-size: 13.5px; }
+.ir-tl-dot { width: 10px; height: 10px; margin-top: 5px; border-radius: 50%; background: var(--primary); }
+.ir-tl-dot.is-edit, .ir-tl-dot.is-share, .ir-tl-dot.is-ref { background: var(--status-review); }
+.ir-tl-dot.is-cancel { background: var(--status-bad); }
+.ir-tl-sub { margin: 3px 0 0; color: var(--text-secondary); font-size: 13px; }
+.ir-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding-top: 12px; border-top: 1px solid var(--grid); }
+.ir-actions-gap { flex: 1; }
+.ir-act-cancel { color: var(--status-bad); }
+.iron-chg { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 4px; font-size: 13.5px; }
+.iron-chg li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
+.iron-chg-k { font-weight: 700; min-width: 70px; }
+.iron-chg del { color: var(--muted); }
+.iron-chg ins { text-decoration: none; font-weight: 700; color: var(--accent-text); }
+.iron-chg-add { color: var(--status-good); font-weight: 600; }
+.iron-chg-del { color: var(--status-bad); font-weight: 600; }
+.iron-chg-none { margin: 0; color: var(--muted); font-size: 13.5px; }
+.iron-edit-reason { margin-top: 10px; }
+.iron-pay-diff { font-weight: 700; color: var(--text-secondary); }
+.iron-pay-diff.is-more { color: var(--status-pending); }
+.iron-pay-diff.is-less { color: var(--status-bad); }
+@media (max-width: 700px) {
+  .ir-row-main { grid-template-columns: 44px 1fr auto; gap: 8px; padding: 10px 4px; }
+  .ir-chev { display: none; }
+  .ir-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ir-fact.is-money { grid-column: 1 / -1; }
+  .ir-dist { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

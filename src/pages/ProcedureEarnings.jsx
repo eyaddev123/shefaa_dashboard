@@ -232,7 +232,7 @@ function IronDetail({ iron, multiDay }) {
             <tr key={l.id}>
               <td className="rt-badge earn-when" dir="ltr">{multiDay && <span className="earn-date">{l.date}</span>}<span>{l.time}</span></td>
               <td className="rt-title">{l.patient}</td>
-              <td data-label="النوع">{l.withDrug ? 'مع دوا' : 'بلا دوا'}</td>
+              <td data-label="النوع">{l.withDrug ? 'مع دواء' : 'بلا دواء'}</td>
               <td data-label="الممرضة">{l.nurse}</td>
               <td className="num" data-label="السعر">{fmtNum(l.price)}</td>
               <td className="num earn-doc" data-label="حصّته">{fmtNum(l.share)}</td>
