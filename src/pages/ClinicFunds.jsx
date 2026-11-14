@@ -7,7 +7,7 @@ import { canWriteClinicFunds } from '../permissions.js'
 import { Modal, fmtDay, parseNum } from '../components/inventory/shared.jsx'
 import { DoctorsTab } from './DoctorAccounts.jsx'
 import { MaterialsView, MaterialProfitDialog } from '../components/funds/ProfitBoard.jsx'
-import { NowCard, PeriodCard, ProfitCard, Movements } from '../components/funds/FundOverview.jsx'
+import { NowCard, PeriodCard, ProfitCard, Movements, MovesStrip, GROUPS } from '../components/funds/FundOverview.jsx'
 
 // ═══ صندوق العيادات · ربح المواد · حسابات الدكاترة ═══
 // صفحةٌ واحدة بثلاثة تبويبات، لجمهورٍ واحد: المشرفة تكتب، والمدير والمشرف العام يطالعان
@@ -17,21 +17,19 @@ import { NowCard, PeriodCard, ProfitCard, Movements } from '../components/funds/
 // والمصاريف. والراتب في تبويب الدكاترة عرضٌ لا يُسحب من أيّ صندوق.
 // التبويب والفترة في الرابط: زرّ الرجوع في الجوال يعود إلى ما كان.
 
-// «الصندوق» يجيب أسئلة المسؤولة بترتيبها (2026-11-14، «نفض» بطلب المستخدم) — ?tab=profit القديم يفتحه
-const TABS = [['fund', 'الصندوق'], ['consumables', 'المستهلكات'], ['doctors', 'حسابات الدكاترة']]
+// تبويبان للصندوق، لكلٍّ فترته (طلب المستخدم 2026-11-14): «حركة الصندوق» أوّلاً ثمّ «ملخّص الصندوق».
+// «المستهلكات» أُزيل من هنا (قراره: تُتابَع من المخزون، وشراؤها يظهر في الحركة). ?tab=profit القديم يفتح الملخّص.
+const TABS = [['fund', 'حركة الصندوق'], ['summary', 'ملخّص الصندوق'], ['doctors', 'حسابات الأطباء']]
 const PERIODS = [
   { key: 'today', label: 'اليوم' },
   { key: 'week', label: 'هالأسبوع' },
   { key: 'month', label: 'هالشهر' },
   { key: 'custom', label: 'من — إلى' },
 ]
+// صفحة الصندوق بالفصحى (طلب المستخدم 2026-11-14) — والحديد يبقى بكلامه
+const FORMAL = { today: 'اليوم', week: 'هذا الأسبوع', month: 'هذا الشهر', custom: 'من — إلى' }
 
 const fmtNum = (n) => Number(n || 0).toLocaleString('ar-SY', { maximumFractionDigits: 2 })
-function Money({ value }) {
-  return <>{fmtNum(value)}<span className="cash-unit">ل.س</span></>
-}
-// «+١٦٬٠٠٠» و«−٦٠٬٠٠٠» — الإشارة نصّاً: toLocaleString يسبق السالب بعلامة اتجاه تُرسم شرطةً ثانية
-const signed = (n) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${fmtNum(Math.abs(n))}`
 const rangeText = (d) => (d.from === d.to ? d.from : `${d.from} ← ${d.to}`)
 
 // ═══ الفترة: أزرارٌ وحقلا تاريخ، والحالة في الرابط ═══
@@ -49,7 +47,7 @@ export function usePeriod(dflt = 'month') {
   return { period, from, to, query, key: JSON.stringify(query), set }
 }
 
-export function PeriodPicker({ p, data }) {
+export function PeriodPicker({ p, data, formal = false }) {
   const pick = (key) => p.set(key === 'custom'
     ? { period: 'custom', from: data?.from || todayLocal(), to: data?.to || todayLocal() }
     : { period: key, from: null, to: null })
@@ -58,7 +56,7 @@ export function PeriodPicker({ p, data }) {
       <div className="earn-periods" role="group" aria-label="الفترة">
         {PERIODS.map((x) => (
           <button key={x.key} type="button" aria-pressed={p.period === x.key}
-            className={`rev-flag${p.period === x.key ? ' is-on' : ''}`} onClick={() => pick(x.key)}>{x.label}</button>
+            className={`rev-flag${p.period === x.key ? ' is-on' : ''}`} onClick={() => pick(x.key)}>{formal ? FORMAL[x.key] : x.label}</button>
         ))}
       </div>
       {p.period === 'custom' && (
@@ -106,13 +104,13 @@ function ExpenseDialog({ onClose, onSaved }) {
     catch (ex) { setErr(ex.message) } finally { setBusy(false) }
   }
   return (
-    <Modal title="مصروف جديد" subtitle="مصاري سحبناها من الصندوق لشي ما إلو علاقة بالمواد: كرسي، فطور للدكاترة، تصليح…" onClose={onClose} busy={busy} sheet>
+    <Modal title="مصروف جديد" subtitle="مبلغٌ يُسحب من الصندوق لأمرٍ لا علاقة له بالمواد: كرسي، فطور للأطباء، تصليح…" onClose={onClose} busy={busy} sheet>
       <form onSubmit={submit} className="inv-form">
         <div className="field"><label htmlFor="fx-amt">المبلغ (ل.س)</label>
           <input id="fx-amt" autoFocus value={amount} inputMode="decimal" placeholder="0"
             onChange={(e) => setAmount(toLatinDigits(e.target.value))} /></div>
         <div className="field"><label htmlFor="fx-why">السبب</label>
-          <input id="fx-why" value={reason} maxLength={300} placeholder="مثال: فطور للدكاترة"
+          <input id="fx-why" value={reason} maxLength={300} placeholder="مثال: فطور للأطباء"
             onChange={(e) => setReason(e.target.value)} /></div>
         {err && <p className="error">{err}</p>}
         <div className="bf-actions inv-actions">
@@ -180,174 +178,106 @@ function OpeningHistory({ onClose }) {
   )
 }
 
-// ═══════ ١) الصندوق — جواب أسئلة المسؤولة بترتيبها (FundOverview.jsx) ═══════
-const PERIOD_WORD = { today: 'اليوم', week: 'هالأسبوع', month: 'هالشهر', custom: 'بالفترة' }
-function FundTab({ canWrite, showToast }) {
+// ═══════ الصندوق: تبويبان، لكلٍّ فترته (FundOverview.jsx) — طلب المستخدم 2026-11-14 ═══════
+const PERIOD_WORD = { today: 'اليوم', week: 'هذا الأسبوع', month: 'هذا الشهر', custom: 'الفترة المحدّدة' }
+
+// ١) «حركة الصندوق» — أوّل ما يُرى: الأرقام، والفلاتر، والحركات سطراً سطراً. والكتابة هنا (مصروف، الرصيد الافتتاحي)
+function MovesTab({ canWrite, showToast }) {
   const p = usePeriod()
   const [params, setParams] = useSearchParams()
-  const view = params.get('view') === 'materials' ? 'materials' : 'overview'
-  const setView = (v) => { const n = new URLSearchParams(params); if (v === 'materials') n.set('view', v); else n.delete('view'); setParams(n); window.scrollTo(0, 0) }
+  const filter = GROUPS.some((g) => g.key === params.get('filter')) ? params.get('filter') : null
+  const setFilter = (f) => { const n = new URLSearchParams(params); if (f) n.set('filter', f); else n.delete('filter'); setParams(n, { replace: true }) }
   const [reload, setReload] = useState(0)
   const [data, err] = useLoad(() => api.clinic.fund(p.query), p.key, reload)
-  const [profit, profitErr] = useLoad(() => api.clinic.materialsProfit(p.query), p.key, reload)
   const [dialog, setDialog] = useState(null)   // 'expense' | 'opening' | 'history'
-  const [filter, setFilter] = useState(null)   // سطرٌ من «من وين/لوين» يفلتر الحركات
-  const [openMat, setOpenMat] = useState(null)
   const refresh = () => { setDialog(null); setReload((k) => k + 1) }
-  const word = PERIOD_WORD[p.period] || 'بالفترة'
-  const pick = (g) => { setFilter(g); if (g) setTimeout(() => document.getElementById('fo-moves')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50) }
-
   return (
     <>
       <div className="fo-bar">
-        <div className="fo-bar-period"><PeriodPicker p={p} data={data || profit} /></div>
+        <div className="fo-bar-period"><PeriodPicker p={p} data={data} formal /></div>
         {canWrite && data && (
           <div className="fo-bar-actions">
-            <button type="button" onClick={() => setDialog('expense')}>+ مصروف</button>
+            <button type="button" onClick={() => setDialog('expense')}>+ مصروف جديد</button>
             <button type="button" className="ghost" onClick={() => setDialog('opening')}>
               {data.opening ? 'الرصيد الافتتاحي' : 'إدخال الرصيد الافتتاحي'}</button>
-            {data.opening && <button type="button" className="link-btn" onClick={() => setDialog('history')}>سجلّه</button>}
+            {data.opening && <button type="button" className="link-btn" onClick={() => setDialog('history')}>سجلّ الرصيد</button>}
           </div>
         )}
       </div>
-      {(err || profitErr) && <p className="error">{err || profitErr}</p>}
-      {!data || !profit ? (!err && !profitErr && <p className="empty">جارٍ التحميل…</p>) : view === 'materials' ? (
-        <MaterialsView data={profit} query={p.query} periodLabel={word} onBack={() => setView('overview')} />
-      ) : (
+      {err ? <p className="error">{err}</p> : !data ? <p className="empty">جارٍ التحميل…</p> : (
         <div className="fo-page">
-          <NowCard fund={data} stock={profit.stock} />
-          <PeriodCard fund={data} periodLabel={word} active={filter} onPick={pick} />
-          <ProfitCard profit={profit} periodLabel={word} onAll={() => setView('materials')} onOpen={setOpenMat} />
+          <MovesStrip fund={data} />
           <Movements fund={data} filter={filter} onFilter={setFilter} />
           <p className="earn-note">
-            يدخل الصندوق تلقائياً ثمن المواد بكلّ إجراءٍ مقبوض (بيوم القبض) واسترداد دوا الحديد وفاضل كل جلسة، ويطلع منه كلّ شراء مواد
-            والمصاريف. حذف إجراءٍ مقبوض بيكتب حركةً عكسية. هالصندوق منفصل عن إيرادات الشفاء (الكشوف وحصّتها من الإجراءات).
-            ربح المواد = سعر بيع ما انباع − كلفة شرائه (متوسّط سعر الشراء لحظة ما انضافت على الإجراء)؛ مواد الحديد بتنطرح بسعر الشراء فما إلها ربح.
+            يدخل الصندوق تلقائياً ثمن المواد في كلّ إجراءٍ مقبوض (بيوم القبض)، واسترداد دواء الحديد وفائض كلّ جلسة، ويخرج منه كلّ شراء مواد
+            والمصاريف. حذف إجراءٍ مقبوض يسجّل حركةً عكسية. هذا الصندوق منفصلٌ عن إيرادات الشفاء (الكشوف وحصّتها من الإجراءات).
           </p>
         </div>
       )}
-      {openMat && <MaterialProfitDialog row={openMat} query={p.query} onClose={() => setOpenMat(null)} />}
-
       {dialog === 'expense' && (
         <ExpenseDialog onClose={() => setDialog(null)}
           onSaved={(_r, n) => { refresh(); showToast(`سُجّل مصروف ${fmtNum(n)} ل.س`, 'success', 4000) }} />
       )}
       {dialog === 'opening' && (
         <OpeningDialog current={data?.opening} onClose={() => setDialog(null)}
-          onSaved={(r) => { refresh(); showToast(`الرصيد الافتتاحي صار ${fmtNum(r.amount)} ل.س`, 'success', 4000) }} />
+          onSaved={(r) => { refresh(); showToast(`أصبح الرصيد الافتتاحي ${fmtNum(r.amount)} ل.س`, 'success', 4000) }} />
       )}
       {dialog === 'history' && <OpeningHistory onClose={() => setDialog(null)} />}
     </>
   )
 }
 
-// ═══════ ٣) حسابات الدكاترة — في DoctorAccounts.jsx (يعرضه هذا التبويب وصفحة «تقارير الدكاترة») ═══════
-
-const shiftMonth = (m, n) => {
-  const [y, mm] = m.split('-').map(Number)
-  const d = new Date(Date.UTC(y, mm - 1 + n, 1))
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`
-}
-
-// ═══ المستهلكات لشهر: هل تقديرات أم أسامة مضبوطة؟ ═══
-// المشتريات = «شراء مواد» لموادّ استهلاكية من الصندوق · المستردّ = ما طُرح فعلاً للمستهلكات من
-// الإجراءات المقبوضة في الشهر · الفرق موجبٌ = التقدير يغطّي، سالبٌ = أقلّ من الكلفة.
-function ConsumablesTab() {
+// ٢) «ملخّص الصندوق» — ما لدينا الآن، ومصادر الداخل وأوجه الخارج، وربح المواد (وصفحة «جميع المواد» تحته)
+function SummaryTab({ onShowMoves }) {
+  const p = usePeriod()
   const [params, setParams] = useSearchParams()
-  const month = /^\d{4}-\d{2}$/.test(params.get('month') || '') ? params.get('month') : null
-  const [data, err] = useLoad(() => api.clinic.consumablesReport(month), month || 'now')
-  const go = (m) => { const next = new URLSearchParams(params); next.set('month', m); setParams(next, { replace: true }) }
-  const cur = data?.month || month
-  const t = data?.totals
-
+  const view = params.get('view') === 'materials' ? 'materials' : 'overview'
+  const setView = (v) => { const n = new URLSearchParams(params); if (v === 'materials') n.set('view', v); else n.delete('view'); setParams(n); window.scrollTo(0, 0) }
+  const [data, err] = useLoad(() => api.clinic.fund(p.query), p.key)
+  const [profit, profitErr] = useLoad(() => api.clinic.materialsProfit(p.query), p.key)
+  const [openMat, setOpenMat] = useState(null)
+  const word = PERIOD_WORD[p.period] || 'الفترة المحدّدة'
   return (
-    <div className="card earn-card">
-      <div className="earn-head">
-        <h3>المستهلكات — المشتريات مقابل المستردّ</h3>
-        <div className="fund-month" role="group" aria-label="الشهر">
-          <button type="button" className="ghost" disabled={!cur} onClick={() => go(shiftMonth(cur, -1))} aria-label="الشهر السابق">→</button>
-          <input type="month" value={cur || ''} aria-label="الشهر" onChange={(e) => e.target.value && go(e.target.value)} />
-          <button type="button" className="ghost" disabled={!cur} onClick={() => go(shiftMonth(cur, 1))} aria-label="الشهر التالي">←</button>
-        </div>
-      </div>
-      {err ? <p className="error">{err}</p> : !data ? <p className="empty">جارٍ التحميل…</p> : (
-        <>
-          <div className="tiles earn-tiles fund-tiles fund-tiles-3">
-            <div className="tile"><div className="label">مشتريات الاستهلاكيات</div><div className="value"><Money value={t.purchases} /></div></div>
-            <div className="tile"><div className="label">المستردّ من الإجراءات</div><div className="value"><Money value={t.recovered} /></div></div>
-            <div className={`tile earn-hero ${t.diff < 0 ? 'fund-loss' : 'fund-gain'}`}>
-              <div className="label">{t.diff < 0 ? 'التقدير أقلّ من الكلفة' : 'التقدير يغطّي'}</div>
-              <div className="value">{signed(t.diff)}</div></div>
-          </div>
-          {data.purchases.length === 0 && data.recovered.length === 0 ? (
-            <p className="empty">لا مشتريات استهلاكيات ولا إجراءات بمستهلكات في هذا الشهر.</p>
-          ) : (
-            <div className="fund-cons-grid">
-              <div>
-                <h4>المشتريات</h4>
-                {data.purchases.length === 0 ? <p className="empty">لا مشتريات استهلاكيات.</p> : (
-                  <table className="rtable earn-table">
-                    <thead><tr><th>المادة</th><th>الكمية</th><th>المبلغ</th></tr></thead>
-                    <tbody>
-                      {data.purchases.map((p) => (
-                        <tr key={p.materialId}>
-                          <td className="rt-title">{p.material}</td>
-                          <td className="num" data-label="الكمية">{fmtNum(p.qty)} {p.unit}</td>
-                          <td className="num" data-label="المبلغ">{fmtNum(p.amount)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-              <div>
-                <h4>المستردّ من الإجراءات</h4>
-                {data.recovered.length === 0 ? <p className="empty">لا إجراءات بمستهلكات.</p> : (
-                  <table className="rtable earn-table">
-                    <thead><tr><th>الإجراء</th><th>المرّات</th><th>المستردّ</th></tr></thead>
-                    <tbody>
-                      {data.recovered.map((r) => (
-                        <tr key={r.procedureId}>
-                          <td className="rt-title">{r.procedure}</td>
-                          <td className="num" data-label="المرّات">{fmtNum(r.times)}</td>
-                          <td className="num" data-label="المستردّ">{fmtNum(r.amount)}
-                            {r.estimate > r.amount && <span className="earn-spec">من تقدير {fmtNum(r.estimate)}</span>}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            </div>
-          )}
-          {t.capped > 0 && (
-            <p className="share-warn">⚠ {fmtNum(t.capped)} ل.س من التقدير لم تُطرح: المواد المعدودة على بعض الإجراءات لم تُبقِ لها من السعر.</p>
-          )}
+    <>
+      <div className="fo-bar"><div className="fo-bar-period"><PeriodPicker p={p} data={data || profit} formal /></div></div>
+      {(err || profitErr) && <p className="error">{err || profitErr}</p>}
+      {!data || !profit ? (!err && !profitErr && <p className="empty">جارٍ التحميل…</p>) : view === 'materials' ? (
+        <MaterialsView data={profit} query={p.query} periodLabel={word} onBack={() => setView('overview')} />
+      ) : (
+        <div className="fo-page">
+          <NowCard fund={data} stock={profit.stock} />
+          <PeriodCard fund={data} periodLabel={word} onPick={(g) => onShowMoves(g, p)} />
+          <ProfitCard profit={profit} periodLabel={word} onAll={() => setView('materials')} onOpen={setOpenMat} />
           <p className="earn-note">
-            المشتريات = كلّ «شراء مواد» من الصندوق لمادةٍ استهلاكية في الشهر (بتاريخ الشراء). المستردّ = قيمة المستهلكات
-            المطروحة من الإجراءات المقبوضة في الشهر (بيوم القبض، والمُزال لا يُعدّ). فرقٌ سالبٌ متكرّر يعني أنّ قيمة
-            المستهلكات على أنواع الإجراءات أقلّ من كلفتها الفعلية — تُعدَّل من صفحة الإجراءات وتسري على ما بعدها.
+            ربح المواد = قيمة بيع ما بيع − كلفة شرائه (متوسّط سعر الشراء لحظة إضافتها على الإجراء)، فالشراء اللاحق لا يغيّر ربح ما بيع.
+            مواد جلسات الحديد تُحتسب بسعر الشراء فلا ربح لها، وفائض الحديد يظهر في حركة الصندوق.
           </p>
-        </>
+        </div>
       )}
-    </div>
+      {openMat && <MaterialProfitDialog row={openMat} query={p.query} onClose={() => setOpenMat(null)} />}
+    </>
   )
 }
+
+// ═══════ ٣) حسابات الدكاترة — في DoctorAccounts.jsx (يعرضه هذا التبويب وصفحة «تقارير الدكاترة») ═══════
 
 export default function ClinicFunds() {
   const { clinicRole: role } = useRole()
   const canWrite = canWriteClinicFunds(role)
   const [params, setParams] = useSearchParams()
-  const tab = TABS.some(([k]) => k === params.get('tab')) ? params.get('tab') : 'fund'   // ومنه ?tab=profit القديم
+  const asked = params.get('tab') === 'profit' ? 'summary' : params.get('tab')
+  const tab = TABS.some(([k]) => k === asked) ? asked : 'fund'
   const [toast, showToast] = useToast()
-  // تبديل التبويب يبدأ بفترته الافتراضية: فترة «الصندوق» ليست شهر «الدكاترة»
+  // لكلّ تبويبٍ فترته: التبديل يبدأ بفترته الافتراضية
   const pickTab = (k) => setParams(k === 'fund' ? {} : { tab: k })
+  // من «الملخّص»: الضغط على مصدرٍ أو وجه يفتح «حركة الصندوق» بالفترة نفسها مصفّاةً به
+  const showMoves = (filter, p) => setParams({ ...(p.period === 'custom' ? { period: 'custom', from: p.from, to: p.to } : { period: p.period }), filter })
 
   return (
     <>
       <h2>صندوق العيادات</h2>
       <p className="subtitle">
-        شو عنّا بالصندوق، شو فات وشو طلع، وقديش عم تربّحنا المواد.
+        حركة الصندوق، وما لدينا الآن، وأرباح المواد.
         {!canWrite && ' للاطّلاع فقط — تديره مشرفة العيادات.'}
       </p>
       {toast}
@@ -357,8 +287,8 @@ export default function ClinicFunds() {
             className={tab === k ? '' : 'ghost'} onClick={() => pickTab(k)}>{label}</button>
         ))}
       </div>
-      {tab === 'fund' && <FundTab canWrite={canWrite} showToast={showToast} />}
-      {tab === 'consumables' && <ConsumablesTab />}
+      {tab === 'fund' && <MovesTab canWrite={canWrite} showToast={showToast} />}
+      {tab === 'summary' && <SummaryTab onShowMoves={showMoves} />}
       {tab === 'doctors' && <DoctorsTab canWrite={canWrite} />}
     </>
   )
