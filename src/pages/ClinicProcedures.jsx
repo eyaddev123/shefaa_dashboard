@@ -1,182 +1,81 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { ProcedureSpecialties, specialtiesText } from '../SpecialtyPicker.jsx'
 import { useDialogs } from '../dialogs.jsx'
-import { api, fmtMoney, toLatinDigits } from '../api.js'
+import { api } from '../api.js'
 import { useRole } from '../RoleContext.jsx'
 import { useToast } from '../action-feedback.jsx'
-import ProcedureReview from './ProcedureReview.jsx'
 import ProcedureEarnings from './ProcedureEarnings.jsx'
+import ProcedureDialog from '../components/procedures/ProcedureDialog.jsx'
 import { canSeeEarnings } from '../permissions.js'
+import { matchesAr } from '../arabic-search.js'
 import { DistributeRuleDialog, PricingHistoryDialog } from '../components/ShareRuleDialogs.jsx'
 import { doctorsCount } from '../share-rule.js'
 
 // ═══ العيادات — الإجراءات ═══
-// كتالوج عام لكل الدكاترة: اسم وسعر، بلا كمية. مسؤول العيادات يضيف ويعدّل ويعطّل —
-// ولا حذف (الحجوزات تشير إليه). تعديل السعر يسري على ما يُضاف بعده فقط: كل حجز
-// يحمل نسخة السعر لحظة إضافته. المجلس والمشرف العام والمدير يطالعون فقط.
-// ومن كل إجراء: «تطبيق قاعدة على دكاترة» (المشرفة) يكتب قاعدةً خاصّة عند عدّة دكاترة دفعةً
-// واحدة، و«تاريخ التسعيرة» (المشرفة والمدير) خطٌّ زمنيّ للسعر والقواعد — يطابق الخادم.
-// «المستهلكات»: قيمةٌ مقدّرة لقطنٍ وشاشٍ وبيتادين يستهلكها الإجراء كلّ مرّة (بلا رصيد ولا كمّيات) —
-// تُطرح من مبلغه لصندوق العيادات مع المواد، وتسري على ما يُضاف بعدها. الخادم لا يرسلها للاستقبال.
+// تبويبان: «الإجراءات» (الكتالوج) و«المستحقات» (من يراها). تبويب «المراجعة» أُزيل بطلب المستخدم
+// (2026-11-15: «المستحقات مكفّيتها»): أدواته التي لها عمل — غير المدفوع، وتصحيح مواد السطر وأثره،
+// و«إجراء فقط» بلا إجراء، والتنبيهات — صارت في «المستحقات». ?tab=review القديم يفتح المستحقات.
+//
+// الكتالوج يجيب أسئلة المشرفة: «بكم الإجراء الفلاني؟» (بحث) · «ما إجراءات هذا الاختصاص؟» (أزرار
+// الاختصاصات بعددها) · «ما الأكثر طلباً؟» (الترتيب). كلّ إجراء بطاقةٌ تُفتح، وفي نافذتها كلّ ما يخصّه.
+// كتالوجٌ عام لكل الدكاترة بلا حذف (الحجوزات تشير إليه): المُستغنى عنه يُعطَّل. المشرفة تكتب، والمجلس
+// والمشرف العام والمدير يطالعون (والمدير والمشرفة يرون تاريخ التسعيرة) — يطابق الخادم.
 const PRICING_HISTORY_READERS = ['clinic_admin', 'manager']
-
-// من يرى المراجعة (المواد بأسعارها والتقسيم) — يطابق SETTLEMENT_VIEWERS في الخادم.
-// الاستقبال غائبٌ عمداً (ولا يرى الصفحة أصلاً): يُدخل الإجراء وموادّه، ولا شأن له بالتقسيم.
-// كتالوج المواد واستهلاكها ليسا هنا: صفحة «المخزون» المكان الوحيد لإدارتهما.
+// المستهلكات تُرسل لمن يرى التقسيم وحده — يطابق SETTLEMENT_VIEWERS في الخادم.
 const SETTLEMENT_VIEWERS = ['clinic_admin', 'board', 'super_admin', 'manager']
-// «المستحقات» تبويبٌ هنا لا صفحةٌ في القائمة: مصدرها لقطات الأسطر نفسها التي تعرضها
-// «المراجعة»، ومن يراها يرى الصفحة أصلاً. يُخفى عن المجلس (canSeeEarnings) والخادم يردّه 403.
-// التبويب في الرابط (?tab=) فيبقى بعد التحديث، ويُفتح من رابطٍ مباشر.
 const TABS = [
   { key: 'catalog', label: 'الإجراءات' },
-  { key: 'review', label: 'المراجعة' },
   { key: 'earnings', label: 'المستحقات', allow: canSeeEarnings },
 ]
+const SORTS = [['used', 'الأكثر استعمالاً'], ['name', 'أبجدياً'], ['price', 'الأعلى سعراً']]
 
-function NewProcedureForm({ onCreated }) {
-  const [form, setForm] = useState({ name: '', price: '', consumables: '' })
-  // «عام» افتراضاً: إجراءٌ جديد يظهر للجميع حتى يُسنده المشرف — لا يختفي بصمت
-  const [spec, setSpec] = useState({ isGeneral: true, specialtyIds: [] })
-  const [err, setErr] = useState(null)
-  const [busy, setBusy] = useState(false)
-  const submit = async (e) => {
-    e.preventDefault()
-    setErr(null); setBusy(true)
-    try {
-      const created = await api.clinic.addProcedure({ name: form.name, price: form.price, consumables_cost: form.consumables })
-      // الإنشاء يُولّد الإجراء «عامّاً» (قيمة العمود الافتراضية)، والاختصاصات
-      // تُضبط بمسارها الذرّيّ. فلا نناديه إلا إن اختار المشرف غير الافتراضي —
-      // وإخفاقه لا يُضيّع الإجراء: نقول إنّه أُنشئ عامّاً ليُسنده من الجدول.
-      if (!spec.isGeneral && created?.id) {
-        try {
-          await api.clinic.setProcedureSpecialties(created.id,
-            { is_general: false, specialty_ids: spec.specialtyIds.map(Number) })
-        } catch (ex) {
-          setErr(`أُنشئ «${form.name.trim()}» لكن تعذّر إسناد الاختصاصات (${ex.message}) — أسنِدها من الجدول.`)
-        }
-      }
-      setForm({ name: '', price: '', consumables: '' })
-      setSpec({ isGeneral: true, specialtyIds: [] })
-      onCreated(form.name.trim(), created?.warnings || [])
-    } catch (ex) { setErr(ex.message) }
-    finally { setBusy(false) }
-  }
-  // سطرٌ واحد: الاسم · السعر · الاختصاصات · الزرّ — بارتفاعٍ واحد وعلى خطٍّ واحد
-  return (
-    <form className="proc-form" onSubmit={submit}>
-      <div className="field"><label htmlFor="new-proc-name">اسم الإجراء</label>
-        <input id="new-proc-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} maxLength={150}
-          placeholder="مثال: تخطيط قلب" required /></div>
-      {/* نصّ لا number: حقل الرقم يبتلع الأرقام العربية */}
-      <div className="field"><label htmlFor="new-proc-price">السعر (ل.س)</label>
-        <input id="new-proc-price" value={form.price} inputMode="decimal" placeholder="0"
-          onChange={(e) => setForm({ ...form, price: toLatinDigits(e.target.value) })} required /></div>
-      <div className="field"><label htmlFor="new-proc-cons">المستهلكات المقدّرة (ل.س)</label>
-        <input id="new-proc-cons" value={form.consumables} inputMode="decimal" placeholder="0"
-          title="قطن وشاش وبيتادين يستهلكها الإجراء كلّ مرّة — تُطرح لصندوق العيادات"
-          onChange={(e) => setForm({ ...form, consumables: toLatinDigits(e.target.value) })} /></div>
-      <ProcedureSpecialties id="new-proc-spec" isGeneral={spec.isGeneral} specialtyIds={spec.specialtyIds}
-        canAdd onChange={setSpec} />
-      <button type="submit" className="proc-form-btn" disabled={busy}>{busy ? 'جارٍ الإضافة…' : 'إضافة'}</button>
-      {err && <p className="error proc-form-err">{err}</p>}
-    </form>
-  )
-}
+const fmtNum = (n) => Number(n || 0).toLocaleString('ar-SY', { maximumFractionDigits: 2 })
+const usedText = (n) => (n === 0 ? 'لم يُستعمل' : n === 1 ? 'مرّة واحدة' : n === 2 ? 'مرّتان'
+  : `${fmtNum(n)} ${n % 100 >= 3 && n % 100 <= 10 ? 'مرّات' : 'مرّة'}`)
+const specsOf = (p) => (p.is_general || !(p.specialties || []).length ? [] : p.specialties)
 
-// تعديل الاسم والسعر والاختصاصات في الصفّ نفسه — بنفس مكوّن الإضافة
-const specKey = (sp) => (sp.isGeneral ? 'general' : [...sp.specialtyIds].map(String).sort().join(','))
-function EditRow({ proc, onSaved, onCancel }) {
-  // onSaved(warnings): سعرٌ نزل تحت مبلغٍ ثابت عند دكتور يرجع بتحذيرٍ من الخادم
+function Catalog({ list, role, reload, showToast }) {
   const dlg = useDialogs()
-  const [name, setName] = useState(proc.name)
-  const [price, setPrice] = useState(String(Number(proc.price)))
-  const [consumables, setConsumables] = useState(String(Number(proc.consumables_cost || 0)))
-  const initialSpec = {
-    isGeneral: !!proc.is_general || !(proc.specialties || []).length,
-    specialtyIds: proc.is_general ? [] : (proc.specialties || []).map((x) => String(x.id)),
-  }
-  const [spec, setSpec] = useState(initialSpec)
-  const specChanged = specKey(spec) !== specKey(initialSpec)
-  const [err, setErr] = useState(null)
-  const [busy, setBusy] = useState(false)
-  const save = async () => {
-    const body = {}
-    if (name.trim() !== proc.name) body.name = name
-    if (Number(price) !== Number(proc.price) || price.trim() === '') body.price = price
-    if (Number(consumables || 0) !== Number(proc.consumables_cost || 0)) body.consumables_cost = consumables || '0'
-    if (Object.keys(body).length === 0 && !specChanged) return onCancel()
-    if (body.price !== undefined) {
-      const ok = await dlg.confirm({
-        title: 'تغيير السعر',
-        body: `تغيير سعر «${proc.name}» من ${fmtMoney(proc.price)} إلى ${fmtMoney(price)}؟\n`
-          + 'يسري على ما يُضاف بعد الحفظ فقط — ما أُضيف لحجوزات سابقة يبقى بسعره.',
-        confirmLabel: 'غيّر السعر',
-      })
-      if (!ok) return
-    }
-    if (body.consumables_cost !== undefined) {
-      const ok = await dlg.confirm({
-        title: 'تغيير المستهلكات',
-        body: `تغيير مستهلكات «${proc.name}» من ${fmtMoney(proc.consumables_cost || 0)} إلى ${fmtMoney(consumables || 0)}؟\n`
-          + 'يسري على ما يُضاف بعد الحفظ فقط — الإجراءات المسجّلة تبقى بقيمتها.',
-        confirmLabel: 'غيّر المستهلكات',
-      })
-      if (!ok) return
-    }
-    setErr(null); setBusy(true)
-    try {
-      const out = Object.keys(body).length ? await api.clinic.updateProcedure(proc.id, body) : null
-      // الاختصاصات بمسارها الذرّيّ (مسحٌ ثمّ إدراج في معاملةٍ واحدة)
-      if (specChanged) await api.clinic.setProcedureSpecialties(proc.id,
-        { is_general: spec.isGeneral, specialty_ids: spec.isGeneral ? [] : spec.specialtyIds.map(Number) })
-      onSaved(out?.warnings || [])
-    } catch (ex) { setErr(ex.message) }
-    finally { setBusy(false) }
-  }
-  return (
-    <tr className="proc-editing">
-      <td className="rt-full"><input value={name} maxLength={150} onChange={(e) => setName(e.target.value)} aria-label="اسم الإجراء" /></td>
-      <td className="rt-full"><input value={price} inputMode="decimal" style={{ width: 130 }} aria-label="السعر"
-        onChange={(e) => setPrice(toLatinDigits(e.target.value))} /></td>
-      <td className="rt-full"><input value={consumables} inputMode="decimal" style={{ width: 110 }} aria-label="المستهلكات المقدّرة"
-        onChange={(e) => setConsumables(toLatinDigits(e.target.value))} /></td>
-      <td className="proc-edit-spec rt-full">
-        <ProcedureSpecialties id={`edit-spec-${proc.id}`} hideLabel isGeneral={spec.isGeneral}
-          specialtyIds={spec.specialtyIds} canAdd onChange={setSpec} />
-      </td>
-      <td colSpan={4} className="rt-full">
-        <div className="inline proc-edit-actions" style={{ gap: 6 }}>
-          <button onClick={save} disabled={busy} style={{ padding: '4px 12px', fontSize: 12 }}>حفظ</button>
-          <button className="ghost" onClick={onCancel} style={{ padding: '4px 12px', fontSize: 12 }}>إلغاء</button>
-        </div>
-        {err && <p className="error" style={{ margin: '6px 0 0' }}>{err}</p>}
-      </td>
-    </tr>
-  )
-}
-
-export default function ClinicProcedures() {
-  const dlg = useDialogs()
-  const [list, setList] = useState(null)
-  const [err, setErr] = useState(null)
-  const [editing, setEditing] = useState(null)
   const [params, setParams] = useSearchParams()
-  const [toast, showToast] = useToast()
-  const { clinicRole: role } = useRole()
-  const tabs = SETTLEMENT_VIEWERS.includes(role) ? TABS.filter((t) => !t.allow || t.allow(role)) : []
-  const tab = tabs.some((t) => t.key === params.get('tab')) ? params.get('tab') : 'catalog'
-  // تبديل التبويب يمسح معاملات التبويب السابق (فترة المستحقات ودكتورها)
-  const setTab = (key) => setParams(key === 'catalog' ? {} : { tab: key }, { replace: true })
+  const q = params.get('q') || ''
+  const spec = params.get('spec') || ''
+  const sort = SORTS.some(([k]) => k === params.get('sort')) ? params.get('sort') : 'used'
+  const set = (patch) => {
+    const next = new URLSearchParams(params)
+    for (const [k, v] of Object.entries(patch)) { if (v == null || v === '') next.delete(k); else next.set(k, v) }
+    setParams(next, { replace: true })
+  }
   const canEdit = role === 'clinic_admin'
   const canHistory = PRICING_HISTORY_READERS.includes(role)
-  // المستهلكات من التقسيم: لمن يراه وحده (والخادم لا يرسلها لغيره أصلاً)
   const seesConsumables = SETTLEMENT_VIEWERS.includes(role)
-  const [distributing, setDistributing] = useState(null)   // الإجراء الذي تُوزَّع قاعدته
+  const canOpen = canEdit || canHistory || seesConsumables
+  const [openId, setOpenId] = useState(null)       // رقم الإجراء المفتوح، أو 'new'
+  const [distributing, setDistributing] = useState(null)
   const [historyOf, setHistoryOf] = useState(null)
+  const open = openId && openId !== 'new' ? list.find((p) => p.id === openId) : null
 
-  const load = () => api.clinic.procedures().then((r) => { setList(r); setErr(null) }).catch((e) => setErr(e.message))
-  useEffect(() => { load() }, [])
+  // أزرار الاختصاصات بعدد المفعَّل في كلٍّ — مرتّبةً بالأكثر
+  const specs = useMemo(() => {
+    const m = new Map()
+    for (const p of list) {
+      if (!p.is_active) continue
+      const ss = specsOf(p)
+      if (!ss.length) m.set('general', { id: 'general', name: 'عام', n: (m.get('general')?.n || 0) + 1 })
+      for (const s of ss) m.set(String(s.id), { id: String(s.id), name: s.name, n: (m.get(String(s.id))?.n || 0) + 1 })
+    }
+    return [...m.values()].sort((a, b) => b.n - a.n || a.name.localeCompare(b.name, 'ar'))
+  }, [list])
+  const active = list.filter((p) => p.is_active)
+  const stopped = list.filter((p) => !p.is_active)
+  const pool = spec === 'off' ? stopped : active
+  const shown = pool
+    .filter((p) => !spec || spec === 'off' || (spec === 'general' ? specsOf(p).length === 0 : specsOf(p).some((s) => String(s.id) === spec)))
+    .filter((p) => !q.trim() || matchesAr(p.name, q.trim()))
+    .sort((a, b) => (sort === 'name' ? a.name.localeCompare(b.name, 'ar')
+      : sort === 'price' ? Number(b.price) - Number(a.price) || a.name.localeCompare(b.name, 'ar')
+      : b.times_used - a.times_used || a.name.localeCompare(b.name, 'ar')))
+  // بحثٌ لا يجد شيئاً في الاختصاص المختار — لكنّه يجد خارجه: نقول ذلك
+  const elsewhere = q.trim() && shown.length === 0 ? list.filter((p) => matchesAr(p.name, q.trim())).length : 0
 
   const toggleActive = async (p) => {
     if (p.is_active) {
@@ -189,107 +88,83 @@ export default function ClinicProcedures() {
     }
     try {
       await api.clinic.updateProcedure(p.id, { is_active: !p.is_active })
-      showToast(p.is_active ? `عُطّل «${p.name}»` : `فُعّل «${p.name}»`, 'success', 3000); load()
+      showToast(p.is_active ? `عُطّل «${p.name}»` : `فُعّل «${p.name}»`, 'success', 3000)
+      setOpenId(null); reload()
     } catch (ex) { showToast(ex.message) }
   }
 
-  if (err && !list) return <p className="error">{err}</p>
-  if (!list) return <p className="empty">جارٍ التحميل…</p>
-
-  const active = list.filter((p) => p.is_active).length
   return (
     <>
-      <h2>العيادات — الإجراءات</h2>
-      <p className="subtitle">
-        الاستقبال يضيف الإجراء على الحجز بعد دخول المريض، ومعه المواد المستعملة فعلاً بكمّياتها؛
-        فتُحسب المواد وحصّة الدكتور وحصّة الشفاء <strong>فوراً</strong> وتُثبَّت، وتنزل المواد من رصيد
-        المخزون تلقائياً. والمريض يدفع سعر الإجراء كما هو دائماً. تعديل الأسعار والقواعد يسري على ما
-        يُضاف بعده فقط. لا حذف: المُستغنى عنه يُعطَّل. كتالوج المواد وأسعارها واستهلاكها في صفحة <Link to="/inventory">«المخزون»</Link>.
-      </p>
-      {toast}
-
-      {/* الصفحة لا يراها الاستقبال أصلاً — والخادم يرفض مساراتها بـ403 لا الواجهة وحدها */}
-      {tabs.length > 0 && (
-        <div className="inline proc-tabs" role="tablist" style={{ gap: 8, marginBottom: 14 }}>
-          {tabs.map((t) => (
-            <button key={t.key} type="button" role="tab" aria-selected={tab === t.key}
-              className={tab === t.key ? '' : 'ghost'} style={{ padding: '6px 16px' }}
-              onClick={() => setTab(t.key)}>{t.label}</button>
+      <div className="pcx-bar">
+        <input type="search" className="pcx-search" value={q} placeholder="ابحث عن إجراء بالاسم"
+          aria-label="بحث عن إجراء" onChange={(e) => set({ q: e.target.value })} />
+        <div className="pcx-sort" role="group" aria-label="الترتيب">
+          {SORTS.map(([k, label]) => (
+            <button key={k} type="button" aria-pressed={sort === k} className={`rev-flag${sort === k ? ' is-on' : ''}`}
+              onClick={() => set({ sort: k === 'used' ? null : k })}>{label}</button>
           ))}
         </div>
+        {canEdit && <button type="button" className="pcx-new" onClick={() => setOpenId('new')}>+ إجراء جديد</button>}
+      </div>
+
+      <div className="pcx-specs" role="group" aria-label="الاختصاص">
+        <button type="button" aria-pressed={!spec} className={`pcx-spec${!spec ? ' is-on' : ''}`} onClick={() => set({ spec: null })}>
+          الكلّ <span className="pcx-spec-n">{fmtNum(active.length)}</span></button>
+        {specs.map((s) => (
+          <button key={s.id} type="button" aria-pressed={spec === s.id} className={`pcx-spec${spec === s.id ? ' is-on' : ''}`}
+            onClick={() => set({ spec: s.id })}>{s.name} <span className="pcx-spec-n">{fmtNum(s.n)}</span></button>
+        ))}
+        {stopped.length > 0 && (
+          <button type="button" aria-pressed={spec === 'off'} className={`pcx-spec is-off${spec === 'off' ? ' is-on' : ''}`}
+            onClick={() => set({ spec: 'off' })}>المعطَّلة <span className="pcx-spec-n">{fmtNum(stopped.length)}</span></button>
+        )}
+      </div>
+
+      {shown.length === 0 ? (
+        <p className="empty pcx-empty">
+          {list.length === 0 ? `لا إجراءات بعد${canEdit ? ' — أضف أوّلها من «إجراء جديد»' : ''}.`
+            : elsewhere ? <>لا نتيجة هنا — وفي غير هذا الاختصاص {fmtNum(elsewhere)}. <button type="button" className="link-btn" onClick={() => set({ spec: null })}>ابحث في الكلّ</button></>
+            : 'لا إجراءات تطابق البحث.'}
+        </p>
+      ) : (
+        <ul className="pcx-grid">
+          {shown.map((p) => {
+            const ss = specsOf(p)
+            const body = (
+              <>
+                <span className="pcx-name">{p.name}</span>
+                <span className="pcx-price">{fmtNum(p.price)}<span className="cash-unit">ل.س</span></span>
+                <span className="pcx-tags">
+                  {ss.length ? ss.map((s) => <span key={s.id} className="pcx-tag">{s.name}</span>) : <span className="pcx-tag">عام</span>}
+                </span>
+                <span className="pcx-foot">
+                  <span>{usedText(p.times_used)}</span>
+                  {seesConsumables && Number(p.consumables_cost) > 0 && <span>مستهلكات {fmtNum(p.consumables_cost)}</span>}
+                </span>
+              </>
+            )
+            return (
+              <li key={p.id} className={p.is_active ? undefined : 'is-off'}>
+                {canOpen
+                  ? <button type="button" className="pcx-card" onClick={() => setOpenId(p.id)} aria-label={`${p.name}، ${fmtNum(p.price)} ل.س`}>{body}</button>
+                  : <div className="pcx-card">{body}</div>}
+              </li>
+            )
+          })}
+        </ul>
       )}
 
-      {tab === 'review' ? <ProcedureReview canEdit={canEdit} showToast={showToast} />
-      : tab === 'earnings' ? <ProcedureEarnings showToast={showToast} />
-      : (
-      <div className="card">
-        <h3>الكتالوج ({list.length} — المفعَّل {active})</h3>
-        {canEdit
-          ? <NewProcedureForm onCreated={(name, warnings) => {
-              if (warnings.length) showToast(`أُضيف «${name}» — ⚠ ${warnings.join('، ')}`, 'warning', 8000)
-              else showToast(`أُضيف «${name}»`, 'success', 3000)
-              load()
-            }} />
-          : <p className="subtitle" style={{ marginTop: -6 }}>للاطّلاع فقط — يديره مسؤول العيادات.</p>}
-        <table className="rtable" style={{ marginTop: 14 }}>
-          <thead>
-            <tr><th>الإجراء</th><th>السعر الحالي</th>{seesConsumables && <th title="تُطرح لصندوق العيادات مع المواد">المستهلكات</th>}<th>الاختصاصات</th><th>الحالة</th><th>استُعمل</th><th>آخر تعديل</th>{canHistory && <th></th>}</tr>
-          </thead>
-          <tbody>
-            {list.map((p) => editing === p.id ? (
-              <EditRow key={p.id} proc={p} onCancel={() => setEditing(null)}
-                onSaved={(warnings) => {
-                  setEditing(null); load()
-                  if (warnings.length) showToast(`حُفظ التعديل — ⚠ ${warnings.join('، ')}`, 'warning', 8000)
-                  else showToast('حُفظ التعديل', 'success', 3000)
-                }} />
-            ) : (
-              <tr key={p.id} className={p.is_active ? undefined : 'proc-inactive'}>
-                <td className="rt-title">{p.name}</td>
-                <td className="num" data-label="السعر الحالي">{fmtMoney(p.price)}</td>
-                {seesConsumables && (
-                  <td className="num" data-label="المستهلكات">
-                    {Number(p.consumables_cost) > 0 ? fmtMoney(p.consumables_cost) : <span className="muted">—</span>}
-                  </td>
-                )}
-                <td className="proc-spec-cell rt-full" data-label="الاختصاصات">
-                  {specialtiesText(p) === 'عام' ? <span className="badge">عام</span> : specialtiesText(p)}
-                </td>
-                <td className="rt-badge">{p.is_active ? <span className="badge good">مفعَّل</span> : <span className="badge">معطَّل</span>}</td>
-                <td className="num" data-label="استُعمل">{p.times_used} حجز</td>
-                <td className="proc-meta-cell" data-label="آخر تعديل" style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                  {p.updated_by_name || p.created_by_name || '—'}
-                  {(p.updated_at || p.created_at) && (
-                    <span dir="ltr" style={{ marginInlineStart: 6 }}>
-                      {new Date(p.updated_at || p.created_at).toLocaleDateString('en-CA')}
-                    </span>
-                  )}
-                </td>
-                {canHistory && (
-                  <td className="proc-actions-cell rt-actions">
-                    {canEdit && <>
-                      <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }}
-                        onClick={() => setEditing(p.id)}>تعديل</button>{' '}
-                      <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }}
-                        onClick={() => toggleActive(p)}>{p.is_active ? 'تعطيل' : 'تفعيل'}</button>{' '}
-                      {/* القاعدة الموزَّعة تُكتب لإجراءٍ مفعَّل وحده — المعطَّل لا يُضاف لحجز أصلاً */}
-                      {p.is_active && (
-                        <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }}
-                          onClick={() => setDistributing(p)}>تطبيق قاعدة على دكاترة</button>
-                      )}{' '}
-                    </>}
-                    <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }}
-                      onClick={() => setHistoryOf(p)}>تاريخ التسعيرة</button>
-                  </td>
-                )}
-              </tr>
-            ))}
-            {list.length === 0 && (
-              <tr><td colSpan={(canHistory ? 7 : 6) + (seesConsumables ? 1 : 0)} className="empty">لا إجراءات بعد{canEdit ? ' — أضف أولها أعلاه' : ''}</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      {(openId === 'new' || open) && (
+        <ProcedureDialog key={openId} proc={open} canEdit={canEdit} canHistory={canHistory} seesConsumables={seesConsumables}
+          onClose={() => setOpenId(null)}
+          onSaved={(text, warnings) => {
+            setOpenId(null); reload()
+            if (warnings.length) showToast(`${text} — ⚠ ${warnings.join('، ')}`, 'warning', 8000)
+            else showToast(text, 'success', 3000)
+          }}
+          onDistribute={() => { setDistributing(open); setOpenId(null) }}
+          onHistory={() => setHistoryOf(open)}
+          onToggle={() => toggleActive(open)} />
       )}
       {distributing && (
         <DistributeRuleDialog procedure={distributing} onClose={() => setDistributing(null)}
@@ -304,5 +179,51 @@ export default function ClinicProcedures() {
       )}
       {historyOf && <PricingHistoryDialog procedure={historyOf} onClose={() => setHistoryOf(null)} />}
     </>
+  )
+}
+
+export default function ClinicProcedures() {
+  const [list, setList] = useState(null)
+  const [err, setErr] = useState(null)
+  const [params, setParams] = useSearchParams()
+  const [toast, showToast] = useToast()
+  const { clinicRole: role } = useRole()
+  const tabs = TABS.filter((t) => !t.allow || t.allow(role))
+  // ?tab=review (رابطٌ قديم أو من لوحة القيادة) ⇐ المستحقات، فأدوات المراجعة فيها الآن
+  const asked = params.get('tab') === 'review' ? 'earnings' : params.get('tab')
+  const tab = tabs.some((t) => t.key === asked) ? asked : 'catalog'
+  const setTab = (key) => setParams(key === 'catalog' ? {} : { tab: key }, { replace: true })
+
+  const load = () => api.clinic.procedures().then((r) => { setList(r); setErr(null) }).catch((e) => setErr(e.message))
+  useEffect(() => { load() }, [])
+
+  const active = list ? list.filter((p) => p.is_active).length : 0
+  return (
+    <div className="pcx-page">
+      <div className="pcx-head">
+        <h2>الإجراءات</h2>
+        <p className="subtitle pcx-lead">
+          {tab === 'earnings'
+            ? 'ما طلع لكلّ دكتور من الإجراءات، وحصّة الشفاء منها — من لحظة القبض، كما سُجّل.'
+            : <>الاستقبال يضيف الإجراء بعد دخول المريض ومعه موادّه، فتُحسب الحصص فوراً وتنزل المواد من المخزون.
+              {' '}المواد وأسعارها في <Link to="/inventory">المخزون</Link>.</>}
+        </p>
+      </div>
+      {toast}
+      {tabs.length > 1 && (
+        <div className="pcx-tabs" role="tablist">
+          {tabs.map((t) => (
+            <button key={t.key} type="button" role="tab" aria-selected={tab === t.key}
+              className={`pcx-tab${tab === t.key ? ' is-on' : ''}`} onClick={() => setTab(t.key)}>
+              {t.label}{t.key === 'catalog' && list && <span className="pcx-tab-n">{fmtNum(active)}</span>}
+            </button>
+          ))}
+        </div>
+      )}
+      {tab === 'earnings' ? <ProcedureEarnings showToast={showToast} canEdit={role === 'clinic_admin'} />
+        : err && !list ? <p className="error">{err}</p>
+        : !list ? <p className="empty">جارٍ التحميل…</p>
+        : <Catalog list={list} role={role} reload={load} showToast={showToast} />}
+    </div>
   )
 }

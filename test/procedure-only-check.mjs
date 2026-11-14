@@ -6,7 +6,7 @@
 // الردود من لقطات الخادم الحقيقي (visit-page.json و cash-report.json) بتعديل النوع والأجر، فلا
 // خادم ولا قاعدة هنا. نفحص: خيار الحجز وما يُرسله · بلا تمرير أفقي (الراديو المخفيّ مدّ الصفحة
 // مرّة) · الطابور والزيارة وقفل النوع · شارة الطبيب · البطاقتان (HTML والوسيط) بلا سطر كشفية ·
-// الجرد لا يعدّها كشوفاً · قسم «انتهت بلا إجراء» في المراجعة.
+// الجرد لا يعدّها كشوفاً · تنبيه «إجراء فقط» بلا إجراء في المستحقات (كان في المراجعة).
 // ═══════════════════════════════════════════════════════════════════
 import { chromium } from 'playwright'
 import { spawn } from 'node:child_process'
@@ -251,21 +251,22 @@ async function run() {
     await ctx.close()
   }
 
-  console.log('\n── ٧) المراجعة ──')
+  console.log('\n── ٧) المستحقات: «إجراء فقط» بلا إجراء في «يحتاج انتباهك» (تبويب المراجعة أُزيل) ──')
   {
     const visits = [{ id: '104', session_id: SID, session_date: '2026-10-25', patient_name: 'مريض رقم 104', doctor_name: 'د. خالد' }]
-    const reviewBody = { lines: [], counts: { lines: 0 }, totals: { price: 0, materials: 0, consumables: 0, doctor: 0, shifa: 0 } }
-    const common = { '/clinic/procedures/review': () => reviewBody, '/clinic/procedures/unpaid': () => ({ lines: [], total: 0 }), '/clinic/doctors': () => [] }
-    let { ctx, page } = await open(browser, '/clinic/procedures?tab=review', { role: 'umosama', on: { ...common, '/clinic/procedures/empty-visits': () => ({ visits }) } })
-    await page.waitForSelector('#rev-empty-title')
-    ok((await textOf(page.locator('#rev-empty-title'))).includes('انتهت بلا إجراء'), '★ القسم ظاهر حين توجد حالة')
-    ok(await page.locator(`a[href="/clinic/session/${SID}/visit/104"]`).count() === 1, 'وبرابطٍ لصفحة الزيارة')
+    const earnings = { from: '2026-10-25', to: '2026-10-25', period: 'today', doctors: [],
+      totals: { count: 0, price: 0, materials: 0, doctor: 0, shifa: 0 }, iron: { count: 0, share: 0 }, grand: 0 }
+    const common = { '/clinic/procedures/earnings': () => earnings, '/clinic/procedures/unpaid': () => ({ lines: [], total: 0 }) }
+    let { ctx, page } = await open(browser, '/clinic/procedures?tab=earnings', { role: 'umosama', on: { ...common, '/clinic/procedures/empty-visits': () => ({ visits }) } })
+    await page.waitForSelector('.pex-chip')
+    ok((await textOf(page.locator('.pex-chip'))).includes('بلا إجراء'), '★ التنبيه ظاهر حين توجد حالة')
+    await page.locator('.pex-chip').click()
+    ok(await page.locator(`.pex-attn-body a[href="/clinic/session/${SID}/visit/104"]`).count() >= 1, 'وبرابطٍ لصفحة الزيارة')
     ok(await noOverflow(page), 'بلا تمرير أفقي')
     await ctx.close()
-    ;({ ctx, page } = await open(browser, '/clinic/procedures?tab=review', { role: 'umosama', on: { ...common, '/clinic/procedures/empty-visits': () => ({ visits: [] }) } }))
-    await page.waitForSelector('text=مراجعة الإجراءات وحصصها')
-    await page.waitForTimeout(300)
-    ok(await page.locator('#rev-empty-title').count() === 0, 'ولا شيء حين لا حالة')
+    ;({ ctx, page } = await open(browser, '/clinic/procedures?tab=earnings', { role: 'umosama', on: { ...common, '/clinic/procedures/empty-visits': () => ({ visits: [] }) } }))
+    await page.waitForSelector('.pex-allclear')
+    ok(await page.locator('.pex-chip').count() === 0, 'ولا شيء حين لا حالة')
     await ctx.close()
   }
 
@@ -273,7 +274,7 @@ async function run() {
   stop()
   console.log(`\n═══ ${pass} تحقّقاً ناجحاً، ${failures.length} فشلاً ═══`)
   if (failures.length) { failures.forEach((f) => console.error(`  ✖ ${f}`)); process.exit(1) }
-  console.log('✔ «إجراء فقط»: الحجز والطابور والزيارة والطبيب والبطاقتان والجرد والمراجعة\n')
+  console.log('✔ «إجراء فقط»: الحجز والطابور والزيارة والطبيب والبطاقتان والجرد والمستحقات\n')
   process.exit(0)
 }
 run().catch((e) => { console.error(e); process.exit(1) })

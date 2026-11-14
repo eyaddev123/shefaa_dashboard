@@ -1,41 +1,45 @@
-import { Fragment, useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api, todayLocal } from '../api.js'
 import ProcedureMaterialsDetail from '../components/ProcedureMaterialsDetail.jsx'
+import { useUnpaid, UnpaidPanel, EmptyVisitsList, LineEditor, LineHistory } from '../components/procedures/LineTools.jsx'
 
-// ═══ مستحقات الدكاترة من الإجراءات ═══
-// «كم طلع لكل دكتور بهالفترة؟» — سطرٌ لكل دكتورٍ له إجراءات، وكبسةٌ تفتح تفصيله إجراءً إجراءً.
-// الحساب كلّه في الخادم (GET /api/clinic/procedures/earnings) من لقطات الأسطر المسجّلة —
-// لا إعادة حساب ولا جمع هنا — وهو نفسه ما يُبنى منه الإكسل. والفترة تُحلّ في الخادم بتوقيت
-// دمشق (اليوم · أمس · هالأسبوع · هالشهر)، فلا تنزلق عند منتصف الليل بساعة الجهاز.
-// الفترة والدكتور المفتوح في الرابط: زرّ الرجوع في الجوال يعود من التفصيل إلى الملخّص.
+// ═══ مستحقات الدكاترة من الإجراءات — ومعها ما كان في «المراجعة» ═══
+// أسئلة المشرفة بترتيبها:
+//   ١) هل ينتظرني شيء؟   — شريط «يحتاج انتباهك»: بانتظار المحاسبة (كلّ الأيام)، و«إجراء فقط» بلا إجراء،
+//                         والشفاء سالبة، وبلا قاعدة، والمواد فوق السعر (في الفترة) — كلٌّ يُفتح بقائمته وأفعالها
+//   ٢) كم طلع في الفترة؟  — للدكاترة، وللشفاء، والمواد (وللإدارة: ربح المواد فوق الشراء)، والحديد إن وُجد
+//   ٣) لكلّ دكتور كم؟     — سطرٌ لكلّ دكتور، وحصّته أوضح ما فيه
+//   ٤) تفصيل الدكتور      — إجراءاته يوماً بيوم، ولكلّ إجراء: موادّه، و«تصحيح المواد» و«الأثر» (المشرفة)
+// الحساب كلّه في الخادم (GET /api/clinic/procedures/earnings) من لقطات الأسطر المقبوضة بيوم القبض —
+// وهو نفسه ما يُبنى منه الإكسل. والفترة تُحلّ في الخادم بتوقيت دمشق. الفترة والدكتور في الرابط.
 // المشرفة والمدير والمشرف العام وحدهم (EARNINGS_ROLES في الخادم) — المجلس والاستقبال 403.
 
 const PERIODS = [
   { key: 'today', label: 'اليوم' },
   { key: 'yesterday', label: 'أمس' },
-  { key: 'week', label: 'هالأسبوع' },
-  { key: 'month', label: 'هالشهر' },
+  { key: 'week', label: 'هذا الأسبوع' },
+  { key: 'month', label: 'هذا الشهر' },
   { key: 'custom', label: 'من — إلى' },
 ]
 
-const fmtNum = (n) => Number(n || 0).toLocaleString('ar-SY')
-const countText = (n) => `${fmtNum(n)} ${n === 1 ? 'إجراء' : 'إجراءات'}`
-function Money({ value }) {
-  return <>{fmtNum(value)}<span className="cash-unit">ل.س</span></>
+const fmtNum = (n) => Number(n || 0).toLocaleString('ar-SY', { maximumFractionDigits: 2 })
+function Money({ value, className }) {
+  return <span className={className}>{fmtNum(value)}<span className="cash-unit">ل.س</span></span>
 }
-// «٢٠٢٦-١٠-٢٤ ← ٢٠٢٦-١٠-٢٩» بأرقامٍ لاتينية كباقي التواريخ في الصفحة
-const rangeText = (d) => (d.from === d.to ? d.from : `${d.from} ← ${d.to}`)
+const asDate = (s) => new Date(`${s}T00:00:00`)
+const fmtLong = (d) => asDate(d).toLocaleDateString('ar-SY', { day: 'numeric', month: 'long' })
+const fmtWeekday = (d) => asDate(d).toLocaleDateString('ar-SY', { weekday: 'long', day: 'numeric', month: 'long' })
+const rangeWords = (d) => (d.from === d.to ? fmtWeekday(d.from) : `من ${fmtLong(d.from)} إلى ${fmtLong(d.to)}`)
+function plural(n, one, two, few, many) {
+  if (n === 1) return one
+  if (n === 2) return two
+  return `${fmtNum(n)} ${n % 100 >= 3 && n % 100 <= 10 ? few : many}`
+}
+const procsText = (n) => plural(n, 'إجراء واحد', 'إجراءان', 'إجراءات', 'إجراءً')
+const sessionsText = (n) => plural(n, 'جلسة واحدة', 'جلستان', 'جلسات', 'جلسة')
 
-const TILES = [
-  { key: 'count', label: 'عدد الإجراءات' },
-  { key: 'price', label: 'إجمالي القيمة', money: true },
-  { key: 'materials', label: 'تكلفة المواد', money: true },
-  { key: 'doctor', label: 'حصّة الدكاترة', money: true, hero: true },
-  { key: 'shifa', label: 'حصّة الشفاء', money: true },
-]
-
-// ما بقي خارج كلفة الشراء والربح: مواد بلا سعر شراء (أو قبل التفعيل)، والمستهلكات، والمواد السابقة
+// ما بقي خارج كلفة الشراء والربح: مواد بلا سعر شراء، والمستهلكات، والمواد السابقة
 export function purchaseOutside(p) {
   return [
     p.unknown > 0 && `${fmtNum(p.unknown)} ${p.unknown === 1 ? 'مادة' : 'مواد'} بلا سعر شراء (مبيعها ${fmtNum(p.unknownSale)})`,
@@ -44,113 +48,7 @@ export function purchaseOutside(p) {
   ].filter(Boolean)
 }
 
-function Tiles({ totals, doctorLabel, iron, grand, purchase }) {
-  const outside = purchase ? purchaseOutside(purchase) : []
-  return (
-    <>
-    <div className="tiles earn-tiles">
-      {TILES.map((t) => (
-        <Fragment key={t.key}>
-        <div className={`tile${t.hero ? ' earn-hero' : ''}`}>
-          <div className="label">{t.key === 'doctor' && doctorLabel ? doctorLabel : t.label}</div>
-          <div className={`value${t.key === 'shifa' && totals.shifa < 0 ? ' neg' : ''}`}>
-            {t.money ? <Money value={totals[t.key]} /> : fmtNum(totals[t.key])}
-          </div>
-        </div>
-        {/* بجانب «تكلفة المواد» (قيمة المبيع المطروحة): كلفة شرائها وربحها — للعلم وحده */}
-        {t.key === 'materials' && purchase && (
-          <>
-            <div className="tile earn-purchase">
-              <div className="label">كلفة شراء المواد</div>
-              <div className="value"><Money value={purchase.cost} /></div>
-            </div>
-            <div className="tile earn-purchase">
-              <div className="label">ربح المواد</div>
-              <div className="value"><Money value={purchase.profit} /></div>
-            </div>
-          </>
-        )}
-        </Fragment>
-      ))}
-      {/* الحديد مميَّز عن الإجراءات: بطاقتان تظهران لمن له جلسات وحده */}
-      {iron?.count > 0 && (
-        <>
-          <div className="tile iron-tile">
-            <div className="label">حصّة الحديد ({fmtNum(iron.count)} {iron.count === 1 ? 'جلسة' : 'جلسات'})</div>
-            <div className="value"><Money value={iron.share} /></div>
-          </div>
-          <div className="tile earn-hero">
-            <div className="label">مجموع المستحق مع الحديد</div>
-            <div className="value"><Money value={grand} /></div>
-          </div>
-        </>
-      )}
-    </div>
-    {purchase && outside.length > 0 && (
-      <p className="earn-note earn-purchase-note">كلفة الشراء والربح لما عُرف سعر شرائه — خارجهما: {outside.join('، ')}.</p>
-    )}
-    </>
-  )
-}
-
-function Summary({ data, onOpen }) {
-  const hasIron = data.iron?.count > 0
-  const hasP = Boolean(data.purchase)
-  return (
-    <table className="rtable earn-table">
-      <thead>
-        <tr><th>الدكتور</th><th>الإجراءات</th><th>إجمالي القيمة</th><th>تكلفة المواد</th>
-          {hasP && <th>كلفة الشراء</th>}{hasP && <th>ربح المواد</th>}
-          <th>حصّة الدكتور</th><th>حصّة الشفاء</th>{hasIron && <th>حصّة الحديد</th>}{hasIron && <th>مجموع المستحق</th>}<th></th></tr>
-      </thead>
-      <tbody>
-        {data.doctors.map((d) => (
-          <tr key={d.doctorId} className="earn-row" onClick={() => onOpen(d.doctorId)}>
-            <td className="rt-title">
-              {d.doctor}
-              {d.specialty && <span className="earn-spec">{d.specialty}</span>}
-            </td>
-            <td className="rt-badge earn-count">
-              <span className="badge sm">{countText(d.totals.count)}</span>
-              {d.noRule > 0 && <span className="badge warn sm">بلا قاعدة ({fmtNum(d.noRule)})</span>}
-              {d.negative > 0 && <span className="badge bad sm">الشفاء سالبة ({fmtNum(d.negative)})</span>}
-            </td>
-            <td className="num" data-label="إجمالي القيمة">{fmtNum(d.totals.price)}</td>
-            <td className="num" data-label="تكلفة المواد">{fmtNum(d.totals.materials)}</td>
-            {hasP && <td className="num" data-label="كلفة الشراء">{fmtNum(d.purchase.cost)}</td>}
-            {hasP && <td className="num" data-label="ربح المواد">{fmtNum(d.purchase.profit)}</td>}
-            <td className="num earn-doc" data-label="حصّة الدكتور">{fmtNum(d.totals.doctor)}</td>
-            <td className={`num${d.totals.shifa < 0 ? ' neg' : ''}`} data-label="حصّة الشفاء">{fmtNum(d.totals.shifa)}</td>
-            {hasIron && <td className="num iron-cell" data-label="حصّة الحديد">{d.iron.count > 0 ? fmtNum(d.iron.share) : <span className="muted">—</span>}</td>}
-            {hasIron && <td className="num earn-doc" data-label="مجموع المستحق">{fmtNum(d.grand)}</td>}
-            <td className="rt-actions earn-open">
-              <button type="button" className="ghost" aria-label={`تفصيل ${d.doctor}`}
-                onClick={(e) => { e.stopPropagation(); onOpen(d.doctorId) }}>التفصيل ←</button>
-            </td>
-          </tr>
-        ))}
-      </tbody>
-      <tfoot>
-        <tr className="earn-total">
-          <td className="rt-title">الإجمالي</td>
-          <td className="rt-badge earn-count"><span className="badge sm">{countText(data.totals.count)}</span></td>
-          <td className="num" data-label="إجمالي القيمة">{fmtNum(data.totals.price)}</td>
-          <td className="num" data-label="تكلفة المواد">{fmtNum(data.totals.materials)}</td>
-          {hasP && <td className="num" data-label="كلفة الشراء">{fmtNum(data.purchase.cost)}</td>}
-          {hasP && <td className="num" data-label="ربح المواد">{fmtNum(data.purchase.profit)}</td>}
-          <td className="num earn-doc" data-label="حصص الدكاترة">{fmtNum(data.totals.doctor)}</td>
-          <td className={`num${data.totals.shifa < 0 ? ' neg' : ''}`} data-label="حصّة الشفاء">{fmtNum(data.totals.shifa)}</td>
-          {hasIron && <td className="num iron-cell" data-label="حصّة الحديد">{fmtNum(data.iron.share)}</td>}
-          {hasIron && <td className="num earn-doc" data-label="مجموع المستحق">{fmtNum(data.grand)}</td>}
-          <td className="rt-actions"></td>
-        </tr>
-      </tfoot>
-    </table>
-  )
-}
-
-// القاعدة بكلمتين كما في الملفّ (ruleShort في الخادم) لكن بأرقامٍ هندية و«٪» العربية —
-// «%40» اللاتينية تنقلب في سطرٍ عربيّ
+// القاعدة بكلمتين بأرقامٍ هندية و«٪» العربية
 export function ruleText(l) {
   if (l.ruleSource === 'none') return 'بلا قاعدة'
   if (l.ruleSource === 'manual') return 'تجاوز يدوي'
@@ -160,99 +58,185 @@ export function ruleText(l) {
   return l.ruleSource === 'doctor' ? `العامة ${v}٪` : `نسبة ${v}٪`
 }
 
+// الإصدار 2: المواد المعدودة تجاوزت السعر فطُرح السعر كلّه (المطروح = المواد المسقوفة + المستهلكات).
+// في الإصدار 1 المطروح = المعدودة + السابقة ≥ المعدودة، فلا يصدق الشرط عليه أبداً.
+export const overPrice = (l) => l.items.reduce((t, m) => t + m.cost, 0) > l.materials - (l.consumables || 0) + 0.005
+
 const qty = (q) => Number(q).toLocaleString('ar-SY', { maximumFractionDigits: 2 })
-function Items({ l }) {
-  if (l.items.length === 0 && !l.legacyMaterials && !l.consumables) return <span className="muted">بلا مواد</span>
+const itemsText = (l) => [
+  ...l.items.map((m) => `${m.name} ×${qty(m.qty)}`),
+  l.legacyMaterials > 0 && 'مواد سابقة',
+  l.consumables > 0 && `مستهلكات ${fmtNum(l.consumables)}`,
+].filter(Boolean).join('، ')
+
+// ═══════ ٢) كم طلع ═══════
+function Totals({ t, iron, grand, purchase, doctorLabel = 'للدكاترة' }) {
+  const hasIron = iron?.count > 0
+  const outside = purchase ? purchaseOutside(purchase) : []
   return (
-    <span className="earn-items">
-      {l.items.map((m, i) => <span key={i}>{m.name} ×{qty(m.qty)} {m.unit}</span>)}
-      {l.legacyMaterials > 0 && <span>مواد سابقة (إجمالي)</span>}
-      {l.consumables > 0 && <span>مستهلكات {fmtNum(l.consumables)}</span>}
-    </span>
+    <section className="pex-totals" aria-label="المجموع">
+      <div className="pex-big">
+        <div className="pex-big-item is-hero">
+          <span className="pex-big-label">{doctorLabel}{hasIron ? ' (مع الحديد)' : ''}</span>
+          <Money value={hasIron ? grand : t.doctor} className="pex-big-value" />
+          {hasIron && <span className="pex-big-sub">الإجراءات {fmtNum(t.doctor)}، والحديد {fmtNum(iron.share)} ({sessionsText(iron.count)})</span>}
+        </div>
+        <div className="pex-big-item">
+          <span className="pex-big-label">للشفاء</span>
+          <Money value={t.shifa} className={`pex-big-value${t.shifa < 0 ? ' neg' : ''}`} />
+        </div>
+        <div className="pex-big-item">
+          <span className="pex-big-label">المواد</span>
+          <Money value={t.materials} className="pex-big-value" />
+          {purchase && <span className="pex-big-sub">كلفة شرائها {fmtNum(purchase.cost)}، وربحها {fmtNum(purchase.profit)}</span>}
+        </div>
+      </div>
+      <p className="pex-sentence">
+        {procsText(t.count)} بقيمة <strong>{fmtNum(t.price)} ل.س</strong> دفعها المرضى، توزّعت: مواد، ثمّ حصّة الدكتور من الباقي بقاعدته، والبقية للشفاء.
+      </p>
+      {purchase && outside.length > 0 && <p className="pex-note">الربح محسوبٌ لما عُرف سعر شرائه — خارجه: {outside.join('، ')}.</p>}
+    </section>
   )
 }
 
-function Detail({ doctor, multiDay }) {
+// ═══════ تفصيل الدكتور: إجراءاته يوماً بيوم ═══════
+function LineRow({ l, canEdit, onReload, showToast }) {
+  const [open, setOpen] = useState(null)   // 'mats' | 'edit' | 'history'
+  const toggle = (w) => setOpen((o) => (o === w ? null : w))
+  const over = overPrice(l)
+  const hasMats = l.items.length > 0 || l.consumables > 0 || l.legacyMaterials > 0
   return (
-    <table className="rtable earn-table earn-detail">
-      <thead>
-        <tr><th>الوقت</th><th>المريض</th><th>الإجراء</th><th>السعر</th><th>المواد</th>
-          <th>القاعدة</th><th>حصّته</th><th>الشفاء</th></tr>
-      </thead>
-      <tbody>
-        {doctor.lines.map((l) => (
-          <Fragment key={l.id}>
-          <tr className={l.negative ? 'earn-neg' : l.noRule ? 'earn-norule' : undefined}>
-            <td className="rt-badge earn-when" dir="ltr">
-              {multiDay && <span className="earn-date">{l.date}</span>}
-              <span>{l.time}</span>
-            </td>
-            <td className="rt-title earn-proc-cell">
-              <span className="earn-proc">{l.procedure}</span>
-            </td>
-            <td className="earn-patient rt-full" data-label="المريض">
-              {l.patient}
-              {l.queue !== '' && l.queue != null && <span className="muted"> (الدور {fmtNum(l.queue)})</span>}
-            </td>
-            <td className="num" data-label="السعر">{fmtNum(l.price)}</td>
-            <td className="earn-mats" data-label="المواد">
-              <strong className="num">{fmtNum(l.materials)}</strong>
-              <Items l={l} />
-            </td>
-            <td data-label="القاعدة">
-              <span className={`earn-rule${l.noRule ? ' is-norule' : ''}`}>{ruleText(l)}</span>
-            </td>
-            <td className="num earn-doc" data-label="حصّته">{fmtNum(l.doctor)}</td>
-            <td className={`num${l.negative ? ' neg' : ''}`} data-label="الشفاء">{fmtNum(l.shifa)}{l.negative && ' ⚠'}</td>
-          </tr>
-          {/* تحت كلّ إجراء: جدول موادّه بالمبيع والشراء والربح (الإدارة وحدها تستلم l.purchase) */}
-          {l.purchase && (l.items.length > 0 || l.consumables > 0 || l.legacyMaterials > 0) && (
-            <tr className="earn-mat-row">
-              <td colSpan={8} className="rt-full">
-                <ProcedureMaterialsDetail items={l.items} consumables={l.consumables} legacy={l.legacyMaterials}
-                  summary={l.purchase} />
-              </td>
-            </tr>
-          )}
-          </Fragment>
-        ))}
-      </tbody>
-    </table>
+    <li className={`pex-line${l.negative ? ' is-neg' : l.noRule ? ' is-norule' : ''}`}>
+      <div className="pex-line-main">
+        <span className="pex-time" dir="ltr">{l.time}</span>
+        <div className="pex-what">
+          <span className="pex-proc">{l.procedure}</span>
+          <span className="pex-meta">{l.patient}{l.queue !== '' && l.queue != null && <> (الدور {fmtNum(l.queue)})</>}</span>
+          <span className="pex-meta">
+            {hasMats ? <>المواد {fmtNum(l.materials)}: {itemsText(l)}</> : 'بلا مواد'}
+          </span>
+          <span className="pex-flags">
+            <span className={`pex-rule${l.noRule ? ' is-norule' : ''}`}>{ruleText(l)}</span>
+            {l.negative && <span className="badge bad sm">الشفاء سالبة</span>}
+            {over && <span className="badge bad sm">المواد فوق السعر</span>}
+          </span>
+        </div>
+        <div className="pex-split">
+          <span className="pex-price">{fmtNum(l.price)}</span>
+          <span className="pex-split-row"><span>الدكتور</span><strong>{fmtNum(l.doctor)}</strong></span>
+          <span className={`pex-split-row${l.negative ? ' neg' : ''}`}><span>الشفاء</span><strong>{fmtNum(l.shifa)}</strong></span>
+        </div>
+      </div>
+      <div className="pex-line-acts">
+        {l.purchase && hasMats && <button type="button" className="ghost" aria-expanded={open === 'mats'} onClick={() => toggle('mats')}>تفصيل المواد</button>}
+        {canEdit && <button type="button" className="ghost" aria-expanded={open === 'edit'} onClick={() => toggle('edit')}>تصحيح المواد</button>}
+        <button type="button" className="ghost" aria-expanded={open === 'history'} onClick={() => toggle('history')}>
+          الأثر{l.changes ? ` (${fmtNum(l.changes)})` : ''}</button>
+      </div>
+      {open && (
+        <div className="pex-line-open">
+          {open === 'mats' ? <ProcedureMaterialsDetail items={l.items} consumables={l.consumables} legacy={l.legacyMaterials} summary={l.purchase} />
+            : open === 'edit' ? <LineEditor lineId={l.id} showToast={showToast} onCancel={() => setOpen(null)} onSaved={() => { setOpen(null); onReload() }} />
+            : <LineHistory lineId={l.id} />}
+        </div>
+      )}
+    </li>
   )
 }
 
-function IronDetail({ iron, multiDay }) {
+function DoctorDetail({ doctor, multiDay, canEdit, onReload, showToast }) {
+  const days = useMemo(() => {
+    const m = new Map()
+    for (const l of doctor.lines) { if (!m.has(l.date)) m.set(l.date, []); m.get(l.date).push(l) }
+    return [...m.entries()].sort((a, b) => (a[0] < b[0] ? 1 : -1))
+  }, [doctor])
   return (
     <>
-      <h4 className="iron-sub"><span className="badge sm iron-badge">حديد</span> جلسات الحديد</h4>
-      <table className="rtable earn-table">
-        <thead><tr><th>الوقت</th><th>المريض</th><th>النوع</th><th>الممرضة</th><th>السعر</th><th>حصّته</th></tr></thead>
-        <tbody>
-          {iron.lines.map((l) => (
-            <tr key={l.id}>
-              <td className="rt-badge earn-when" dir="ltr">{multiDay && <span className="earn-date">{l.date}</span>}<span>{l.time}</span></td>
-              <td className="rt-title">{l.patient}</td>
-              <td data-label="النوع">{l.withDrug ? 'مع دواء' : 'بلا دواء'}</td>
-              <td data-label="الممرضة">{l.nurse}</td>
-              <td className="num" data-label="السعر">{fmtNum(l.price)}</td>
-              <td className="num earn-doc" data-label="حصّته">{fmtNum(l.share)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {days.map(([day, ls]) => (
+        <div key={day} className="pex-day">
+          <div className="refx-day-head">
+            <span>{fmtWeekday(day)}</span>
+            <span className="refx-day-sum"><span className="refx-day-n">{procsText(ls.length)}</span>
+              <span>حصّته <Money value={ls.reduce((s, l) => s + l.doctor, 0)} /></span></span>
+          </div>
+          <ul className="pex-lines">
+            {ls.map((l) => <LineRow key={l.id} l={l} canEdit={canEdit} onReload={onReload} showToast={showToast} />)}
+          </ul>
+        </div>
+      ))}
+      {doctor.iron?.count > 0 && (
+        <div className="pex-day">
+          <div className="refx-day-head">
+            <span><span className="badge sm iron-badge">حديد</span> جلسات الحديد</span>
+            <span className="refx-day-sum"><span className="refx-day-n">{sessionsText(doctor.iron.count)}</span>
+              <span>حصّته <Money value={doctor.iron.share} /></span></span>
+          </div>
+          <ul className="pex-lines">
+            {doctor.iron.lines.map((l) => (
+              <li key={l.id} className="pex-line">
+                <div className="pex-line-main">
+                  <span className="pex-time" dir="ltr">{l.time}</span>
+                  <div className="pex-what">
+                    <span className="pex-proc">{l.withDrug ? 'جلسة حديد مع دواء' : 'جلسة حديد بلا دواء'}</span>
+                    <span className="pex-meta">{l.patient}، الممرضة {l.nurse}{multiDay && <>، {fmtLong(l.date)}</>}</span>
+                  </div>
+                  <div className="pex-split">
+                    <span className="pex-price">{fmtNum(l.price)}</span>
+                    <span className="pex-split-row"><span>الدكتور</span><strong>{fmtNum(l.share)}</strong></span>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </>
   )
 }
 
-export default function ProcedureEarnings({ showToast }) {
+// ═══════ ١) يحتاج انتباهك ═══════
+function Attention({ items, open, setOpen }) {
+  const shown = items.filter((x) => x.n > 0)
+  if (shown.length === 0) return <p className="pex-allclear">✓ لا شيء ينتظرك: لا إجراء بانتظار المحاسبة، ولا سطر يحتاج تصحيحاً في هذه الفترة.</p>
+  const cur = shown.find((x) => x.key === open)
+  return (
+    <section className="pex-attn" aria-label="يحتاج انتباهك">
+      <div className="pex-attn-head">
+        <h3>يحتاج انتباهك</h3>
+        <div className="pex-attn-chips">
+          {shown.map((x) => (
+            <button key={x.key} type="button" aria-expanded={open === x.key}
+              className={`pex-chip is-${x.tone}${open === x.key ? ' is-on' : ''}`} onClick={() => setOpen(open === x.key ? null : x.key)}>
+              <span className="pex-chip-n">{fmtNum(x.n)}</span>
+              <span className="pex-chip-label">{x.label}</span>
+              {x.amount != null && <span className="pex-chip-amt">{fmtNum(x.amount)} ل.س</span>}
+            </button>
+          ))}
+        </div>
+      </div>
+      {cur && (
+        <div className="pex-attn-body">
+          <p className="pex-attn-why">{cur.why}</p>
+          {cur.body}
+        </div>
+      )}
+    </section>
+  )
+}
+
+export default function ProcedureEarnings({ showToast, canEdit }) {
   const [params, setParams] = useSearchParams()
   const period = PERIODS.some((p) => p.key === params.get('period')) ? params.get('period') : 'today'
   const from = params.get('from') || todayLocal()
   const to = params.get('to') || from
   const doctorId = params.get('doctor')
-  const [loaded, setLoaded] = useState(null)    // { key, data } — الردّ مع الفترة التي طُلب لها
+  const [loaded, setLoaded] = useState(null)
   const [err, setErr] = useState(null)
   const [exporting, setExporting] = useState(false)
+  const [reload, setReload] = useState(0)
+  const [attnOpen, setAttnOpen] = useState(null)
+  const [unpaid, reloadUnpaid] = useUnpaid(showToast)
+  const [empty, setEmpty] = useState(null)
 
   const query = period === 'custom' ? { from, to } : { period }
   const qKey = JSON.stringify(query)
@@ -263,11 +247,14 @@ export default function ProcedureEarnings({ showToast }) {
       .then((d) => { if (live) setLoaded({ key: qKey, data: d }) })
       .catch((e) => { if (live) setErr(e.message) })
     return () => { live = false }
-  }, [qKey])
-  // ردّ فترةٍ سابقة لا يُعرض تحت زرّ الفترة الجديدة ولو لإطارٍ واحد
+  }, [qKey, reload])
   const data = loaded && loaded.key === qKey ? loaded.data : null
+  // «إجراء فقط» انتهت بلا إجراء — في مدى الفترة المحلول في الخادم
+  useEffect(() => {
+    if (!data) return
+    api.clinic.emptyProcedureVisits({ from: data.from, to: data.to }).then((r) => setEmpty(r.visits)).catch(() => setEmpty([]))
+  }, [data?.from, data?.to, reload])
 
-  // الرابط وحده الحالة: تبويب الصفحة يبقى، وتغيير الفترة يُغلق التفصيل
   const update = (patch, { push = false } = {}) => {
     const next = new URLSearchParams(params)
     for (const [k, v] of Object.entries(patch)) { if (v == null || v === '') next.delete(k); else next.set(k, v) }
@@ -277,9 +264,47 @@ export default function ProcedureEarnings({ showToast }) {
     ? { period: 'custom', from: data?.from || todayLocal(), to: data?.to || todayLocal(), doctor: null }
     : { period: key, from: null, to: null, doctor: null })
   const open = (id) => { update({ doctor: id }, { push: true }); window.scrollTo?.(0, 0) }
+  const refresh = () => { setReload((n) => n + 1); reloadUnpaid() }
 
   const doctor = data && doctorId ? data.doctors.find((d) => d.doctorId === doctorId) : null
   const multiDay = data && data.from !== data.to
+
+  // التنبيهات من أسطر الفترة نفسها — لكلّ تنبيهٍ قائمته بأسطره، والكبس على السطر يفتح دكتوره
+  const allLines = data ? data.doctors.flatMap((d) => d.lines.map((l) => ({ ...l, doctorName: d.doctor, doctorId: d.doctorId }))) : []
+  const flagList = (pred) => {
+    const ls = allLines.filter(pred)
+    return (
+      <ul className="pex-plist">
+        {ls.map((l) => (
+          <li key={l.id} className="pex-pline">
+            <div className="pex-pwho">
+              <span className="pex-pname">{l.procedure}</span>
+              <span className="pex-pmeta">{l.patient}، {l.doctorName}، {fmtLong(l.date)}</span>
+            </div>
+            <span className="pex-pamt">{fmtNum(l.price)}</span>
+            <button type="button" className="ghost pex-pact" onClick={() => { setAttnOpen(null); open(l.doctorId) }}>عند الدكتور ←</button>
+          </li>
+        ))}
+      </ul>
+    )
+  }
+  const attention = [
+    { key: 'unpaid', tone: 'warn', label: 'بانتظار المحاسبة', n: unpaid?.lines.length || 0, amount: unpaid?.total,
+      why: 'إجراءاتٌ أضافها الأطباء ولم تُقبض بعد — من كلّ الأيام. لا تدخل المستحقات ولا الجرد حتى تُقبض.',
+      body: unpaid && <UnpaidPanel data={unpaid} canEdit={canEdit} showToast={showToast} onChanged={refresh} /> },
+    { key: 'empty', tone: 'warn', label: '«إجراء فقط» بلا إجراء', n: empty?.length || 0,
+      why: 'زياراتٌ سُجّلت «إجراء فقط» وانتهت بلا إجراء ولا كشفية، فلم يُقبض منها شيء. هل نُسي تسجيل الإجراء؟',
+      body: empty && <EmptyVisitsList visits={empty} /> },
+    { key: 'negative', tone: 'bad', label: 'الشفاء سالبة', n: allLines.filter((l) => l.negative).length,
+      why: 'المواد وحصّة الدكتور فاقت سعر الإجراء، فخسرت الشفاء على السطر. صحّح المواد من عند الدكتور إن كانت خطأً.',
+      body: flagList((l) => l.negative) },
+    { key: 'over', tone: 'bad', label: 'المواد فوق السعر', n: allLines.filter(overPrice).length,
+      why: 'المواد المسجّلة تجاوزت سعر الإجراء، فطُرح السعر كلّه للمواد — الدكتور والشفاء صفر.',
+      body: flagList(overPrice) },
+    { key: 'norule', tone: 'warn', label: 'بلا قاعدة', n: allLines.filter((l) => l.noRule).length,
+      why: 'الدكتور لم تكن له قاعدة لحظة تسجيل الإجراء، فحصّته صفر. ضبط القاعدة الآن لا يغيّر هذه الأسطر.',
+      body: flagList((l) => l.noRule) },
+  ]
 
   const doExport = async () => {
     setExporting(true)
@@ -291,22 +316,17 @@ export default function ProcedureEarnings({ showToast }) {
   }
 
   return (
-    <div className="card earn-card">
-      <div className="earn-head">
-        <h3>{doctor ? doctor.doctor : data?.iron?.count > 0 ? 'مستحقات الدكاترة من الإجراءات والحديد' : 'مستحقات الدكاترة من الإجراءات'}</h3>
-        <button type="button" className="ghost earn-export" disabled={exporting || !data || data.doctors.length === 0}
-          onClick={doExport}>
+    <div className="pex-page">
+      <div className="pex-controls">
+        <div className="earn-periods" role="group" aria-label="الفترة">
+          {PERIODS.map((p) => (
+            <button key={p.key} type="button" aria-pressed={period === p.key}
+              className={`rev-flag${period === p.key ? ' is-on' : ''}`} onClick={() => pickPeriod(p.key)}>{p.label}</button>
+          ))}
+        </div>
+        <button type="button" className="ghost pex-export" disabled={exporting || !data || data.doctors.length === 0} onClick={doExport}>
           {exporting ? 'جارٍ التصدير…' : doctor ? 'إكسل هذا الدكتور' : 'إكسل الملخّص والتفصيل'}
         </button>
-      </div>
-
-      <div className="earn-periods" role="group" aria-label="الفترة">
-        {PERIODS.map((p) => (
-          <button key={p.key} type="button" aria-pressed={period === p.key}
-            className={`rev-flag${period === p.key ? ' is-on' : ''}`} onClick={() => pickPeriod(p.key)}>
-            {p.label}
-          </button>
-        ))}
       </div>
       {period === 'custom' && (
         <div className="inline rev-filters earn-custom">
@@ -318,34 +338,64 @@ export default function ProcedureEarnings({ showToast }) {
               onChange={(e) => e.target.value && update({ to: e.target.value, doctor: null })} /></div>
         </div>
       )}
-      {data && <p className="earn-range">الفترة: <span dir="ltr">{rangeText(data)}</span></p>}
+
+      {!doctorId && <Attention items={attention} open={attnOpen} setOpen={setAttnOpen} />}
 
       {err ? <p className="error">{err}</p>
         : !data ? <p className="empty">جارٍ التحميل…</p>
         : doctorId ? (
-          !doctor ? (
-            <>
-              <p className="empty">لا إجراءات لهذا الدكتور في هذه الفترة.</p>
-              <button type="button" className="ghost earn-back" onClick={() => update({ doctor: null })}>→ كل الدكاترة</button>
-            </>
-          ) : (
-            <>
-              <button type="button" className="ghost earn-back" onClick={() => update({ doctor: null })}>→ كل الدكاترة</button>
-              <Tiles totals={doctor.totals} doctorLabel="حصّة الدكتور" iron={doctor.iron} grand={doctor.grand} purchase={doctor.purchase} />
-              {doctor.lines.length > 0 && <Detail doctor={doctor} multiDay={multiDay} />}
-              {doctor.iron?.count > 0 && <IronDetail iron={doctor.iron} multiDay={multiDay} />}
-            </>
-          )
+          <section className="card pex-card">
+            <button type="button" className="ghost pex-back" onClick={() => update({ doctor: null })}>→ كلّ الدكاترة</button>
+            {!doctor ? <p className="empty">لا إجراءات لهذا الدكتور {rangeWords(data)}.</p> : (
+              <>
+                <div className="pex-doc-head">
+                  <h3>{doctor.doctor}</h3>
+                  <span className="pex-range">{doctor.specialty ? `${doctor.specialty}، ` : ''}{rangeWords(data)}</span>
+                </div>
+                <Totals t={doctor.totals} iron={doctor.iron} grand={doctor.grand} purchase={doctor.purchase} doctorLabel="حصّته" />
+                <DoctorDetail doctor={doctor} multiDay={multiDay} canEdit={canEdit} onReload={refresh} showToast={showToast} />
+              </>
+            )}
+          </section>
         )
-        : data.doctors.length === 0 ? <p className="empty">لا إجراءات في هذه الفترة.</p>
+        : data.doctors.length === 0 ? <p className="empty pex-empty">لا إجراءات مقبوضة {rangeWords(data)}.</p>
         : (
           <>
-            <Tiles totals={data.totals} iron={data.iron} grand={data.grand} purchase={data.purchase} />
-            <Summary data={data} onOpen={open} />
-            <p className="earn-note">
-              الأرقام من لقطة كلّ سطر لحظة تسجيله — تغيير قاعدةٍ أو سعرٍ لاحقاً لا يمسّها. والإجراء المُزال لا يُحسب.
-              {data.iron?.count > 0 && ' وأعمدة الإجراءات لا تشمل الحديد: حصّته في عمودها، والمجموع هو ما يُدفع للدكتور.'}
-            </p>
+            <p className="pex-range">{rangeWords(data)}{period === 'week' && ' (الأسبوع يبدأ السبت)'}</p>
+            <Totals t={data.totals} iron={data.iron} grand={data.grand} purchase={data.purchase} />
+            <section className="card pex-card" aria-label="الدكاترة">
+              <h3 className="pex-h">لكلّ دكتور</h3>
+              <ul className="pex-docs">
+                {data.doctors.map((d) => {
+                  const due = d.iron?.count > 0 ? d.grand : d.totals.doctor
+                  return (
+                    <li key={d.doctorId}>
+                      <button type="button" className="pex-doc" onClick={() => open(d.doctorId)} aria-label={`تفصيل ${d.doctor}`}>
+                        <span className="pex-doc-who">
+                          <span className="pex-doc-name">{d.doctor}</span>
+                          <span className="pex-meta">{d.specialty ? `${d.specialty}، ` : ''}{procsText(d.totals.count)}{d.iron?.count > 0 && `، و${sessionsText(d.iron.count)} حديد`}</span>
+                          {(d.noRule > 0 || d.negative > 0) && (
+                            <span className="pex-flags">
+                              {d.negative > 0 && <span className="badge bad sm">الشفاء سالبة ({fmtNum(d.negative)})</span>}
+                              {d.noRule > 0 && <span className="badge warn sm">بلا قاعدة ({fmtNum(d.noRule)})</span>}
+                            </span>
+                          )}
+                        </span>
+                        <span className="pex-doc-nums">
+                          <span className="pex-doc-col"><span>القيمة</span>{fmtNum(d.totals.price)}</span>
+                          <span className="pex-doc-col"><span>المواد</span>{fmtNum(d.totals.materials)}</span>
+                          <span className={`pex-doc-col${d.totals.shifa < 0 ? ' neg' : ''}`}><span>للشفاء</span>{fmtNum(d.totals.shifa)}</span>
+                          <span className="pex-doc-col is-hero"><span>حصّته</span>{fmtNum(due)}</span>
+                        </span>
+                        <span className="pex-doc-go" aria-hidden="true">←</span>
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+              <p className="pex-note">الأرقام من لقطة كلّ سطر لحظة تسجيله — تغيير قاعدةٍ أو سعرٍ لاحقاً لا يمسّها، والإجراء المُزال لا يُحسب.
+                {data.iron?.count > 0 && ' و«حصّته» تشمل الحديد.'}</p>
+            </section>
           </>
         )}
     </div>

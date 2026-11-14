@@ -212,6 +212,7 @@ export const api = {
       return http(`/clinic/procedures/empty-visits?${q}`)
     },
     procedureHistory: (lineId) => http(`/clinic/procedures/${lineId}/history`),
+    procedureLine: (lineId) => http(`/clinic/procedures/lines/${lineId}`),
     exportProcedures: ({ from, to, doctorId }) => {
       const q = new URLSearchParams({ from, to: to || from })
       if (doctorId) q.set('doctor_id', String(doctorId))

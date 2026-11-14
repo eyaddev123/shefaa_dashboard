@@ -4,7 +4,7 @@ import { api, dayLabel, fmtTime } from '../api.js'
 import { useRole } from '../RoleContext.jsx'
 import { useToast } from '../action-feedback.jsx'
 import { generateLabel, generateSummary } from '../generate-summary.js'
-import { canGenerateSessions, canSeeCashReport, canSeeClinicFunds, canSeeInventory, canSeeProceduresPage, canSeeReferralsPage, isReadOnly } from '../permissions.js'
+import { canGenerateSessions, canSeeCashReport, canSeeClinicFunds, canSeeEarnings, canSeeInventory, canSeeReferralsPage, isReadOnly } from '../permissions.js'
 import RoomBadge from './RoomBadge.jsx'
 import Highlights from './Highlights.jsx'
 import { CC } from './cc-icons.jsx'
@@ -251,7 +251,7 @@ function AlertsCard({ a, role }) {
           {unpaid.n > 0 && (
             <Alert icon={CC.receipt} title={<>{plural(unpaid.n, 'إجراء واحد', 'إجراءان', 'إجراءات', 'إجراءً')} بانتظار المحاسبة</>}>
               <Money value={unpaid.total} />
-              {canSeeProceduresPage(role) && <Link className="plain" to="/clinic/procedures?tab=review">المراجعة</Link>}
+              {canSeeEarnings(role) && <Link className="plain" to="/clinic/procedures?tab=earnings">المستحقات</Link>}
             </Alert>
           )}
           {lowStock?.n > 0 && (
