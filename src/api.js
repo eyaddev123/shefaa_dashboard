@@ -248,6 +248,9 @@ export const api = {
     fundOpeningHistory: () => http('/clinic/fund/opening/history'),
     materialsProfit: ({ period, from, to }) =>
       http(`/clinic/materials-profit?${new URLSearchParams(period ? { period } : { from, to: to || from })}`),
+    // مادةٌ واحدة: كلّ بيعة وكلّ شراء بالفترة (صفحة الصندوق)
+    materialProfit: (id, { period, from, to }) =>
+      http(`/clinic/materials-profit/${id}?${new URLSearchParams(period ? { period } : { from, to: to || from })}`),
     // حسابات الدكاترة: { month } شهرٌ (بلاه الحالي) أو { from, to } يومٌ أو فترة
     doctorAccounts: ({ month, from, to } = {}) => http(`/clinic/doctor-accounts${
       from ? `?${new URLSearchParams({ from, to: to || from })}` : month ? `?month=${month}` : ''}`),

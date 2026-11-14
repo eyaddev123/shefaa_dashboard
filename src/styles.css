@@ -5105,3 +5105,83 @@ button.invx-counter.is-on, button.invx-counter.tone-warn.is-on, button.invx-coun
 .ps-list li { font-size: 14.5px; }
 .ps-list li.is-off { opacity: .55; cursor: not-allowed; }
 .ps-note { font-size: 12px; color: var(--status-pending); padding: 2px 6px 0; }
+
+/* ═══ صفحة الصندوق والربح (2026-11-14) — كشبكة المخزون: محايدة، والرقم هو البطل ═══ */
+.fx-period { padding: 12px 16px; }
+.fx-period .earn-range { margin-bottom: 0; }
+.fx-hero { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 14px; margin-bottom: 16px; }
+.fx-hero-card { display: flex; flex-direction: column; gap: 4px; padding: 16px 18px; background: var(--surface-1);
+  border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-card); min-width: 0; }
+.fx-label { font-size: 12.5px; font-weight: 700; color: var(--text-secondary); }
+.fx-big { font-size: 28px; font-weight: 800; color: var(--text-primary); line-height: 1.25; font-variant-numeric: tabular-nums; }
+.fx-big.neg, .fx-sales .neg { color: var(--status-bad); }
+.fx-big.muted { color: var(--muted); }
+.fx-line { font-size: 13.5px; font-weight: 600; color: var(--text-primary); }
+.fx-sub { font-size: 12.5px; color: var(--text-secondary); }
+.fx-sub .link-btn { margin-inline-start: 6px; }
+.fx-actions { margin-top: 8px; }
+.fx-hero-tag { align-self: flex-start; margin: 4px 0 0; }
+.fx-card { padding: 16px 18px; }
+.fx-card h3 { margin: 0; font-size: 15px; }
+
+/* الرسم: أعمدةٌ بلونين هادئين — البيع خفيف خلف الربح */
+.fx-chart-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 14px; margin-bottom: 10px; }
+.fx-chart-read { font-size: 12.5px; color: var(--text-secondary); min-height: 1.4em; }
+.fx-chart { display: flex; align-items: flex-end; gap: 3px; height: 150px; padding: 4px 0; border-bottom: 1px solid var(--grid); }
+.fx-col { flex: 1 1 0; min-width: 0; height: 100%; position: relative; padding: 0; border: 0; border-radius: 4px 4px 0 0;
+  background: transparent; cursor: pointer; }
+.fx-col:hover, .fx-col.on, .fx-col:focus-visible { background: var(--grid); }
+.fx-bar { position: absolute; bottom: 0; inset-inline: 12%; border-radius: 3px 3px 0 0; min-height: 0; }
+.fx-bar-sale { background: var(--primary-soft); border: 1px solid var(--grid); border-bottom: 0; }
+.fx-bar-profit { inset-inline: 28%; background: var(--primary); }
+.fx-bar-profit.neg { background: var(--status-bad); }
+.fx-chart-axis { display: flex; gap: 3px; margin-top: 4px; }
+.fx-chart-axis span { flex: 1 1 0; min-width: 0; font-size: 10.5px; color: var(--muted); text-align: center; white-space: nowrap; overflow: visible; }
+.fx-legend { display: flex; gap: 14px; margin-top: 8px; font-size: 12px; color: var(--text-secondary); }
+.fx-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.fx-key { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.fx-key-sale { background: var(--primary-soft); border: 1px solid var(--grid); }
+.fx-key-profit { background: var(--primary); }
+
+/* المواد: شبكة بطاقات بعمودين على العريض */
+.fx-mat-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.fx-search { width: min(260px, 100%); }
+.fx-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin-bottom: 12px; }
+.fx-controls .earn-periods { margin: 0; }
+.fx-only { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-secondary); cursor: pointer; }
+.fx-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(360px, 100%), 1fr)); gap: 10px; }
+.fx-mat { display: flex; flex-direction: column; gap: 5px; text-align: start; padding: 12px 14px; background: var(--surface-1);
+  color: var(--text-primary); border: 1px solid var(--border); border-radius: 12px; cursor: pointer; font: inherit; min-width: 0; }
+.fx-mat:hover, .fx-mat:focus-visible { border-color: var(--primary); }
+.fx-mat.is-off { opacity: .7; }
+.fx-mat-name { font-size: 15px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.fx-unit { font-size: 12px; color: var(--muted); font-weight: 500; }
+.fx-mat-prices { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13px; color: var(--text-secondary); }
+.fx-mat-prices b, .fx-mat-unit b, .fx-mat-period b, .fx-mat-stock b { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.fx-mat-unit { font-size: 14px; font-weight: 600; }
+.fx-pct { margin-inline-start: 6px; font-size: 12px; font-weight: 700; color: var(--text-secondary);
+  padding: 0 7px; border-radius: 999px; border: 1px solid var(--border); }
+.fx-mat-period, .fx-mat-stock { font-size: 12.5px; color: var(--text-secondary); }
+.fx-mat .muted { color: var(--muted); }
+
+/* نافذة المادة */
+.fx-dlg-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin-bottom: 14px; }
+.fx-dlg-tiles > div { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; }
+.fx-dlg-tiles b { font-size: 17px; font-variant-numeric: tabular-nums; }
+.fx-dlg-tiles .fx-pct { align-self: flex-start; margin: 2px 0 0; }
+.fx-dlg-h { margin: 16px 0 8px; font-size: 14px; }
+.fx-sales { list-style: none; margin: 0; padding: 0; }
+.fx-sales li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px; padding: 9px 0; border-top: 1px solid var(--grid); }
+.fx-sales li:first-child { border-top: 0; }
+.fx-sale-main, .fx-sale-nums { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.fx-sale-nums { text-align: end; font-size: 13px; }
+.fx-sale-nums b { font-variant-numeric: tabular-nums; }
+@media (max-width: 600px) {
+  .fx-big { font-size: 24px; }
+  .fx-chart { height: 120px; gap: 2px; }
+  .fx-sale-nums { text-align: start; }
+}
+.fx-col { max-width: 48px; }
+.fx-chart-axis span { max-width: 48px; }
+.fx-only { white-space: nowrap; }
+.fx-more { display: block; margin: 10px auto 0; }

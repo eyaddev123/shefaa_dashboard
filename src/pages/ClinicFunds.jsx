@@ -6,6 +6,7 @@ import { useToast } from '../action-feedback.jsx'
 import { canWriteClinicFunds } from '../permissions.js'
 import { Modal, fmtDay, parseNum } from '../components/inventory/shared.jsx'
 import { DoctorsTab } from './DoctorAccounts.jsx'
+import { ProfitHero, DailyChart, MaterialsProfit } from '../components/funds/ProfitBoard.jsx'
 
 // ═══ صندوق العيادات · ربح المواد · حسابات الدكاترة ═══
 // صفحةٌ واحدة بثلاثة تبويبات، لجمهورٍ واحد: المشرفة تكتب، والمدير والمشرف العام يطالعان
@@ -15,7 +16,8 @@ import { DoctorsTab } from './DoctorAccounts.jsx'
 // والمصاريف. والراتب في تبويب الدكاترة عرضٌ لا يُسحب من أيّ صندوق.
 // التبويب والفترة في الرابط: زرّ الرجوع في الجوال يعود إلى ما كان.
 
-const TABS = [['fund', 'الصندوق'], ['profit', 'ربح المواد'], ['consumables', 'المستهلكات'], ['doctors', 'حسابات الدكاترة']]
+// «الصندوق» صفحةٌ واحدة للرصيد وربح المواد والحركات (2026-11-14، قرار المستخدم) — ?tab=profit القديم يفتحها
+const TABS = [['fund', 'الصندوق والربح'], ['consumables', 'المستهلكات'], ['doctors', 'حسابات الدكاترة']]
 const PERIODS = [
   { key: 'today', label: 'اليوم' },
   { key: 'week', label: 'هالأسبوع' },
@@ -28,6 +30,7 @@ const KIND_BADGE = {
   iron_materials: 'good', iron_materials_rev: 'bad', iron_materials_edit: '', iron_surplus_edit: '',
 }
 
+const MOVES_SHOWN = 10
 const fmtNum = (n) => Number(n || 0).toLocaleString('ar-SY', { maximumFractionDigits: 2 })
 function Money({ value }) {
   return <>{fmtNum(value)}<span className="cash-unit">ل.س</span></>
@@ -221,37 +224,47 @@ function FundTab({ canWrite, showToast }) {
   const p = usePeriod()
   const [reload, setReload] = useState(0)
   const [data, err] = useLoad(() => api.clinic.fund(p.query), p.key, reload)
+  const [profit, profitErr] = useLoad(() => api.clinic.materialsProfit(p.query), p.key, reload)
   const [dialog, setDialog] = useState(null)   // 'expense' | 'opening' | 'history'
+  const [allMoves, setAllMoves] = useState(false)   // شهرٌ = عشرات الحركات: آخر ١٠ ثمّ «كل الحركات»
   const refresh = () => { setDialog(null); setReload((k) => k + 1) }
+  const moves = data ? (allMoves ? data.movements : data.movements.slice(0, MOVES_SHOWN)) : []
 
   return (
     <>
-      <div className="card fund-hero">
-        <div className="fund-balance">
-          <span className="label">الرصيد الحالي</span>
-          {data ? <strong className={`value${data.balance < 0 ? ' neg' : ''}`}>
+      {/* الفترة لكلّ الصفحة: الربح والرسم والمواد والحركات معاً */}
+      <div className="card fx-period"><PeriodPicker p={p} data={data || profit} /></div>
+
+      <div className="fx-hero">
+        <div className="fx-hero-card fund-hero-balance">
+          <span className="fx-label">الرصيد هلأ</span>
+          {data ? <strong className={`fx-big${data.balance < 0 ? ' neg' : ''}`}>
             {data.balance < 0 && '−'}<Money value={Math.abs(data.balance)} /></strong>
-            : <strong className="value muted">…</strong>}
+            : <strong className="fx-big muted">…</strong>}
           {data && (
-            <span className="fund-opening">
+            <span className="fx-sub">
               {data.opening ? <>الرصيد الافتتاحي <Money value={data.opening.amount} /> منذ {fmtDay(data.opening.date)}</>
                 : 'لم يُدخل الرصيد الافتتاحي بعد'}
               {data.opening && <button type="button" className="link-btn" onClick={() => setDialog('history')}>السجلّ</button>}
             </span>
           )}
+          {canWrite && data && (
+            <span className="fund-actions fx-actions">
+              <button type="button" onClick={() => setDialog('expense')}>+ مصروف جديد</button>
+              <button type="button" className="ghost" onClick={() => setDialog('opening')}>
+                {data.opening ? 'تعديل الرصيد الافتتاحي' : 'إدخال الرصيد الافتتاحي'}</button>
+            </span>
+          )}
         </div>
-        {canWrite && data && (
-          <div className="fund-actions">
-            <button type="button" onClick={() => setDialog('expense')}>+ مصروف جديد</button>
-            <button type="button" className="ghost" onClick={() => setDialog('opening')}>
-              {data.opening ? 'تعديل الرصيد الافتتاحي' : 'إدخال الرصيد الافتتاحي'}</button>
-          </div>
-        )}
+        {profit && <ProfitHero data={profit} />}
       </div>
+      {profitErr && <p className="error">{profitErr}</p>}
+
+      {profit && <div className="card fx-card"><DailyChart daily={profit.daily} /></div>}
+      {profit && <MaterialsProfit data={profit} query={p.query} />}
 
       <div className="card earn-card">
-        <div className="earn-head"><h3>الحركات</h3></div>
-        <PeriodPicker p={p} data={data} />
+        <div className="earn-head"><h3>حركات الصندوق</h3></div>
         {err ? <p className="error">{err}</p> : !data ? <p className="empty">جارٍ التحميل…</p> : (
           <>
             <div className="tiles earn-tiles fund-tiles">
@@ -264,7 +277,7 @@ function FundTab({ canWrite, showToast }) {
               <table className="rtable earn-table fund-table">
                 <thead><tr><th>اليوم</th><th>الحركة</th><th>التفصيل</th><th>المبلغ</th><th>بواسطة</th></tr></thead>
                 <tbody>
-                  {data.movements.map((m) => (
+                  {moves.map((m) => (
                     <tr key={m.id}>
                       <td className="rt-badge earn-when" dir="ltr">{m.date}</td>
                       <td className="rt-title"><span className={`badge sm ${KIND_BADGE[m.kind]}`}>{m.label}</span></td>
@@ -275,6 +288,10 @@ function FundTab({ canWrite, showToast }) {
                   ))}
                 </tbody>
               </table>
+            )}
+            {data.movements.length > MOVES_SHOWN && (
+              <button type="button" className="ghost fx-more" onClick={() => setAllMoves((v) => !v)}>
+                {allMoves ? 'أخفِ القديمة' : `كل الحركات (${fmtNum(data.movements.length)})`}</button>
             )}
             <p className="earn-note">
               يدخل تلقائياً ثمن المواد في كلّ إجراءٍ مقبوض (بيوم القبض) واسترداد دواء الحديد وفاضل كلّ جلسة حديد، ويخرج تلقائياً كلّ شراء مواد (الكمية × سعر القطعة).
@@ -294,64 +311,6 @@ function FundTab({ canWrite, showToast }) {
       )}
       {dialog === 'history' && <OpeningHistory onClose={() => setDialog(null)} />}
     </>
-  )
-}
-
-// ═══════ ٢) ربح المواد ═══════
-function ProfitTab() {
-  const p = usePeriod()
-  const [data, err] = useLoad(() => api.clinic.materialsProfit(p.query), p.key)
-  return (
-    <div className="card earn-card">
-      <div className="earn-head"><h3>ربح المواد</h3></div>
-      <p className="fund-method">
-        التكلفة بـ<strong>متوسّط سعر الشراء المرجّح</strong>: كلّ شراءٍ جديد يُمزج مع الموجود في المخزون بحسب كميته،
-        وتُثبَّت كلفة القطعة لحظة إضافتها على الإجراء — فشراءٌ لاحق لا يغيّر ربح ما بيع.
-      </p>
-      <PeriodPicker p={p} data={data} />
-      {err ? <p className="error">{err}</p> : !data ? <p className="empty">جارٍ التحميل…</p>
-        : data.rows.length === 0 ? <p className="empty">لا مواد بيعت في هذه الفترة.</p> : (
-          <>
-            <div className="tiles earn-tiles fund-tiles fund-tiles-3">
-              <div className="tile"><div className="label">قديش بعنا</div><div className="value"><Money value={data.totals.sales} /></div></div>
-              <div className="tile"><div className="label">التكلفة</div><div className="value"><Money value={data.totals.cost} /></div></div>
-              <div className="tile earn-hero"><div className="label">الربح</div>
-                <div className={`value${data.totals.profit < 0 ? ' neg' : ''}`}>{signed(data.totals.profit)}</div></div>
-            </div>
-            <table className="rtable earn-table">
-              <thead><tr><th>المادة</th><th>الكمية المباعة</th><th>قديش بعنا</th><th>التكلفة</th><th>الربح</th></tr></thead>
-              <tbody>
-                {data.rows.map((r) => (
-                  <tr key={r.id} className={r.missing ? 'earn-norule' : undefined}>
-                    <td className="rt-title">{r.name}
-                      {r.estimated && <span className="badge warn sm fund-flag" title="بيعت قبل تثبيت الكلفة — قُدّرت بسعر الشراء الحالي">تقديري</span>}
-                      {r.missing && <span className="badge warn sm fund-flag">بلا سعر شراء</span>}</td>
-                    <td className="num" data-label="الكمية المباعة">{fmtNum(r.qty)} {r.unit}</td>
-                    <td className="num" data-label="قديش بعنا">{fmtNum(r.sales)}</td>
-                    <td className="num" data-label="التكلفة">{r.cost === null ? '—' : fmtNum(r.cost)}</td>
-                    <td className={`num fund-amt${r.profit === null ? '' : r.profit < 0 ? ' is-out' : ' is-in'}`} data-label="الربح">
-                      {r.profit === null ? '—' : signed(r.profit)}</td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="earn-total">
-                  <td className="rt-title">المجموع</td>
-                  <td className="rt-hide"></td>
-                  <td className="num" data-label="قديش بعنا">{fmtNum(data.totals.sales)}</td>
-                  <td className="num" data-label="التكلفة">{fmtNum(data.totals.cost)}</td>
-                  <td className={`num fund-amt${data.totals.profit < 0 ? ' is-out' : ' is-in'}`} data-label="الربح">{signed(data.totals.profit)}</td>
-                </tr>
-              </tfoot>
-            </table>
-            {data.missing > 0 && (
-              <p className="share-warn">⚠ {data.missing === 1 ? 'مادةٌ واحدة' : `${fmtNum(data.missing)} مواد`} بلا سعر شراء — خارج التكلفة والربح.
-                اكتب سعرها من «المخزون ← أسعار الشراء».</p>
-            )}
-            <p className="earn-note">من مواد الإجراءات المقبوضة في الفترة (بيوم القبض). الإجراء المحذوف لا يُحسب.</p>
-          </>
-        )}
-    </div>
   )
 }
 
@@ -452,7 +411,7 @@ export default function ClinicFunds() {
   const { clinicRole: role } = useRole()
   const canWrite = canWriteClinicFunds(role)
   const [params, setParams] = useSearchParams()
-  const tab = TABS.some(([k]) => k === params.get('tab')) ? params.get('tab') : 'fund'
+  const tab = TABS.some(([k]) => k === params.get('tab')) ? params.get('tab') : 'fund'   // ومنه ?tab=profit القديم
   const [toast, showToast] = useToast()
   // تبديل التبويب يبدأ بفترته الافتراضية: فترة «الصندوق» ليست شهر «الدكاترة»
   const pickTab = (k) => setParams(k === 'fund' ? {} : { tab: k })
@@ -472,7 +431,6 @@ export default function ClinicFunds() {
         ))}
       </div>
       {tab === 'fund' && <FundTab canWrite={canWrite} showToast={showToast} />}
-      {tab === 'profit' && <ProfitTab />}
       {tab === 'consumables' && <ConsumablesTab />}
       {tab === 'doctors' && <DoctorsTab canWrite={canWrite} />}
     </>
