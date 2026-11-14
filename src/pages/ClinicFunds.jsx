@@ -6,7 +6,8 @@ import { useToast } from '../action-feedback.jsx'
 import { canWriteClinicFunds } from '../permissions.js'
 import { Modal, fmtDay, parseNum } from '../components/inventory/shared.jsx'
 import { DoctorsTab } from './DoctorAccounts.jsx'
-import { ProfitHero, DailyChart, MaterialsProfit } from '../components/funds/ProfitBoard.jsx'
+import { MaterialsView, MaterialProfitDialog } from '../components/funds/ProfitBoard.jsx'
+import { NowCard, PeriodCard, ProfitCard, Movements } from '../components/funds/FundOverview.jsx'
 
 // ═══ صندوق العيادات · ربح المواد · حسابات الدكاترة ═══
 // صفحةٌ واحدة بثلاثة تبويبات، لجمهورٍ واحد: المشرفة تكتب، والمدير والمشرف العام يطالعان
@@ -16,21 +17,15 @@ import { ProfitHero, DailyChart, MaterialsProfit } from '../components/funds/Pro
 // والمصاريف. والراتب في تبويب الدكاترة عرضٌ لا يُسحب من أيّ صندوق.
 // التبويب والفترة في الرابط: زرّ الرجوع في الجوال يعود إلى ما كان.
 
-// «الصندوق» صفحةٌ واحدة للرصيد وربح المواد والحركات (2026-11-14، قرار المستخدم) — ?tab=profit القديم يفتحها
-const TABS = [['fund', 'الصندوق والربح'], ['consumables', 'المستهلكات'], ['doctors', 'حسابات الدكاترة']]
+// «الصندوق» يجيب أسئلة المسؤولة بترتيبها (2026-11-14، «نفض» بطلب المستخدم) — ?tab=profit القديم يفتحه
+const TABS = [['fund', 'الصندوق'], ['consumables', 'المستهلكات'], ['doctors', 'حسابات الدكاترة']]
 const PERIODS = [
   { key: 'today', label: 'اليوم' },
   { key: 'week', label: 'هالأسبوع' },
   { key: 'month', label: 'هالشهر' },
   { key: 'custom', label: 'من — إلى' },
 ]
-const KIND_BADGE = {
-  opening: 'blue', material_sale: 'good', material_edit: '', material_reversal: 'bad', purchase: 'warn', expense: 'bad',
-  iron_drug: 'good', iron_surplus: 'good', iron_drug_rev: 'bad', iron_surplus_rev: 'bad',
-  iron_materials: 'good', iron_materials_rev: 'bad', iron_materials_edit: '', iron_surplus_edit: '',
-}
 
-const MOVES_SHOWN = 10
 const fmtNum = (n) => Number(n || 0).toLocaleString('ar-SY', { maximumFractionDigits: 2 })
 function Money({ value }) {
   return <>{fmtNum(value)}<span className="cash-unit">ل.س</span></>
@@ -95,41 +90,6 @@ export function useLoad(fn, key, reload = 0) {
 }
 
 // ═══════ ١) الصندوق ═══════
-function MovementDetail({ m }) {
-  if (m.line) {
-    return (
-      <span className="fund-detail">
-        <strong>{m.line.procedure}</strong>
-        <span className="fund-sub">{m.line.patient}{m.line.doctor && ` — ${m.line.doctor}`}</span>
-      </span>
-    )
-  }
-  if (m.purchase) {
-    return (
-      <span className="fund-detail">
-        <strong>{m.purchase.material}</strong>
-        <span className="fund-sub">
-          الكمية {fmtNum(m.purchase.qty)} {m.purchase.unit}، سعر القطعة {fmtNum(m.purchase.unitCost)}
-          {m.purchase.supplier && ` — ${m.purchase.supplier}`}
-        </span>
-      </span>
-    )
-  }
-  if (m.iron) {
-    return (
-      <span className="fund-detail">
-        <strong>{m.iron.patient}</strong>
-        <span className="fund-sub">
-          {m.iron.withDrug ? 'مع دوا' : 'بلا دوا'}، سعر الجلسة {fmtNum(m.iron.price)} — الممرضة {m.iron.nurse}
-          {m.iron.doctor && ` — ${m.iron.doctor}`}
-        </span>
-        {m.kind.endsWith('_rev') && m.iron.cancelReason && <span className="fund-sub">سبب الإلغاء: {m.iron.cancelReason}</span>}
-      </span>
-    )
-  }
-  return <span className="fund-detail">{m.reason || <span className="muted">—</span>}</span>
-}
-
 function ExpenseDialog({ onClose, onSaved }) {
   const [amount, setAmount] = useState('')
   const [reason, setReason] = useState('')
@@ -220,86 +180,53 @@ function OpeningHistory({ onClose }) {
   )
 }
 
+// ═══════ ١) الصندوق — جواب أسئلة المسؤولة بترتيبها (FundOverview.jsx) ═══════
+const PERIOD_WORD = { today: 'اليوم', week: 'هالأسبوع', month: 'هالشهر', custom: 'بالفترة' }
 function FundTab({ canWrite, showToast }) {
   const p = usePeriod()
+  const [params, setParams] = useSearchParams()
+  const view = params.get('view') === 'materials' ? 'materials' : 'overview'
+  const setView = (v) => { const n = new URLSearchParams(params); if (v === 'materials') n.set('view', v); else n.delete('view'); setParams(n); window.scrollTo(0, 0) }
   const [reload, setReload] = useState(0)
   const [data, err] = useLoad(() => api.clinic.fund(p.query), p.key, reload)
   const [profit, profitErr] = useLoad(() => api.clinic.materialsProfit(p.query), p.key, reload)
   const [dialog, setDialog] = useState(null)   // 'expense' | 'opening' | 'history'
-  const [allMoves, setAllMoves] = useState(false)   // شهرٌ = عشرات الحركات: آخر ١٠ ثمّ «كل الحركات»
+  const [filter, setFilter] = useState(null)   // سطرٌ من «من وين/لوين» يفلتر الحركات
+  const [openMat, setOpenMat] = useState(null)
   const refresh = () => { setDialog(null); setReload((k) => k + 1) }
-  const moves = data ? (allMoves ? data.movements : data.movements.slice(0, MOVES_SHOWN)) : []
+  const word = PERIOD_WORD[p.period] || 'بالفترة'
+  const pick = (g) => { setFilter(g); if (g) setTimeout(() => document.getElementById('fo-moves')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50) }
 
   return (
     <>
-      {/* الفترة لكلّ الصفحة: الربح والرسم والمواد والحركات معاً */}
-      <div className="card fx-period"><PeriodPicker p={p} data={data || profit} /></div>
-
-      <div className="fx-hero">
-        <div className="fx-hero-card fund-hero-balance">
-          <span className="fx-label">الرصيد هلأ</span>
-          {data ? <strong className={`fx-big${data.balance < 0 ? ' neg' : ''}`}>
-            {data.balance < 0 && '−'}<Money value={Math.abs(data.balance)} /></strong>
-            : <strong className="fx-big muted">…</strong>}
-          {data && (
-            <span className="fx-sub">
-              {data.opening ? <>الرصيد الافتتاحي <Money value={data.opening.amount} /> منذ {fmtDay(data.opening.date)}</>
-                : 'لم يُدخل الرصيد الافتتاحي بعد'}
-              {data.opening && <button type="button" className="link-btn" onClick={() => setDialog('history')}>السجلّ</button>}
-            </span>
-          )}
-          {canWrite && data && (
-            <span className="fund-actions fx-actions">
-              <button type="button" onClick={() => setDialog('expense')}>+ مصروف جديد</button>
-              <button type="button" className="ghost" onClick={() => setDialog('opening')}>
-                {data.opening ? 'تعديل الرصيد الافتتاحي' : 'إدخال الرصيد الافتتاحي'}</button>
-            </span>
-          )}
-        </div>
-        {profit && <ProfitHero data={profit} />}
-      </div>
-      {profitErr && <p className="error">{profitErr}</p>}
-
-      {profit && <div className="card fx-card"><DailyChart daily={profit.daily} /></div>}
-      {profit && <MaterialsProfit data={profit} query={p.query} />}
-
-      <div className="card earn-card">
-        <div className="earn-head"><h3>حركات الصندوق</h3></div>
-        {err ? <p className="error">{err}</p> : !data ? <p className="empty">جارٍ التحميل…</p> : (
-          <>
-            <div className="tiles earn-tiles fund-tiles">
-              <div className="tile"><div className="label">قبل الفترة</div><div className={`value${data.before < 0 ? ' neg' : ''}`}>{signed(data.before)}</div></div>
-              <div className="tile fund-in"><div className="label">داخل</div><div className="value"><Money value={data.totals.in} /></div></div>
-              <div className="tile fund-out"><div className="label">خارج</div><div className="value"><Money value={data.totals.out} /></div></div>
-              <div className="tile earn-hero"><div className="label">صافي الفترة</div><div className={`value${data.totals.net < 0 ? ' neg' : ''}`}>{signed(data.totals.net)}</div></div>
-            </div>
-            {data.movements.length === 0 ? <p className="empty">لا حركات في هذه الفترة.</p> : (
-              <table className="rtable earn-table fund-table">
-                <thead><tr><th>اليوم</th><th>الحركة</th><th>التفصيل</th><th>المبلغ</th><th>بواسطة</th></tr></thead>
-                <tbody>
-                  {moves.map((m) => (
-                    <tr key={m.id}>
-                      <td className="rt-badge earn-when" dir="ltr">{m.date}</td>
-                      <td className="rt-title"><span className={`badge sm ${KIND_BADGE[m.kind]}`}>{m.label}</span></td>
-                      <td className="rt-full" data-label="التفصيل"><MovementDetail m={m} /></td>
-                      <td className={`num fund-amt${m.amount < 0 ? ' is-out' : ' is-in'}`} data-label="المبلغ">{signed(m.amount)}</td>
-                      <td className="fund-by" data-label="بواسطة">{m.by || '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-            {data.movements.length > MOVES_SHOWN && (
-              <button type="button" className="ghost fx-more" onClick={() => setAllMoves((v) => !v)}>
-                {allMoves ? 'أخفِ القديمة' : `كل الحركات (${fmtNum(data.movements.length)})`}</button>
-            )}
-            <p className="earn-note">
-              يدخل تلقائياً ثمن المواد في كلّ إجراءٍ مقبوض (بيوم القبض) واسترداد دواء الحديد وفاضل كلّ جلسة حديد، ويخرج تلقائياً كلّ شراء مواد (الكمية × سعر القطعة).
-              حذف إجراءٍ مقبوض يكتب حركةً عكسية. هذا الصندوق منفصلٌ عن إيرادات الشفاء (الكشوف وحصّتها من الإجراءات).
-            </p>
-          </>
+      <div className="fo-bar">
+        <div className="fo-bar-period"><PeriodPicker p={p} data={data || profit} /></div>
+        {canWrite && data && (
+          <div className="fo-bar-actions">
+            <button type="button" onClick={() => setDialog('expense')}>+ مصروف</button>
+            <button type="button" className="ghost" onClick={() => setDialog('opening')}>
+              {data.opening ? 'الرصيد الافتتاحي' : 'إدخال الرصيد الافتتاحي'}</button>
+            {data.opening && <button type="button" className="link-btn" onClick={() => setDialog('history')}>سجلّه</button>}
+          </div>
         )}
       </div>
+      {(err || profitErr) && <p className="error">{err || profitErr}</p>}
+      {!data || !profit ? (!err && !profitErr && <p className="empty">جارٍ التحميل…</p>) : view === 'materials' ? (
+        <MaterialsView data={profit} query={p.query} periodLabel={word} onBack={() => setView('overview')} />
+      ) : (
+        <div className="fo-page">
+          <NowCard fund={data} stock={profit.stock} />
+          <PeriodCard fund={data} periodLabel={word} active={filter} onPick={pick} />
+          <ProfitCard profit={profit} periodLabel={word} onAll={() => setView('materials')} onOpen={setOpenMat} />
+          <Movements fund={data} filter={filter} onFilter={setFilter} />
+          <p className="earn-note">
+            يدخل الصندوق تلقائياً ثمن المواد بكلّ إجراءٍ مقبوض (بيوم القبض) واسترداد دوا الحديد وفاضل كل جلسة، ويطلع منه كلّ شراء مواد
+            والمصاريف. حذف إجراءٍ مقبوض بيكتب حركةً عكسية. هالصندوق منفصل عن إيرادات الشفاء (الكشوف وحصّتها من الإجراءات).
+            ربح المواد = سعر بيع ما انباع − كلفة شرائه (متوسّط سعر الشراء لحظة ما انضافت على الإجراء)؛ مواد الحديد بتنطرح بسعر الشراء فما إلها ربح.
+          </p>
+        </div>
+      )}
+      {openMat && <MaterialProfitDialog row={openMat} query={p.query} onClose={() => setOpenMat(null)} />}
 
       {dialog === 'expense' && (
         <ExpenseDialog onClose={() => setDialog(null)}
@@ -420,7 +347,7 @@ export default function ClinicFunds() {
     <>
       <h2>صندوق العيادات</h2>
       <p className="subtitle">
-        ثمن المواد المباعة ونصيب الصندوق من جلسات الحديد يدخلان، وشراء المواد والمصاريف تخرج — منفصلٌ عن إيرادات الشفاء.
+        شو عنّا بالصندوق، شو فات وشو طلع، وقديش عم تربّحنا المواد.
         {!canWrite && ' للاطّلاع فقط — تديره مشرفة العيادات.'}
       </p>
       {toast}

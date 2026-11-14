@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { api } from '../../api.js'
 import { Modal, fmtDay } from '../inventory/shared.jsx'
 
-// ═══ ربح المواد بين الشراء والبيع — قلب صفحة الصندوق (2026-11-14، قرارات المستخدم) ═══
-// ربح القطعة ونسبته · ربح المخزون الموجود · كلّ بيعة بتفاصيلها (بالكبس على المادة) · ربح كلّ يوم برسم.
+// ═══ «كل المواد وأرباحها» — الصفحة تحت الصندوق (?view=materials)، ونافذة المادة، والرسم ═══
+// ربح القطعة ونسبته · المخزون وربحه الجاي · كلّ بيعة بتفاصيلها (بالكبس على المادة) · ربح كلّ يوم برسم.
 // مواد الإجراءات وحدها: مواد الحديد بسعر الشراء فربحها صفر (القرار). الحساب كلّه بالخادم
 // (buildProfitBoard) — هنا عرضٌ وترتيبٌ وبحثٌ محلّي. والنسبة فوق سعر الشراء: ربح ٤٠ على ١٨٠ = ٢٢٪.
 // الشكل كشبكة المخزون: بطاقاتٌ محايدة بلا «برقعة ألوان»، وشارةٌ صغيرة للمشكلة وحدها.
@@ -11,35 +11,11 @@ import { Modal, fmtDay } from '../inventory/shared.jsx'
 export const fmtNum = (n) => Number(n || 0).toLocaleString('ar-SY', { maximumFractionDigits: 2 })
 const fmtInt = (n) => Number(n || 0).toLocaleString('ar-SY', { maximumFractionDigits: 0 })
 export const signed = (n) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${fmtNum(Math.abs(n))}`
-const pctText = (p) => (p === null || p === undefined ? null : `${Number(p).toLocaleString('ar-SY', { maximumFractionDigits: 1 })}٪`)
+export const pctText = (p) => (p === null || p === undefined ? null : `${Number(p).toLocaleString('ar-SY', { maximumFractionDigits: 1 })}٪`)
 const qtyText = (q, unit) => `${fmtNum(q)} ${unit}`
 // «١٤ تشرين الثاني» للأيام و«تشرين الثاني» للأشهر
 const shortDay = (k) => new Date(`${k.length === 7 ? `${k}-01` : k}T00:00:00`)
   .toLocaleDateString('ar-SY', k.length === 7 ? { month: 'long' } : { day: 'numeric', month: 'long' })
-
-// ═══ البطاقات العلوية: ربح الفترة · المخزون ═══
-export function ProfitHero({ data }) {
-  const t = data.totals, s = data.stock
-  return (
-    <>
-      <div className="fx-hero-card">
-        <span className="fx-label">ربح المواد بهالفترة</span>
-        <strong className={`fx-big${t.profit < 0 ? ' neg' : ''}`}>{signed(t.profit)}<span className="cash-unit">ل.س</span></strong>
-        <span className="fx-line">
-          {pctText(t.pct) ? <>{pctText(t.pct)} فوق سعر الشراء</> : 'ما انباع شي بسعر شراء معروف'}
-        </span>
-        <span className="fx-sub">بعنا بـ {fmtNum(t.sales)} · كلّفت {fmtNum(t.cost)}</span>
-      </div>
-      <div className="fx-hero-card">
-        <span className="fx-label">المخزون الموجود هلأ</span>
-        <strong className="fx-big">{signed(s.profit)}<span className="cash-unit">ل.س</span></strong>
-        <span className="fx-line">ربح جاي لما ينباع كلّه{pctText(s.pct) && ` (${pctText(s.pct)})`}</span>
-        <span className="fx-sub">كلّفنا {fmtNum(s.cost)} · بينباع بـ {fmtNum(s.sale)}</span>
-        {s.unpriced > 0 && <span className="invx-tag is-warn fx-hero-tag">{fmtInt(s.unpriced)} بلا سعر شراء — خارج الحساب</span>}
-      </div>
-    </>
-  )
-}
 
 // ═══ الرسم: عمودٌ لكلّ يوم (أو شهر) — البيع خفيف خلف الربح ═══
 export function DailyChart({ daily, title = 'ربح كل يوم' }) {
@@ -90,13 +66,13 @@ const SORTS = [
 ]
 const norm = (s) => String(s || '').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').trim()
 
-export function MaterialsProfit({ data, query }) {
+export function MaterialsView({ data, query, periodLabel, onBack, initial = null }) {
   const [sort, setSort] = useState('profit')
   const soldCount = data.rows.filter((r) => r.qty > 0).length
   // ٤٤ مادة وأغلبها ما انباع بالفترة: يبدأ باللي انباع (إن وُجد)، والكبسة تُري الكلّ ومخزونها
   const [onlySold, setOnlySold] = useState(soldCount > 0)
   const [q, setQ] = useState('')
-  const [open, setOpen] = useState(null)
+  const [open, setOpen] = useState(initial)
   const list = useMemo(() => {
     const cmp = SORTS.find(([k]) => k === sort)[2]
     const nq = norm(q)
@@ -106,8 +82,9 @@ export function MaterialsProfit({ data, query }) {
 
   return (
     <div className="card fx-card">
+      <button type="button" className="link-btn fo-back" onClick={onBack}>→ رجوع للصندوق</button>
       <div className="fx-mat-head">
-        <h3>المواد — منشتري بكم ومنبيع بكم</h3>
+        <h3>المواد وأرباحها — {periodLabel}</h3>
         <input className="fx-search" type="search" placeholder="دوّر على مادة…" value={q} onChange={(e) => setQ(e.target.value)}
           aria-label="البحث عن مادة" />
       </div>
@@ -146,36 +123,31 @@ function MaterialProfitCard({ r, onOpen }) {
   const loss = r.unitProfit !== null && r.unitProfit <= 0
   return (
     <button type="button" className={`fx-mat${r.active ? '' : ' is-off'}`} onClick={onOpen}>
-      <span className="fx-mat-name">
-        <strong>{r.name}</strong> <span className="fx-unit">{r.unit}</span>
-        {r.avgCost === null && <span className="invx-tag is-warn">بلا سعر شراء</span>}
-        {loss && <span className="invx-tag is-bad">عم تنباع بخسارة</span>}
-        {r.estimated && <span className="invx-tag is-warn" title="انباعت قبل تثبيت الكلفة — قُدّرت بسعر الشراء الحالي">تقديري</span>}
-        {!r.active && <span className="invx-tag">موقوفة</span>}
+      <span className="fx-mat-top">
+        <span className="fx-mat-name">
+          <strong>{r.name}</strong> <span className="fx-unit">{r.unit}</span>
+          {r.avgCost === null && <span className="invx-tag is-warn">بلا سعر شراء</span>}
+          {loss && <span className="invx-tag is-bad">عم تنباع بخسارة</span>}
+          {!r.active && <span className="invx-tag">موقوفة</span>}
+        </span>
+        {r.qty > 0 && r.profit !== null && <span className="fx-mat-profit"><span className="fo-muted">ربحنا</span> {signed(r.profit)}</span>}
       </span>
       <span className="fx-mat-prices">
-        <span>منشتريها بـ <b>{r.avgCost === null ? '—' : fmtNum(r.avgCost)}</b></span>
-        <span>منبيعها بـ <b>{fmtNum(r.unitPrice)}</b></span>
-      </span>
-      <span className="fx-mat-unit">
-        {r.unitProfit === null ? <span className="muted">ربح القطعة: بدّه سعر شراء</span>
-          : <>ربح القطعة <b>{signed(r.unitProfit)}</b>{pctText(r.unitPct) && <span className="fx-pct">{pctText(r.unitPct)}</span>}</>}
-      </span>
-      <span className="fx-mat-period">
-        {r.qty > 0
-          ? <>بهالفترة انباع {qtyText(r.qty, r.unit)} · {r.profit === null ? 'ربحها بدّه سعر شراء' : <>ربحنا <b>{signed(r.profit)}</b></>}</>
-          : <span className="muted">ما انباعت بهالفترة</span>}
+        {r.avgCost === null ? <>منبيعها بـ <b>{fmtNum(r.unitPrice)}</b> · سعر الشراء مش مكتوب</>
+          : <>اشتريناها <b>{fmtNum(r.avgCost)}</b> ← منبيعها <b>{fmtNum(r.unitPrice)}</b> · <b>{signed(r.unitProfit)}</b> للقطعة
+            {pctText(r.unitPct) && <span className="fx-pct">{pctText(r.unitPct)}</span>}</>}
       </span>
       <span className="fx-mat-stock">
-        الموجود {qtyText(r.balance, r.unit)}
-        {r.balance > 0 && r.stockProfit !== null && <> · لما ينباع <b>{signed(r.stockProfit)}</b></>}
+        {r.qty > 0 ? <>انباع {qtyText(r.qty, r.unit)}</> : <span className="muted">ما انباعت بالفترة</span>}
+        {' · '}بالمخزون {qtyText(r.balance, r.unit)}
+        {r.balance > 0 && r.stockProfit !== null && <> (لما ينباع {signed(r.stockProfit)})</>}
       </span>
     </button>
   )
 }
 
 // ═══ مادةٌ واحدة: كلّ بيعة وكلّ شراء بالفترة ═══
-function MaterialProfitDialog({ row, query, onClose }) {
+export function MaterialProfitDialog({ row, query, onClose }) {
   const [data, setData] = useState(null)
   const [err, setErr] = useState(null)
   useEffect(() => {
