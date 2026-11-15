@@ -45,6 +45,7 @@ import VisitPage from './pages/VisitPage.jsx'
 import DoctorScreen from './pages/DoctorScreen.jsx'
 import MyWorkPage from './pages/MyWork.jsx'
 import MyPatientsPage from './pages/MyPatients.jsx'
+import MySettingsPage from './pages/MySettings.jsx'
 import PublicDisplay from './pages/PublicDisplay.jsx'
 import OrderDisplay from './pages/OrderDisplay.jsx'
 import PatientTurn from './pages/PatientTurn.jsx'
@@ -136,6 +137,8 @@ function Sidebar({ onNavigate }) {
         {/* أرقام الطبيب في صفحتها وحدها — الشاشة الرئيسية بلا مبالغ */}
         {canSeeDoctorScreen(clinicRole) && <NavLink to="/clinic/my-patients">{I.clinic} مرضاي</NavLink>}
         {canSeeDoctorScreen(clinicRole) && <NavLink to="/clinic/my-work">{I.clinic} أعمالي</NavLink>}
+        {/* إعدادات الطبيب لنفسه — كانت زرّاً أعلى «شاشتي»؛ أعلى الشاشة للتنبيه وحده */}
+        {canSeeDoctorScreen(clinicRole) && <NavLink to="/clinic/my-settings">{I.settings} الإعدادات</NavLink>}
         {canSeeDoctorsPage(clinicRole) && <NavLink to="/clinic/doctors">{I.clinic} الدكاترة والدوام</NavLink>}
         {/* تبويب «المستحقات» لمن يراه وحده — المجلس يرى الإجراءات بلا مستحقات */}
         {canSeeProceduresPage(clinicRole) && canSeeEarnings(clinicRole) && <NavLink to="/clinic/procedures">{I.clinic} الإجراءات والمستحقات</NavLink>}
@@ -265,6 +268,8 @@ function Shell() {
             <Guard allow={canSeeDoctorScreen}><DoctorScreen /></Guard>} />
           <Route path="/clinic/my-work" element={
             <Guard allow={canSeeDoctorScreen}><MyWorkPage /></Guard>} />
+          <Route path="/clinic/my-settings" element={
+            <Guard allow={canSeeDoctorScreen}><MySettingsPage /></Guard>} />
           <Route path="/clinic/my-patients" element={
             <Guard allow={canSeeDoctorScreen}><MyPatientsPage /></Guard>} />
           <Route path="/users" element={

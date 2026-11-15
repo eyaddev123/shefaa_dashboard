@@ -7,7 +7,7 @@ import { useToast, RecallButton } from '../action-feedback.jsx'
 import {
   WAITING_RETURN, waitingReturnOf, serverOffsetOf, queueWithReturnees, isBackInQueue, useServerNow, isLate,
 } from '../waiting-return.jsx'
-import { ReturnState, ReturnModeField, returnModeOf, returnModeValue } from '../waiting-return-ui.jsx'
+import { ReturnState } from '../waiting-return-ui.jsx'
 import BottomSheet from '../components/BottomSheet.jsx'
 import { ProcedureOnlyBadge } from '../components/ProcedureOnly.jsx'
 import MaterialsEditor, { qtyValid, toPayload } from '../components/MaterialsEditor.jsx'
@@ -216,7 +216,6 @@ export default function DoctorScreen() {
   const [matCatalog, setMatCatalog] = useState(null)
   const [audioOn, setAudioOn] = useState(audioReady())
   const [pushOffer, setPushOffer] = useState(false)
-  const [settingsOpen, setSettingsOpen] = useState(false)
 
   const loadSessions = () => api.clinic.mySessions(todayLocal()).then((rows) => {
     setSessions(rows); setLoadErr(null)
@@ -436,7 +435,6 @@ export default function DoctorScreen() {
             onClick={toggleNurse} title={nurse ? 'الطلب ظاهرٌ عند الاستقبال — اكبس لإلغائه' : 'يومض عند الاستقبال: الدكتور يحتاج ممرضة'}>
             {nurse ? 'طُلبت ممرضة — إلغاء' : 'أحتاج ممرضة'}
           </button>
-          <button type="button" className="ghost dk-tool dk-settings-btn" onClick={() => setSettingsOpen(true)}>الإعدادات</button>
           {/* ★ يبقى مكانه بعد التفعيل (تتبدّل حالته لا يختفي): أوّل لمسة في الصفحة تفتح الصوت،
               واختفاء الزرّ بين ضغطها ورفعها كان يُزيح الصفحة فتضيع اللمسة عن هدفها */}
           <button type="button" className={`ghost dk-tool dk-audio${audioOn ? ' is-on' : ''}`} disabled={audioOn}
@@ -670,49 +668,11 @@ export default function DoctorScreen() {
       {withProcedures ? <TodayBar lines={todayLines} toast={toast} />
         : toast && <div className="dk-toast-float">{toast}</div>}
 
-      {settingsOpen && <MySettingsSheet onClose={() => setSettingsOpen(false)} onSaved={(m) => showToast(m, 'success', 4000)} />}
-
       {sheetAppt && (
         <AddProcedureSheet appt={sheetAppt} catalog={catalog} usage={mine?.usage || {}}
           matCatalog={matCatalog} loadMaterials={loadMaterials}
           draft={draft} setDraft={setDraft} onConfirm={confirmAdd} onClose={() => setSheetFor(null)} />
       )}
     </div>
-  )
-}
-
-// ═══ «إعداداتي» — ما يضبطه الدكتور لنفسه ═══
-// الخروج المؤقت: «لحين ما تخبّر الاستقبال» أو «يرجع تلقائياً بعد كذا دقيقة» — المدّة يكتبها هو
-// (أو المشرفة من البروفايل). الإعداد نفسه، والتغيير في سجلّ الدكتور بفاعله.
-function MySettingsSheet({ onClose, onSaved }) {
-  const [value, setValue] = useState(null)
-  const [err, setErr] = useState(null)
-  const [busy, setBusy] = useState(false)
-  useEffect(() => {
-    api.clinic.mySettings().then((r) => setValue(returnModeOf(r.return_after_minutes))).catch((e) => setErr(e.message))
-  }, [])
-  const save = async () => {
-    const v = returnModeValue(value)
-    if (v === undefined) return   // التنبيه تحت الحقل مباشرةً (ReturnModeField)
-    setErr(null); setBusy(true)
-    try {
-      const r = await api.clinic.saveMySettings({ return_after_minutes: v })
-      onSaved(r.return_after_minutes == null ? 'حُفظ: الخروج المؤقت لحين ما تخبّر الاستقبال'
-        : `حُفظ: يرجع على الدور تلقائياً بعد ${Number(r.return_after_minutes).toLocaleString('ar-SY')} دقيقة`)
-      onClose()
-    } catch (ex) { setErr(ex.message) } finally { setBusy(false) }
-  }
-  return (
-    <BottomSheet title="إعداداتي" subtitle="تخصّك وحدك — والمشرفة تراها في بروفايلك" onClose={onClose}
-      footer={value && (
-        <div className="dk-settings-foot">
-          <button type="button" disabled={busy} onClick={save}>حفظ</button>
-          <button type="button" className="ghost" onClick={onClose}>إلغاء</button>
-        </div>
-      )}>
-      {value ? <ReturnModeField value={value} onChange={(v) => { setValue(v); setErr(null) }} name="my_return_mode" />
-        : !err && <p className="empty">جارٍ التحميل…</p>}
-      {err && <p className="error" role="alert">{err}</p>}
-    </BottomSheet>
   )
 }

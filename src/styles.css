@@ -5992,3 +5992,11 @@ button.nurse-alert-btn:hover:not(:disabled) { filter: none; background: #fff3f3;
 @media (prefers-reduced-motion: reduce) { .nurse-alert { animation: none; } }
 /* زرّ الطبيب: القائم بحدٍّ برتقاليّ هادئ — يعرف أنّ طلبه ما زال ينتظر */
 .dk button.dk-nurse.is-on { border-color: var(--status-pending); color: var(--status-pending); }
+
+/* «الإعدادات» للطبيب: صفحةٌ بعرضٍ مقروء */
+.ds { max-width: 760px; }
+.ds-foot { display: flex; gap: 8px; margin-top: 14px; }
+.ds-foot button { min-height: 44px; padding: 0 22px; }
+/* شريط «إجراءات اليوم»: لا يغطّي القائمة الجانبية — عرضها ٢٢٤ بين ١٠٢٤ و١٢٨٠، ويختفي والدرج مفتوح (التابلت) */
+@media (min-width: 1024px) and (max-width: 1280px) { .dk-today { right: 224px; } }
+.layout.drawer-open .dk-today, .layout.drawer-open .dk-toast-float { visibility: hidden; }
