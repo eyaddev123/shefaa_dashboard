@@ -9,8 +9,9 @@ import BottomSheet from '../components/BottomSheet.jsx'
 //     وإجراءاتها) — «إذا بحث عن مريض يقدر يشوف السجل تبعو ايمت زارو».
 //   • الفترة: اليوم · هذا الأسبوع · هذا الشهر · مدّة (من–إلى، حتى ٩٢ يوماً) — لا سهمٌ ليومٍ سابق/لاحق.
 //   • كروتٌ مرتّبة في كلّ الشاشات (جوال، تابلت، لابتوب) مجمّعةً باليوم، الأحدث أوّلاً.
-//   • في الكرت ما يهمّ الطبيب: رقم الدور، الاسم، الجنس والعمر، معاينة أو مراجعة، الحالة، ملاحظة
-//     الحجز، الإجراءات — بلا أوقات حجزٍ ولا حضورٍ ولا انصراف («ما بهمّو»)، وبلا موبايل ولا مبلغ.
+//   • في الكرت ما يهمّ الطبيب: رقم الدور، الاسم، الجنس والعمر، معاينة أو مراجعة، ملاحظة الحجز،
+//     الإجراءات — بلا أوقات حجزٍ ولا حضورٍ ولا انصراف ولا حالة كشف («ما بهمّني»)، وبلا موبايل ولا مبلغ.
+//     ومن جاءه وحده (الخادم): لا المحجوز الذي لم يصل ولا من لم يحضر — فعدد «زارك» صادق.
 //   • جملة ملخّص وترشيحٌ بنوع الزيارة: «مين إجا معاينات ومين إجا مراجعات».
 // ═══════════════════════════════════════════════════════════════════
 
@@ -22,8 +23,6 @@ const count = (k, [one, two, few, many]) => (k === 1 ? one : k === 2 ? two : `${
 const PATIENTS = ['مريض واحد', 'مريضان', 'مرضى', 'مريضاً']
 const AGE = ['سنة واحدة', 'سنتان', 'سنوات', 'سنة']
 const TIMES = ['مرّة واحدة', 'مرّتين', 'مرّات', 'مرّة']
-const STATUS = { waiting: 'لم يحضر بعد', arrived: 'حاضر — بانتظار الدور', in_service: 'عندك الآن',
-  waiting_return: 'خارج مؤقتاً', done: 'انتهى', no_show: 'لم يحضر' }
 const GENDER = { male: 'ذكر', female: 'أنثى' }
 const PERIODS = [['today', 'اليوم'], ['week', 'هذا الأسبوع'], ['month', 'هذا الشهر'], ['custom', 'مدّة']]
 const FILTERS = [['all', 'الكل'], ['consultation', 'معاينات'], ['followup', 'مراجعات'], ['procedure_only', 'إجراء فقط']]
@@ -34,8 +33,6 @@ const minus = (ymd, days) => {
 
 function Summary({ patients }) {
   const by = (k) => patients.filter((p) => p.visit_type === k).length
-  const done = patients.filter((p) => p.status === 'done').length
-  const absent = patients.filter((p) => p.status === 'no_show').length
   const parts = [
     by('consultation') && count(by('consultation'), ['معاينة واحدة', 'معاينتان', 'معاينات', 'معاينة']),
     by('followup') && count(by('followup'), ['مراجعة واحدة', 'مراجعتان', 'مراجعات', 'مراجعة']),
@@ -45,9 +42,6 @@ function Summary({ patients }) {
     <p className="mp-summary">
       <strong>{count(patients.length, PATIENTS)}</strong>
       {parts.length > 0 && <>: {parts.join('، ')}</>}.
-      {' '}{done > 0 && <>انتهى كشف {count(done, PATIENTS)}</>}
-      {absent > 0 && <>{done > 0 ? '، و' : ''}لم يحضر {count(absent, PATIENTS)}</>}
-      {(done > 0 || absent > 0) && '.'}
     </p>
   )
 }
@@ -70,7 +64,6 @@ function VisitCard({ p, onOpen }) {
       {who(p) && <span className="mp-card-who">{who(p)}</span>}
       {p.reason && <span className="mp-card-note">ملاحظة الحجز: {p.reason}</span>}
       <Procs list={p.procedures} />
-      <span className={`mp-card-status is-${p.status}`}>{STATUS[p.status] || p.status}</span>
     </button>
   )
 }
@@ -95,7 +88,6 @@ function HistorySheet({ patientId, onClose }) {
                 <strong>{longDay(v.date)}</strong>
                 <span className={`dk-vt is-${v.visit_type}`}>{VISIT_TYPES[v.visit_type] || v.visit_type}</span>
               </div>
-              <span className={`mp-card-status is-${v.status}`}>{STATUS[v.status] || v.status}</span>
               {v.reason && <span className="mp-card-note">ملاحظة الحجز: {v.reason}</span>}
               <Procs list={v.procedures} />
             </li>
