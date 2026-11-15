@@ -5902,3 +5902,66 @@ button.mp-arrow, button.mp-today { min-height: 40px; padding: 0 14px; font-size:
 .dk-bookings summary::after { content: '▾'; margin-inline-start: auto; color: var(--muted); }
 .dk-bookings[open] summary::after { content: '▴'; }
 .dw-warn { margin: 8px 0 0; font-size: 13px; color: var(--status-pending); }
+/* المبدِّل أعلى بطاقة الدور: زرّان متلاصقان محايدان بعدّادَيهما — لا تبويبات ملوّنة */
+.dk-switch { display: flex; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-bottom: 10px; }
+.dk-switch button { flex: 1 1 0; min-height: 40px; padding: 0 10px; border: 0; border-radius: 0; background: transparent;
+  color: var(--text-secondary); font-size: 14px; font-weight: 600; }
+.dk-switch button + button { border-inline-start: 1px solid var(--border); }
+.dk-switch button:hover { filter: none; background: var(--primary-soft); }
+.dk-switch button.is-on { background: var(--primary-soft); color: var(--text-primary); font-weight: 700; }
+/* سطور الدور أقصر قليلاً: عشرة حاضرين يتّسعون في شاشة التابلت */
+.dk .dk-wait { min-height: 44px; padding: 4px 0; }
+
+/* ═══ أزرار «عندك الآن» — نظامٌ واحد (ملاحظة المستخدم: «زرّ يتيم» وأحجامٌ مختلفة) ═══
+   الأساسيّ سطرٌ كامل، والبقيّة شبكةٌ متساوية العرض تحته (--n عددها). القرار بعرض البطاقة:
+   ضيّقة (< ٤٦٠px: جوال وعمودا التابلت) ⇒ الأربعة ٢×٢؛ عريضة (≥ ٧٢٠px: لابتوب) ⇒ صفٌّ واحد كلّها. */
+.dk .card.dk-current { container-type: inline-size; }
+.dk .dk-actions { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; margin-top: 14px; align-items: stretch; }
+.dk .dk-actions .dk-primary { width: 100%; min-height: 46px; }
+.dk-more { display: grid; grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)); gap: 8px; }
+.dk .dk-more > button { width: 100%; min-width: 0; min-height: 44px; padding: 0 8px; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; font-size: 14px; font-weight: 600; }
+@container (max-width: 459px) {
+  .dk-more[data-n='4'] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container (min-width: 720px) {
+  .dk .dk-actions { grid-template-columns: minmax(0, 1fr) minmax(0, 2.6fr); }
+}
+/* «خارج العيادة مؤقتاً»: زرّا السطر بعرضٍ واحد */
+.dk .wr-btns > button { min-width: 96px; }
+
+/* ═══ «مرضاي» بالكروت (جولة ٢): بحثٌ وفترةٌ فوق، كروتٌ مجمّعة باليوم — جوال ⇐ عمود، تابلت ⇐ ٢–٣، لابتوب ⇐ ٤ ═══ */
+.mp-bar { display: flex; flex-direction: column; gap: 10px; }
+.mp-search { width: 100%; min-height: 44px; font-size: 15px; }
+.mp-bar-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.mp-range { display: flex; gap: 10px; flex-wrap: wrap; }
+.mp-range label { display: flex; align-items: center; gap: 6px; font-size: 14px; color: var(--text-secondary); }
+.mp-range input[type='date'] { min-height: 40px; width: auto; }
+.mp-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 4px 0 10px; }
+.mp-head .mp-summary { margin: 0; }
+.mp-head .mp-filter { margin: 0; }
+.mp-day-group + .mp-day-group { margin-top: 18px; }
+.mp-day-title { margin: 0 0 8px; font-size: 14px; font-weight: 700; color: var(--text-secondary); }
+.mp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+button.mp-card { display: flex; flex-direction: column; align-items: stretch; gap: 4px; text-align: start; white-space: normal;
+  min-height: 0; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface-1);
+  color: var(--text-primary); font-weight: 400; line-height: 1.5; cursor: pointer; }
+button.mp-card:hover { filter: none; border-color: var(--primary); }
+.mp-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.mp-card-top .dk-vt { margin: 0; }
+.mp-card-num { font-size: 12.5px; color: var(--muted); font-weight: 600; }
+.mp-card-name { font-size: 15.5px; font-weight: 700; }
+.mp-card-who, .mp-card-note { font-size: 13px; color: var(--text-secondary); }
+.mp-card-procs { display: flex; flex-direction: column; font-size: 13px; }
+.mp-card-procs small { color: var(--status-pending); }
+.mp-card-status { margin-top: 2px; font-size: 12.5px; color: var(--muted); }
+.mp-card-status.is-no_show { color: var(--status-bad); }
+.mp-card-open { margin-top: 4px; font-size: 13px; color: var(--accent-text); font-weight: 600; }
+.mp-history { list-style: none; margin: 0; padding: 0; }
+.mp-visit { display: flex; flex-direction: column; gap: 3px; padding: 10px 0; border-top: 1px solid var(--border); }
+.mp-visit:first-child { border-top: 0; }
+.mp-visit-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.mp-visit-head .dk-vt { margin: 0; }
+/* شاشة اللابتوب كاملة لـ«شاشتي» و«مرضاي» (طلب المستخدم): بلا سقف الـ١٢٤٠px العامّ — العمودان والكروت
+   تتّسع. «أعمالي» يبقى بسقفه: نصٌّ وجداول تُقرأ أسوأ على ١٩٢٠px. */
+.main:has(> .dk), .main:has(> .mp) { max-width: none; }

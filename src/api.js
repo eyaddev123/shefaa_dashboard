@@ -473,7 +473,10 @@ export const api = {
     mySalary: (month) => http(`/clinic/my-salary${month ? `?month=${month}` : ''}`),
     // صفحات الطبيب: has_procedures يقرّر إظهار آثار الإجراءات، و«مرضاي» ليومٍ واحد
     myProfile: () => http('/clinic/my-profile'),
-    myPatients: (date) => http(`/clinic/my-patients${date ? `?date=${date}` : ''}`),
+    // { period: 'today'|'week'|'month' } أو { from, to }
+    myPatients: (q = {}) => http(`/clinic/my-patients?${new URLSearchParams(q)}`),
+    myPatientsSearch: (q) => http(`/clinic/my-patients/search?q=${encodeURIComponent(q)}`),
+    myPatientHistory: (patientId) => http(`/clinic/my-patients/${patientId}/history`),
     removeAppointmentProcedure: (appointmentId, lineId, reason) =>
       http(`/clinic/appointments/${appointmentId}/procedures/${lineId}/remove`,
         { method: 'POST', body: JSON.stringify({ reason }) }),

@@ -200,6 +200,9 @@ export default function DoctorScreen() {
   const [toast, showToast] = useToast()
   // has_procedures من اختصاصه (الخادم): بلا إجراءات ⇒ لا «+ إجراء» ولا شريط «إجراءات اليوم»
   const [profile, setProfile] = useState(null)
+  // عمود الدور: «بانتظار الدور» أو «محجوزون لم يحضروا» — مبدِّلٌ ثابت أعلى البطاقة، فالحجوزات لا تُدفع
+  // لأسفل الشاشة حين يطول الدور (ملاحظة المستخدم: عشرة حاضرين أخفوا الحاجزين)
+  const [side, setSide] = useState('line')
   const [mine, setMine] = useState(null)
   const [adding, setAdding] = useState([])          // إضافاتٌ متفائلة: {tempId, appointment_id, name}
   const [sheetFor, setSheetFor] = useState(null)    // id الحجز الذي تُضاف له
@@ -469,51 +472,62 @@ export default function DoctorScreen() {
                       {current.reason && <span className="dk-current-note">ملاحظة الحجز: {current.reason}</span>}
                     </p>
                     <AddedProcedures added={current.procedures} pending={pendingFor(current.id)} />
-                    <div className="dk-actions">
-                      {needsStart ? (
-                        <button className="dk-btn dk-primary dk-btn-start" disabled={busy}
-                          title="المريض دخل الغرفة — يبدأ الكشف بلا نداء جديد"
-                          onClick={() => act(api.clinic.start, current.id, { ok: 'بدأ الكشف', undo: 'start' })}>
-                          بدء كشف
-                        </button>
-                      ) : (
-                        <button className="dk-btn dk-primary dk-btn-done" disabled={busy}
-                          onClick={() => act(api.clinic.done, current.id, { ok: 'انتهى الكشف', undo: 'done' })}>
-                          إنهاء الكشف
-                        </button>
-                      )}
-                      {withProcedures && (
-                        <button type="button" className="ghost dk-btn dk-btn-add" onClick={() => openSheet(current)}>
-                          + إجراء
-                        </button>
-                      )}
-                      <RecallButton apptId={current.id} onError={showToast} className="ghost dk-btn dk-light" />
-                      {/* نودي ولم يدخل ⇒ «تأخّر المريض» (لا «لم يحضر»: من قطع بطاقته حاضر). يخرج من
-                          الدور لحين تكبس الاستقبال «رجع» فيصير التالي — وتنادي غيره الآن.
-                          ومن دخل وبدأ كشفه ⇒ «خروج مؤقت» (قطرة، صورة…) بإعداد الدكتور. */}
-                      {needsStart ? (
-                        <button className="ghost dk-btn dk-light" disabled={busy}
-                          title="نودي ولم يدخل — يرجع على الدور حين تخبر الاستقبال أنه وصل، وتنادي التالي"
-                          onClick={() => act(api.clinic.stepOut, current.id,
-                            { ok: `الدور ${shownNumber(current)} تأخّر — يرجع على الدور حين تخبرك الاستقبال` })}>
-                          تأخّر المريض
-                        </button>
-                      ) : (
-                        <button className="ghost dk-btn dk-light" disabled={busy}
-                          title="المريض يخرج (قطرة، صورة…) ويعود بدوره — وتنادي التالي"
-                          onClick={() => act(api.clinic.stepOut, current.id)}>
-                          خروج مؤقت
-                        </button>
-                      )}
-                      {/* إنهاءٌ بلا بدء ممكن (يُستبعد من حساب المدة) — خفيفٌ هنا لا ينافس «بدء» */}
-                      {needsStart && (
-                        <button className="ghost dk-btn dk-light" disabled={busy}
-                          title="المريض دخل وخرج — يُنهى بلا نداء"
-                          onClick={() => act(api.clinic.done, current.id, { ok: 'انتهى الكشف', undo: 'done' })}>
-                          إنهاء كشف
-                        </button>
-                      )}
-                    </div>
+                    {/* ═══ الأزرار: نظامٌ واحد لكلّ الشاشات ═══ الأساسيّ («بدء كشف» أو «إنهاء الكشف») سطرٌ
+                        كامل، وتحته البقيّة بعرضٍ متساوٍ بلا زرٍّ يتيم: أربعةٌ ⇒ ٢×٢ في بطاقةٍ ضيّقة (جوال،
+                        عمودا التابلت)، وثلاثةٌ ⇒ صفٌّ واحد. والبطاقة العريضة (لابتوب) ⇒ كلّها صفٌّ واحد،
+                        الأساسيّ أعرض. القرار بعرض البطاقة نفسها (container query) لا بعرض الشاشة. */}
+                    {(() => {
+                      const more = [
+                        withProcedures && (
+                          <button key="add" type="button" className="ghost dk-btn dk-btn-add" onClick={() => openSheet(current)}>
+                            + إجراء
+                          </button>
+                        ),
+                        <RecallButton key="recall" apptId={current.id} onError={showToast} icon={false} className="ghost dk-btn dk-light" />,
+                        needsStart ? (
+                          // نودي ولم يدخل ⇒ «تأخّر المريض» (لا «لم يحضر»: من قطع بطاقته حاضر). يخرج من الدور
+                          // لحين تكبس الاستقبال «رجع» فيصير التالي — وتنادي غيره الآن.
+                          <button key="late" className="ghost dk-btn dk-light" disabled={busy}
+                            title="نودي ولم يدخل — يرجع على الدور حين تخبر الاستقبال أنه وصل، وتنادي التالي"
+                            onClick={() => act(api.clinic.stepOut, current.id,
+                              { ok: `الدور ${shownNumber(current)} تأخّر — يرجع على الدور حين تخبرك الاستقبال` })}>
+                            تأخّر المريض
+                          </button>
+                        ) : (
+                          // من دخل وبدأ كشفه ⇒ «خروج مؤقت» (قطرة، صورة…) بإعداد الدكتور
+                          <button key="out" className="ghost dk-btn dk-light" disabled={busy}
+                            title="المريض يخرج (قطرة، صورة…) ويعود بدوره — وتنادي التالي"
+                            onClick={() => act(api.clinic.stepOut, current.id)}>
+                            خروج مؤقت
+                          </button>
+                        ),
+                        // إنهاءٌ بلا بدء ممكن (يُستبعد من حساب المدة) — ثانويٌّ هنا لا ينافس «بدء»
+                        needsStart && (
+                          <button key="end" className="ghost dk-btn dk-light" disabled={busy}
+                            title="المريض دخل وخرج — يُنهى بلا نداء"
+                            onClick={() => act(api.clinic.done, current.id, { ok: 'انتهى الكشف', undo: 'done' })}>
+                            إنهاء كشف
+                          </button>
+                        ),
+                      ].filter(Boolean)
+                      return (
+                        <div className="dk-actions">
+                          {needsStart ? (
+                            <button className="dk-btn dk-primary dk-btn-start" disabled={busy}
+                              title="المريض دخل الغرفة — يبدأ الكشف بلا نداء جديد"
+                              onClick={() => act(api.clinic.start, current.id, { ok: 'بدأ الكشف', undo: 'start' })}>
+                              بدء كشف
+                            </button>
+                          ) : (
+                            <button className="dk-btn dk-primary dk-btn-done" disabled={busy}
+                              onClick={() => act(api.clinic.done, current.id, { ok: 'انتهى الكشف', undo: 'done' })}>
+                              إنهاء الكشف
+                            </button>
+                          )}
+                          <div className="dk-more" data-n={more.length} style={{ '--n': more.length }}>{more}</div>
+                        </div>
+                      )
+                    })()}
                   </>
                 )
               })() : (
@@ -556,14 +570,32 @@ export default function DoctorScreen() {
           </section>
 
           <section className="dk-side" aria-label="بانتظار الدور">
-            {/* ═══ بانتظار الدور ═══ بالترتيب الفعلي (الإسعافي ثمّ العائدون ثمّ الحاضرون). أوّلهم
-                «التالي» وعلى سطره «بدء كشف» وحده (دخل وحده — بلا نداء)؛ والبقية للعرض بلا أزرار. */}
+            {/* ═══ بانتظار الدور | محجوزون لم يحضروا ═══ مبدِّلٌ واحد أعلى البطاقة بعدّادَيه — كلاهما ظاهرٌ
+                مهما طال الدور. «بانتظار الدور» بالترتيب الفعلي (الإسعافي ثمّ العائدون ثمّ الحاضرون)، أوّله
+                «التالي» وعليه «بدء كشف» وحده؛ والبقية للعرض بلا أزرار. والمحجوزون للاطّلاع. */}
             <div className="card dk-waiting">
-              <h3 className="dk-sec">بانتظار الدور <span className="dk-count">({line.length.toLocaleString('ar-SY')})</span></h3>
-              {line.length === 0 ? (
+              <div className="dk-switch" role="tablist" aria-label="المرضى">
+                <button type="button" role="tab" aria-selected={side === 'line'} className={side === 'line' ? 'is-on' : ''}
+                  onClick={() => setSide('line')}>بانتظار الدور <span className="dk-count">{line.length.toLocaleString('ar-SY')}</span></button>
+                <button type="button" role="tab" aria-selected={side === 'bookings'} className={side === 'bookings' ? 'is-on' : ''}
+                  onClick={() => setSide('bookings')}>محجوزون لم يحضروا <span className="dk-count">{bookings.length.toLocaleString('ar-SY')}</span></button>
+              </div>
+              {side === 'bookings' ? (
+                bookings.length === 0 ? <p className="empty">لا حجوزات بانتظار الحضور.</p> : (
+                  <ul className="dk-book-list dk-bookings" role="tabpanel">
+                    {bookings.map((a) => (
+                      <li key={a.id} className="dk-book">
+                        <span className="dk-book-time" dir="ltr">{timeOf(a) || '—'}</span>
+                        <span className="dk-book-name">{a.full_name}<VisitType appt={a} /><ProcedureOnlyBadge appt={a} /></span>
+                        <span className="dk-book-ref">حجز {a.queue_number}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )
+              ) : line.length === 0 ? (
                 <p className="empty">لا أحد حاضر بانتظار الدور.</p>
               ) : (
-                <ul className="dk-wait-list">
+                <ul className="dk-wait-list" role="tabpanel">
                   {line.map((a) => {
                     const isNext = a.id === nextUp?.id
                     return (
@@ -592,22 +624,6 @@ export default function DoctorScreen() {
                 </ul>
               )}
             </div>
-
-            {/* الحجوزات التي لم تحضر بعد — للاطّلاع، مطويّة: لا تزاحم من هو موجود */}
-            {bookings.length > 0 && (
-              <details className="card dk-bookings">
-                <summary>حجوزات لم تحضر بعد <span className="dk-count">({bookings.length.toLocaleString('ar-SY')})</span></summary>
-                <ul className="dk-book-list">
-                  {bookings.map((a) => (
-                    <li key={a.id} className="dk-book">
-                      <span className="dk-book-time" dir="ltr">{timeOf(a) || '—'}</span>
-                      <span className="dk-book-name">{a.full_name}<ProcedureOnlyBadge appt={a} /></span>
-                      <span className="dk-book-ref">حجز {a.queue_number}</span>
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            )}
           </section>
         </div>
         </>

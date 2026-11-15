@@ -1,27 +1,36 @@
 import { useCallback, useEffect, useState } from 'react'
-import { api, APPOINTMENT_STATUSES, VISIT_TYPES } from '../api.js'
-import { AttendanceBadge, usePolling, fmtClock } from '../attendance-ui.jsx'
+import { api, VISIT_TYPES, todayLocal } from '../api.js'
+import { AttendanceBadge, usePolling } from '../attendance-ui.jsx'
+import BottomSheet from '../components/BottomSheet.jsx'
 
 // ═══════════════════════════════════════════════════════════════════
-// «مرضاي» — مرضى الطبيب في يومٍ واحد (طلب المستخدم 2026-11-15: «صفحة للمرضى مع فلترة كل يوم
-// يشوف مين المرضى يلي عندو وأسماءهن وكل شي»، و«يعرف مين إجا معاينات ومين إجا مراجعات»).
-//   • اليوم بسهمين يقفزان إلى أقرب يومٍ فيه مرضى (prev_day/next_day من الخادم) وتاريخٍ حرّ.
-//   • جملة الملخّص فوق، ثمّ ترشيحٌ بنوع الزيارة: الكل · معاينات · مراجعات · إجراء فقط.
-//   • لكلّ مريض: رقم دوره، اسمه، جنسه وعمره، نوع الزيارة، الحالة، أوقات الحضور والدخول والانتهاء،
-//     ملاحظة الحجز، والإجراءات بأسمائها — بلا موبايل ولا مبلغ ولا إحالة (من الخادم أصلاً).
-// اليوم الجاري يتحدّث كلّ ٣٠ ثانية.
+// «مرضاي» — مرضى الطبيب (doctor-pages-redesign، قرارات المستخدم 2026-11-15)
+//   • البحث بالاسم فوق: أيّ مريضٍ زاره ولو مرّة، ولمسةٌ تفتح سجلّه عنده (متى زاره، ونوع كلّ زيارة،
+//     وإجراءاتها) — «إذا بحث عن مريض يقدر يشوف السجل تبعو ايمت زارو».
+//   • الفترة: اليوم · هذا الأسبوع · هذا الشهر · مدّة (من–إلى، حتى ٩٢ يوماً) — لا سهمٌ ليومٍ سابق/لاحق.
+//   • كروتٌ مرتّبة في كلّ الشاشات (جوال، تابلت، لابتوب) مجمّعةً باليوم، الأحدث أوّلاً.
+//   • في الكرت ما يهمّ الطبيب: رقم الدور، الاسم، الجنس والعمر، معاينة أو مراجعة، الحالة، ملاحظة
+//     الحجز، الإجراءات — بلا أوقات حجزٍ ولا حضورٍ ولا انصراف («ما بهمّو»)، وبلا موبايل ولا مبلغ.
+//   • جملة ملخّص وترشيحٌ بنوع الزيارة: «مين إجا معاينات ومين إجا مراجعات».
 // ═══════════════════════════════════════════════════════════════════
 
 const n = (x) => Number(x || 0).toLocaleString('ar-SY')
-const dayTitle = (ymd) => new Date(`${ymd}T12:00:00`).toLocaleDateString('ar-SY',
-  { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+const dayTitle = (ymd) => new Date(`${ymd}T12:00:00`).toLocaleDateString('ar-SY', { weekday: 'long', day: 'numeric', month: 'long' })
+const longDay = (ymd) => new Date(`${ymd}T12:00:00`).toLocaleDateString('ar-SY', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 // جمع المعدود: «مريض واحد»، «مريضان»، «٣ مرضى»، «١١ مريضاً»
 const count = (k, [one, two, few, many]) => (k === 1 ? one : k === 2 ? two : `${n(k)} ${k >= 3 && k <= 10 ? few : many}`)
 const PATIENTS = ['مريض واحد', 'مريضان', 'مرضى', 'مريضاً']
 const AGE = ['سنة واحدة', 'سنتان', 'سنوات', 'سنة']
-const STATUS = { ...APPOINTMENT_STATUSES, waiting: 'لم يحضر بعد', arrived: 'حاضر — بانتظار الدور', waiting_return: 'خارج مؤقتاً' }
+const TIMES = ['مرّة واحدة', 'مرّتين', 'مرّات', 'مرّة']
+const STATUS = { waiting: 'لم يحضر بعد', arrived: 'حاضر — بانتظار الدور', in_service: 'عندك الآن',
+  waiting_return: 'خارج مؤقتاً', done: 'انتهى', no_show: 'لم يحضر' }
 const GENDER = { male: 'ذكر', female: 'أنثى' }
+const PERIODS = [['today', 'اليوم'], ['week', 'هذا الأسبوع'], ['month', 'هذا الشهر'], ['custom', 'مدّة']]
 const FILTERS = [['all', 'الكل'], ['consultation', 'معاينات'], ['followup', 'مراجعات'], ['procedure_only', 'إجراء فقط']]
+const who = (p) => [GENDER[p.gender], p.age != null && (p.age < 1 ? 'أقلّ من سنة' : count(p.age, AGE))].filter(Boolean).join('، ')
+const minus = (ymd, days) => {
+  const d = new Date(`${ymd}T12:00:00Z`); d.setUTCDate(d.getUTCDate() - days); return d.toISOString().slice(0, 10)
+}
 
 function Summary({ patients }) {
   const by = (k) => patients.filter((p) => p.visit_type === k).length
@@ -43,100 +52,172 @@ function Summary({ patients }) {
   )
 }
 
+const Procs = ({ list }) => (list.length === 0 ? null : (
+  <span className="mp-card-procs">{list.map((x, i) => (
+    <span key={i}>{x.name}{!x.paid && <small> (بانتظار المحاسبة)</small>}</span>
+  ))}</span>
+))
+
+// كرت زيارة: ما يهمّ الطبيب وحده — ولمسةٌ تفتح سجلّ المريض
+function VisitCard({ p, onOpen }) {
+  return (
+    <button type="button" className="mp-card" onClick={() => onOpen(p.patient_id)} title="سجلّ المريض عندك">
+      <span className="mp-card-top">
+        <span className="mp-card-num">{p.number == null ? 'بلا دور بعد' : `الدور ${n(p.number)}`}</span>
+        <span className={`dk-vt is-${p.visit_type}`}>{VISIT_TYPES[p.visit_type] || p.visit_type}</span>
+      </span>
+      <strong className="mp-card-name">{p.full_name}<AttendanceBadge priority={p.priority} /></strong>
+      {who(p) && <span className="mp-card-who">{who(p)}</span>}
+      {p.reason && <span className="mp-card-note">ملاحظة الحجز: {p.reason}</span>}
+      <Procs list={p.procedures} />
+      <span className={`mp-card-status is-${p.status}`}>{STATUS[p.status] || p.status}</span>
+    </button>
+  )
+}
+
+// سجلّ المريض عند هذا الطبيب: كلّ زياراته، الأحدث أوّلاً
+function HistorySheet({ patientId, onClose }) {
+  const [data, setData] = useState(null)
+  const [err, setErr] = useState(null)
+  useEffect(() => {
+    api.clinic.myPatientHistory(patientId).then(setData).catch((e) => setErr(e.message))
+  }, [patientId])
+  const p = data?.patient
+  return (
+    <BottomSheet title={p ? p.full_name : 'سجلّ المريض'}
+      subtitle={p ? [who(p), `زارك ${count(data.visits.length, TIMES)}`].filter(Boolean).join(' — ') : undefined}
+      onClose={onClose}>
+      {err ? <p className="error">{err}</p> : !data ? <p className="empty">جارٍ التحميل…</p> : (
+        <ul className="mp-history">
+          {data.visits.map((v) => (
+            <li key={v.id} className="mp-visit">
+              <div className="mp-visit-head">
+                <strong>{longDay(v.date)}</strong>
+                <span className={`dk-vt is-${v.visit_type}`}>{VISIT_TYPES[v.visit_type] || v.visit_type}</span>
+              </div>
+              <span className={`mp-card-status is-${v.status}`}>{STATUS[v.status] || v.status}</span>
+              {v.reason && <span className="mp-card-note">ملاحظة الحجز: {v.reason}</span>}
+              <Procs list={v.procedures} />
+            </li>
+          ))}
+        </ul>
+      )}
+    </BottomSheet>
+  )
+}
+
 export default function MyPatientsPage() {
-  const [date, setDate] = useState(null)        // null = اليوم (من الخادم)
+  const today = todayLocal()
+  const [period, setPeriod] = useState('today')
+  const [from, setFrom] = useState(minus(today, 6))
+  const [to, setTo] = useState(today)
   const [data, setData] = useState(null)
   const [err, setErr] = useState(null)
   const [filter, setFilter] = useState('all')
-  const load = useCallback(() => api.clinic.myPatients(date).then((d) => { setData(d); setErr(null) })
-    .catch((e) => setErr(e.message)), [date])
-  useEffect(() => { load() }, [load])
-  const shown = data && (date === null || data.date === date) ? data : null
-  usePolling(load, !!shown && shown.date === shown.today, 30000)
-  useEffect(() => { setFilter('all') }, [date])
+  const [q, setQ] = useState('')
+  const [found, setFound] = useState(null)
+  const [open, setOpen] = useState(null)       // patient_id سجلّه مفتوح
+
+  const key = period === 'custom' ? `${from}|${to}` : period
+  const load = useCallback(() => api.clinic.myPatients(period === 'custom' ? { from, to } : { period })
+    .then((d) => { setData({ key, d }); setErr(null) })
+    .catch((e) => setErr(e.message)), [key])  // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setFilter('all'); load() }, [load])
+  const shown = data?.key === key ? data.d : null
+  usePolling(load, period === 'today', 30000)
+
+  // البحث وهو يكتب (حرفان فأكثر)، بمهلةٍ قصيرة
+  useEffect(() => {
+    const t = q.trim()
+    if (t.length < 2) { setFound(null); return undefined }
+    const id = setTimeout(() => {
+      api.clinic.myPatientsSearch(t).then((r) => setFound({ q: t, results: r.results })).catch((e) => setErr(e.message))
+    }, 250)
+    return () => clearTimeout(id)
+  }, [q])
+  const searching = q.trim().length >= 2
 
   const patients = shown?.patients || []
   const kinds = FILTERS.filter(([k]) => k === 'all' || patients.some((p) => p.visit_type === k))
   const list = filter === 'all' ? patients : patients.filter((p) => p.visit_type === filter)
-  const withProcs = patients.some((p) => p.procedures.length > 0)
+  const days = [...new Set(list.map((p) => p.date))]
+  const manyDays = shown && shown.from !== shown.to
 
   return (
     <div className="dp mp">
       <h2>مرضاي</h2>
-      <p className="subtitle">مرضاك في يومٍ واحد — بأسمائهم ونوع زيارتهم وحالتهم</p>
+      <p className="subtitle">مرضاك في الفترة التي تختارها، والبحث عن أيّ مريضٍ زارك وسجلّه عندك</p>
 
-      <div className="card mp-day" role="group" aria-label="اليوم">
-        <button type="button" className="ghost mp-arrow" disabled={!shown?.prev_day}
-          title="أقرب يومٍ قبله فيه مرضى" onClick={() => setDate(shown.prev_day)}>يومٌ سابق</button>
-        <div className="mp-day-mid">
-          <strong>{shown ? dayTitle(shown.date) : '…'}</strong>
-          <input type="date" aria-label="اختيار يوم" value={shown?.date || ''} max={shown?.today}
-            onChange={(e) => e.target.value && setDate(e.target.value)} />
-          {shown && shown.date !== shown.today && (
-            <button type="button" className="ghost mp-today" onClick={() => setDate(null)}>اليوم</button>
-          )}
-        </div>
-        <button type="button" className="ghost mp-arrow" disabled={!shown?.next_day}
-          title="أقرب يومٍ بعده فيه مرضى" onClick={() => setDate(shown.next_day)}>يومٌ لاحق</button>
+      <div className="card mp-bar">
+        <input type="search" className="mp-search" placeholder="ابحث عن مريض بالاسم…" value={q}
+          onChange={(e) => setQ(e.target.value)} aria-label="البحث عن مريض" />
+        {!searching && (
+          <div className="mp-bar-row">
+            <div className="dp-period" role="group" aria-label="الفترة">
+              {PERIODS.map(([k, label]) => (
+                <button key={k} type="button" aria-pressed={period === k} className={period === k ? 'is-on' : ''}
+                  onClick={() => setPeriod(k)}>{label}</button>
+              ))}
+            </div>
+            {period === 'custom' && (
+              <div className="mp-range">
+                <label>من <input type="date" value={from} max={to} onChange={(e) => e.target.value && setFrom(e.target.value)} /></label>
+                <label>إلى <input type="date" value={to} min={from} max={today} onChange={(e) => e.target.value && setTo(e.target.value)} /></label>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {err && <p className="error">{err}</p>}
-      {!shown ? (!err && <p className="empty">جارٍ التحميل…</p>) : patients.length === 0 ? (
-        <div className="card"><p className="empty">
-          {shown.sessions.length === 0 ? 'لا دوام لك في هذا اليوم.' : 'لا مرضى في هذا اليوم.'}</p></div>
-      ) : (
-        <div className="card">
-          <Summary patients={patients} />
-          {kinds.length > 2 && (
-            <div className="mp-filter" role="group" aria-label="نوع الزيارة">
-              {kinds.map(([k, label]) => {
-                const c = k === 'all' ? patients.length : patients.filter((p) => p.visit_type === k).length
-                return (
-                  <button key={k} type="button" aria-pressed={filter === k} className={filter === k ? 'is-on' : ''}
-                    onClick={() => setFilter(k)}>{label} <span className="dk-count">{n(c)}</span></button>
-                )
-              })}
-            </div>
-          )}
-          <table className="rtable mp-table">
-            <thead>
-              <tr>
-                <th>الدور</th><th>المريض</th><th>الزيارة</th><th>الحالة</th><th>الأوقات</th>
-                {withProcs && <th>الإجراءات</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {list.map((p) => (
-                <tr key={p.id}>
-                  <td className="num mp-num" data-label="الدور">{p.number == null ? '—' : n(p.number)}</td>
-                  <td className="rt-title">
-                    <div className="mp-who">
-                      <strong>{p.full_name}<AttendanceBadge priority={p.priority} /></strong>
-                      <small>{[GENDER[p.gender], p.age != null && (p.age < 1 ? 'أقلّ من سنة' : count(p.age, AGE))].filter(Boolean).join('، ')}</small>
-                      {p.reason && <small className="mp-note">ملاحظة الحجز: {p.reason}</small>}
-                    </div>
-                  </td>
-                  <td data-label="الزيارة"><span className={`dk-vt is-${p.visit_type}`}>{VISIT_TYPES[p.visit_type] || p.visit_type}</span></td>
-                  <td data-label="الحالة" className={`mp-status is-${p.status}`}>{STATUS[p.status] || p.status}</td>
-                  <td data-label="الأوقات" className="mp-times">
-                    {[p.arrived_at && `حضر ${fmtClock(p.arrived_at)}`, p.started_at && `دخل ${fmtClock(p.started_at)}`,
-                      p.done_at && `انتهى ${fmtClock(p.done_at)}`].filter(Boolean).join('، ') || '—'}
-                  </td>
-                  {withProcs && (
-                    <td data-label="الإجراءات">
-                      {p.procedures.length === 0 ? '—' : (
-                        <div className="mp-procs">{p.procedures.map((x, i) => (
-                          <span key={i}>{x.name}{!x.paid && <small> (بانتظار المحاسبة)</small>}</span>
-                        ))}</div>
-                      )}
-                    </td>
-                  )}
-                </tr>
+
+      {searching ? (
+        !found || found.q !== q.trim() ? <p className="empty">جارٍ البحث…</p>
+          : found.results.length === 0 ? <div className="card"><p className="empty">لا مريض بهذا الاسم زارك.</p></div> : (
+            <div className="mp-grid">
+              {found.results.map((r) => (
+                <button key={r.patient_id} type="button" className="mp-card" onClick={() => setOpen(r.patient_id)}>
+                  <strong className="mp-card-name">{r.full_name}</strong>
+                  {who(r) && <span className="mp-card-who">{who(r)}</span>}
+                  <span className="mp-card-note">زارك {count(r.visits, TIMES)} — آخرها {dayTitle(r.last_visit)}</span>
+                  <span className="mp-card-open">عرض السجلّ</span>
+                </button>
               ))}
-            </tbody>
-          </table>
-        </div>
+            </div>
+          )
+      ) : !shown ? (!err && <p className="empty">جارٍ التحميل…</p>) : patients.length === 0 ? (
+        <div className="card"><p className="empty">لا مرضى في هذه الفترة.</p></div>
+      ) : (
+        <>
+          <div className="mp-head">
+            <Summary patients={patients} />
+            {kinds.length > 2 && (
+              <div className="mp-filter" role="group" aria-label="نوع الزيارة">
+                {kinds.map(([k, label]) => {
+                  const c = k === 'all' ? patients.length : patients.filter((p) => p.visit_type === k).length
+                  return (
+                    <button key={k} type="button" aria-pressed={filter === k} className={filter === k ? 'is-on' : ''}
+                      onClick={() => setFilter(k)}>{label} <span className="dk-count">{n(c)}</span></button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+          {days.map((d) => {
+            const dayList = list.filter((p) => p.date === d)
+            return (
+              <section key={d} className="mp-day-group">
+                {manyDays && <h3 className="mp-day-title">{dayTitle(d)} <span className="dk-count">— {count(dayList.length, PATIENTS)}</span></h3>}
+                <div className="mp-grid">
+                  {dayList.map((p) => <VisitCard key={p.id} p={p} onOpen={setOpen} />)}
+                </div>
+              </section>
+            )
+          })}
+        </>
       )}
+
+      {open && <HistorySheet patientId={open} onClose={() => setOpen(null)} />}
     </div>
   )
 }

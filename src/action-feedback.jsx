@@ -52,7 +52,8 @@ export function useToast() {
 export const RECALL_COOLDOWN_S = 10
 const cooldownUntil = new Map()   // appointment_id → ms — يبقى عبر إعادة الرسم وتحديث الطابور
 
-export function RecallButton({ apptId, onError, onDone, className = 'ghost', style }) {
+// icon={false}: شاشة الطبيب بلا أيقونة — أزرارها نصٌّ وحده بعرضٍ متساوٍ
+export function RecallButton({ apptId, onError, onDone, className = 'ghost', style, icon = true }) {
   const [now, setNow] = useState(Date.now())
   const [busy, setBusy] = useState(false)
   const until = cooldownUntil.get(String(apptId)) || 0
@@ -79,7 +80,7 @@ export function RecallButton({ apptId, onError, onDone, className = 'ghost', sty
   return (
     <button className={className} style={style} disabled={busy || left > 0} onClick={press}
       title={left > 0 ? 'أُعيد النداء للتو — الخادم يسمح بإعادته مرّة كل ١٠ ثوانٍ' : undefined}>
-      🔊 إعادة النداء{left > 0 && <span className="recall-wait"> ({secondsAr(left)})</span>}
+      {icon ? '🔊 ' : ''}إعادة النداء{left > 0 && <span className="recall-wait"> ({secondsAr(left)})</span>}
     </button>
   )
 }
