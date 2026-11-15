@@ -227,11 +227,20 @@ const run = async () => {
     ok(!(await text(page, '.cc-finance')).includes('مقبوضات'), '★ المشرف العام بلا مقبوضات (لا يقرأ الجرد)')
     await ctx.close()
   }
-  for (const [role, label] of [['brd', 'عضو المجلس'], ['doc', 'الطبيب']]) {
-    const { ctx, page, calls } = await open(browser, { role })
+  {
+    const { ctx, page, calls } = await open(browser, { role: 'brd' })
     await page.waitForSelector('h2')
     await page.waitForTimeout(300)
-    ok(!calls.includes('GET /clinic/command') && !await has(page, '.cc-switch') && calls.includes('GET /dashboard'), `★ ${label}: لوحته كما كانت`)
+    ok(!calls.includes('GET /clinic/command') && !await has(page, '.cc-switch') && calls.includes('GET /dashboard'), '★ عضو المجلس: لوحته كما كانت')
+    await ctx.close()
+  }
+  {
+    // doctor-pages-redesign: الطبيب بلا «لوحة قيادة» — «/» تفتح «شاشتي»
+    const { ctx, page, calls } = await open(browser, { role: 'doc' })
+    await page.waitForSelector('h2')
+    await page.waitForTimeout(300)
+    ok(new URL(page.url()).pathname === '/clinic/doctor' && !calls.includes('GET /clinic/command') && !calls.includes('GET /dashboard')
+      && (await text(page, 'h2')) === 'شاشتي', '★ الطبيب: «/» ⇐ «شاشتي» بعنوانها ولو بلا جلسة', page.url())
     await ctx.close()
   }
 

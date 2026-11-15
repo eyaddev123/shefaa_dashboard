@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { api, fmtTime, todayLocal, openStaffStream } from '../api.js'
 import VisitType from '../components/VisitType.jsx'
 import { AttendanceBadge, urgentRowClass, isAttendanceSession, usePolling, fmtClock, fmtTimeOfDay } from '../attendance-ui.jsx'
@@ -346,7 +347,15 @@ export default function DoctorScreen() {
     </div>
   )
   if (!sessions) return <p className="empty">جارٍ التحميل…</p>
-  if (sessions.length === 0) return <p className="empty">لا جلسات لك اليوم.</p>
+  // صفحته الأولى (لا «لوحة قيادة» للطبيب): يومٌ بلا جلسة يبقى صفحةً بعنوانها، ومنها إلى مرضاه
+  if (sessions.length === 0) return (
+    <div className="dk">
+      <div className="dk-top"><div><h2>شاشتي</h2><p className="subtitle">لا جلسات لك اليوم.</p></div></div>
+      <div className="card dk-current is-empty">
+        <p className="empty">لا دوام لك اليوم. مرضاك السابقون وسجلّاتهم في <Link to="/clinic/my-patients">«مرضاي»</Link>.</p>
+      </div>
+    </div>
+  )
 
   const appts = queue?.appointments || []
   const current = appts.find((a) => a.status === 'in_service')
@@ -578,7 +587,7 @@ export default function DoctorScreen() {
                 <button type="button" role="tab" aria-selected={side === 'line'} className={side === 'line' ? 'is-on' : ''}
                   onClick={() => setSide('line')}>بانتظار الدور <span className="dk-count">{line.length.toLocaleString('ar-SY')}</span></button>
                 <button type="button" role="tab" aria-selected={side === 'bookings'} className={side === 'bookings' ? 'is-on' : ''}
-                  onClick={() => setSide('bookings')}>محجوزون لم يحضروا <span className="dk-count">{bookings.length.toLocaleString('ar-SY')}</span></button>
+                  onClick={() => setSide('bookings')}>محجوزون لم يصلوا بعد <span className="dk-count">{bookings.length.toLocaleString('ar-SY')}</span></button>
               </div>
               {side === 'bookings' ? (
                 bookings.length === 0 ? <p className="empty">لا حجوزات بانتظار الحضور.</p> : (
