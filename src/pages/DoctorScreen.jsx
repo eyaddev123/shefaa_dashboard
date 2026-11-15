@@ -118,7 +118,8 @@ function AddProcedureSheet({ appt, catalog, usage, matCatalog, loadMaterials, dr
               {x.open && (
                 <div className="dk-mats-body">
                   {matCatalog == null ? <p className="empty">جارٍ التحميل…</p>
-                    : <MaterialsEditor catalog={matCatalog} value={x.mats} onChange={(mats) => update(x.id, { mats })} />}
+                    // combo: الكبسة تفتح قائمة المواد كاملةً منسدلة، والكتابة تُرشّحها (لا بحثٌ أعمى)
+                    : <MaterialsEditor combo comboHint="المواد: المس لعرضها كلّها، أو اكتب اسم مادة…" catalog={matCatalog} value={x.mats} onChange={(mats) => update(x.id, { mats })} />}
                   {!qtyValid(x.mats) && <p className="error">صحّح الكمّية (رقم أكبر من صفر).</p>}
                 </div>
               )}

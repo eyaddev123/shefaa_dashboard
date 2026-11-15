@@ -5965,3 +5965,14 @@ button.mp-card:hover { filter: none; border-color: var(--primary); }
 /* شاشة اللابتوب كاملة لـ«شاشتي» و«مرضاي» (طلب المستخدم): بلا سقف الـ١٢٤٠px العامّ — العمودان والكروت
    تتّسع. «أعمالي» يبقى بسقفه: نصٌّ وجداول تُقرأ أسوأ على ١٩٢٠px. */
 .main:has(> .dk), .main:has(> .mp) { max-width: none; }
+
+/* ═══ BottomSheet ⇐ نافذة وسطٍ على الشاشات العريضة (≥٦٤٠px) ═══ ورقةٌ سفلية على الجوال كما هي (أريح للإبهام)،
+   وعلى التابلت واللابتوب نافذةٌ في الوسط بحوافٍ مستديرة كلّها، بلا مقبض سحب. */
+@media (min-width: 640px) {
+  .bs-backdrop { align-items: center; padding: 24px; }
+  .bs-card { width: min(600px, 100%); max-height: min(86vh, 760px); border-radius: 16px; border-bottom: 1px solid var(--border);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35); animation: bs-pop 0.16s ease-out; }
+  .bs-grab { padding-top: 16px; cursor: default; touch-action: auto; }
+  .bs-handle { display: none; }
+  @keyframes bs-pop { from { transform: scale(0.97); opacity: 0.6; } to { transform: none; opacity: 1; } }
+}

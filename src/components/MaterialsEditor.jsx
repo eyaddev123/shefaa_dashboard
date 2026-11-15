@@ -55,7 +55,8 @@ export function qtyLimit(material, catalog, saved) {
   return { max: Math.max(available, 0), available }
 }
 
-export default function MaterialsEditor({ catalog, value, onChange, disabled, combo, saved }) {
+// comboHint: نصّ خانة القائمة المنسدلة — الافتراضيّ للاستقبال (مؤنّث)، وشاشة الطبيب تمرّر نصّاً محايداً
+export default function MaterialsEditor({ catalog, value, onChange, disabled, combo, saved, comboHint = 'اكبسي لعرض المواد، أو اكتبي للفلترة…' }) {
   const [query, setQuery] = useState('')
   const chosen = new Set(value.map((m) => String(m.material_id)))
   const results = query.trim() === '' ? [] : (catalog || [])
@@ -110,7 +111,7 @@ export default function MaterialsEditor({ catalog, value, onChange, disabled, co
       {combo ? (
         <div className="mat-search">
           <ComboAdd id="mat-combo" ariaLabel="ابحث عن مادة" disabled={disabled || !catalog}
-            placeholder={catalog ? 'اكبسي لعرض المواد، أو اكتبي للفلترة…' : 'جارٍ تحميل المواد…'}
+            placeholder={catalog ? comboHint : 'جارٍ تحميل المواد…'}
             options={(catalog || []).filter((m) => !chosen.has(String(m.id))).map(materialOption)}
             emptyText="لا مواد متاحة" onPick={(o) => add(o.m)} />
         </div>
