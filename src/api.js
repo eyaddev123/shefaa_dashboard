@@ -471,6 +471,9 @@ export const api = {
     myPunctuality: (period) => http(`/clinic/my-punctuality?period=${period}`),
     myShareRule: () => http('/clinic/my-share-rule'),
     mySalary: (month) => http(`/clinic/my-salary${month ? `?month=${month}` : ''}`),
+    // صفحات الطبيب: has_procedures يقرّر إظهار آثار الإجراءات، و«مرضاي» ليومٍ واحد
+    myProfile: () => http('/clinic/my-profile'),
+    myPatients: (date) => http(`/clinic/my-patients${date ? `?date=${date}` : ''}`),
     removeAppointmentProcedure: (appointmentId, lineId, reason) =>
       http(`/clinic/appointments/${appointmentId}/procedures/${lineId}/remove`,
         { method: 'POST', body: JSON.stringify({ reason }) }),

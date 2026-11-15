@@ -43,6 +43,7 @@ import SessionQueue from './pages/SessionQueue.jsx'
 import VisitPage from './pages/VisitPage.jsx'
 import DoctorScreen from './pages/DoctorScreen.jsx'
 import MyWorkPage from './pages/MyWork.jsx'
+import MyPatientsPage from './pages/MyPatients.jsx'
 import PublicDisplay from './pages/PublicDisplay.jsx'
 import OrderDisplay from './pages/OrderDisplay.jsx'
 import PatientTurn from './pages/PatientTurn.jsx'
@@ -116,7 +117,8 @@ function Sidebar({ onNavigate }) {
       {/* قسمان بعنوانٍ صغير لكلٍّ: «طلبات المساعدة» و«العيادات» — كلّ دورٍ يرى ما له وحده،
           والعنوان يظهر بظهور قسمه. لوحة القيادة فوقهما، والموظفون والإعدادات تحتهما بفاصل. */}
       <nav>
-        <NavLink to="/" end>{I.home} لوحة القيادة</NavLink>
+        {/* الطبيب بلا «لوحة القيادة»: صفحته الأولى «شاشتي» (كانت اللوحة جدولاً بسطرٍ يكرّرها) */}
+        {!canSeeDoctorScreen(clinicRole) && <NavLink to="/" end>{I.home} لوحة القيادة</NavLink>}
         {aid && <div className="nav-section">طلبات المساعدة</div>}
         {aid && <NavLink to="/requests">{I.requests} الطلبات</NavLink>}
         {aid && <NavLink to="/families">{I.families} العائلات (الملفات)</NavLink>}
@@ -131,6 +133,7 @@ function Sidebar({ onNavigate }) {
         {canSeeIronLog(clinicRole) && <NavLink to="/clinic/iron">{I.clinic} جلسات الحديد</NavLink>}
         {canSeeDoctorScreen(clinicRole) && <NavLink to="/clinic/doctor">{I.clinic} شاشتي</NavLink>}
         {/* أرقام الطبيب في صفحتها وحدها — الشاشة الرئيسية بلا مبالغ */}
+        {canSeeDoctorScreen(clinicRole) && <NavLink to="/clinic/my-patients">{I.clinic} مرضاي</NavLink>}
         {canSeeDoctorScreen(clinicRole) && <NavLink to="/clinic/my-work">{I.clinic} أعمالي</NavLink>}
         {canSeeDoctorsPage(clinicRole) && <NavLink to="/clinic/doctors">{I.clinic} الدكاترة والدوام</NavLink>}
         {/* تبويب «المستحقات» لمن يراه وحده — المجلس يرى الإجراءات بلا مستحقات */}
@@ -181,7 +184,7 @@ function TopBar({ onOpen, open }) {
 }
 
 function Shell() {
-  const { user, loading, role } = useRole()
+  const { user, loading, role, clinicRole } = useRole()
   const [drawer, setDrawer] = useState(false)
   const { pathname } = useLocation()
 
@@ -214,7 +217,7 @@ function Shell() {
       {canTakePayment(user.role) && <UnpaidBell role={user.role} />}
       <main className="main">
         <Routes>
-          <Route path="/" element={<Dashboard />} />
+          <Route path="/" element={canSeeDoctorScreen(clinicRole) ? <Navigate to="/clinic/doctor" replace /> : <Dashboard />} />
           <Route path="/requests" element={aid(<Requests />)} />
           <Route path="/requests/new" element={aid(<NewRequest />)} />
           <Route path="/requests/:id" element={aid(<RequestDetail />)} />
@@ -259,6 +262,8 @@ function Shell() {
             <Guard allow={canSeeDoctorScreen}><DoctorScreen /></Guard>} />
           <Route path="/clinic/my-work" element={
             <Guard allow={canSeeDoctorScreen}><MyWorkPage /></Guard>} />
+          <Route path="/clinic/my-patients" element={
+            <Guard allow={canSeeDoctorScreen}><MyPatientsPage /></Guard>} />
           <Route path="/users" element={
             <Guard allow={canManageUsers}><Users /></Guard>} />
           <Route path="/settings" element={

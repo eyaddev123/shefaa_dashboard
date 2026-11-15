@@ -74,37 +74,42 @@ const run = async () => {
   if (!up) { console.error('لم يقلع vite'); process.exit(1) }
   const browser = await chromium.launch()
 
-  console.log('\n── ١) راتبي وحضوري ──')
+  console.log('\n── ١) «أعمالي»: الراتب داخل «مستحقّاتي»، وأداة فترةٍ واحدة (doctor-pages-redesign) ──')
   {
     const { ctx, page, calls, errors } = await open(browser)
     await page.waitForSelector('.dk-sal-calc')
     const t = await page.textContent('.dk-salary')
     ok(t.includes('٣٩٠'), '★ الراتب ٣٩٠٬٠٠٠')
     ok(t.includes('٥ أيام × ٥٠') && t.includes('١٤:٠٠ ساعة × ١٠'), '★ الحساب: يومية × أيام + ساعة × ساعات (الساعات س:دد)')
-    ok(t.includes('انصراف غير مسجَّل') && await has(page, '.dk-salary tr.dt-row-warn .badge.warn'), '★ يوم بلا انصراف معلَّم')
+    ok(t.includes('انصراف غير مسجَّل') && t.includes('ساعاتها لا تُحسب'), '★ يوم بلا انصراف يُقال تحت الراتب', t)
     ok(!/حصّة الشفاء|الربح|خسارة|تحاسبه/.test(t), '★ لا حصّة ولا فرق ولا دورة')
+    // «قاعدة حصّتي» مطويّة تحت: تُفتح بلمسة
+    await page.click('.dk-rule summary')
     await page.waitForSelector('.dk-rule-list li')
     const ruleTxt = await page.textContent('.dk-rule')
     ok(ruleTxt.includes('٤٠٪') && ruleTxt.includes('خياطة') && /٢٠٬?٠٠٠/.test(ruleTxt), '★ «قاعدة حصّتي»: العامّة والخاصّة', ruleTxt)
     ok(await page.locator('.dk-rule :is(input, select, button)').count() === 0, '★ عرضٌ بلا أيّ حقل أو زرّ تعديل')
     ok(!/الشفاء|مستهلك|سعر/.test(ruleTxt), '★ بلا شفاء ولا مستهلكات ولا سعر')
-    ok(await page.$eval('.dk-sal-month button[aria-label="الشهر التالي"]', (b) => b.disabled), 'لا شهر بعد الجاري')
+    ok(await page.locator('.dp-period button').count() === 4 && await page.locator('.dk-sal-month').count() === 0,
+      '★ أداة فترةٍ واحدة (اليوم · الأسبوع · الشهر · الشهر الماضي) — لا أسهم شهرٍ للراتب')
     ok(!/·\s*[٠-٩]|[٠-٩]\s*·/.test(t), 'لا «·» بجانب رقم')
+    // تعطّل «الالتزام» (500 في هذا الفحص) لا يُخفي الراتب — كلّ قسمٍ وحده
+    ok(await page.locator('.dw .error').count() >= 1 && await has(page, '.dk-sal-calc'), '★ فشل قسمٍ لا يُخفي غيره')
     await shot(page, 'salary-light')
-    await page.click('.dk-sal-month button[aria-label="الشهر السابق"]')
-    await page.waitForFunction(() => document.querySelector('.dk-sal-month span')?.textContent === '2026-09')
-    ok(calls.includes('/clinic/my-salary?month=2026-09'), 'الشهر السابق يُطلب')
-    const t2 = await page.textContent('.dk-salary')
-    ok(t2.includes('لا حضور مسجَّل') && t2.includes('لا أيام') && !t2.includes('٠'), '★ الفراغ جملة لا «٠»')
+    const now = new Date(); const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    const want = `${lm.getFullYear()}-${String(lm.getMonth() + 1).padStart(2, '0')}`
+    await page.click('.dp-period button:has-text("الشهر الماضي")')
+    await page.waitForTimeout(600)
+    ok(calls.includes(`/clinic/my-salary?month=${want}`) && calls.some((c) => c.startsWith('/clinic/my-work?period=last_month')),
+      '★ «الشهر الماضي» يطلب راتب الشهر السابق وعمله', JSON.stringify(calls.filter((c) => c.includes('my-'))))
     ok(errors.length === 0, `بلا أخطاء (${errors[0] || ''})`)
     await ctx.close()
   }
   {
     const { ctx, page } = await open(browser, { salary: UNSET })
     await page.waitForSelector('.dk-sal-unset')
-    ok((await page.textContent('.dk-sal-unset')).trim() === 'لم تُحدد إعدادات الراتب بعد', '★ الرسالة حرفياً')
+    ok((await page.textContent('.dk-sal-unset')).includes('لم تُحدَّد إعدادات راتبك بعد'), '★ الرسالة')
     ok(!await has(page, '.dk-sal-calc'), 'بلا حساب')
-    ok((await page.textContent('.dk-salary')).includes('انصراف غير مسجَّل'), 'والحضور يبقى ظاهراً')
     await shot(page, 'salary-unset')
     await ctx.close()
   }
@@ -148,7 +153,7 @@ const run = async () => {
   {
     const { ctx, page } = await open(browser, { path: '/clinic/doctor', sessions: [SESSION({ apologized: true })] })
     await page.waitForSelector('.dk-apology')
-    ok((await page.textContent('.dk-apology .badge')) === 'معتذر', '★ بشارة «معتذر» في شاشته')
+    ok((await page.textContent('.dk-apology strong')) === 'معتذر', '★ «معتذر» في شاشته (كلمةٌ لا فقاعة)')
     await shot(page, 'apology')
     await ctx.close()
   }
@@ -165,9 +170,12 @@ const run = async () => {
     await ctx.close()
   }
   {
-    const { ctx, page } = await open(browser, { path: '/', dashboard: { view: 'doctor', mySessions: [SESSION({ apologized: true })] } })
-    await page.waitForSelector('td .badge')
-    ok((await page.textContent('td .badge')) === 'معتذر', '★ وفي لوحته الرئيسية')
+    // doctor-pages-redesign: لا «لوحة قيادة» للطبيب — «/» تفتح «شاشتي» مباشرةً، والاعتذار فيها
+    const { ctx, page } = await open(browser, { path: '/', sessions: [SESSION({ apologized: true })] })
+    await page.waitForSelector('.dk-apology')
+    ok(new URL(page.url()).pathname === '/clinic/doctor', '★ «/» للطبيب ⇐ «شاشتي»', page.url())
+    ok(await page.locator('nav a', { hasText: 'لوحة القيادة' }).count() === 0
+      && await page.locator('nav a', { hasText: 'مرضاي' }).count() === 1, '★ القائمة: شاشتي · مرضاي · أعمالي — بلا «لوحة القيادة»')
     await ctx.close()
   }
 

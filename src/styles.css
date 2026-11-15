@@ -5732,3 +5732,173 @@ button.pcx-card:focus-visible { outline: 2px solid var(--primary); outline-offse
   .pex-line-acts button { padding: 6px 12px; }
 }
 .pex-pedit { flex: 1 1 100%; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   صفحات الطبيب v2 (doctor-pages-redesign، 2026-11-15) — «شاشتي» و«مرضاي» و«أعمالي»
+   طلب المستخدم: لا «برقعة ألوان» ولا فقاعات ولا أزرار عملاقة — أطبّاء على تابلت.
+   القاعدة: بطاقات محايدة بحدٍّ رفيع، لونٌ واحد مُعبّأ للزرّ الأساسيّ وحده، الشارات نصٌّ صغير،
+   الأزرار ٤٤px (لمسة إصبع على التابلت، لا إبهام على جوال). تُكتب فوق قواعد dk-* القديمة.
+   ═══════════════════════════════════════════════════════════════════ */
+.dk .dk-top { align-items: center; margin-bottom: 4px; }
+.dk .dk-top h2 { margin-bottom: 2px; }
+.dk .dk-top .subtitle { margin: 0; }
+button.dk-tool { min-height: 40px; padding: 6px 14px; font-size: 13.5px; font-weight: 600; }
+button.dk-audio.is-on:disabled { color: var(--text-secondary); background: transparent; border-color: var(--border); }
+.dk .dk-top-tools select { min-height: 40px; }
+
+.dk .dk-callbar { margin: 14px 0; padding: 10px 14px; border-radius: 12px; box-shadow: none; justify-content: space-between; }
+.dk .dk-callbar-who { font-size: 15px; flex: 1 1 220px; min-width: 0; }
+button.dk-callbar-btn { min-height: 44px; padding: 0 24px; font-size: 15.5px; font-weight: 700; border-radius: 10px; }
+@media (max-width: 600px) { button.dk-callbar-btn { width: 100%; } }
+
+.dk .dk-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0 16px; max-width: none; }
+@media (min-width: 820px) { .dk .dk-grid { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); } }
+.dk .dk-main, .dk .dk-side { min-width: 0; }
+.dk .card { box-shadow: none; padding: 16px; margin-bottom: 14px; }
+.dk .dk-sec { margin: 0 0 10px !important; font-size: 13.5px; font-weight: 700; color: var(--text-secondary); }
+.dk-count { font-weight: 500; color: var(--muted); }
+
+.dk .card.dk-current { border: 1px solid var(--border); padding: 16px; }
+.dk .card.dk-current.is-empty { border-style: solid; }
+.dk .dk-current-who { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.dk .dk-current-num { font-size: 20px; font-weight: 800; color: var(--text-primary); }
+.dk .dk-current-name { flex: 0 1 auto; font-size: 18px; font-weight: 700; }
+.dk-current-meta { margin: 4px 0 0; font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 2px 12px; }
+.dk .dk-current-note { flex: 0 1 auto; font-size: 13px; color: var(--text-secondary); }
+
+.dk-procs { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 14px; }
+.dk-proc small { color: var(--muted); font-size: 12px; }
+.dk-proc.is-unpaid small { color: var(--status-pending); }
+
+.dk .dk-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.dk .dk-btn { width: auto; min-height: 44px; padding: 0 18px; font-size: 14.5px; font-weight: 600; border-radius: 10px; }
+.dk .dk-primary, .dk .dk-actions .dk-primary { min-height: 44px; font-size: 15px; font-weight: 700; padding: 0 22px; }
+.dk .dk-btn-start, .dk .dk-btn-start:hover:not(:disabled), .dk .dk-btn-done { background: var(--primary); color: #fff; }
+.dk button.dk-light, .dk button.dk-btn-add { color: var(--text-primary); border: 1px solid var(--border); background: transparent; font-size: 14px; }
+@media (max-width: 600px) { .dk .dk-actions .dk-primary { flex: 1 1 100%; } }
+
+/* الشارات داخل صفحات الطبيب: كلمةٌ صغيرة لا فقاعة — الإسعافي وحده بلون */
+.dk .badge, .dp .badge { background: transparent !important; border: 0; padding: 0; margin-inline-start: 8px;
+  font-size: 12.5px; font-weight: 700; color: var(--text-secondary); }
+.dk .badge.bad, .dp .badge.bad { color: var(--status-bad); }
+.dk-tag { margin-inline-start: 8px; font-size: 12.5px; font-weight: 600; color: var(--text-secondary); }
+.dk-tag.is-late { color: var(--status-pending); }
+
+/* بانتظار الدور: سطورٌ هادئة؛ «التالي» بخطٍّ أثقل وكلمة صغيرة — بلا خلفيّة ملوّنة */
+.dk .dk-wait { min-height: 48px; padding: 6px 0; flex-wrap: wrap; }
+.dk .dk-wait.is-next { background: none; border-radius: 0; padding: 8px 0; }
+.dk .dk-wait.is-next .dk-wait-name { font-weight: 700; }
+.dk .dk-wait-num { min-width: 28px; color: var(--text-secondary); font-weight: 700; }
+.dk .dk-wait-name { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 2px; }
+.dk-next-note { flex-basis: 100%; font-size: 12.5px; font-weight: 400; color: var(--muted); }
+.dk .dk-next-actions { margin-inline-start: auto; display: flex; align-items: center; gap: 10px; }
+.dk .doc-next-tag { margin: 0; font-size: 12px; font-weight: 600; color: var(--muted); letter-spacing: 0; }
+.dk .dk-tap { min-height: 40px; padding: 0 16px; font-size: 14px; }
+
+.dk .wr-card h3 { font-size: 13.5px; }
+.dk .wr-item { flex-wrap: wrap; gap: 4px 12px; padding: 8px 0; }
+.dk .wr-num { color: var(--text-primary); min-width: 0; }
+.dk .wr-name { color: var(--text-primary); }
+.wr-btns { margin-inline-start: auto; display: flex; gap: 8px; }
+
+.dk-bookings summary { cursor: pointer; font-size: 13.5px; font-weight: 700; color: var(--text-secondary); min-height: 32px; display: flex; align-items: center; gap: 6px; }
+.dk-bookings[open] summary { margin-bottom: 8px; }
+.dk .dk-book-time { color: var(--text-secondary); }
+
+.dk .dk-apology { background: transparent; border: 1px solid var(--border); color: var(--text-primary); font-weight: 500; }
+.dk .dk-apology strong { color: var(--status-bad); }
+.dk .dk-push { background: var(--surface-1); }
+
+/* شريط «إجراءات اليوم» (من له إجراءات وحده): سطرٌ محايد؛ والصفحة تُفسح له تحتها فلا يغطّي الأزرار */
+.dk.has-bar { padding-bottom: 72px; }
+.dk.has-bar.has-toast { padding-bottom: 150px; }
+.dk .dk-today { background: var(--surface-1); box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.06); }
+.dk .dk-today-sum { font-size: 14px; font-weight: 600; color: var(--text-secondary); }
+.dk-today-state { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+.dk-today-state.is-unpaid { color: var(--status-pending); }
+.dk-toast-float { position: fixed; bottom: 12px; inset-inline: 12px; z-index: 50; max-width: 640px; margin-inline: auto; }
+
+/* ورقة الإضافة: أزرارٌ محايدة بحدّ، والمختار بحدٍّ ولونٍ خفيف لا تعبئة كاملة */
+button.dk-pick { min-height: 52px; font-size: 14.5px; background: var(--surface-1); color: var(--text-primary); border: 1px solid var(--border); }
+button.dk-pick:hover:not(:disabled) { background: var(--primary-soft); }
+button.dk-pick.is-on, button.dk-pick.is-on:hover:not(:disabled) { background: var(--primary-soft); color: var(--text-primary); border: 2px solid var(--primary); }
+.dk-pick-check { background: var(--primary); color: #fff; width: 20px; height: 20px; font-size: 12px; }
+.dk-pick-tag { color: var(--text-secondary); }
+button.dk-confirm { min-height: 48px; font-size: 15.5px; }
+/* نوع الزيارة: كلمةٌ بجانب الاسم — «مراجعة» بلون النظام الخفيف لتُميَّز من «معاينة» بلا فقاعة */
+.dk-vt { margin-inline-start: 8px; font-size: 12.5px; font-weight: 600; color: var(--text-secondary); }
+.dk-vt.is-followup { color: var(--accent-text); }
+
+/* ═══ «أعمالي» و«مرضاي» (dp) — المحايد نفسه ═══ */
+.dp .card { box-shadow: none; padding: 16px; margin-bottom: 14px; }
+.dw-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.dw-top h2 { margin-bottom: 2px; }
+.dw-top .subtitle { margin: 0; }
+.dp-period, .mp-filter { display: inline-flex; flex-wrap: wrap; gap: 0; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--surface-1); }
+.dp-period button, .mp-filter button { min-height: 40px; padding: 0 16px; border-radius: 0; background: transparent; color: var(--text-secondary);
+  font-size: 14px; font-weight: 600; border: 0; border-inline-start: 1px solid var(--border); }
+.dp-period button:first-child, .mp-filter button:first-child { border-inline-start: 0; }
+.dp-period button:hover, .mp-filter button:hover { filter: none; background: var(--primary-soft); }
+.dp-period button.is-on, .mp-filter button.is-on { background: var(--primary-soft); color: var(--text-primary); font-weight: 700; }
+.dw-h { margin: 0 0 12px; font-size: 14px; font-weight: 700; color: var(--text-secondary); }
+details > summary.dw-h { cursor: pointer; margin: 0; }
+details[open] > summary.dw-h { margin-bottom: 12px; }
+.dw-nums { display: flex; gap: 32px; flex-wrap: wrap; }
+.dw-num { display: flex; flex-direction: column; }
+.dw-num strong { font-size: 28px; font-weight: 800; line-height: 1.2; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.dw-num span { font-size: 13px; color: var(--text-secondary); }
+.dw-sub + .dw-sub { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+.dw-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.dw .dk-work-total { margin: 0; padding: 0; border: 0; font-size: 15px; font-weight: 600; }
+.dw-row-head span { font-size: 15px; font-weight: 600; }
+.dw-row-head strong, .dw .dk-work-total strong { font-size: 18px; font-weight: 800; color: var(--text-primary); }
+.dw-details { margin-top: 8px; }
+.dw-details summary { cursor: pointer; font-size: 13px; color: var(--accent-text); }
+.dw-lines { list-style: none; margin: 8px 0 0; padding: 0; }
+.dw-lines li { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 40px; padding: 4px 0; border-top: 1px solid var(--border); font-size: 14px; }
+.dw-lines li small { color: var(--muted); }
+.dw-lines li b { font-variant-numeric: tabular-nums; }
+.dw-pending { margin-top: 12px; }
+button.dw-x { min-height: 36px; padding: 0 12px; font-size: 13px; color: var(--status-bad); }
+.dw-note { margin: 8px 0 0; font-size: 12.5px; color: var(--muted); }
+.dw .dk-salary { margin: 0; }
+.dw .dk-sal-unset { margin: 8px 0 0; background: transparent; padding: 0; font-weight: 500; }
+.dw .dk-sal-calc { margin: 8px 0 0; }
+.dw-sentence { margin: 0; font-size: 15px; line-height: 1.8; }
+.dw-days { margin-top: 12px; }
+.dw-state { white-space: nowrap; }
+.dw-state.is-late { color: var(--status-pending); }
+.dw-state.is-absent { color: var(--status-bad); }
+.dw-state small { color: var(--status-pending); }
+.dw .dk-rule { padding: 14px 16px; }
+
+.mp-day { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 10px 12px; }
+.mp-day-mid { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: center; flex: 1 1 260px; }
+.mp-day-mid strong { font-size: 15.5px; }
+.mp-day-mid input[type='date'] { min-height: 40px; width: auto; }
+button.mp-arrow, button.mp-today { min-height: 40px; padding: 0 14px; font-size: 14px; }
+.mp-summary { margin: 0 0 12px; font-size: 15px; line-height: 1.8; }
+.mp-filter { margin-bottom: 12px; }
+.mp-table td { vertical-align: top; }
+.mp-num { font-weight: 700; color: var(--text-secondary); }
+.mp-who { display: flex; flex-direction: column; gap: 2px; }
+.mp-who small { font-size: 12.5px; color: var(--muted); font-weight: 400; }
+.mp-who .mp-note { color: var(--text-secondary); }
+.mp-who .badge { margin: 0; align-self: flex-start; }
+.mp-table .dk-vt { margin: 0; }
+.mp-status { white-space: nowrap; font-size: 14px; }
+.mp-status.is-no_show { color: var(--muted); }
+.mp-times { font-size: 13px; color: var(--text-secondary); }
+.mp-procs { display: flex; flex-direction: column; gap: 2px; font-size: 13.5px; }
+.mp-procs small { color: var(--status-pending); }
+/* تصويبات بعد اللقطة الأولى: الأزرار صفٌّ لا عمود، والإسعافي كلمةٌ حمراء لا سطرٌ أحمر، والتالي بحجم البقية */
+.dk .dk-actions { flex-direction: row; align-items: center; }
+.dk li.attn-row-urgent { background: none; color: inherit; font-weight: inherit; box-shadow: none; border-radius: 0; padding-left: 0; padding-right: 0; }
+.dk .badge::before, .dp .badge::before { display: none; }
+.dk .dk-next-who { font-size: inherit; }
+.dk .dk-wait-name { flex: 1 1 160px; min-width: 0; }
+.dk-bookings summary { list-style: none; }
+.dk-bookings summary::-webkit-details-marker { display: none; }
+.dk-bookings summary::after { content: '▾'; margin-inline-start: auto; color: var(--muted); }
+.dk-bookings[open] summary::after { content: '▴'; }
+.dw-warn { margin: 8px 0 0; font-size: 13px; color: var(--status-pending); }

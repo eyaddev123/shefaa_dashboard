@@ -178,7 +178,8 @@ const run = async () => {
     const st = await dp.evaluate(() => {
       const btn = (sel, text) => [...document.querySelectorAll(sel)].filter((b) => b.textContent.includes(text))
       return {
-        listButtons: document.querySelectorAll('.dk-wait-list button').length,
+        // doctor-pages-redesign: «التالي» أوّل سطرٍ في القائمة وعليه «بدء كشف» وحده — والبقية بلا أزرار
+        listButtons: [...document.querySelectorAll('.dk-wait-list button')].filter((b) => !b.closest('.dk-next-actions')).length,
         listRows: document.querySelectorAll('.dk-wait-list li').length,
         walkins: btn('.dk-next-actions button', 'بدء كشف').map((b) => b.disabled),
         walkinsElsewhere: btn('button', 'بدء كشف').filter((b) => !b.closest('.dk-next-actions, .dk-actions, .wr-list')).length,
@@ -194,7 +195,7 @@ const run = async () => {
         hints: [...document.querySelectorAll('.dk-hint, .wr-hint')].map((h) => h.textContent.trim()),
       }
     })
-    ok(st.listRows === 3 && st.listButtons === 0, `★ ${label}: قائمة المنتظرين للعرض — ٣ أسطر بلا أيّ زرّ (${st.listButtons})`)
+    ok(st.listRows === 3 && st.listButtons === 0, `★ ${label}: قائمة المنتظرين — ٣ أسطر، ولا زرّ إلا «بدء كشف» على سطر التالي (${st.listButtons})`)
     ok(st.walkins.length === 1 && st.walkinsElsewhere === 0, `★ ${label}: «بدء كشف» في بطاقة «التالي» وحدها (${st.walkins.length}/${st.walkinsElsewhere})`)
     // waiting-return-modes (جولة ٢): «نادِ التالي» زرٌّ واحد ثابت أعلى الشاشة (.dk-callbar) لا في بطاقة،
     // ولا «لم يحضر» في الشاشة كلّها — من نودي ولم يدخل فـ«تأخّر المريض»
@@ -255,9 +256,9 @@ const run = async () => {
     await page.waitForSelector('.dk-wait-list', { timeout: 10000 }).catch(() => {})
     const st = await page.evaluate(() => ({
       order: [...document.querySelectorAll('.dk-wait-list li .dk-wait-num')].map((e) => e.textContent.trim()),
-      tags: [...document.querySelectorAll('.dk-wait-list li')].filter((li) => li.querySelector('.wr-back-tag'))
+      tags: [...document.querySelectorAll('.dk-wait-list li')].filter((li) => li.querySelector('.dk-tag'))
         .map((li) => li.querySelector('.dk-wait-num').textContent.trim()),
-      next: document.querySelector('.dk-next-who')?.textContent || '',
+      next: document.querySelector('.dk-wait.is-next')?.textContent || '',
       nextButtons: [...document.querySelectorAll('.dk-next-actions button')].map((b) => b.textContent.trim()),
       out: [...document.querySelectorAll('.wr-list .wr-item')].map((li) => li.textContent),
     }))
@@ -270,12 +271,12 @@ const run = async () => {
     // نجعل الإسعافيّ يُخدَم: نُخرجه من القائمة فيصير ٦ «التالي»
     appts.splice(0, 1)
     await page.reload({ waitUntil: 'load' })
-    await page.waitForSelector('.dk-next-who', { timeout: 10000 }).catch(() => {})
+    await page.waitForSelector('.dk-wait.is-next', { timeout: 10000 }).catch(() => {})
     const nx = await page.evaluate(() => ({
-      next: document.querySelector('.dk-next-who')?.textContent || '',
+      next: document.querySelector('.dk-wait.is-next')?.textContent || '',
       nextButtons: [...document.querySelectorAll('.dk-next-actions button')].map((b) => b.textContent.trim()),
     }))
-    ok(nx.next.includes('الدور 6') && nx.next.includes('عائد — يكمّل كشفه'), `★ «التالي» هو العائد ٦ بعلامته (${nx.next})`)
+    ok(nx.next.startsWith('6') && nx.next.includes('مريض 6') && nx.next.includes('عائد — يكمّل كشفه'), `★ «التالي» هو العائد ٦ بعلامته (${nx.next})`)
     ok(j2(nx.nextButtons) === j2(['بدء كشف']), `★ بطاقة «التالي»: «بدء كشف» وحده (${j2(nx.nextButtons)})`)
     await page.locator('.dk-callbar button', { hasText: 'نادِ التالي' }).click()
     await page.waitForTimeout(300)
