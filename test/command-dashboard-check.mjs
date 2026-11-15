@@ -130,7 +130,9 @@ const run = async () => {
     ok(await page.$eval('.cc-scard[href="/clinic/session/2"] .cc-scard-turn strong', (e) => e.textContent) === '—', 'بلا كشفٍ جارٍ: شرطة')
     ok(JSON.stringify(await page.$$eval('.cc-scard', (x) => x.map((a) => a.getAttribute('href').split('/').pop()))) === '["1","2","3"]', '★ الترتيب: شغّالة ⇐ جاهزة ⇐ منتهية')
     ok((await text(page, '.cc-scard[href="/clinic/session/1"]')).includes('انتهى ٧ من ١٤'), 'التقدّم في البطاقة')
-    const api = calls.filter((c) => !c.includes('/auth/me') && !c.includes('notifications') && !c.includes('/unpaid') && !c.includes('/events'))
+    // ‏/nurse-calls: تنبيه «أحتاج ممرضة» في كلّ صفحات المشرفة والاستقبال (App)، لا طلبٌ من اللوحة
+    const api = calls.filter((c) => !c.includes('/auth/me') && !c.includes('notifications') && !c.includes('/unpaid') && !c.includes('/events')
+      && !c.includes('/nurse-calls'))
     // StrictMode في التطوير يضاعف كلّ effect — فالعدد الفعليّ يُفحص على البناء، وهنا الأنواع
     ok([...new Set(api)].sort().join() === 'GET /clinic/command,GET /clinic/highlights', `★ اللوحة طلبان لا غير (${api.join(' | ')})`)
     ok(!calls.includes('GET /dashboard'), '★ لا /dashboard لموظف العيادات')
