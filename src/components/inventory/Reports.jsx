@@ -32,7 +32,7 @@ function useReport(load, deps) {
 
 // ═══ تقرير الاستهلاك الواحد ═══
 // لكل مادة في المدى: الكمّية، وقيمة البيع (ما حُسب على الإجراءات من لقطاتها)، وكلفة
-// الشراء (بسعر آخر شراء)، والهامش بينهما — الفرق معلومةٌ لا تقريران يتناقضان.
+// الشراء (بسعر شراء المادة المعروض في بطاقتها)، والهامش بينهما — الفرق معلومةٌ لا تقريران يتناقضان.
 // المجلس (withCost=false) يرى الكمّية وقيمة البيع وحدهما، والخادم يحذف الباقي أصلاً.
 function Consumption({ showToast, withCost }) {
   const [from, setFrom] = useState(monthStart)
@@ -119,7 +119,7 @@ function Consumption({ showToast, withCost }) {
             </table>
             <p className="inv-footnote">
               قيمة البيع ما حُسب على الإجراءات بسعر المادة لحظة إضافتها.
-              {withCost && ' كلفة الشراء بسعر آخر شراء، والهامش الفرق بينهما.'}
+              {withCost && ' كلفة الشراء بسعر شراء المادة، والهامش الفرق بينهما.'}
               {withCost && data.missing_cost > 0 && (
                 <span className="inv-muted"> {materialsCount(data.missing_cost)} بلا سعر شراء — لا تدخل في الكلفة ولا الهامش.</span>
               )}
