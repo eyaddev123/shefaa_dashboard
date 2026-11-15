@@ -28,6 +28,8 @@ function ProfileForm({ doctor, globalBuffer, onSaved, readOnly = false }) {
     notes: doctor.notes || '',
     accepts_urgent: doctor.accepts_urgent !== false,
     appointments_based: doctor.appointments_based === true,
+    // الخروج المؤقت: '' = يرجع بإخبار الاستقبال، أو دقائق الرجوع التلقائي
+    return_after_minutes: doctor.return_after_minutes == null ? '' : String(doctor.return_after_minutes),
   })
   const [err, setErr] = useState(null)
   const [saved, setSaved] = useState(false)
@@ -48,6 +50,8 @@ function ProfileForm({ doctor, globalBuffer, onSaved, readOnly = false }) {
         // فارغ = احذف التخصيص وعُد للإعداد العام (يُرسل null صريحاً)
         hourly_buffer_minutes: form.hourly_buffer_minutes === ''
           ? null : Number(form.hourly_buffer_minutes),
+        // الخادم يتحقّق (1–240) ويقبل الأرقام الهندية — ويُسجّل التغيير في السجلّ
+        return_after_minutes: form.return_after_minutes === '' ? null : form.return_after_minutes,
       })
       setSaved(true); onSaved()
     } catch (ex) { setErr(ex.message) }
@@ -148,6 +152,28 @@ function ProfileForm({ doctor, globalBuffer, onSaved, readOnly = false }) {
                   يوم حضوره يُحسب كالمعتاد بـ«وصل الطبيب».</small></span>
             </label>
           </div>
+          {/* ═══ الخروج المؤقت ═══ إعدادٌ واحد للدكتور لا سؤالٌ عند كلّ خروج: أكثرهم يُخرج المريض
+              لصورةٍ أو تحليل (قد يغيب ساعة) فيرجع حين تكبس الاستقبال «رجع»؛ ودكتور العينية يُخرجه
+              لقطرة فيرجع على الدور وحده بعد ربع ساعة. يُطبَّق على الخروج التالي لا الجاري. */}
+          <div className="pf-return" role="radiogroup" aria-labelledby="pf-return-h">
+            <div id="pf-return-h" className="pf-return-title"><strong>الخروج المؤقت</strong>
+              <small>متى يرجع المريض على الدور بعد أن يكبس الدكتور «خروج مؤقت»؟</small></div>
+            <label className="pf-toggle">
+              <input type="radio" name="return_mode" checked={form.return_after_minutes === ''}
+                onChange={() => { setForm((f) => ({ ...f, return_after_minutes: '' })); setSaved(false) }} />
+              <span><strong>لحين ما تخبّر الاستقبال</strong>
+                <small>للصور والأشعّة والتحاليل: يبقى خارجاً حتى تكبس الاستقبال «رجع»، فيدخل أوّل واحد برقمه.</small></span>
+            </label>
+            <label className="pf-toggle">
+              <input type="radio" name="return_mode" checked={form.return_after_minutes !== ''}
+                onChange={() => { setForm((f) => ({ ...f, return_after_minutes: f.return_after_minutes || '15' })); setSaved(false) }} />
+              <span><strong>يرجع على الدور تلقائياً بعد
+                <input className="pf-return-min" inputMode="numeric" aria-label="دقائق الرجوع التلقائي"
+                  value={form.return_after_minutes} disabled={readOnly || form.return_after_minutes === ''}
+                  onChange={set('return_after_minutes')} /> دقيقة</strong>
+                <small>للقطرات: يرجع وحده بعد المدّة أوّل واحد برقمه — والاستقبال تستطيع «رجع» قبلها.</small></span>
+            </label>
+          </div>
           <div className="field pf-notes">
             <label>ملاحظات</label>
             <input value={form.notes} onChange={set('notes')} />
@@ -206,6 +232,10 @@ function changeText(h) {
   if (h.field === 'pricing') return pricingText(h, 'doctor')
   if (h.field === 'room') return `الغرفة: ${roomLabel(h.old_value)} ← ${roomLabel(h.new_value)}`
   if (h.field === 'schedule') return scheduleEditText(h)
+  if (h.field === 'return_after_minutes') {
+    const mode = (v) => (v == null || v === '' ? 'بإخبار الاستقبال' : `تلقائياً بعد ${Number(v).toLocaleString('ar-SY')} د`)
+    return `الخروج المؤقت: ${mode(h.old_value)} ← ${mode(h.new_value)}`
+  }
   if (h.field === 'appointments_based')
     return h.new_value === 'true' ? 'فُعِّل «بمواعيد خاصة» — لا تأخير يُحسب عليه' : 'أُطفئ «بمواعيد خاصة» — عاد حساب التأخير'
   const line = h.weekday == null ? 'سطر دوامٍ حُذف لاحقاً'
@@ -301,6 +331,10 @@ export default function DoctorProfile() {
               {doctor.is_active ? <span className="badge good">فعّال</span> : <span className="badge">موقوف</span>}
               <span className="badge blue">{doctor.room ? `العيادة ${doctor.room}` : 'بلا غرفة'}</span>
               {doctor.appointments_based && <span className="badge">بمواعيد خاصة</span>}
+              {doctor.return_after_minutes != null && (
+                <span className="badge" title="الخروج المؤقت يرجع على الدور تلقائياً">
+                  خروج مؤقت: {Number(doctor.return_after_minutes).toLocaleString('ar-SY')} د</span>
+              )}
               {doctor.accepts_urgent === false && <span className="badge">لا يقبل الإسعافي</span>}
             </div>
           </div>

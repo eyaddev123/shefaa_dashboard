@@ -13,7 +13,7 @@ import { QUEUE_TABS, DEFAULT_TAB, isTab, rowsOfTab, matchesQuery, tabCounts, tab
 import { useRole } from '../RoleContext.jsx'
 import { useToast, RecallButton } from '../action-feedback.jsx'
 import { canStepOutAsSupervisor, canOperateQueue } from '../permissions.js'
-import { WAITING_RETURN, waitingReturnOf, serverOffsetOf, Elapsed, useStaffEvents } from '../waiting-return.jsx'
+import { WAITING_RETURN, waitingReturnOf, serverOffsetOf, ReturnState, useStaffEvents } from '../waiting-return.jsx'
 import ReferralsEditor from '../components/ReferralFields.jsx'
 import { referralPayload, referralReady, referralSummary } from '../referral.js'
 import RoomBadge from '../components/RoomBadge.jsx'
@@ -66,16 +66,41 @@ export function appointmentBadge(status, small = false) {
 }
 
 // ═══ خانة الحالة في الطابور ═══
-// «بانتظار العودة» (خروج مؤقت) شارةٌ زرقاء هادئة ومعها كم صار له خارجاً — لا «غائب»:
-// المريض في الصالة ينتظر أن يناديه الطبيب ليُكمل، ورقم دوره كما هو.
+// «بانتظار العودة» (خروج مؤقت) شارةٌ زرقاء هادئة ومعها حاله — لا «غائب»: خارج منذ كذا
+// (يرجع بإخبار الاستقبال)، أو يرجع تلقائياً بعد كذا، أو رجع على الدور. ورقم دوره كما هو.
 export function StatusCell({ appt, offset }) {
   if (appt.status !== WAITING_RETURN) return appointmentBadge(appt.status)
   return (
     <span className="wr-status">
       {appointmentBadge(appt.status)}
-      <Elapsed since={appt.stepped_out_at} offset={offset} />
+      <ReturnState appt={appt} offset={offset} />
     </span>
   )
+}
+
+// ═══ «رجع» — للاستقبال (والمشرفة) ═══
+// المريض رجع من الصورة أو التحليل ومرّ على الاستقبال: كبسةٌ تُرجعه على الدور برقمه، فيظهر
+// عند الطبيب «التالي» بعلامة «عائد» ويناديه من زرّه. ومن كُبس له خطأً: «تراجع» ما دام لم يُنادَ.
+// (من رجع تلقائياً بوقته لا يحتاج شيئاً — ولا تراجع عنه: الطبيب يُعيده بـ«خروج مؤقت» إن لزم.)
+export function ReturnedButton({ appt, offset = 0, onDone, onError }) {
+  const { clinicRole: role } = useRole()
+  const [busy, setBusy] = useState(false)
+  if (appt.status !== WAITING_RETURN || !canOperateQueue(role)) return null
+  const run = async (undo) => {
+    setBusy(true)
+    try {
+      await api.clinic.markReturned(appt.id, undo)
+      onDone(undo ? 'تراجعتَ — ما زال خارجاً' : 'رجع على الدور — يظهر عند الدكتور «التالي»')
+    } catch (ex) { onError(ex.message) } finally { setBusy(false) }
+  }
+  const btn = { padding: '3px 10px', fontSize: 11.5 }
+  const due = appt.return_due_at ? Date.parse(appt.return_due_at) : NaN
+  const autoBack = Number.isFinite(due) && due <= Date.now() + offset
+  if (appt.returned_at) return autoBack ? null : (
+    <button className="ghost" style={btn} disabled={busy} onClick={() => run(true)}>تراجع عن «رجع»</button>
+  )
+  if (autoBack) return null
+  return <button style={btn} disabled={busy} onClick={() => run(false)}>رجع</button>
 }
 
 // ═══ أزرار الطوارئ لمشرف العيادات ═══
@@ -954,7 +979,8 @@ function AttendanceCurrentCard({ current, returning = [], recalled, onRecalled, 
         <div className="wr-inline">
           بانتظار العودة:
           {returning.map((a) => (
-            <span key={a.id} className="wr-inline-num">{turnLabel(a, true)}</span>
+            <span key={a.id} className={`wr-inline-num${a.returned_at ? ' is-back' : ''}`}
+              title={a.returned_at ? 'رجع — على الدور' : undefined}>{turnLabel(a, true)}{a.returned_at ? ' ✓' : ''}</span>
           ))}
         </div>
       )}
@@ -1531,6 +1557,7 @@ export function VisitActions({ appt: a, data, actions, onDone, onError }) {
       {['waiting', 'arrived'].includes(a.status) && (
         <button className="ghost" style={btn} onClick={() => setPostponing(a)}>تأجيل</button>
       )}{' '}
+      <ReturnedButton appt={a} offset={serverOffsetOf(data)} onDone={onDone} onError={onError} />{' '}
       <SupervisorReturnActions appt={a} onDone={onDone} onError={onError} />
     </>
   )

@@ -185,6 +185,7 @@ const run = async () => {
         call: btn('.dk-next-actions button', 'نادِ التالي').map((b) => b.disabled),
         resume: btn('.wr-list button', 'استئناف الكشف').map((b) => b.disabled),
         returnCall: btn('.wr-list button', 'نداء').filter((b) => b.textContent.trim() === 'نداء').map((b) => b.disabled),
+        wrButtons: [...document.querySelectorAll('.wr-list button')].map((b) => [b.textContent.trim(), b.disabled]),
         hints: [...document.querySelectorAll('.dk-hint, .wr-hint')].map((h) => h.textContent.trim()),
       }
     })
@@ -193,17 +194,86 @@ const run = async () => {
     if (cur) {
       ok(st.walkins.every(Boolean), `★ ${label}: «بدء كشف» في بطاقة التالي معطّل`)
       ok(st.call.length === 1 && st.call[0], `${label}: «نادِ التالي» معطّل`)
-      ok(st.resume.length === 1 && st.resume[0], `★ ${label}: «استئناف الكشف» معطّل (${j2(st.resume)})`)
-      ok(st.returnCall.length === 1 && st.returnCall[0], `${label}: نداء العودة معطّل`)
-      ok(st.hints.length === 2 && st.hints.every((h) => h.startsWith(HINT)),
-        `★ ${label}: الجملة نفسها تحت بطاقة «التالي» وتحت المنتظرين العودة (${j2(st.hints)})`)
+      ok(st.hints.length === 1 && st.hints.every((h) => h.startsWith(HINT)),
+        `★ ${label}: الجملة تحت بطاقة «التالي» وحدها (${j2(st.hints)})`)
     } else {
-      ok(st.walkins.every((d) => !d) && st.resume.every((d) => !d) && st.call.every((d) => !d),
+      ok(st.walkins.every((d) => !d) && st.call.every((d) => !d),
         `${label}: الأزرار مفعّلة (${j2(st)})`)
       ok(st.hints.length === 0, `${label}: بلا جملة المنع`)
     }
+    // waiting-return-modes: النداء من «التالي» وحده — بطاقة «بانتظار العودة» للعرض: «رجع» و«إنهاء» مفعّلان دائماً
+    ok(st.resume.length === 0 && st.returnCall.length === 0,
+      `★ ${label}: «بانتظار العودة» بلا «نداء» ولا «استئناف» (${j2(st.wrButtons)})`)
+    ok(j2(st.wrButtons) === j2([['رجع', false], ['إنهاء كشف', false]]),
+      `★ ${label}: «رجع» و«إنهاء كشف» مفعّلان (${j2(st.wrButtons)})`)
     ok(derr.length === 0, `${label}: لا أخطاء صفحة ${derr.join(' | ')}`)
     await dctx.close()
+  }
+
+  // ═══ العائدون على الدور (waiting-return-modes) ═══
+  // ٥ كبست له الاستقبال «رجع» الآن، و٦ رجع تلقائياً قبل دقيقة (فهو الأسبق رجوعاً)، و٧ ما زال
+  // خارجاً لعشر دقائق، و٨ إسعافيّ حاضر. الدور المتوقَّع: ٨ ثمّ ٦ ثمّ ٥ ثمّ ٢ و٣.
+  {
+    const t = (sec) => new Date(Date.now() + sec * 1000).toISOString()
+    const appts = [ap(8, 'arrived', 8, { priority: 'urgent' }), ap(2, 'arrived', 2), ap(3, 'arrived', 3),
+      ap(5, 'waiting_return', 5, { started_at: t(-1200), stepped_out_at: t(-1200), returned_at: t(-5) }),
+      ap(6, 'waiting_return', 6, { started_at: t(-1000), stepped_out_at: t(-960), return_due_at: t(-60) }),
+      ap(7, 'waiting_return', 7, { started_at: t(-400), stepped_out_at: t(-300), return_due_at: t(600) })]
+    const ctx = await browser.newContext({ viewport: { width: 1366, height: 900 }, locale: 'ar' })
+    await ctx.addInitScript(() => localStorage.setItem('token', 'test'))
+    const page = await ctx.newPage()
+    const perr = []; page.on('pageerror', (e) => perr.push(e.message))
+    const posts = []
+    await page.route('**/api/**', (r) => {
+      const p = new URL(r.request().url()).pathname.replace(/^\/api/, '')
+      const json = (b) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) })
+      if (r.request().method() === 'POST') { posts.push(p); return json({}) }
+      if (p === '/auth/me') return json({ role: 'doctor', doctor_id: 1, display_name: 'د. عيون' })
+      if (p === '/clinic/my-sessions') return json([{ id: 1, start_time: '09:00:00', end_time: '14:00:00', status: 'open',
+        active_count: appts.length, flow_mode: 'attendance', apologized: false }])
+      if (/^\/clinic\/sessions\/\d+\/queue$/.test(p)) return json({ id: 1, flow_mode: 'attendance', doctor_name: D1,
+        appointments: appts, server_now: new Date().toISOString() })
+      if (p === '/clinic/my-procedures') return json({ lines: [], usage: {} })
+      if (p.startsWith('/push')) return json({ enabled: false })
+      return json([])
+    })
+    await page.goto(`${BASE}/clinic/doctor`, { waitUntil: 'load' })
+    await page.waitForSelector('.dk-wait-list', { timeout: 10000 }).catch(() => {})
+    const st = await page.evaluate(() => ({
+      order: [...document.querySelectorAll('.dk-wait-list li .dk-wait-num')].map((e) => e.textContent.trim()),
+      tags: [...document.querySelectorAll('.dk-wait-list li')].filter((li) => li.querySelector('.wr-back-tag'))
+        .map((li) => li.querySelector('.dk-wait-num').textContent.trim()),
+      next: document.querySelector('.dk-next-who')?.textContent || '',
+      nextButtons: [...document.querySelectorAll('.dk-next-actions button')].map((b) => b.textContent.trim()),
+      out: [...document.querySelectorAll('.wr-list .wr-item')].map((li) => li.textContent),
+    }))
+    ok(j2(st.order) === j2(['8', '6', '5', '2', '3']), `★ العائدون بعد الإسعافي وقبل الحاضرين، الأسبق رجوعاً أولاً (${j2(st.order)})`)
+    ok(j2(st.tags) === j2(['6', '5']), `العائدان بعلامة «عائد» (${j2(st.tags)})`)
+    ok(st.out.length === 1 && st.out[0].includes('الدور 7') && st.out[0].includes('يرجع على الدور بعد'),
+      `★ «بانتظار العودة» فيه من ما زال خارجاً وحده، بعدٍّ تنازلي (${j2(st.out)})`)
+    // نجعل الإسعافيّ يُخدَم: نُخرجه من القائمة فيصير ٦ «التالي»
+    appts.splice(0, 1)
+    await page.reload({ waitUntil: 'load' })
+    await page.waitForSelector('.dk-next-who', { timeout: 10000 }).catch(() => {})
+    const nx = await page.evaluate(() => ({
+      next: document.querySelector('.dk-next-who')?.textContent || '',
+      nextButtons: [...document.querySelectorAll('.dk-next-actions button')].map((b) => b.textContent.trim()),
+    }))
+    ok(nx.next.includes('الدور 6') && nx.next.includes('عائد — يكمّل كشفه'), `★ «التالي» هو العائد ٦ بعلامته (${nx.next})`)
+    ok(j2(nx.nextButtons) === j2(['نادِ التالي', 'بدء كشف']), `★ العائد بلا «لم يحضر» (${j2(nx.nextButtons)})`)
+    await page.locator('.dk-next-actions button', { hasText: 'نادِ التالي' }).click()
+    await page.waitForTimeout(300)
+    ok(posts.includes('/clinic/appointments/6/return'), `★ «نادِ التالي» على العائد = نداء العودة (${j2(posts)})`)
+    posts.length = 0
+    await page.locator('.dk-next-actions button', { hasText: 'بدء كشف' }).click()
+    await page.waitForTimeout(300)
+    ok(posts.includes('/clinic/appointments/6/resume'), `★ «بدء كشف» على العائد = استئناف صامت (${j2(posts)})`)
+    posts.length = 0
+    await page.locator('.wr-list button', { hasText: 'رجع' }).click()
+    await page.waitForTimeout(300)
+    ok(posts.includes('/clinic/appointments/7/returned'), `«رجع» عند الطبيب لمن دخل غرفته مباشرةً (${j2(posts)})`)
+    ok(perr.length === 0, `العائدون: لا أخطاء صفحة ${perr.join(' | ')}`)
+    await ctx.close()
   }
   await browser.close()
   stop()

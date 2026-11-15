@@ -2244,6 +2244,16 @@ button.danger:hover:not(:disabled) { filter: brightness(1.08); }
 .wr-inline { margin-top: 8px; font-size: 12.5px; color: var(--muted); }
 .wr-inline .wr-inline-num { font-weight: 800; color: var(--status-review); margin-inline-start: 6px; }
 .wr-status { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+/* حال الخروج (waiting-return-modes): خارج منذ / يرجع بعد / رجع على الدور */
+.wr-state { font-size: 12.5px; color: var(--text-secondary); white-space: nowrap; }
+.wr-state .wr-elapsed { margin-inline-start: 4px; }
+.wr-state-hint { color: var(--muted); font-size: 11.5px; }
+.wr-state.is-back { color: var(--status-good); font-weight: 700; }
+.wr-inline .wr-inline-num.is-back { color: var(--status-good); }
+/* «عائد» على «التالي» وفي قائمة الحاضرين: يكمّل كشفه لا مريضٌ جديد */
+.wr-back-tag { display: inline-block; margin-inline-start: 8px; padding: 1px 8px; border-radius: 999px;
+  font-size: 11.5px; font-weight: 800; color: var(--status-review); white-space: nowrap;
+  background: color-mix(in srgb, var(--status-review) 14%, transparent); }
 
 /* ═══════════════════════════════════════════════════════════════════
    نوافذ التأكيد والإدخال (dialogs.jsx) — بديل window.confirm/alert/prompt
@@ -4648,6 +4658,13 @@ a.dr-chip:hover { color: var(--accent-text); border-color: var(--primary); }
 .pf-toggle > span { display: flex; flex-direction: column; gap: 2px; }
 .pf-toggle strong { font-size: 13.5px; }
 .pf-notes input { width: 100%; }
+/* الخروج المؤقت في البروفايل: خياران متجاوران، والدقائق داخل الخيار الثاني */
+.pf-return { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.pf-return-title { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 2px; }
+.pf-return-title strong { font-size: 13.5px; }
+.pf-return-title small { font-size: 11.5px; color: var(--muted); }
+.pf-toggle input.pf-return-min { width: 56px; height: auto; margin: 0 6px; padding: 2px 6px; text-align: center;
+  font: inherit; font-weight: 800; accent-color: auto; }
 .pf-savebar { position: sticky; bottom: 0; z-index: 4; display: flex; align-items: center; justify-content: space-between; gap: 12px;
   margin: 6px -24px -22px; padding: 12px 24px; border-top: 1px solid var(--grid); border-radius: 0 0 18px 18px;
   background: color-mix(in srgb, var(--surface-1) 92%, transparent); backdrop-filter: blur(6px); }

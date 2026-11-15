@@ -2,7 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api, fmtTime, todayLocal, openStaffStream } from '../api.js'
 import { AttendanceBadge, urgentRowClass, isAttendanceSession, usePolling, fmtClock, fmtTimeOfDay } from '../attendance-ui.jsx'
 import { useToast, RecallButton } from '../action-feedback.jsx'
-import { waitingReturnOf, serverOffsetOf, Elapsed } from '../waiting-return.jsx'
+import {
+  WAITING_RETURN, waitingReturnOf, serverOffsetOf, ReturnState, queueWithReturnees, isBackInQueue, useServerNow,
+} from '../waiting-return.jsx'
 import BottomSheet from '../components/BottomSheet.jsx'
 import { ProcedureOnlyBadge } from '../components/ProcedureOnly.jsx'
 import MaterialsEditor, { qtyValid, toPayload } from '../components/MaterialsEditor.jsx'
@@ -283,6 +285,22 @@ export default function DoctorScreen() {
     finally { setBusy(false); loadQueue() }
   }
 
+  // ═══ «رجع على الدور» — ساعة الخادم، وإشعارٌ لمن رجع ═══
+  // الاستقبال تكبس «رجع» (يصل بالبثّ) أو يحلّ وقت الرجوع التلقائي (الساعة تتحدّث عنده):
+  // إشعارٌ صامت «الدور ٨ رجع على الدور» — بلا رنّة، فالطبيب مع مريض. لا عند أوّل تحميل.
+  const serverNow = useServerNow(queue?.appointments, serverOffsetOf(queue))
+  const backSeen = useRef(null)
+  useEffect(() => {
+    const list = queue?.appointments || []
+    const ids = new Set(list.filter((a) => isBackInQueue(a, serverNow)).map((a) => String(a.id)))
+    const prev = backSeen.current
+    backSeen.current = { session: queue?.id, ids }
+    if (!prev || String(prev.session) !== String(queue?.id)) return
+    const fresh = list.filter((a) => ids.has(String(a.id)) && !prev.ids.has(String(a.id)))
+    if (fresh.length === 1) showToast(`الدور ${shownNumber(fresh[0])} رجع من الخروج المؤقت — على الدور`, 'success', 6000)
+    else if (fresh.length > 1) showToast(`رجع ${fresh.length.toLocaleString('ar-SY')} من الخروج المؤقت — على الدور`, 'success', 6000)
+  }, [queue, serverNow])
+
   // ═══ الإضافة: الورقة تُغلق فوراً، والشارة «تُضاف…» حتى يردّ الخادم ═══
   const openSheet = (appt) => {
     if (String(sheetFor) !== String(appt.id)) setDraft(emptyDraft)
@@ -329,9 +347,13 @@ export default function DoctorScreen() {
   const appts = queue?.appointments || []
   const current = appts.find((a) => a.status === 'in_service')
   const arrivedWaiting = appts.filter((a) => a.status === 'arrived')
-  const nextUp = arrivedWaiting[0]
-  // خرجوا مؤقتاً (قطرة، صورة…) وسيُنادَون ليُكملوا — ليسوا في الطابور ولا «قيد الكشف»
+  // خرجوا مؤقتاً (قطرة، صورة…) — ليسوا في الطابور ولا «قيد الكشف» حتى يرجعوا على الدور
   const returning = waitingReturnOf(appts)
+  const stillOut = returning.filter((a) => !isBackInQueue(a, serverNow))
+  // الدور الفعلي: الإسعافي ثمّ العائدون ثمّ الحاضرون — والنداء من الزرّ العلوي وحده
+  const line = queueWithReturnees(arrivedWaiting, appts, serverNow)
+  const nextUp = line[0]
+  const nextIsBack = nextUp?.status === WAITING_RETURN
   const offset = serverOffsetOf(queue)
   // «الحجوزات»: محجوزو الجلسة الذين لم يحضروا بعد — بالوقت التقريبي/الخانة ثمّ رقم الحجز
   const timeOf = (a) => (attendance ? fmtTimeOfDay(a.estimated_time) : (a.slot_time ? fmtTime(a.slot_time) : null))
@@ -486,38 +508,31 @@ export default function DoctorScreen() {
                   )}
                 </div>
 
-                {/* ═══ بانتظار العودة ═══ */}
-                {returning.length > 0 && (
+                {/* ═══ بانتظار العودة ═══ للعرض: من ما زال خارجاً وحاله. من رجع ينتقل إلى الدور
+                    («التالي» بعلامة «عائد») ويُنادى من الزرّ العلوي — لا نداء لكلّ مريض هنا.
+                    «رجع» خفيف لمن دخل الغرفة مباشرةً بلا الاستقبال، و«إنهاء» لمن أكمل وذهب. */}
+                {stillOut.length > 0 && (
                   <div className="card wr-card">
-                    <h3>بانتظار العودة <span className="wr-count">{returning.length}</span></h3>
+                    <h3>بانتظار العودة <span className="wr-count">{stillOut.length}</span></h3>
                     <ul className="wr-list">
-                      {returning.map((a) => (
+                      {stillOut.map((a) => (
                         <li key={a.id} className="wr-item">
                           <span className="wr-num">الدور {shownNumber(a)}</span>
                           <span className="wr-name">{a.full_name}<ProcedureOnlyBadge appt={a} /></span>
-                          <Elapsed since={a.stepped_out_at} offset={offset} />
-                          {/* رجع وحده إلى الغرفة: استئنافٌ صامت بلا نداء على الصالة */}
-                          <button className="wr-call dk-tap" disabled={busy || !!current}
-                            title="المريض رجع إلى الغرفة — يُستأنف كشفه بلا نداء"
-                            onClick={() => act(api.clinic.resume, a.id, { ok: `استُؤنف كشف الدور ${shownNumber(a)}`, undo: 'resume' })}>
-                            استئناف الكشف
-                          </button>
-                          {/* من يريد أن يناديه للعودة: نداء العودة كما كان (صوت وبطاقة نداء) */}
-                          <button className="ghost wr-call dk-tap" disabled={busy || !!current}
-                            onClick={() => act(api.clinic.returnCall, a.id)}>
-                            نداء
-                          </button>
-                          {/* أكمل وخرج: إنهاءٌ مباشر بلا نداء عودة ولا رجوع */}
+                          <ReturnState appt={a} offset={serverOffsetOf(queue)} />
                           <button className="ghost wr-call dk-tap" disabled={busy}
+                            title="المريض رجع — يصير على الدور برقمه، وتناديه من «التالي»"
+                            onClick={() => act((id) => api.clinic.markReturned(id), a.id)}>
+                            رجع
+                          </button>
+                          <button className="ghost wr-call dk-tap" disabled={busy}
+                            title="أكمل وذهب — يُنهى كشفه بلا رجوع"
                             onClick={() => act(api.clinic.done, a.id, { ok: `انتهى كشف الدور ${shownNumber(a)}`, undo: 'done' })}>
                             إنهاء كشف
                           </button>
                         </li>
                       ))}
                     </ul>
-                    {current && (
-                      <p className="wr-hint">{ACTIVE_HINT}</p>
-                    )}
                   </div>
                 )}
 
@@ -530,21 +545,29 @@ export default function DoctorScreen() {
                           الدور {shownNumber(nextUp)} — {nextUp.full_name}
                           {attendance && <AttendanceBadge priority={nextUp.priority} />}
                           <ProcedureOnlyBadge appt={nextUp} />
+                          {nextIsBack && <span className="wr-back-tag">عائد — يكمّل كشفه</span>}
                         </div>
                         {nextUp.reason && <div className="dk-next-note">{nextUp.reason}</div>}
                       </div>
                       <div className="dk-next-actions">
-                        <button className="dk-tap" disabled={busy || !!current} onClick={() => act(api.clinic.call, nextUp.id)}>
+                        {/* العائد يُنادى بنداء العودة ويُستأنف بصمت — الأزرار نفسها في المكان نفسه */}
+                        <button className="dk-tap" disabled={busy || !!current}
+                          onClick={() => act(nextIsBack ? api.clinic.returnCall : api.clinic.call, nextUp.id)}>
                           نادِ التالي
                         </button>
                         <button className="ghost dk-tap" disabled={busy || !!current}
                           title="المريض دخل وحده — يبدأ كشفه بلا نداء ولا صوت في الصالة"
-                          onClick={() => act(api.clinic.walkIn, nextUp.id, { ok: `بدأ كشف الدور ${shownNumber(nextUp)} (بلا نداء)`, undo: 'walk_in' })}>
+                          onClick={() => (nextIsBack
+                            ? act(api.clinic.resume, nextUp.id, { ok: `استُؤنف كشف الدور ${shownNumber(nextUp)} (بلا نداء)`, undo: 'resume' })
+                            : act(api.clinic.walkIn, nextUp.id, { ok: `بدأ كشف الدور ${shownNumber(nextUp)} (بلا نداء)`, undo: 'walk_in' }))}>
                           بدء كشف
                         </button>
-                        <button className="ghost dk-tap" disabled={busy} onClick={() => act(api.clinic.noShow, nextUp.id)}>
-                          لم يحضر
-                        </button>
+                        {/* العائد كُشف عليه ودفع: لا «لم يحضر» له — إن نودي ولم يدخل فـ«خروج مؤقت» من جديد */}
+                        {!nextIsBack && (
+                          <button className="ghost dk-tap" disabled={busy} onClick={() => act(api.clinic.noShow, nextUp.id)}>
+                            لم يحضر
+                          </button>
+                        )}
                       </div>
                     </div>
                   ) : (
@@ -556,16 +579,17 @@ export default function DoctorScreen() {
                 </div>
 
                 <div className="card">
-                  <h3>الحاضرون بانتظار الدور ({arrivedWaiting.length.toLocaleString('ar-SY')})</h3>
-                  {arrivedWaiting.length === 0 ? (
+                  <h3>الحاضرون بانتظار الدور ({line.length.toLocaleString('ar-SY')})</h3>
+                  {line.length === 0 ? (
                     <p className="empty">لا أحد بانتظار الدور.</p>
                   ) : (
                     <ul className="dk-wait-list">
-                      {arrivedWaiting.map((a) => (
+                      {line.map((a) => (
                         <li key={a.id} className={['dk-wait', a.id === nextUp?.id ? 'is-next' : '',
                           attendance ? urgentRowClass(a) : ''].filter(Boolean).join(' ')}>
                           <span className="dk-wait-num">{shownNumber(a)}</span>
                           <span className="dk-wait-name">{a.full_name}{attendance && <AttendanceBadge priority={a.priority} />}<ProcedureOnlyBadge appt={a} /></span>
+                          {a.status === WAITING_RETURN && <span className="wr-back-tag">عائد</span>}
                           {a.id === nextUp?.id && <span className="doc-next-tag">التالي</span>}
                         </li>
                       ))}

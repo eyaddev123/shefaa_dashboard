@@ -406,6 +406,10 @@ export const api = {
     // ويرفضها الخادم (409 DOCTOR_BUSY) والطبيب في منتصف كشف مريضٍ آخر.
     stepOut: (appointmentId) => http(`/clinic/appointments/${appointmentId}/step-out`, { method: 'POST' }),
     returnCall: (appointmentId) => http(`/clinic/appointments/${appointmentId}/return`, { method: 'POST' }),
+    // «رجع» (الاستقبال، والطبيب لمن دخل غرفته): المريض عاد من الخروج المؤقت فيصير التالي برقمه.
+    // undo: true يمحوه إن كُبس خطأً. متجانس.
+    markReturned: (appointmentId, undo = false) =>
+      http(`/clinic/appointments/${appointmentId}/returned`, { method: 'POST', body: JSON.stringify({ undo }) }),
     // ── نمط الحضور ──
     // بدء الكشف: منفصل عن النداء — يسجّل started_at وحده
     start: (appointmentId) => http(`/clinic/appointments/${appointmentId}/start`, { method: 'POST' }),

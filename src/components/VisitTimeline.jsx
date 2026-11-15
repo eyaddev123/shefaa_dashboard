@@ -31,7 +31,8 @@ function statusTitle(from, to, reason) {
   if (to === 'in_service' && from === 'arrived') return 'النداء — دخل الكشف'
   if (to === 'done' && from === 'waiting_return') return 'إنهاء الكشف (من الخروج المؤقت)'
   if (to === 'in_service' && from === 'waiting_return') return 'نداء العودة من الخروج المؤقت'
-  if (to === 'waiting_return') return 'خروج مؤقت'
+  // السبب يحمل نمط الرجوع: «خروج مؤقت — يرجع على الدور تلقائياً بعد 15 د»
+  if (to === 'waiting_return') return reason && reason.startsWith('خروج مؤقت') ? reason : 'خروج مؤقت'
   if (to === 'done' && from === 'in_service') return 'إنهاء الكشف'
   if (to === 'no_show') return 'تعليم «لم يحضر»'
   if (to === 'cancelled') return 'إلغاء الحجز'
@@ -61,6 +62,10 @@ export function describeEvent(e) {
       return { title: 'تعديل الإحالة', detail: change(e) }
     case 'reason': return { title: 'تعديل ملاحظة الحجز', detail: change(e) }
     case 'priority': return { title: `تغيير الأولوية: ${change(e)}` }
+    // «رجع» من الخروج المؤقت (الاستقبال أو الطبيب) — وتراجعه
+    case 'returned': return e.new_value
+      ? { title: 'رجع من الخروج المؤقت — على الدور', tone: 'add' }
+      : { title: 'تراجع عن «رجع» — ما زال خارجاً' }
     default: return { title: `تعديل ${FIELD_LABELS[e.field] || e.field}: ${change(e)}` }
   }
 }
