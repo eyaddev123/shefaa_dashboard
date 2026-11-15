@@ -13,7 +13,7 @@ import { QUEUE_TABS, DEFAULT_TAB, isTab, rowsOfTab, matchesQuery, tabCounts, tab
 import { useRole } from '../RoleContext.jsx'
 import { useToast, RecallButton } from '../action-feedback.jsx'
 import { canStepOutAsSupervisor, canOperateQueue } from '../permissions.js'
-import { WAITING_RETURN, waitingReturnOf, serverOffsetOf, ReturnState, useStaffEvents } from '../waiting-return.jsx'
+import { WAITING_RETURN, waitingReturnOf, serverOffsetOf, ReturnState, useStaffEvents, isLate } from '../waiting-return.jsx'
 import ReferralsEditor from '../components/ReferralFields.jsx'
 import { referralPayload, referralReady, referralSummary } from '../referral.js'
 import RoomBadge from '../components/RoomBadge.jsx'
@@ -72,7 +72,8 @@ export function StatusCell({ appt, offset }) {
   if (appt.status !== WAITING_RETURN) return appointmentBadge(appt.status)
   return (
     <span className="wr-status">
-      {appointmentBadge(appt.status)}
+      {/* «تأخّر» (نودي ولم يدخل) — لا «لم يحضر»: قطع بطاقته فهو حاضر، والاستقبال تكبس «رجع» حين يظهر */}
+      {isLate(appt) ? <span className="badge warn">تأخّر</span> : appointmentBadge(appt.status)}
       <ReturnState appt={appt} offset={offset} />
     </span>
   )

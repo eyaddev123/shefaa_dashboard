@@ -167,8 +167,8 @@ const run = async () => {
       if (p === '/auth/me') return json({ role: 'doctor', doctor_id: 1, display_name: 'د. عيون' })
       if (p === '/clinic/my-sessions') return json([{ id: 1, start_time: '09:00:00', end_time: '14:00:00', status: 'open',
         active_count: appts.length, flow_mode: 'attendance', apologized: false }])
-      if (/^\/clinic\/sessions\/\d+\/queue$/.test(p)) return json({ session: { id: 1, flow_mode: 'attendance', doctor_name: D1 },
-        appointments: appts, server_now: now })
+      if (/^\/clinic\/sessions\/\d+\/queue$/.test(p)) return json({ id: 1, flow_mode: 'attendance', doctor_name: D1,
+        session: { id: 1, flow_mode: 'attendance', doctor_name: D1 }, appointments: appts, server_now: now })
       if (p === '/clinic/my-procedures') return json({ lines: [], usage: {} })
       if (p.startsWith('/push')) return json({ enabled: false })
       return json([])
@@ -181,8 +181,13 @@ const run = async () => {
         listButtons: document.querySelectorAll('.dk-wait-list button').length,
         listRows: document.querySelectorAll('.dk-wait-list li').length,
         walkins: btn('.dk-next-actions button', 'بدء كشف').map((b) => b.disabled),
-        walkinsElsewhere: btn('button', 'بدء كشف').filter((b) => !b.closest('.dk-next-actions, .dk-actions')).length,
-        call: btn('.dk-next-actions button', 'نادِ التالي').map((b) => b.disabled),
+        walkinsElsewhere: btn('button', 'بدء كشف').filter((b) => !b.closest('.dk-next-actions, .dk-actions, .wr-list')).length,
+        call: btn('.dk-callbar button', 'نادِ التالي').map((b) => b.disabled),
+        callElsewhere: btn('button', 'نادِ التالي').filter((b) => !b.closest('.dk-callbar')).length,
+        callbarText: document.querySelector('.dk-callbar-who')?.textContent.trim() || '',
+        noShow: btn('button', 'لم يحضر').length + btn('button', 'ما حضر').length,
+        late: btn('.dk-actions button', 'تأخّر المريض').length,
+        stepOut: btn('.dk-actions button', 'خروج مؤقت').length,
         resume: btn('.wr-list button', 'استئناف الكشف').map((b) => b.disabled),
         returnCall: btn('.wr-list button', 'نداء').filter((b) => b.textContent.trim() === 'نداء').map((b) => b.disabled),
         wrButtons: [...document.querySelectorAll('.wr-list button')].map((b) => [b.textContent.trim(), b.disabled]),
@@ -191,21 +196,29 @@ const run = async () => {
     })
     ok(st.listRows === 3 && st.listButtons === 0, `★ ${label}: قائمة المنتظرين للعرض — ٣ أسطر بلا أيّ زرّ (${st.listButtons})`)
     ok(st.walkins.length === 1 && st.walkinsElsewhere === 0, `★ ${label}: «بدء كشف» في بطاقة «التالي» وحدها (${st.walkins.length}/${st.walkinsElsewhere})`)
+    // waiting-return-modes (جولة ٢): «نادِ التالي» زرٌّ واحد ثابت أعلى الشاشة (.dk-callbar) لا في بطاقة،
+    // ولا «لم يحضر» في الشاشة كلّها — من نودي ولم يدخل فـ«تأخّر المريض»
+    ok(st.call.length === 1 && st.callElsewhere === 0, `★ ${label}: «نادِ التالي» في الشريط الثابت وحده (${st.call.length}/${st.callElsewhere})`)
+    ok(st.noShow === 0, `★ ${label}: لا «لم يحضر» في شاشة الدكتور`)
+    ok(st.hints.length === 0, `${label}: لا جملة تحت البطاقات (الجملة في الشريط)`)
     if (cur) {
       ok(st.walkins.every(Boolean), `★ ${label}: «بدء كشف» في بطاقة التالي معطّل`)
-      ok(st.call.length === 1 && st.call[0], `${label}: «نادِ التالي» معطّل`)
-      ok(st.hints.length === 1 && st.hints.every((h) => h.startsWith(HINT)),
-        `★ ${label}: الجملة تحت بطاقة «التالي» وحدها (${j2(st.hints)})`)
+      ok(st.call[0], `${label}: «نادِ التالي» معطّل`)
+      ok(st.callbarText.startsWith(HINT), `★ ${label}: الجملة في الشريط الثابت (${st.callbarText})`)
     } else {
       ok(st.walkins.every((d) => !d) && st.call.every((d) => !d),
         `${label}: الأزرار مفعّلة (${j2(st)})`)
-      ok(st.hints.length === 0, `${label}: بلا جملة المنع`)
+      ok(st.callbarText.includes('الدور 2'), `${label}: الشريط يقول من التالي (${st.callbarText})`)
     }
-    // waiting-return-modes: النداء من «التالي» وحده — بطاقة «بانتظار العودة» للعرض: «رجع» و«إنهاء» مفعّلان دائماً
+    if (label.startsWith('منادى'))
+      ok(st.late === 1 && st.stepOut === 0, `★ ${label}: «تأخّر المريض» بدل «خروج مؤقت» (${st.late}/${st.stepOut})`)
+    if (label === 'قيد الكشف')
+      ok(st.late === 0 && st.stepOut === 1, `★ ${label}: «خروج مؤقت» بلا «تأخّر» (${st.late}/${st.stepOut})`)
+    // بطاقة «بانتظار العودة»: لا نداء — «بدء كشف» لمن دخل الغرفة (معطّل ما دام عنده أحد) و«إنهاء»
     ok(st.resume.length === 0 && st.returnCall.length === 0,
       `★ ${label}: «بانتظار العودة» بلا «نداء» ولا «استئناف» (${j2(st.wrButtons)})`)
-    ok(j2(st.wrButtons) === j2([['رجع', false], ['إنهاء كشف', false]]),
-      `★ ${label}: «رجع» و«إنهاء كشف» مفعّلان (${j2(st.wrButtons)})`)
+    ok(j2(st.wrButtons) === j2([['بدء كشف', !!cur], ['إنهاء كشف', false]]),
+      `★ ${label}: «بدء كشف» و«إنهاء كشف» (${j2(st.wrButtons)})`)
     ok(derr.length === 0, `${label}: لا أخطاء صفحة ${derr.join(' | ')}`)
     await dctx.close()
   }
@@ -218,7 +231,8 @@ const run = async () => {
     const appts = [ap(8, 'arrived', 8, { priority: 'urgent' }), ap(2, 'arrived', 2), ap(3, 'arrived', 3),
       ap(5, 'waiting_return', 5, { started_at: t(-1200), stepped_out_at: t(-1200), returned_at: t(-5) }),
       ap(6, 'waiting_return', 6, { started_at: t(-1000), stepped_out_at: t(-960), return_due_at: t(-60) }),
-      ap(7, 'waiting_return', 7, { started_at: t(-400), stepped_out_at: t(-300), return_due_at: t(600) })]
+      ap(7, 'waiting_return', 7, { started_at: t(-400), stepped_out_at: t(-300), return_due_at: t(600) }),
+      ap(9, 'waiting_return', 9, { started_at: null, stepped_out_at: t(-100), late_at: t(-100) })]
     const ctx = await browser.newContext({ viewport: { width: 1366, height: 900 }, locale: 'ar' })
     await ctx.addInitScript(() => localStorage.setItem('token', 'test'))
     const page = await ctx.newPage()
@@ -249,8 +263,10 @@ const run = async () => {
     }))
     ok(j2(st.order) === j2(['8', '6', '5', '2', '3']), `★ العائدون بعد الإسعافي وقبل الحاضرين، الأسبق رجوعاً أولاً (${j2(st.order)})`)
     ok(j2(st.tags) === j2(['6', '5']), `العائدان بعلامة «عائد» (${j2(st.tags)})`)
-    ok(st.out.length === 1 && st.out[0].includes('الدور 7') && st.out[0].includes('يرجع على الدور بعد'),
+    ok(st.out.length === 2 && st.out[0].includes('الدور 7') && st.out[0].includes('يرجع على الدور بعد'),
       `★ «بانتظار العودة» فيه من ما زال خارجاً وحده، بعدٍّ تنازلي (${j2(st.out)})`)
+    ok(st.out[1]?.includes('الدور 9') && st.out[1].includes('تأخّر') && st.out[1].includes('نودي ولم يدخل')
+      && !st.out[1].includes('إنهاء كشف'), `★ المتأخّر: علامة «تأخّر»، «نودي ولم يدخل»، بلا «إنهاء» (${j2(st.out[1])})`)
     // نجعل الإسعافيّ يُخدَم: نُخرجه من القائمة فيصير ٦ «التالي»
     appts.splice(0, 1)
     await page.reload({ waitUntil: 'load' })
@@ -260,18 +276,19 @@ const run = async () => {
       nextButtons: [...document.querySelectorAll('.dk-next-actions button')].map((b) => b.textContent.trim()),
     }))
     ok(nx.next.includes('الدور 6') && nx.next.includes('عائد — يكمّل كشفه'), `★ «التالي» هو العائد ٦ بعلامته (${nx.next})`)
-    ok(j2(nx.nextButtons) === j2(['نادِ التالي', 'بدء كشف']), `★ العائد بلا «لم يحضر» (${j2(nx.nextButtons)})`)
-    await page.locator('.dk-next-actions button', { hasText: 'نادِ التالي' }).click()
+    ok(j2(nx.nextButtons) === j2(['بدء كشف']), `★ بطاقة «التالي»: «بدء كشف» وحده (${j2(nx.nextButtons)})`)
+    await page.locator('.dk-callbar button', { hasText: 'نادِ التالي' }).click()
     await page.waitForTimeout(300)
-    ok(posts.includes('/clinic/appointments/6/return'), `★ «نادِ التالي» على العائد = نداء العودة (${j2(posts)})`)
+    ok(posts.includes('/clinic/appointments/6/return'), `★ «نادِ التالي» (الشريط) على العائد = نداء العودة (${j2(posts)})`)
     posts.length = 0
     await page.locator('.dk-next-actions button', { hasText: 'بدء كشف' }).click()
     await page.waitForTimeout(300)
     ok(posts.includes('/clinic/appointments/6/resume'), `★ «بدء كشف» على العائد = استئناف صامت (${j2(posts)})`)
     posts.length = 0
-    await page.locator('.wr-list button', { hasText: 'رجع' }).click()
+    await page.locator('.wr-list .wr-item', { hasText: 'الدور 7' }).locator('button', { hasText: 'بدء كشف' }).click()
     await page.waitForTimeout(300)
-    ok(posts.includes('/clinic/appointments/7/returned'), `«رجع» عند الطبيب لمن دخل غرفته مباشرةً (${j2(posts)})`)
+    ok(posts.includes('/clinic/appointments/7/resume'), `★ «بدء كشف» على بطاقة الخارج (دخل غرفته مباشرةً) = استئناف (${j2(posts)})`)
+    ok(!posts.some((p) => p.endsWith('/returned')), 'الطبيب لا يكبس «رجع» — للاستقبال')
     ok(perr.length === 0, `العائدون: لا أخطاء صفحة ${perr.join(' | ')}`)
     await ctx.close()
   }

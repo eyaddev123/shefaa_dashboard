@@ -4,6 +4,7 @@ import { AttendanceBadge, urgentRowClass, isAttendanceSession, usePolling, fmtCl
 import { useToast, RecallButton } from '../action-feedback.jsx'
 import {
   WAITING_RETURN, waitingReturnOf, serverOffsetOf, ReturnState, queueWithReturnees, isBackInQueue, useServerNow,
+  isLate, ReturnModeField, returnModeOf, returnModeValue,
 } from '../waiting-return.jsx'
 import BottomSheet from '../components/BottomSheet.jsx'
 import { ProcedureOnlyBadge } from '../components/ProcedureOnly.jsx'
@@ -210,6 +211,7 @@ export default function DoctorScreen() {
   const [matCatalog, setMatCatalog] = useState(null)
   const [audioOn, setAudioOn] = useState(audioReady())
   const [pushOffer, setPushOffer] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   const loadSessions = () => api.clinic.mySessions(todayLocal()).then((rows) => {
     setSessions(rows); setLoadErr(null)
@@ -381,6 +383,9 @@ export default function DoctorScreen() {
           )}
           {/* ★ يبقى مكانه بعد التفعيل (تتبدّل حالته لا يختفي): أوّل لمسة في الصفحة تفتح الصوت،
               واختفاء الزرّ بين ضغطها ورفعها كان يُزيح الصفحة فتضيع اللمسة عن هدفها */}
+          <button type="button" className="ghost dk-settings-btn" onClick={() => setSettingsOpen(true)}>
+            <span aria-hidden="true">⚙</span> إعداداتي
+          </button>
           <button type="button" className={`ghost dk-audio${audioOn ? ' is-on' : ''}`} disabled={audioOn}
             onClick={() => unlockAudio()} title="المتصفّح لا يُصدر صوتاً قبل أوّل لمسة على الصفحة">
             {audioOn ? '🔔 التنبيه مفعّل' : '🔈 فعّل صوت التنبيه'}
@@ -415,6 +420,21 @@ export default function DoctorScreen() {
           <button className="ghost" onClick={loadQueue}>إعادة المحاولة</button>
         </div>
       ) : <p className="empty">جارٍ التحميل…</p>) : (
+        <>
+        {/* ═══ «نادِ التالي» — زرٌّ واحد ثابت أعلى الشاشة ═══ مكانه لا يتحرّك مهما تغيّرت البطاقات
+            تحته (يلتصق بالأعلى عند التمرير): الطبيب يكبسه دون أن يبحث عن بطاقة. ينادي «التالي»
+            أيّاً كان — حاضراً أو عائداً من خروج مؤقت (نداء العودة) — ولا نداء عند كلّ مريض. */}
+        <div className="dk-callbar" role="region" aria-label="النداء">
+          <button type="button" className="dk-callbar-btn" disabled={busy || !!current || !nextUp}
+            onClick={() => act(nextIsBack ? api.clinic.returnCall : api.clinic.call, nextUp.id)}>
+            <span aria-hidden="true">📣</span> نادِ التالي
+          </button>
+          <span className="dk-callbar-who">
+            {current ? ACTIVE_HINT
+              : nextUp ? <>التالي: <strong>الدور {shownNumber(nextUp)}</strong> — {nextUp.full_name}</>
+              : 'لا أحد بانتظار الدور'}
+          </span>
+        </div>
         <div className="dk-grid">
           <section className="dk-queue" aria-label="المرضى">
             <div className="dk-tabs" role="tablist">
@@ -485,11 +505,23 @@ export default function DoctorScreen() {
                             </button>
                             <div className="dk-tertiary">
                               <RecallButton apptId={current.id} onError={showToast} className="ghost dk-btn dk-light" />
-                              <button className="ghost dk-btn dk-light" disabled={busy}
-                                title="المريض يخرج (قطرة، صورة…) ويعود بدوره — وتنادي التالي"
-                                onClick={() => act(api.clinic.stepOut, current.id)}>
-                                <span aria-hidden="true">⏸</span> خروج مؤقت
-                              </button>
+                              {/* نودي ولم يدخل ⇒ «تأخّر المريض» (لا «لم يحضر»: من قطع بطاقته حاضر). يخرج من
+                                  الدور لحين تكبس الاستقبال «رجع» فيصير التالي — وتنادي غيره الآن.
+                                  ومن دخل وبدأ كشفه ⇒ «خروج مؤقت» (قطرة، صورة…) بإعداد الدكتور. */}
+                              {needsStart ? (
+                                <button className="ghost dk-btn dk-light" disabled={busy}
+                                  title="نودي ولم يدخل — يرجع على الدور حين تخبر الاستقبال أنه وصل، وتنادي التالي"
+                                  onClick={() => act(api.clinic.stepOut, current.id,
+                                    { ok: `الدور ${shownNumber(current)} تأخّر — يرجع على الدور حين تخبرك الاستقبال` })}>
+                                  <span aria-hidden="true">⏳</span> تأخّر المريض
+                                </button>
+                              ) : (
+                                <button className="ghost dk-btn dk-light" disabled={busy}
+                                  title="المريض يخرج (قطرة، صورة…) ويعود بدوره — وتنادي التالي"
+                                  onClick={() => act(api.clinic.stepOut, current.id)}>
+                                  <span aria-hidden="true">⏸</span> خروج مؤقت
+                                </button>
+                              )}
                               {/* إنهاءٌ بلا بدء ممكن (يُستبعد من حساب المدة) — خفيفٌ هنا لا ينافس «بدء» */}
                               {needsStart && (
                                 <button className="ghost dk-btn dk-light" disabled={busy}
@@ -508,9 +540,10 @@ export default function DoctorScreen() {
                   )}
                 </div>
 
-                {/* ═══ بانتظار العودة ═══ للعرض: من ما زال خارجاً وحاله. من رجع ينتقل إلى الدور
-                    («التالي» بعلامة «عائد») ويُنادى من الزرّ العلوي — لا نداء لكلّ مريض هنا.
-                    «رجع» خفيف لمن دخل الغرفة مباشرةً بلا الاستقبال، و«إنهاء» لمن أكمل وذهب. */}
+                {/* ═══ بانتظار العودة ═══ من ما زال خارجاً (أو تأخّر) وحاله. من رجع ينتقل إلى الدور
+                    («التالي» بعلامته) ويُنادى من الزرّ الثابت أعلى الشاشة — لا نداء عند كلّ مريض.
+                    على البطاقة «بدء كشف» وحده لمن دخل الغرفة مباشرةً (بلا نداء)، و«إنهاء» لمن
+                    خرج لقطرة فأكمل وذهب (المتأخّر لم يُكشف عليه أصلاً فلا «إنهاء» له). */}
                 {stillOut.length > 0 && (
                   <div className="card wr-card">
                     <h3>بانتظار العودة <span className="wr-count">{stillOut.length}</span></h3>
@@ -518,18 +551,21 @@ export default function DoctorScreen() {
                       {stillOut.map((a) => (
                         <li key={a.id} className="wr-item">
                           <span className="wr-num">الدور {shownNumber(a)}</span>
-                          <span className="wr-name">{a.full_name}<ProcedureOnlyBadge appt={a} /></span>
+                          <span className="wr-name">{a.full_name}<ProcedureOnlyBadge appt={a} />
+                            {isLate(a) && <span className="wr-back-tag is-late">تأخّر</span>}</span>
                           <ReturnState appt={a} offset={serverOffsetOf(queue)} />
-                          <button className="ghost wr-call dk-tap" disabled={busy}
-                            title="المريض رجع — يصير على الدور برقمه، وتناديه من «التالي»"
-                            onClick={() => act((id) => api.clinic.markReturned(id), a.id)}>
-                            رجع
+                          <button className="ghost wr-call dk-tap" disabled={busy || !!current}
+                            title="المريض دخل الغرفة — يبدأ كشفه بلا نداء ولا صوت في الصالة"
+                            onClick={() => act(api.clinic.resume, a.id, { ok: `بدأ كشف الدور ${shownNumber(a)} (بلا نداء)`, undo: 'resume' })}>
+                            بدء كشف
                           </button>
-                          <button className="ghost wr-call dk-tap" disabled={busy}
-                            title="أكمل وذهب — يُنهى كشفه بلا رجوع"
-                            onClick={() => act(api.clinic.done, a.id, { ok: `انتهى كشف الدور ${shownNumber(a)}`, undo: 'done' })}>
-                            إنهاء كشف
-                          </button>
+                          {!isLate(a) && (
+                            <button className="ghost wr-call dk-tap" disabled={busy}
+                              title="أكمل وذهب — يُنهى كشفه بلا رجوع"
+                              onClick={() => act(api.clinic.done, a.id, { ok: `انتهى كشف الدور ${shownNumber(a)}`, undo: 'done' })}>
+                              إنهاء كشف
+                            </button>
+                          )}
                         </li>
                       ))}
                     </ul>
@@ -545,36 +581,27 @@ export default function DoctorScreen() {
                           الدور {shownNumber(nextUp)} — {nextUp.full_name}
                           {attendance && <AttendanceBadge priority={nextUp.priority} />}
                           <ProcedureOnlyBadge appt={nextUp} />
-                          {nextIsBack && <span className="wr-back-tag">عائد — يكمّل كشفه</span>}
+                          {nextIsBack && (isLate(nextUp)
+                            ? <span className="wr-back-tag is-late">تأخّر — ووصل</span>
+                            : <span className="wr-back-tag">عائد — يكمّل كشفه</span>)}
                         </div>
                         {nextUp.reason && <div className="dk-next-note">{nextUp.reason}</div>}
                       </div>
                       <div className="dk-next-actions">
-                        {/* العائد يُنادى بنداء العودة ويُستأنف بصمت — الأزرار نفسها في المكان نفسه */}
+                        {/* النداء من الزرّ الثابت أعلى الشاشة وحده. هنا «بدء كشف» لمن دخل الغرفة وحده
+                            (بلا نداء ولا صوت). لا «لم يحضر»: من قطع بطاقته حاضر — ومن نودي ولم يدخل
+                            فـ«تأخّر المريض» من بطاقة «قيد الكشف». */}
                         <button className="dk-tap" disabled={busy || !!current}
-                          onClick={() => act(nextIsBack ? api.clinic.returnCall : api.clinic.call, nextUp.id)}>
-                          نادِ التالي
-                        </button>
-                        <button className="ghost dk-tap" disabled={busy || !!current}
                           title="المريض دخل وحده — يبدأ كشفه بلا نداء ولا صوت في الصالة"
                           onClick={() => (nextIsBack
-                            ? act(api.clinic.resume, nextUp.id, { ok: `استُؤنف كشف الدور ${shownNumber(nextUp)} (بلا نداء)`, undo: 'resume' })
+                            ? act(api.clinic.resume, nextUp.id, { ok: `بدأ كشف الدور ${shownNumber(nextUp)} (بلا نداء)`, undo: 'resume' })
                             : act(api.clinic.walkIn, nextUp.id, { ok: `بدأ كشف الدور ${shownNumber(nextUp)} (بلا نداء)`, undo: 'walk_in' }))}>
                           بدء كشف
                         </button>
-                        {/* العائد كُشف عليه ودفع: لا «لم يحضر» له — إن نودي ولم يدخل فـ«خروج مؤقت» من جديد */}
-                        {!nextIsBack && (
-                          <button className="ghost dk-tap" disabled={busy} onClick={() => act(api.clinic.noShow, nextUp.id)}>
-                            لم يحضر
-                          </button>
-                        )}
                       </div>
                     </div>
                   ) : (
                     <p className="empty">لا أحد حاضر بانتظار الدور بعد.</p>
-                  )}
-                  {current && nextUp && (
-                    <p className="dk-hint">{ACTIVE_HINT}</p>
                   )}
                 </div>
 
@@ -589,7 +616,7 @@ export default function DoctorScreen() {
                           attendance ? urgentRowClass(a) : ''].filter(Boolean).join(' ')}>
                           <span className="dk-wait-num">{shownNumber(a)}</span>
                           <span className="dk-wait-name">{a.full_name}{attendance && <AttendanceBadge priority={a.priority} />}<ProcedureOnlyBadge appt={a} /></span>
-                          {a.status === WAITING_RETURN && <span className="wr-back-tag">عائد</span>}
+                          {a.status === WAITING_RETURN && <span className={`wr-back-tag${isLate(a) ? ' is-late' : ''}`}>{isLate(a) ? 'تأخّر' : 'عائد'}</span>}
                           {a.id === nextUp?.id && <span className="doc-next-tag">التالي</span>}
                         </li>
                       ))}
@@ -601,9 +628,12 @@ export default function DoctorScreen() {
           </section>
 
         </div>
+        </>
       )}
 
       <TodayBar lines={todayLines} toast={toast} />
+
+      {settingsOpen && <MySettingsSheet onClose={() => setSettingsOpen(false)} onSaved={(m) => showToast(m, 'success', 4000)} />}
 
       {sheetAppt && (
         <AddProcedureSheet appt={sheetAppt} catalog={catalog} usage={mine?.usage || {}}
@@ -611,5 +641,41 @@ export default function DoctorScreen() {
           draft={draft} setDraft={setDraft} onConfirm={confirmAdd} onClose={() => setSheetFor(null)} />
       )}
     </div>
+  )
+}
+
+// ═══ «إعداداتي» — ما يضبطه الدكتور لنفسه ═══
+// الخروج المؤقت: «لحين ما تخبّر الاستقبال» أو «يرجع تلقائياً بعد كذا دقيقة» — المدّة يكتبها هو
+// (أو المشرفة من البروفايل). الإعداد نفسه، والتغيير في سجلّ الدكتور بفاعله.
+function MySettingsSheet({ onClose, onSaved }) {
+  const [value, setValue] = useState(null)
+  const [err, setErr] = useState(null)
+  const [busy, setBusy] = useState(false)
+  useEffect(() => {
+    api.clinic.mySettings().then((r) => setValue(returnModeOf(r.return_after_minutes))).catch((e) => setErr(e.message))
+  }, [])
+  const save = async () => {
+    const v = returnModeValue(value)
+    if (v === undefined) return   // التنبيه تحت الحقل مباشرةً (ReturnModeField)
+    setErr(null); setBusy(true)
+    try {
+      const r = await api.clinic.saveMySettings({ return_after_minutes: v })
+      onSaved(r.return_after_minutes == null ? 'حُفظ: الخروج المؤقت لحين ما تخبّر الاستقبال'
+        : `حُفظ: يرجع على الدور تلقائياً بعد ${Number(r.return_after_minutes).toLocaleString('ar-SY')} دقيقة`)
+      onClose()
+    } catch (ex) { setErr(ex.message) } finally { setBusy(false) }
+  }
+  return (
+    <BottomSheet title="إعداداتي" subtitle="تخصّك وحدك — والمشرفة تراها في بروفايلك" onClose={onClose}
+      footer={value && (
+        <div className="dk-settings-foot">
+          <button type="button" disabled={busy} onClick={save}>حفظ</button>
+          <button type="button" className="ghost" onClick={onClose}>إلغاء</button>
+        </div>
+      )}>
+      {value ? <ReturnModeField value={value} onChange={(v) => { setValue(v); setErr(null) }} name="my_return_mode" />
+        : !err && <p className="empty">جارٍ التحميل…</p>}
+      {err && <p className="error" role="alert">{err}</p>}
+    </BottomSheet>
   )
 }

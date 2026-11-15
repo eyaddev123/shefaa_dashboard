@@ -397,6 +397,9 @@ export const api = {
     appointmentHistory: (appointmentId) =>
       http(`/clinic/appointments/${appointmentId}/history`),
     mySessions: (date) => http(`/clinic/my-sessions?date=${date}`),
+    // إعدادات الدكتور نفسه (الخروج المؤقت) — من شاشته
+    mySettings: () => http('/clinic/my-settings'),
+    saveMySettings: (body) => http('/clinic/my-settings', { method: 'PUT', body: JSON.stringify(body) }),
     call: (appointmentId) => http(`/clinic/appointments/${appointmentId}/call`, { method: 'POST' }),
     done: (appointmentId) => http(`/clinic/appointments/${appointmentId}/done`, { method: 'POST' }),
     noShow: (appointmentId) => http(`/clinic/appointments/${appointmentId}/no-show`, { method: 'POST' }),

@@ -2249,11 +2249,13 @@ button.danger:hover:not(:disabled) { filter: brightness(1.08); }
 .wr-state .wr-elapsed { margin-inline-start: 4px; }
 .wr-state-hint { color: var(--muted); font-size: 11.5px; }
 .wr-state.is-back { color: var(--status-good); font-weight: 700; }
+.pf-return-need { grid-column: 1 / -1; margin: 0; font-size: 12px; color: var(--status-pending); }
 .wr-inline .wr-inline-num.is-back { color: var(--status-good); }
 /* «عائد» على «التالي» وفي قائمة الحاضرين: يكمّل كشفه لا مريضٌ جديد */
 .wr-back-tag { display: inline-block; margin-inline-start: 8px; padding: 1px 8px; border-radius: 999px;
   font-size: 11.5px; font-weight: 800; color: var(--status-review); white-space: nowrap;
   background: color-mix(in srgb, var(--status-review) 14%, transparent); }
+.wr-back-tag.is-late { background: var(--status-pending-bg); color: var(--status-pending); }
 
 /* ═══════════════════════════════════════════════════════════════════
    نوافذ التأكيد والإدخال (dialogs.jsx) — بديل window.confirm/alert/prompt
@@ -3474,6 +3476,17 @@ button.cs-choice.on { background: var(--primary); border-color: var(--primary); 
 .dk-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .dk-top-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .dk-top-tools select { min-height: 44px; }
+.dk-settings-btn { min-height: 44px; }
+.dk-settings-foot { display: flex; gap: 8px; }
+.dk-settings-foot button { min-height: 48px; padding-inline: 22px; }
+/* «نادِ التالي» الثابت: يلتصق بأعلى الشاشة عند التمرير، ومكانه لا يتحرّك مع البطاقات */
+.dk-callbar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  margin: 12px 0; padding: 10px 14px; border-radius: 14px; background: var(--surface-1);
+  border: 1px solid var(--border); box-shadow: var(--shadow-card); }
+.dk-callbar-btn { min-height: 56px; padding: 0 28px; font-size: 18px; font-weight: 800; border-radius: 12px; }
+.dk-callbar-who { font-size: 15px; color: var(--text-secondary); }
+.dk-callbar-who strong { color: var(--text-primary); }
+@media (max-width: 600px) { .dk-callbar-btn { width: 100%; } }
 .dk-audio { min-height: 44px; font-size: 13px; }
 button.dk-audio.is-on:disabled { opacity: 1; cursor: default; color: var(--status-good); border-color: transparent; background: var(--status-good-bg); }
 

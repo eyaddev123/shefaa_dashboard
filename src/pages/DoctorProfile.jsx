@@ -8,6 +8,7 @@ import DoctorPayCard from '../components/DoctorPayCard.jsx'
 import { canSeeClinicFunds, canWriteClinicFunds, canSeeDoctorDashboard } from '../permissions.js'
 import { useToast } from '../action-feedback.jsx'
 import { pricingText } from '../share-rule.js'
+import { ReturnModeField, returnModeOf, returnModeValue } from '../waiting-return.jsx'
 
 // من يرى حصص الإجراءات — يطابق SETTLEMENT_VIEWERS في الخادم، ومشرف العيادات وحده يكتب
 const SHARE_VIEWERS = ['clinic_admin', 'board', 'super_admin', 'manager']
@@ -29,7 +30,7 @@ function ProfileForm({ doctor, globalBuffer, onSaved, readOnly = false }) {
     accepts_urgent: doctor.accepts_urgent !== false,
     appointments_based: doctor.appointments_based === true,
     // الخروج المؤقت: '' = يرجع بإخبار الاستقبال، أو دقائق الرجوع التلقائي
-    return_after_minutes: doctor.return_after_minutes == null ? '' : String(doctor.return_after_minutes),
+    return_mode: returnModeOf(doctor.return_after_minutes),
   })
   const [err, setErr] = useState(null)
   const [saved, setSaved] = useState(false)
@@ -39,10 +40,14 @@ function ProfileForm({ doctor, globalBuffer, onSaved, readOnly = false }) {
 
   const submit = async (e) => {
     e.preventDefault()
-    setErr(null); setBusy(true)
+    setErr(null)
+    const returnAfter = returnModeValue(form.return_mode)
+    if (returnAfter === undefined) { setErr('الخروج المؤقت: اكتب عدد الدقائق للرجوع التلقائي'); return }
+    setBusy(true)
     try {
+      const { return_mode, ...rest } = form
       await api.clinic.updateDoctor(doctor.id, {
-        ...form,
+        ...rest,
         consultation_fee: Number(form.consultation_fee) || 0,
         followup_fee: Number(form.followup_fee) || 0,
         followup_window_days: Number(form.followup_window_days) || 7,
@@ -51,7 +56,7 @@ function ProfileForm({ doctor, globalBuffer, onSaved, readOnly = false }) {
         hourly_buffer_minutes: form.hourly_buffer_minutes === ''
           ? null : Number(form.hourly_buffer_minutes),
         // الخادم يتحقّق (1–240) ويقبل الأرقام الهندية — ويُسجّل التغيير في السجلّ
-        return_after_minutes: form.return_after_minutes === '' ? null : form.return_after_minutes,
+        return_after_minutes: returnAfter,
       })
       setSaved(true); onSaved()
     } catch (ex) { setErr(ex.message) }
@@ -154,26 +159,10 @@ function ProfileForm({ doctor, globalBuffer, onSaved, readOnly = false }) {
           </div>
           {/* ═══ الخروج المؤقت ═══ إعدادٌ واحد للدكتور لا سؤالٌ عند كلّ خروج: أكثرهم يُخرج المريض
               لصورةٍ أو تحليل (قد يغيب ساعة) فيرجع حين تكبس الاستقبال «رجع»؛ ودكتور العينية يُخرجه
-              لقطرة فيرجع على الدور وحده بعد ربع ساعة. يُطبَّق على الخروج التالي لا الجاري. */}
-          <div className="pf-return" role="radiogroup" aria-labelledby="pf-return-h">
-            <div id="pf-return-h" className="pf-return-title"><strong>الخروج المؤقت</strong>
-              <small>متى يرجع المريض على الدور بعد أن يكبس الدكتور «خروج مؤقت»؟</small></div>
-            <label className="pf-toggle">
-              <input type="radio" name="return_mode" checked={form.return_after_minutes === ''}
-                onChange={() => { setForm((f) => ({ ...f, return_after_minutes: '' })); setSaved(false) }} />
-              <span><strong>لحين ما تخبّر الاستقبال</strong>
-                <small>للصور والأشعّة والتحاليل: يبقى خارجاً حتى تكبس الاستقبال «رجع»، فيدخل أوّل واحد برقمه.</small></span>
-            </label>
-            <label className="pf-toggle">
-              <input type="radio" name="return_mode" checked={form.return_after_minutes !== ''}
-                onChange={() => { setForm((f) => ({ ...f, return_after_minutes: f.return_after_minutes || '15' })); setSaved(false) }} />
-              <span><strong>يرجع على الدور تلقائياً بعد
-                <input className="pf-return-min" inputMode="numeric" aria-label="دقائق الرجوع التلقائي"
-                  value={form.return_after_minutes} disabled={readOnly || form.return_after_minutes === ''}
-                  onChange={set('return_after_minutes')} /> دقيقة</strong>
-                <small>للقطرات: يرجع وحده بعد المدّة أوّل واحد برقمه — والاستقبال تستطيع «رجع» قبلها.</small></span>
-            </label>
-          </div>
+              لقطرة فيرجع على الدور وحده بعد المدّة التي تُكتب هنا. يُطبَّق على الخروج التالي لا الجاري.
+              والدكتور يضبطه أيضاً من «إعداداتي» في شاشته. */}
+          <ReturnModeField value={form.return_mode} disabled={readOnly}
+            onChange={(v) => { setForm((f) => ({ ...f, return_mode: v })); setSaved(false) }} />
           <div className="field pf-notes">
             <label>ملاحظات</label>
             <input value={form.notes} onChange={set('notes')} />

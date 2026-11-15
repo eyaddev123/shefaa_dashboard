@@ -32,7 +32,7 @@ function statusTitle(from, to, reason) {
   if (to === 'done' && from === 'waiting_return') return 'إنهاء الكشف (من الخروج المؤقت)'
   if (to === 'in_service' && from === 'waiting_return') return 'نداء العودة من الخروج المؤقت'
   // السبب يحمل نمط الرجوع: «خروج مؤقت — يرجع على الدور تلقائياً بعد 15 د»
-  if (to === 'waiting_return') return reason && reason.startsWith('خروج مؤقت') ? reason : 'خروج مؤقت'
+  if (to === 'waiting_return') return reason && (reason.startsWith('خروج مؤقت') || reason.startsWith('تأخّر')) ? reason : 'خروج مؤقت'
   if (to === 'done' && from === 'in_service') return 'إنهاء الكشف'
   if (to === 'no_show') return 'تعليم «لم يحضر»'
   if (to === 'cancelled') return 'إلغاء الحجز'
