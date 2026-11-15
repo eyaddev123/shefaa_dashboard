@@ -205,6 +205,8 @@ export default function DoctorScreen() {
   // عمود الدور: «بانتظار الدور» أو «محجوزون لم يحضروا» — مبدِّلٌ ثابت أعلى البطاقة، فالحجوزات لا تُدفع
   // لأسفل الشاشة حين يطول الدور (ملاحظة المستخدم: عشرة حاضرين أخفوا الحاجزين)
   const [side, setSide] = useState('line')
+  // «أحتاج ممرضة»: طلبٌ واحد قائم أو لا — يومض عند الاستقبال حتى تكبس «أرسلنا ممرضة»
+  const [nurse, setNurse] = useState(null)       // null = لم يُحمَّل، false = لا طلب، {requested_at} = قائم
   const [mine, setMine] = useState(null)
   const [adding, setAdding] = useState([])          // إضافاتٌ متفائلة: {tempId, appointment_id, name}
   const [sheetFor, setSheetFor] = useState(null)    // id الحجز الذي تُضاف له
@@ -222,6 +224,9 @@ export default function DoctorScreen() {
   }).catch((e) => setLoadErr(e.message))
   useEffect(() => { loadSessions() }, [])
   useEffect(() => { api.clinic.myProfile().then(setProfile).catch(() => setProfile({})) }, [])
+  const loadNurse = useCallback(() => api.clinic.nurseCalls().then((d) => setNurse(d.calls[0] || false))
+    .catch(() => setNurse(false)), [])
+  useEffect(() => { loadNurse() }, [loadNurse])
 
   const queueRef = useRef(null)
   queueRef.current = queue
@@ -270,6 +275,24 @@ export default function DoctorScreen() {
     const un = onAudioState(setAudioOn)
     return () => { off(); un() }
   }, [])
+  // ردّ الاستقبال على طلب الممرضة (أو إلغاؤه من جهازٍ آخر) — حدثٌ بلا جلسة على بثّ الموظفين
+  useEffect(() => {
+    if (!profile?.id) return undefined
+    return openStaffStream((name, data) => {
+      if (name !== 'nurse_call' || String(data?.doctor_id) !== String(profile.id)) return
+      if (data.action === 'ack') {
+        setNurse(false)
+        showToast(`الممرضة في الطريق${data.by ? ` — أرسلتها ${data.by}` : ''}`, 'success', 6000)
+      } else loadNurse()
+    })
+  }, [profile?.id, loadNurse, showToast])
+  const toggleNurse = async () => {
+    try {
+      if (nurse) { await api.clinic.cancelNurseCall(); setNurse(false); showToast('أُلغي طلب الممرضة', 'success', 3000) }
+      else { setNurse(await api.clinic.nurseCall()); showToast('طُلبت ممرضة — يظهر الطلب عند الاستقبال الآن', 'success', 4000) }
+    } catch (ex) { showToast(ex.message) }
+  }
+
   // Web Push: عرضٌ لطيف أوّل مرّة؛ والإذن الممنوح سابقاً يُجدَّد بصمت
   useEffect(() => {
     if (shouldOfferPush()) api.push.key().then((k) => setPushOffer(!!k.enabled)).catch(() => {})
@@ -408,6 +431,11 @@ export default function DoctorScreen() {
               ))}
             </select>
           )}
+          {/* «أحتاج ممرضة»: كبسةٌ تطلب، والثانية تُلغي — والطلب القائم ظاهرٌ بحدّه حتى تُجيب الاستقبال */}
+          <button type="button" className={`ghost dk-tool dk-nurse${nurse ? ' is-on' : ''}`} disabled={nurse === null}
+            onClick={toggleNurse} title={nurse ? 'الطلب ظاهرٌ عند الاستقبال — اكبس لإلغائه' : 'يومض عند الاستقبال: الدكتور يحتاج ممرضة'}>
+            {nurse ? 'طُلبت ممرضة — إلغاء' : 'أحتاج ممرضة'}
+          </button>
           <button type="button" className="ghost dk-tool dk-settings-btn" onClick={() => setSettingsOpen(true)}>الإعدادات</button>
           {/* ★ يبقى مكانه بعد التفعيل (تتبدّل حالته لا يختفي): أوّل لمسة في الصفحة تفتح الصوت،
               واختفاء الزرّ بين ضغطها ورفعها كان يُزيح الصفحة فتضيع اللمسة عن هدفها */}

@@ -50,6 +50,8 @@ export const canSeeProceduresPage = (role) =>
 export const canEditAppointmentProcedures = (role) => role === 'clinic_admin' || role === 'clinic_reception'
 // «تمت المحاسبة» على إجراءٍ أضافه الطبيب: من يقبض — مرآة PAYMENT_TAKERS في الخادم
 export const canTakePayment = (role) => role === 'clinic_admin' || role === 'clinic_reception'
+// «الطبيب يحتاج ممرضة»: التنبيه الوامض والإجابة للاستقبال والمشرفة
+export const canAnswerNurseCall = (role) => role === 'clinic_admin' || role === 'clinic_reception'
 
 // تشغيل الدور (حجز، حضر، نداء، إعادة نداء، «وصل الطبيب»، ما حضر، تأجيل، تقديم): الاستقبال والمشرفة.
 // المجلس والمشرف العام والمدير يطالعون الدور بلا أزرار — والخادم يرفض كتابتهم أصلاً (المدير بطبقةٍ عامة).

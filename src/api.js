@@ -473,6 +473,11 @@ export const api = {
     mySalary: (month) => http(`/clinic/my-salary${month ? `?month=${month}` : ''}`),
     // صفحات الطبيب: has_procedures يقرّر إظهار آثار الإجراءات، و«مرضاي» ليومٍ واحد
     myProfile: () => http('/clinic/my-profile'),
+    // «أحتاج ممرضة»: الطبيب يطلب ويُلغي، والاستقبال تُجيب
+    nurseCall: () => http('/clinic/nurse-call', { method: 'POST' }),
+    cancelNurseCall: () => http('/clinic/nurse-call', { method: 'DELETE' }),
+    nurseCalls: () => http('/clinic/nurse-calls'),
+    ackNurseCall: (doctorId) => http(`/clinic/nurse-calls/${doctorId}/ack`, { method: 'POST' }),
     // { period: 'today'|'week'|'month' } أو { from, to }
     myPatients: (q = {}) => http(`/clinic/my-patients?${new URLSearchParams(q)}`),
     myPatientsSearch: (q) => http(`/clinic/my-patients/search?q=${encodeURIComponent(q)}`),

@@ -4,12 +4,13 @@ import { RoleProvider, useRole } from './RoleContext.jsx'
 import {
   canManageUsers, canReadAid, canSearchAid, canSeeClinicBoard, canSeeCashReport, canSeeDoctorsPage,
   canSeeDoctorScreen, canSeeSettings, canSeeProceduresPage, canSeePrinterSetup, canSeeInventory, canWriteInventory, canSeeReferralsPage, homePathFor,
-  canTakePayment, canSeeClinicFunds, canReadClinic, canSeeEarnings, canSeeDoctorDashboard, canSeeIronLog,
+  canTakePayment, canAnswerNurseCall, canSeeClinicFunds, canReadClinic, canSeeEarnings, canSeeDoctorDashboard, canSeeIronLog,
 } from './permissions.js'
 import { ROLE_LABELS } from './api.js'
 import ThemeToggle from './components/ThemeToggle.jsx'
 import NotificationsBell from './components/NotificationsBell.jsx'
 import UnpaidBell from './components/UnpaidBell.jsx'
+import NurseCallAlert from './components/NurseCallAlert.jsx'
 import Login from './pages/Login.jsx'
 import Search from './pages/Search.jsx'
 import Dashboard from './pages/Dashboard.jsx'
@@ -215,6 +216,8 @@ function Shell() {
       <Sidebar onNavigate={() => setDrawer(false)} />
       {/* إجراءات الأطباء بانتظار المحاسبة — زرٌّ عائم حيّ في كلّ صفحة لمن يقبض */}
       {canTakePayment(user.role) && <UnpaidBell role={user.role} />}
+      {/* «الدكتور يحتاج ممرضة» — شريطٌ وامض أعلى أيّ صفحة للاستقبال والمشرفة */}
+      {canAnswerNurseCall(user.role) && <NurseCallAlert />}
       <main className="main">
         <Routes>
           <Route path="/" element={canSeeDoctorScreen(clinicRole) ? <Navigate to="/clinic/doctor" replace /> : <Dashboard />} />
