@@ -2246,7 +2246,6 @@ button.danger:hover:not(:disabled) { filter: brightness(1.08); }
 .wr-status { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 /* حال الخروج (waiting-return-modes): خارج منذ / يرجع بعد / رجع على الدور */
 .wr-state { font-size: 12.5px; color: var(--text-secondary); white-space: nowrap; }
-.wr-state .wr-elapsed { margin-inline-start: 4px; }
 .wr-state-hint { color: var(--muted); font-size: 11.5px; }
 .wr-state.is-back { color: var(--status-good); font-weight: 700; }
 .pf-return-need { grid-column: 1 / -1; margin: 0; font-size: 12px; color: var(--status-pending); }

@@ -8,7 +8,7 @@ import DoctorPayCard from '../components/DoctorPayCard.jsx'
 import { canSeeClinicFunds, canWriteClinicFunds, canSeeDoctorDashboard } from '../permissions.js'
 import { useToast } from '../action-feedback.jsx'
 import { pricingText } from '../share-rule.js'
-import { ReturnModeField, returnModeOf, returnModeValue } from '../waiting-return.jsx'
+import { ReturnModeField, returnModeOf, returnModeValue } from '../waiting-return-ui.jsx'
 
 // من يرى حصص الإجراءات — يطابق SETTLEMENT_VIEWERS في الخادم، ومشرف العيادات وحده يكتب
 const SHARE_VIEWERS = ['clinic_admin', 'board', 'super_admin', 'manager']

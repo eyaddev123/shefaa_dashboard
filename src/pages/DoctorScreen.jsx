@@ -3,9 +3,9 @@ import { api, fmtTime, todayLocal, openStaffStream } from '../api.js'
 import { AttendanceBadge, urgentRowClass, isAttendanceSession, usePolling, fmtClock, fmtTimeOfDay } from '../attendance-ui.jsx'
 import { useToast, RecallButton } from '../action-feedback.jsx'
 import {
-  WAITING_RETURN, waitingReturnOf, serverOffsetOf, ReturnState, queueWithReturnees, isBackInQueue, useServerNow,
-  isLate, ReturnModeField, returnModeOf, returnModeValue,
+  WAITING_RETURN, waitingReturnOf, serverOffsetOf, queueWithReturnees, isBackInQueue, useServerNow, isLate,
 } from '../waiting-return.jsx'
+import { ReturnState, ReturnModeField, returnModeOf, returnModeValue } from '../waiting-return-ui.jsx'
 import BottomSheet from '../components/BottomSheet.jsx'
 import { ProcedureOnlyBadge } from '../components/ProcedureOnly.jsx'
 import MaterialsEditor, { qtyValid, toPayload } from '../components/MaterialsEditor.jsx'
