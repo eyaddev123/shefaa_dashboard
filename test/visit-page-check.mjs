@@ -225,6 +225,19 @@ const run = async () => {
     await adm.ctx.close()
   }
   {
+    // حادثة الخميس 2026-11-12: «طباعة البطاقة» لحجزٍ لم يحضر طبعت رقم الحجز (3) ودورُ 3 لمريضةٍ أخرى
+    const { ctx, page } = await open(browser, { path: visitPath('new') })
+    await page.waitForSelector('.visit-page')
+    ok(!(await page.$('.visit-reprint')), '★ لم يحضر بعد (نمط الحضور): لا زرّ «طباعة البطاقة»')
+    ok((await text(page, '.visit-reprint-wait')).includes('بعد تسجيل الحضور'), '★ لم يحضر بعد: السبب ظاهر مكان الزرّ')
+    await ctx.close()
+    const arr = await open(browser, { path: visitPath('arrived') })
+    await arr.page.waitForSelector('.visit-page')
+    ok(await arr.page.locator('.visit-reprint').isVisible(), '★ الحاضر برقم دوره: الزرّ باقٍ')
+    ok(!(await arr.page.$('.visit-reprint-wait')), 'الحاضر: لا سطر «لا رقم دور»')
+    await arr.ctx.close()
+  }
+  {
     const { ctx, page } = await open(browser, { path: visitPath('slots') })
     await page.waitForSelector('.visit-page')
     ok((await text(page, '.visit-num-main')).trim() === String(apptOf('slots').queue_number), 'خانات: رقم الدور في الرأس')

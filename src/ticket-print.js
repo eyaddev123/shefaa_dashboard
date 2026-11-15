@@ -204,6 +204,8 @@ export function ticketHtml(data, width = 80, heightMm = null, origin = '', copy 
 // تُرجع وعداً يُحلّ دائماً — الطباعة لا تُفشل الحضور أبداً. { ok, reason }
 // copies: نسخةً بعد نسخة (احتياط المتصفّح وحده — الوسيط يطبعها مهمّةً واحدة)
 export async function printTicket(data, width = 80, doc = document, { copies = 1 } = {}) {
+  // بطاقة دورٍ بلا رقم لا تُطبع أبداً (الإيصال وحده بلا رقم بطبيعته)
+  if (!data?.receipt && data?.queue_number == null) return { ok: false, reason: NO_TURN_NUMBER }
   const n = clampCopies(copies, 1)
   let last = { ok: true, reason: null }
   for (let i = 0; i < n; i++) {
@@ -289,9 +291,19 @@ function printOneTicket(data, width = 80, doc = document, copy = null) {
 // ★ الإحالة: البطاقة تحمل ما يدفعه المريض فعلاً — بعد الخصم، بلا كلمة «خصم» ولا اسم الجهة.
 // patient_fee و patient_price يرسلهما الخادم مع صفّ الطابور (للاستقبال وحده)؛ وبلا إحالة
 // يساويان الأصل، وفي غيابهما (ردٌّ قديم) يُطبع الأصل كما كان.
+// ★ ولا رجوع إلى رقم الحجز إطلاقاً: من لم يحضر بعدُ لا رقم دور له، ورقم حجزه قد يساوي دور
+//   مريضٍ حاضر — حادثة الخميس 2026-11-12: بطاقة «3» لمريضةٍ حجزها 3 قبل حضورها، والدور 3 لغيرها.
+//   فالرقم null، و ticketNotReady يقول لماذا، والطباعة نفسها ترفض بطاقةً بلا رقم.
+export const NO_TURN_NUMBER = 'لا رقم دور — سجّل الحضور أولاً'
+
+export const ticketNotReady = (appt, session) =>
+  session?.flow_mode === 'attendance' && appt?.arrival_number == null
+    ? 'لا رقم دور بعد — البطاقة تُطبع بعد تسجيل الحضور، برقم الدور'
+    : null
+
 export const ticketFrom = (appt, session) => ({
   queue_number: session?.flow_mode === 'attendance'
-    ? (appt.arrival_number ?? appt.queue_number) : appt.queue_number,
+    ? (appt.arrival_number ?? null) : appt.queue_number,
   full_name: appt.full_name,
   birth_year: appt.birth_year,
   visit_type: appt.visit_type,

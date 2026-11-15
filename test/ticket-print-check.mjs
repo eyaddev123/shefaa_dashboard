@@ -67,7 +67,22 @@ console.log('\n── ١ب) الرقم المطبوع ──')
   const r = await page.evaluate(() => ({
     attn: ticketFrom({ queue_number: 17, arrival_number: 1, estimated_time: '11:20:00' }, { flow_mode: 'attendance' }),
     slots: ticketFrom({ queue_number: 17, arrival_number: null }, { flow_mode: 'slots' }),
+    // لم يحضر بعد: لا رجوع إلى رقم الحجز (حادثة الخميس 2026-11-12)
+    early: ticketFrom({ queue_number: 3, arrival_number: null }, { flow_mode: 'attendance' }),
+    earlyWhy: ticketNotReady({ queue_number: 3, arrival_number: null }, { flow_mode: 'attendance' }),
+    arrivedWhy: ticketNotReady({ queue_number: 3, arrival_number: 13 }, { flow_mode: 'attendance' }),
+    slotsWhy: ticketNotReady({ queue_number: 3, arrival_number: null }, { flow_mode: 'slots' }),
   }))
+  ok(r.early.queue_number === null, '★ نمط الحضور ولم يحضر: لا رقم على البطاقة (لا رقم الحجز ٣)', JSON.stringify(r.early))
+  ok(/بعد تسجيل الحضور/.test(r.earlyWhy || ''), '★ ticketNotReady يقول السبب لمن لم يحضر', String(r.earlyWhy))
+  ok(r.arrivedWhy === null && r.slotsWhy === null, 'الحاضر ونمط الخانات: لا مانع')
+  const refused = await page.evaluate(async () => {
+    const before = document.querySelectorAll('iframe').length
+    const res = await printTicket({ queue_number: null, full_name: 'أ ب ج', fee: 0 }, 80)
+    return { res, frames: document.querySelectorAll('iframe').length - before }
+  })
+  ok(refused.res.ok === false && /سجّل الحضور/.test(refused.res.reason || '') && refused.frames === 0,
+    '★ printTicket يرفض بطاقة دورٍ بلا رقم ولا يفتح إطار طباعة', JSON.stringify(refused))
   ok(r.attn.queue_number === 1, '★ نمط الحضور: البطاقة تطبع رقم الدور (١) لا رقم الحجز (١٧)', JSON.stringify(r.attn))
   ok(!('estimated_time' in r.attn), '★ ولا وقت تقريبي على البطاقة')
   ok(r.slots.queue_number === 17, 'نمط الخانات: رقم الدور كما كان')

@@ -201,6 +201,18 @@ const run = async () => {
   const p1 = parseStream(readFileSync(join(jobs, f1[0])))
   ok(one.ok && p1.ops.filter((x) => x === 'cut').length === 1 && p1.images.length === 1, 'نسخة واحدة ⇒ قطعٌ واحد', p1.ops.join(','))
 
+  // ── ③ب) بطاقة دورٍ بلا رقم (لم يحضر بعد) لا تصل الوسيط أصلاً — حادثة الخميس 2026-11-12 ──
+  console.log('\n── ٣ب) بلا رقم دور ──')
+  rmSync(jobs, { recursive: true, force: true })
+  const none = await page.evaluate(async ([data, port]) => {
+    const m = await import('/src/print-helper.js')
+    return m.printViaHelper({ ...data, queue_number: null }, 80, { port, token: 'tk' }, document, { copies: 2 })
+  }, [DATA, HELPER_PORT])
+  let noneJobs = []
+  try { noneJobs = readdirSync(jobs) } catch { /* لا مجلّد = لا مهمّة */ }
+  ok(none.ok === false && /سجّل الحضور/.test(none.reason || '') && noneJobs.length === 0,
+    '★ queue_number فارغ ⇒ رفضٌ بسببه ولا مهمّة طباعة', JSON.stringify(none) + ' ' + noneJobs.length)
+
   // ── ④ الإعداد: ٢ افتراضاً، ويُحفظ دون محو منفذ الوسيط ورمزه ──
   console.log('\n── ٤) إعداد عدد النسخ ──')
   const s = await page.evaluate(async () => {

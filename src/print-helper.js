@@ -9,7 +9,7 @@
 // عربية في الطابعة، تختلف بين الموديلات وتكسر وصل الحروف. والصورة بتّاتٌ
 // لا تعرف لغة — ما رسمه المتصفّح هو ما يُطبع حرفياً.
 
-import { ticketHtml, ORG_NAME, ORG_NAME_PARTS, copyLabel } from './ticket-print.js'
+import { ticketHtml, ORG_NAME, ORG_NAME_PARTS, copyLabel, NO_TURN_NUMBER } from './ticket-print.js'
 
 const SETTINGS_KEY = 'shefaa.printer'
 export const DEFAULT_HELPER = { port: 17625, token: '' }
@@ -258,6 +258,8 @@ const OLD_HELPER_ERROR = /^image يجب أن تكون/
  * (قبل النسخ) تُرسل نسخةً نسخة — الورق نفسه، فلا تنقطع الطباعة قبل تحديثه.
  */
 export async function printViaHelper(data, width = 80, cfg = loadHelper(), doc = document, { copies = 1 } = {}) {
+  // بطاقة دورٍ بلا رقم لا تُطبع أبداً — انظر ticketNotReady في ticket-print.js
+  if (!data?.receipt && data?.queue_number == null) return { ok: false, reason: NO_TURN_NUMBER }
   try {
     const n = Math.max(1, Math.min(5, Math.round(Number(copies) || 1)))
     // ★ عرض الورق المركَّب يعرفه الوسيط (config.json ⇒ printable_width): على 58

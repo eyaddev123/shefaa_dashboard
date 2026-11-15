@@ -7,7 +7,7 @@
 import { Fragment, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useDialogs } from '../dialogs.jsx'
-import { loadPrinter, printTicket, ticketFrom, MAX_COPIES } from '../ticket-print.js'
+import { loadPrinter, printTicket, ticketFrom, ticketNotReady, MAX_COPIES } from '../ticket-print.js'
 import { printViaHelper } from '../print-helper.js'
 import { api, APPOINTMENT_STATUSES, BOOKING_TYPES, VISIT_TYPES, PROCEDURE_ONLY, PRIORITIES, fmtMoney, toLatinDigits, cleanMobile, mobileError } from '../api.js'
 import MobileInput from '../components/MobileInput.jsx'
@@ -69,6 +69,8 @@ function PaymentCard({ appt, session, onToast }) {
   const dayOk = role === 'clinic_admin' || session.session_day === session.server_today
   // إعادة الطباعة بشرط لوحة التفاصيل القديمة نفسه
   const canReprint = canEditBooking(role) && appt.status !== 'postponed' && dayOk
+  // نمط الحضور ولم يحضر بعد: لا رقم دور، فلا بطاقة — كانت تُطبع برقم الحجز فيصادم دور غيره
+  const notReady = ticketNotReady(appt, session)
   const note = appt.status === 'cancelled' ? 'الحجز ملغى.'
     : appt.status === 'no_show' ? 'لم يحضر.'
     : appt.status === 'postponed' ? 'أُجّل — المبلغ على الحجز الجديد.' : null
@@ -101,7 +103,9 @@ function PaymentCard({ appt, session, onToast }) {
       )}
       {note && <p className="visit-empty">{note}</p>}
       {endedWithoutProcedure(appt) && <p className="visit-empty">انتهت الزيارة بلا إجراء ولا كشفية — لم يُقبض شيء.</p>}
-      {canReprint && <ReprintButton appt={appt} session={session} onToast={onToast} />}
+      {canReprint && (notReady
+        ? <p className="visit-empty visit-reprint-wait">{notReady}</p>
+        : <ReprintButton appt={appt} session={session} onToast={onToast} />)}
     </section>
   )
 }
