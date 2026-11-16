@@ -50,7 +50,14 @@
           }
           var m = e && e.message ? e.message : 'خطأ غير معروف'
           var src = e && e.filename ? e.filename + ':' + e.lineno + ':' + e.colno : ''
-          show('خطأ JavaScript', m + (src ? '\n' + src : ''))
+          // مكان الخطأ الأصلي (2026-11-16): خطأ رسمٍ يرميه React من داخله، فالسطر أعلاه قد يكون
+          // مكانَ الرمي لا مكانَ العطل. مكدّس الخطأ نفسه يحمل السطر الحقيقي في الحزمة (يُترجَم بخريطة
+          // مصدرٍ من بناءٍ محلّيّ للالتزام نفسه)، و«المكوّن» يكتبه حارس الأخطاء في main.jsx.
+          var stack = e && e.error && e.error.stack ? String(e.error.stack).split('\n').slice(0, 8).join('\n') : ''
+          var comp = window.__shefaaComponentStack ? String(window.__shefaaComponentStack).split('\n').slice(0, 9).join('\n') : ''
+          show('خطأ JavaScript', m + (src ? '\n' + src : '') +
+            (stack ? '\n\nالمكان:\n' + stack : '') + (comp ? '\n\nالمكوّن:' + comp : '') +
+            '\n\nالصفحة: ' + location.pathname + location.search)
         }, true)
         window.addEventListener('unhandledrejection', function (e) {
           var r = e && e.reason
