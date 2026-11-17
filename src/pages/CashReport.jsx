@@ -16,7 +16,7 @@ import { canSeeVisitAudit } from '../permissions.js'
 // المشرفة والمدير يزيدان قسمين (canSeeVisitAudit): «نشاط الموظفين» تحت البطاقات، وعمود
 // «السجل» يفتح الخط الزمني لكل مريض. الاستقبال يرى الشاشة بلاهما — والخادم يردّه 403 عليهما.
 
-const fmtNum = (n) => Number(n || 0).toLocaleString('ar-SY')
+const fmtNum = (n) => Number(n || 0).toLocaleString('ar-SY-u-nu-latn')
 const patientsText = (n) => `${fmtNum(n)} ${n === 1 ? 'مريض' : 'مرضى'}`
 const AUTO_OPEN_MAX = 3   // حتى ثلاثة دكاترة: الكتل مفتوحة؛ أكثر: مطويّة ويُفتح ما يُراد
 

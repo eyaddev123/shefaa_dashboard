@@ -95,7 +95,7 @@ const run = async () => {
   let s = await read()
   ok(s.banner, 'النداء الحقيقي: بطاقة النداء الكبيرة ظهرت')
   ok(s.cards[0].flash, 'النداء الحقيقي: البطاقة تومض')
-  ok(s.cards[0].number.trim() === '1', `النداء الحقيقي: «يُخدَم الآن» = ١ (${s.cards[0].number})`)
+  ok(s.cards[0].number.trim() === '1', `النداء الحقيقي: «يُخدَم الآن» = 1 (${s.cards[0].number})`)
   await pause(3300)   // ينتهي الوميض (FLASH_MS)
 
   // ٢) «بدء كشف» بعد النداء لهذا المريض: refresh صامت برقم حجزه
@@ -120,8 +120,8 @@ const run = async () => {
   const early = await read()
   await pause(600)
   s = await read()
-  ok(s.cards[0].number.trim() === '3', `★ «بدء كشف» بلا نداء: الدور ٣ في «يُخدَم الآن» (${s.cards[0].number})`)
-  ok(!s.cards[0].chips.includes('3') && s.cards[0].chips.includes('2'), `★ «بدء كشف» بلا نداء: خرج من الحبّات، وبقي الدور ٢ (${s.cards[0].chips})`)
+  ok(s.cards[0].number.trim() === '3', `★ «بدء كشف» بلا نداء: الدور 3 في «يُخدَم الآن» (${s.cards[0].number})`)
+  ok(!s.cards[0].chips.includes('3') && s.cards[0].chips.includes('2'), `★ «بدء كشف» بلا نداء: خرج من الحبّات، وبقي الدور 2 (${s.cards[0].chips})`)
   ok(!s.banner && !early.banner, '★ «بدء كشف» بلا نداء: لا بطاقة نداء إطلاقاً')
   ok(!s.cards[0].flash && !early.cards[0].flash, '★ «بدء كشف» بلا نداء: لا وميض')
 
@@ -195,7 +195,7 @@ const run = async () => {
         hints: [...document.querySelectorAll('.dk-hint, .wr-hint')].map((h) => h.textContent.trim()),
       }
     })
-    ok(st.listRows === 3 && st.listButtons === 0, `★ ${label}: قائمة المنتظرين — ٣ أسطر، ولا زرّ إلا «بدء كشف» على سطر التالي (${st.listButtons})`)
+    ok(st.listRows === 3 && st.listButtons === 0, `★ ${label}: قائمة المنتظرين — 3 أسطر، ولا زرّ إلا «بدء كشف» على سطر التالي (${st.listButtons})`)
     ok(st.walkins.length === 1 && st.walkinsElsewhere === 0, `★ ${label}: «بدء كشف» في بطاقة «التالي» وحدها (${st.walkins.length}/${st.walkinsElsewhere})`)
     // waiting-return-modes (جولة ٢): «نادِ التالي» زرٌّ واحد ثابت أعلى الشاشة (.dk-callbar) لا في بطاقة،
     // ولا «لم يحضر» في الشاشة كلّها — من نودي ولم يدخل فـ«تأخّر المريض»
@@ -276,7 +276,7 @@ const run = async () => {
       next: document.querySelector('.dk-wait.is-next')?.textContent || '',
       nextButtons: [...document.querySelectorAll('.dk-next-actions button')].map((b) => b.textContent.trim()),
     }))
-    ok(nx.next.startsWith('6') && nx.next.includes('مريض 6') && nx.next.includes('عائد — يكمّل كشفه'), `★ «التالي» هو العائد ٦ بعلامته (${nx.next})`)
+    ok(nx.next.startsWith('6') && nx.next.includes('مريض 6') && nx.next.includes('عائد — يكمّل كشفه'), `★ «التالي» هو العائد 6 بعلامته (${nx.next})`)
     ok(j2(nx.nextButtons) === j2(['بدء كشف']), `★ بطاقة «التالي»: «بدء كشف» وحده (${j2(nx.nextButtons)})`)
     await page.locator('.dk-callbar button', { hasText: 'نادِ التالي' }).click()
     await page.waitForTimeout(300)

@@ -5,16 +5,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from './api.js'
 
-// أرقام عربية — ٠١٢٣٤٥٦٧٨٩
-export const toArabicDigits = (v) => String(v).replace(/\d/g, (d) => '٠١٢٣٤٥٦٧٨٩'[d])
-
-// ثوانٍ بالجمع الصحيح: ثانية واحدة، ثانيتان، ٣–١٠ ثوانٍ، ١١ فما فوق ثانية
+// ثوانٍ بالجمع الصحيح: ثانية واحدة، ثانيتان، 3–10 ثوانٍ، 11 فما فوق ثانية
 export function secondsAr(n) {
   const k = Math.max(0, Math.round(n))
   if (k === 1) return 'ثانية واحدة'
   if (k === 2) return 'ثانيتان'
-  if (k >= 3 && k <= 10) return `${toArabicDigits(k)} ثوانٍ`
-  return `${toArabicDigits(k)} ثانية`
+  if (k >= 3 && k <= 10) return `${k} ثوانٍ`
+  return `${k} ثانية`
 }
 
 // ═══ إشعار عابر ═══
@@ -79,7 +76,7 @@ export function RecallButton({ apptId, onError, onDone, className = 'ghost', sty
   }
   return (
     <button className={className} style={style} disabled={busy || left > 0} onClick={press}
-      title={left > 0 ? 'أُعيد النداء للتو — الخادم يسمح بإعادته مرّة كل ١٠ ثوانٍ' : undefined}>
+      title={left > 0 ? 'أُعيد النداء للتو — الخادم يسمح بإعادته مرّة كل 10 ثوانٍ' : undefined}>
       {icon ? '🔊 ' : ''}إعادة النداء{left > 0 && <span className="recall-wait"> ({secondsAr(left)})</span>}
     </button>
   )

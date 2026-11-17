@@ -14,7 +14,7 @@ function Countdown({ until, offset }) {
   return <span className="wr-elapsed" dir="ltr">{fmtElapsed(until - (Date.now() + offset))}</span>
 }
 
-const clock = (t) => new Date(t).toLocaleTimeString('ar', { hour: '2-digit', minute: '2-digit' })
+const clock = (t) => new Date(t).toLocaleTimeString('ar-SY-u-nu-latn', { hour: '2-digit', minute: '2-digit' })
 
 // ═══ حال الخروج بسطرٍ واحد — للطبيب والاستقبال ═══
 //   رجع (الاستقبال)        ⇒ «رجع ١١:٢٠ — على الدور»
@@ -73,10 +73,10 @@ export function ReturnModeField({ value, onChange, disabled = false, name = 'ret
           <input ref={minRef} className="pf-return-min" inputMode="numeric" aria-label="دقائق الرجوع التلقائي"
             placeholder="—" value={value.minutes} disabled={disabled || value.mode !== 'auto'}
             onChange={(e) => onChange({ ...value, minutes: e.target.value })} /> دقيقة</strong>
-          <small>للقطرات: اكتب المدّة التي تحتاجها (٣٠، ٤٠…) — يرجع وحده بعدها أوّل واحد برقمه، والاستقبال تستطيع «رجع» قبلها.</small></span>
+          <small>للقطرات: اكتب المدّة التي تحتاجها (30، 40…) — يرجع وحده بعدها أوّل واحد برقمه، والاستقبال تستطيع «رجع» قبلها.</small></span>
       </label>
       {value.mode === 'auto' && !String(value.minutes).trim() && (
-        <p className="pf-return-need" role="alert">اكتب عدد الدقائق (من ١ إلى ٢٤٠).</p>
+        <p className="pf-return-need" role="alert">اكتب عدد الدقائق (من 1 إلى 240).</p>
       )}
     </div>
   )

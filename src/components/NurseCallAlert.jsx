@@ -9,7 +9,7 @@ import { playRing, primeOnFirstGesture } from '../doctor-alert.js'
 const POLL_MS = 30000
 const minutesAgo = (iso, now) => Math.max(0, Math.floor((now - Date.parse(iso)) / 60000))
 const ago = (m) => (m < 1 ? 'الآن' : m === 1 ? 'منذ دقيقة' : m === 2 ? 'منذ دقيقتين'
-  : `منذ ${m.toLocaleString('ar-SY')} ${m <= 10 ? 'دقائق' : 'دقيقة'}`)
+  : `منذ ${m.toLocaleString('ar-SY-u-nu-latn')} ${m <= 10 ? 'دقائق' : 'دقيقة'}`)
 
 export default function NurseCallAlert() {
   const [calls, setCalls] = useState([])

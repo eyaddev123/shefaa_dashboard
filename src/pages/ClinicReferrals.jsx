@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useDialogs } from '../dialogs.jsx'
-import { api, todayLocal } from '../api.js'
+import { api, todayLocal, fmtDay } from '../api.js'
 import { useToast } from '../action-feedback.jsx'
 import { useRole } from '../RoleContext.jsx'
 import { canWriteReferralSources } from '../permissions.js'
@@ -45,12 +45,12 @@ export function periodRange(key, today = todayLocal()) {
   return { from: `${today.slice(0, 8)}01`, to: today }
 }
 
-const fmtNum = (n) => Number(n || 0).toLocaleString('ar-SY', { maximumFractionDigits: 2 })
+const fmtNum = (n) => Number(n || 0).toLocaleString('ar-SY-u-nu-latn', { maximumFractionDigits: 2 })
 function Money({ value, className }) {
   return <span className={className}>{fmtNum(value)}<span className="cash-unit">ل.س</span></span>
 }
-const fmtLong = (d) => asDate(d).toLocaleDateString('ar-SY', { day: 'numeric', month: 'long' })
-const fmtWeekday = (d) => asDate(d).toLocaleDateString('ar-SY', { weekday: 'long', day: 'numeric', month: 'long' })
+const fmtLong = (d) => fmtDay(asDate(d), { year: false })
+const fmtWeekday = (d) => fmtDay(asDate(d), { weekday: true, year: false })
 const rangeWords = (from, to) => (from === to ? fmtWeekday(from) : `من ${fmtLong(from)} إلى ${fmtLong(to)}`)
 // «زيارة واحدة» · «زيارتان» · «٣ زيارات» · «١١ زيارة»
 function plural(n, one, two, few, many) {
@@ -81,7 +81,7 @@ export function groupVisits(lines) {
 }
 // «إجراء: بلازما» ⇐ «بلازما» — نوع البند يقوله لونه وعلامته
 const itemName = (l) => (l.kind === 'procedure' ? l.item.replace(/^إجراء:\s*/, '') : l.item)
-const pctText = (l) => (l.discount_type === 'percent' ? `خصم ${fmtNum(l.discount_value)}٪` : 'خصم ثابت')
+const pctText = (l) => (l.discount_type === 'percent' ? `خصم ${fmtNum(l.discount_value)}%` : 'خصم ثابت')
 
 // ═══════ إدارة الجهات (نافذة) ═══════
 function SourcesDialog({ sources, canWrite, onClose, onChanged, showToast }) {
@@ -304,7 +304,7 @@ export default function ClinicReferrals() {
 
       {err ? <p className="error">{err}</p> : !data ? <p className="empty">جارٍ التحميل…</p> : (
         <>
-          {/* ١) كم لنا؟ */}
+          {/* 1) كم لنا؟ */}
           <section className="refx-hero" aria-label="المستحقّ">
             <div className="refx-hero-main">
               <span className="refx-hero-label">المستحقّ لنا على {whom}</span>
@@ -329,7 +329,7 @@ export default function ClinicReferrals() {
             </div>
           </section>
 
-          {/* ٢) على أيّ جهة؟ — حين تكون أكثر من جهة في الفترة */}
+          {/* 2) على أيّ جهة؟ — حين تكون أكثر من جهة في الفترة */}
           {totals.length > 1 && (
             <div className="refx-sources" role="group" aria-label="الجهة">
               <button type="button" aria-pressed={!sourceId} className={`refx-source${!sourceId ? ' is-on' : ''}`}
@@ -356,7 +356,7 @@ export default function ClinicReferrals() {
             </div>
           )}
 
-          {/* ٣) على مَن؟ — كشف الحساب يوماً بيوم */}
+          {/* 3) على مَن؟ — كشف الحساب يوماً بيوم */}
           {scoped.length > 0 && (
             <section className="card refx-list" aria-label="الزيارات">
               <div className="refx-list-head">

@@ -74,20 +74,20 @@ const run = async () => {
   if (!up) { console.error('لم يقلع vite'); process.exit(1) }
   const browser = await chromium.launch()
 
-  console.log('\n── ١) «أعمالي»: الراتب داخل «مستحقّاتي»، وأداة فترةٍ واحدة (doctor-pages-redesign) ──')
+  console.log('\n── 1) «أعمالي»: الراتب داخل «مستحقّاتي»، وأداة فترةٍ واحدة (doctor-pages-redesign) ──')
   {
     const { ctx, page, calls, errors } = await open(browser)
     await page.waitForSelector('.dk-sal-calc')
     const t = await page.textContent('.dk-salary')
-    ok(t.includes('٣٩٠'), '★ الراتب ٣٩٠٬٠٠٠')
-    ok(t.includes('٥ أيام × ٥٠') && t.includes('١٤:٠٠ ساعة × ١٠'), '★ الحساب: يومية × أيام + ساعة × ساعات (الساعات س:دد)')
+    ok(t.includes('390'), '★ الراتب 390,000')
+    ok(t.includes('5 أيام × 50') && t.includes('14:00 ساعة × 10'), '★ الحساب: يومية × أيام + ساعة × ساعات (الساعات س:دد)')
     ok(t.includes('انصراف غير مسجَّل') && t.includes('ساعاتها لا تُحسب'), '★ يوم بلا انصراف يُقال تحت الراتب', t)
     ok(!/حصّة الشفاء|الربح|خسارة|تحاسبه/.test(t), '★ لا حصّة ولا فرق ولا دورة')
     // «قاعدة حصّتي» مطويّة تحت: تُفتح بلمسة
     await page.click('.dk-rule summary')
     await page.waitForSelector('.dk-rule-list li')
     const ruleTxt = await page.textContent('.dk-rule')
-    ok(ruleTxt.includes('٤٠٪') && ruleTxt.includes('خياطة') && /٢٠٬?٠٠٠/.test(ruleTxt), '★ «قاعدة حصّتي»: العامّة والخاصّة', ruleTxt)
+    ok(ruleTxt.includes('40%') && ruleTxt.includes('خياطة') && /20,?000/.test(ruleTxt), '★ «قاعدة حصّتي»: العامّة والخاصّة', ruleTxt)
     ok(await page.locator('.dk-rule :is(input, select, button)').count() === 0, '★ عرضٌ بلا أيّ حقل أو زرّ تعديل')
     ok(!/الشفاء|مستهلك|سعر/.test(ruleTxt), '★ بلا شفاء ولا مستهلكات ولا سعر')
     ok(await page.locator('.dp-period button').count() === 4 && await page.locator('.dk-sal-month').count() === 0,
@@ -128,7 +128,7 @@ const run = async () => {
     await ctx.close()
   }
 
-  console.log('\n── ٢) إضافة اختصاص ──')
+  console.log('\n── 2) إضافة اختصاص ──')
   // بعد استقرار الصفحة: لوحةٌ منهارة تُخفي الزرّ أيضاً، فالحقل نفسه وغياب الأخطاء شرطان للفحص
   const profile = async (role) => {
     const { ctx, page, errors } = await open(browser, { role, path: '/clinic/doctors/1' })
@@ -149,7 +149,7 @@ const run = async () => {
     ok(r.add, '★ المشرفة: الزرّ باقٍ')
   }
 
-  console.log('\n── ٣) معتذر ──')
+  console.log('\n── 3) معتذر ──')
   {
     const { ctx, page } = await open(browser, { path: '/clinic/doctor', sessions: [SESSION({ apologized: true })] })
     await page.waitForSelector('.dk-apology')
@@ -179,7 +179,7 @@ const run = async () => {
     await ctx.close()
   }
 
-  console.log('\n── ٤) العنوان ──')
+  console.log('\n── 4) العنوان ──')
   for (const [role, want] of [['mgr', 'مدير (اطّلاع فقط)'], ['chair', 'المدير المسؤول'], ['brd', 'عضو مجلس الإدارة']]) {
     const { ctx, page } = await open(browser, { role, path: '/' })
     await page.waitForSelector('h2')

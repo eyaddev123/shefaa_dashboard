@@ -50,4 +50,4 @@ export default function useDraft(key, state, applyDraft, isEmpty) {
 }
 
 export const fmtDraftTime = (iso) =>
-  iso ? new Date(iso).toLocaleTimeString('ar-SY', { hour: '2-digit', minute: '2-digit' }) : ''
+  iso ? new Date(iso).toLocaleTimeString('ar-SY-u-nu-latn', { hour: '2-digit', minute: '2-digit' }) : ''

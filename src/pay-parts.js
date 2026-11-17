@@ -16,7 +16,7 @@ const consult = (scope) => scope === 'consultation'
 /** اسم المكوّن: «المرضى» أو «المعاينات» */
 export const patientsLabel = (scope) => (consult(scope) ? 'المعاينات' : 'المرضى')
 
-const fmt = (n) => Number(n || 0).toLocaleString('ar-SY', { maximumFractionDigits: 2 })
+const fmt = (n) => Number(n || 0).toLocaleString('ar-SY-u-nu-latn', { maximumFractionDigits: 2 })
 const countText = (n, one, two, few, many) => (n === 1 ? one : n === 2 ? two : `${fmt(n)} ${n >= 3 && n <= 10 ? few : many}`)
 
 /**

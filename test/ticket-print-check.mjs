@@ -37,7 +37,7 @@ const MM = 96 / 25.4   // بكسل CSS لكل مليمتر عند 96dpi
 const browser = await chromium.launch()
 
 // ═══ ١) منطق العمر ═══
-console.log('\n── ١) العمر من سنة الميلاد ──')
+console.log('\n── 1) العمر من سنة الميلاد ──')
 {
   const page = await browser.newPage()
   await page.addScriptTag({ content: src })
@@ -49,18 +49,18 @@ console.log('\n── ١) العمر من سنة الميلاد ──')
     bogus: ageFrom(1800),
     future: ageFrom(2099, new Date('2026-10-19')),
   }))
-  ok(r.normal === 36, 'سنة ميلاد ١٩٩٠ ⇒ ٣٦ سنة', JSON.stringify(r.normal))
+  ok(r.normal === 36, 'سنة ميلاد 1990 ⇒ 36 سنة', JSON.stringify(r.normal))
   ok(r.unknown === null, 'بلا سنة ⇒ null (يُحذف السطر)')
   ok(r.empty === null, 'نصّ فارغ ⇒ null')
   ok(r.zero === null, 'صفر ⇒ null')
-  ok(r.bogus === null, '١٨٠٠ ⇒ null (خارج المعقول)')
+  ok(r.bogus === null, '1800 ⇒ null (خارج المعقول)')
   ok(r.future === null, 'سنة مستقبلية ⇒ null')
   await page.close()
 }
 
 // ═══ ٢) المحتوى: ما يجب أن يظهر وما يجب ألّا يظهر ═══
 // ═══ ١ب) الرقم المطبوع: رقم الدور عند الحضور في نمط الحضور ═══
-console.log('\n── ١ب) الرقم المطبوع ──')
+console.log('\n── 1ب) الرقم المطبوع ──')
 {
   const page = await browser.newPage()
   await page.addScriptTag({ content: src })
@@ -73,7 +73,7 @@ console.log('\n── ١ب) الرقم المطبوع ──')
     arrivedWhy: ticketNotReady({ queue_number: 3, arrival_number: 13 }, { flow_mode: 'attendance' }),
     slotsWhy: ticketNotReady({ queue_number: 3, arrival_number: null }, { flow_mode: 'slots' }),
   }))
-  ok(r.early.queue_number === null, '★ نمط الحضور ولم يحضر: لا رقم على البطاقة (لا رقم الحجز ٣)', JSON.stringify(r.early))
+  ok(r.early.queue_number === null, '★ نمط الحضور ولم يحضر: لا رقم على البطاقة (لا رقم الحجز 3)', JSON.stringify(r.early))
   ok(/بعد تسجيل الحضور/.test(r.earlyWhy || ''), '★ ticketNotReady يقول السبب لمن لم يحضر', String(r.earlyWhy))
   ok(r.arrivedWhy === null && r.slotsWhy === null, 'الحاضر ونمط الخانات: لا مانع')
   const refused = await page.evaluate(async () => {
@@ -83,14 +83,14 @@ console.log('\n── ١ب) الرقم المطبوع ──')
   })
   ok(refused.res.ok === false && /سجّل الحضور/.test(refused.res.reason || '') && refused.frames === 0,
     '★ printTicket يرفض بطاقة دورٍ بلا رقم ولا يفتح إطار طباعة', JSON.stringify(refused))
-  ok(r.attn.queue_number === 1, '★ نمط الحضور: البطاقة تطبع رقم الدور (١) لا رقم الحجز (١٧)', JSON.stringify(r.attn))
+  ok(r.attn.queue_number === 1, '★ نمط الحضور: البطاقة تطبع رقم الدور (1) لا رقم الحجز (17)', JSON.stringify(r.attn))
   ok(!('estimated_time' in r.attn), '★ ولا وقت تقريبي على البطاقة')
   ok(r.slots.queue_number === 17, 'نمط الخانات: رقم الدور كما كان')
   await page.close()
 }
 
 // ═══ ١ج) الإحالة: البطاقة تحمل ما يدفعه المريض بعد الخصم — بلا كلمة «خصم» ═══
-console.log('\n── ١ج) بطاقة مريضٍ بإحالة ──')
+console.log('\n── 1ج) بطاقة مريضٍ بإحالة ──')
 {
   const page = await browser.newPage()
   await page.addScriptTag({ content: src })
@@ -115,7 +115,7 @@ console.log('\n── ١ج) بطاقة مريضٍ بإحالة ──')
   await page.close()
 }
 
-console.log('\n── ٢) محتوى البطاقة ──')
+console.log('\n── 2) محتوى البطاقة ──')
 {
   const page = await browser.newPage()
   await page.addScriptTag({ content: src })
@@ -130,13 +130,13 @@ console.log('\n── ٢) محتوى البطاقة ──')
   ok(html.includes('>12<'), 'رقم الدور')
   ok(html.includes('عبد الرحمن محمد الخطيب'), 'الاسم الثلاثي')
   ok(html.includes('العمر: 34 سنة'), 'العمر محسوبٌ من سنة الميلاد')
-  ok(html.includes('العيادة 3'), '«العيادة ٣» لا «الغرفة»')
+  ok(html.includes('العيادة 3'), '«العيادة 3» لا «الغرفة»')
   ok(!html.includes('الغرفة'), '★ كلمة «الغرفة» غير موجودة إطلاقاً')
   ok(html.includes('د. سامر الحلبي'), 'اسم الدكتور')
   ok(html.includes('معاينة'), 'نوع الزيارة')
   ok(html.includes('15,000 ل.س'), 'المبلغ للدفع')
   ok(html.includes('2026-10-19') && html.includes('14:30'), 'التاريخ والوقت')
-  ok(html.includes('size: 80mm auto'), '@page بعرض ٨٠مم وطولٍ تلقائي')
+  ok(html.includes('size: 80mm auto'), '@page بعرض 80مم وطولٍ تلقائي')
   ok(html.includes('margin: 0'), 'بلا هوامش')
   // ★ المطلوب صراحةً: لا رمز وصول على هذه البطاقة
   ok(!/رمز الوصول|access_code/.test(html), '★ لا رمز وصول على البطاقة')
@@ -144,7 +144,7 @@ console.log('\n── ٢) محتوى البطاقة ──')
 }
 
 // ═══ ٣) الإجراءات: إعادة الطباعة بعد إضافتها ═══
-console.log('\n── ٣) إعادة الطباعة مع الإجراءات ──')
+console.log('\n── 3) إعادة الطباعة مع الإجراءات ──')
 {
   const page = await browser.newPage()
   await page.addScriptTag({ content: src })
@@ -170,7 +170,7 @@ console.log('\n── ٣) إعادة الطباعة مع الإجراءات ─�
 }
 
 // ═══ ٤) بلا عمر: السطر يُحذف ═══
-console.log('\n── ٤) بيانات ناقصة ──')
+console.log('\n── 4) بيانات ناقصة ──')
 {
   const page = await browser.newPage()
   await page.addScriptTag({ content: src })
@@ -185,7 +185,7 @@ console.log('\n── ٤) بيانات ناقصة ──')
 }
 
 // ═══ ٥) القياس على الورق: لا شيء يُقصّ ═══
-console.log('\n── ٥) القياس على ورقٍ حقيقي ──')
+console.log('\n── 5) القياس على ورقٍ حقيقي ──')
 const CASES = [
   { w: 80, label: 'اسم طويل + إجراءات', data: {
       queue_number: 128, full_name: 'عبد الرحمن عبد اللطيف الشامي الحموي', birth_year: 1975,
@@ -197,12 +197,12 @@ const CASES = [
       queue_number: 3, full_name: 'علي حسن خالد',
       visit_type: 'consultation', fee: 15000, procedures: [],
       doctor_name: 'د. هدى', room: '2' } },
-  { w: 58, label: '٥٨مم + إجراءات', data: {
+  { w: 58, label: '58مم + إجراءات', data: {
       queue_number: 99, full_name: 'عبد الرحمن عبد اللطيف الشامي', birth_year: 1988,
       visit_type: 'consultation', fee: 15000,
       procedures: [{ name: 'تخطيط قلب', price: 25000 }],
       doctor_name: 'د. سامر الحلبي', room: '7' } },
-  { w: 58, label: '٥٨مم قصير', data: {
+  { w: 58, label: '58مم قصير', data: {
       queue_number: 4, full_name: 'علي حسن خالد', birth_year: 2000,
       visit_type: 'consultation', fee: 15000, procedures: [],
       doctor_name: 'د. هدى', room: '1' } },
@@ -242,7 +242,7 @@ for (const c of CASES) {
     m.overflow.length ? JSON.stringify(m.overflow) : '')
   ok(m.bodyW <= Math.round(c.w * MM) + 1, `${tag}: عرض الجسم ≤ عرض الورق`,
     `${m.bodyW} ≤ ${Math.round(c.w * MM)}`)
-  ok(m.cutMm >= 7 && m.cutMm <= 10, `${tag}: فراغ القصّ ٨مم تقريباً`, `${m.cutMm}مم`)
+  ok(m.cutMm >= 7 && m.cutMm <= 10, `${tag}: فراغ القصّ 8مم تقريباً`, `${m.cutMm}مم`)
 
   const file = `${SHOTS}/ticket-${c.w}mm-${CASES.indexOf(c)}.png`
   await page.screenshot({ path: file, fullPage: true })
@@ -276,7 +276,7 @@ for (const c of CASES) {
 }
 
 // ═══ ٥ب) الخطّ Cairo من ملفات التطبيق — ويعمل بلا إنترنت ═══
-console.log('\n── ٥ب) خطّ البطاقة ──')
+console.log('\n── 5ب) خطّ البطاقة ──')
 {
   const page = await browser.newPage()
   // اقطع Google كلّياً: الاستقبال قد يعمل على شبكةٍ محلّية بلا إنترنت
@@ -311,7 +311,7 @@ console.log('\n── ٥ب) خطّ البطاقة ──')
 }
 
 // ═══ ٥د) الاسم الجديد بخطّ Cairo الحقيقيّ: يسع العرض، سطرٌ أو سطران متوازنان ═══
-console.log('\n── ٥د) اسم الجهة واسم النسخة بخطّ Cairo ──')
+console.log('\n── 5د) اسم الجهة واسم النسخة بخطّ Cairo ──')
 for (const w of [80, 58]) {
   const page = await browser.newPage({ viewport: { width: Math.round(w * MM), height: 900 } })
   // ملفّات الخطّ من public/fonts — كما يخدمها التطبيق
@@ -356,7 +356,7 @@ for (const w of [80, 58]) {
 }
 
 // ═══ ٥ج) ارتفاع الصفحة = المحتوى (لا ورق أبيض) ═══
-console.log('\n── ٥ج) الورق لا يزيد عن المحتوى ──')
+console.log('\n── 5ج) الورق لا يزيد عن المحتوى ──')
 {
   const page = await browser.newPage({ viewport: { width: Math.round(80 * MM), height: 900 } })
   await page.addScriptTag({ content: src })
@@ -375,12 +375,12 @@ console.log('\n── ٥ج) الورق لا يزيد عن المحتوى ──'
   ok(new RegExp(`size: 80mm ${r.measured}mm`).test(r.fixedPage),
     `★ بارتفاعٍ مقيس ⇒ @page بطول المحتوى (${r.measured}مم)`, r.fixedPage)
   ok(r.measured > 60 && r.measured < 160,
-    `★ الطول معقول (${r.measured}مم) لا ٢١٠مم ورقةً كاملة`)
+    `★ الطول معقول (${r.measured}مم) لا 210مم ورقةً كاملة`)
   await page.close()
 }
 
 // ═══ ٦) الطباعة لا تُفشل شيئاً ═══
-console.log('\n── ٦) الطباعة لا ترمي أبداً ──')
+console.log('\n── 6) الطباعة لا ترمي أبداً ──')
 {
   const page = await browser.newPage()
   await page.addScriptTag({ content: src })
@@ -412,7 +412,7 @@ console.log('\n── ٦) الطباعة لا ترمي أبداً ──')
 }
 
 // ═══ ٧) إعدادات الجهاز ═══
-console.log('\n── ٧) إعداد الجهاز في localStorage ──')
+console.log('\n── 7) إعداد الجهاز في localStorage ──')
 {
   // localStorage يُرفض على about:blank (بلا أصل) — نستعمل أصلاً حقيقياً
   const page = await browser.newPage()
@@ -433,8 +433,8 @@ console.log('\n── ٧) إعداد الجهاز في localStorage ──')
     return out
   })
   ok(r.default.enabled === false, '★ الافتراض: الجهاز لا يطبع (طابعةٌ واحدة لجهازين)')
-  ok(r.default.width === 80, 'الافتراض ٨٠مم')
-  ok(r.saved.enabled === true && r.saved.width === 58, 'يحفظ ويقرأ ٥٨مم')
+  ok(r.default.width === 80, 'الافتراض 80مم')
+  ok(r.saved.enabled === true && r.saved.width === 58, 'يحفظ ويقرأ 58مم')
   ok(r.corrupt.enabled === false && r.corrupt.width === 80, 'قيمة تالفة ⇒ الافتراضات')
   ok(r.bogus.enabled === false && r.bogus.width === 80, 'قيمة غير منطقية ⇒ الافتراضات')
   await page.close()
@@ -448,4 +448,4 @@ if (failures.length) {
   failures.forEach((f) => console.log(`  ✘ ${f}`))
   process.exit(1)
 }
-console.log('✔ البطاقة تخرج كاملةً على ٨٠مم و٥٨مم، بلا قصٍّ وبلا رمز وصول')
+console.log('✔ البطاقة تخرج كاملةً على 80مم و58مم، بلا قصٍّ وبلا رمز وصول')

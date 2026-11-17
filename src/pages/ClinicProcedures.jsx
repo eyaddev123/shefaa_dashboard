@@ -29,7 +29,7 @@ const TABS = [
 ]
 const SORTS = [['used', 'الأكثر استعمالاً'], ['name', 'أبجدياً'], ['price', 'الأعلى سعراً']]
 
-const fmtNum = (n) => Number(n || 0).toLocaleString('ar-SY', { maximumFractionDigits: 2 })
+const fmtNum = (n) => Number(n || 0).toLocaleString('ar-SY-u-nu-latn', { maximumFractionDigits: 2 })
 const usedText = (n) => (n === 0 ? 'لم يُستعمل' : n === 1 ? 'مرّة واحدة' : n === 2 ? 'مرّتان'
   : `${fmtNum(n)} ${n % 100 >= 3 && n % 100 <= 10 ? 'مرّات' : 'مرّة'}`)
 const specsOf = (p) => (p.is_general || !(p.specialties || []).length ? [] : p.specialties)

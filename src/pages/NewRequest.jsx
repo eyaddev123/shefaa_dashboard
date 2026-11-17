@@ -135,10 +135,10 @@ export default function NewRequest() {
       )}
 
       <form onSubmit={submit}>
-        {/* ١ — بيانات الطلب */}
+        {/* 1 — بيانات الطلب */}
         <div className="card">
           <h3 style={{ justifyContent: 'space-between' }}>
-            ١ · بيانات الطلب
+            1 · بيانات الطلب
             {savedAt && !restored && <span className="draft-saved">يُحفظ تلقائياً ✓ {fmtDraftTime(savedAt)}</span>}
           </h3>
           <div className="inline" style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-end' }}>
@@ -161,9 +161,9 @@ export default function NewRequest() {
           </div>
         </div>
 
-        {/* ٢ — المستفيدون */}
+        {/* 2 — المستفيدون */}
         <div className="card">
-          <h3>٢ · المستفيدون — فرد أو أكثر</h3>
+          <h3>2 · المستفيدون — فرد أو أكثر</h3>
           {!familyId && <p className="empty">اختر العائلة أولاً لعرض أفرادها</p>}
           {familyId && members.length === 0 && <p className="empty">لا أفراد مسجّلين على هذا الملف</p>}
           {members.length > 0 && (
@@ -186,9 +186,9 @@ export default function NewRequest() {
           )}
         </div>
 
-        {/* ٣ — الكلفة المتوقعة */}
+        {/* 3 — الكلفة المتوقعة */}
         <div className="card">
-          <h3>٣ · الكلفة المتوقعة — من كتالوج الأسعار الطبية <span style={{ fontWeight: 500, fontSize: 12, color: 'var(--muted)' }}>(اختياري لكنه أساس حسابات الخزينة)</span></h3>
+          <h3>3 · الكلفة المتوقعة — من كتالوج الأسعار الطبية <span style={{ fontWeight: 500, fontSize: 12, color: 'var(--muted)' }}>(اختياري لكنه أساس حسابات الخزينة)</span></h3>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'flex-end' }}>
             <div className="field">
               <label>المرض</label>
@@ -222,9 +222,9 @@ export default function NewRequest() {
           </div>
         </div>
 
-        {/* ٤ — المرفقات */}
+        {/* 4 — المرفقات */}
         <div className="card">
-          <h3>٤ · المرفقات — تقارير طبية، وصفات، فواتير</h3>
+          <h3>4 · المرفقات — تقارير طبية، وصفات، فواتير</h3>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
             <button type="button" className="ghost" style={{ padding: '8px 16px', fontSize: 13 }}
                     onClick={() => fileInput.current?.click()}>

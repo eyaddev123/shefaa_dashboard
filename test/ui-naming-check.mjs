@@ -15,7 +15,7 @@ const check = (label, ok, info = '') => {
   if (ok) { pass++; console.log(`  ✔ ${label}`) } else { fail++; console.log(`  ✘ ${label}${info ? `\n     ${info}` : ''}`) }
 }
 
-console.log('── ١) لا «طابور» في النصوص الظاهرة ──')
+console.log('── 1) لا «طابور» في النصوص الظاهرة ──')
 const walk = (d) => readdirSync(d).flatMap((f) => {
   const p = join(d, f)
   return statSync(p).isDirectory() ? walk(p) : /\.(jsx?|html)$/.test(f) ? [p] : []
@@ -33,7 +33,7 @@ for (const f of [...walk(join(root, 'src')), join(root, 'index.html')]) {
 }
 check('لا نصّ ظاهر فيه «طابور»', hits.length === 0, hits.join('\n     '))
 
-console.log('\n── ٢) شارة رقم العيادة ──')
+console.log('\n── 2) شارة رقم العيادة ──')
 // JSX → JS بـ esbuild (يأتي مع vite) ثمّ تُرسم بـ react-dom/server — بلا متصفّح
 const require = createRequire(join(root, 'package.json'))
 const { transformSync } = require('esbuild')
@@ -49,7 +49,7 @@ try {
   const RoomBadge = require(file).default
   const html = (props) => renderToStaticMarkup(React.createElement(RoomBadge, props))
 
-  check('غرفة ٣ ⇒ «العيادة 3» خضراء', html({ room: '3' }) === '<span class="room-badge">العيادة 3</span>', html({ room: '3' }))
+  check('غرفة 3 ⇒ «العيادة 3» خضراء', html({ room: '3' }) === '<span class="room-badge">العيادة 3</span>', html({ room: '3' }))
   check('الحجم الكبير في رأس الصفحة', html({ room: '3', size: 'lg' }).includes('class="room-badge lg"'))
   check('الرقم كما في المصدر (doctors.room) بلا تحويل', html({ room: '12' }).includes('12'))
   for (const v of [null, undefined, '', '   '])
@@ -58,7 +58,7 @@ try {
   check('الكبير بلا غرفة يبقى تحذيرياً', html({ room: null, size: 'lg' }).includes('class="room-badge lg none"'))
 } finally { rmSync(tmp, { recursive: true, force: true }) }
 
-console.log('\n── ٣) مواضع الشارة ──')
+console.log('\n── 3) مواضع الشارة ──')
 const sq = readFileSync(join(root, 'src/pages/SessionQueue.jsx'), 'utf8')
 check('رأس صفحة الدور: الشارة الكبيرة بجانب الاسم، والرأس ثابت',
   /<h2 className="queue-head">دور \{data\.doctor_name\}<RoomBadge room=\{data\.room\} size="lg" \/>/.test(sq))

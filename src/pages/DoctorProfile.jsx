@@ -84,7 +84,7 @@ function ProfileForm({ doctor, globalBuffer, onSaved, readOnly = false }) {
             {/* رقم الغرفة يظهر ويُنطَق على شاشة الصالة، ويُشتقّ منه اسم المقطع الصوتي
                 (room-3.mp3) — الخادم يطبّع الأرقام العربية والمسافات (AUDIO.md) */}
             <div className="field"><label>الغرفة</label><input value={form.room} onChange={set('room')} placeholder="مثال: 3" />
-              <small className="hint">بالأرقام اللاتينية (3 لا ٣) — يُنطق على شاشة النداء</small></div>
+              <small className="hint">يُنطق على شاشة النداء</small></div>
           </div>
         </div>
 
@@ -222,7 +222,7 @@ function changeText(h) {
   if (h.field === 'room') return `الغرفة: ${roomLabel(h.old_value)} ← ${roomLabel(h.new_value)}`
   if (h.field === 'schedule') return scheduleEditText(h)
   if (h.field === 'return_after_minutes') {
-    const mode = (v) => (v == null || v === '' ? 'بإخبار الاستقبال' : `تلقائياً بعد ${Number(v).toLocaleString('ar-SY')} د`)
+    const mode = (v) => (v == null || v === '' ? 'بإخبار الاستقبال' : `تلقائياً بعد ${Number(v).toLocaleString('ar-SY-u-nu-latn')} د`)
     return `الخروج المؤقت: ${mode(h.old_value)} ← ${mode(h.new_value)}`
   }
   if (h.field === 'appointments_based')
@@ -322,7 +322,7 @@ export default function DoctorProfile() {
               {doctor.appointments_based && <span className="badge">بمواعيد خاصة</span>}
               {doctor.return_after_minutes != null && (
                 <span className="badge" title="الخروج المؤقت يرجع على الدور تلقائياً">
-                  خروج مؤقت: {Number(doctor.return_after_minutes).toLocaleString('ar-SY')} د</span>
+                  خروج مؤقت: {Number(doctor.return_after_minutes).toLocaleString('ar-SY-u-nu-latn')} د</span>
               )}
               {doctor.accepts_urgent === false && <span className="badge">لا يقبل الإسعافي</span>}
             </div>

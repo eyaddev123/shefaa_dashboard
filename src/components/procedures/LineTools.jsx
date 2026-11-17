@@ -10,7 +10,7 @@ import MaterialsEditor, { qtyValid, toPayload, fmtQty } from '../MaterialsEditor
 //   LineHistory  — أثر السطر: كلّ تصحيحٍ بفاعله وأرقامه قبل وبعد
 // المنطق كلّه في الخادم كما كان؛ هنا العرض والطلب وحدهما.
 
-const fmtNum = (n) => Number(n || 0).toLocaleString('ar-SY', { maximumFractionDigits: 2 })
+const fmtNum = (n) => Number(n || 0).toLocaleString('ar-SY-u-nu-latn', { maximumFractionDigits: 2 })
 
 export function useUnpaid(onError) {
   const [data, setData] = useState(null)

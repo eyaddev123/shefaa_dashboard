@@ -97,6 +97,6 @@ export const draftDiscount = (f, amounts) => {
 
 // «50٪» / «30,000 ل.س ثابت» — بأرقام الواجهة نفسها (ar-SY كـ fmtMoney)
 export const amountText = (r) => r.discount_type === 'percent'
-  ? `${Number(r.discount_value).toLocaleString('ar-SY')}٪`
-  : `${Number(r.discount_value).toLocaleString('ar-SY')} ل.س ثابت`
+  ? `${Number(r.discount_value).toLocaleString('ar-SY-u-nu-latn')}%`
+  : `${Number(r.discount_value).toLocaleString('ar-SY-u-nu-latn')} ل.س ثابت`
 export const referralSummary = (r) => [amountText(r), DISCOUNT_SCOPES[r.discount_scope]].join(' · ')

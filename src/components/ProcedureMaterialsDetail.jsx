@@ -4,8 +4,8 @@
 // لغيرها أصلاً (hasPurchaseDetail).
 // مادةٌ بلا سعر شراء، أو صُرفت قبل تفعيل التفصيل، أو المستهلكات: «—» وخارج الكلفة والربح.
 
-const fmt = (n) => Number(n || 0).toLocaleString('ar-SY', { maximumFractionDigits: 2 })
-const qty = (q) => Number(q).toLocaleString('ar-SY', { maximumFractionDigits: 2 })
+const fmt = (n) => Number(n || 0).toLocaleString('ar-SY-u-nu-latn', { maximumFractionDigits: 2 })
+const qty = (q) => Number(q).toLocaleString('ar-SY-u-nu-latn', { maximumFractionDigits: 2 })
 const has = (v) => v !== null && v !== undefined
 
 // شكلان من الخادم: المراجعة (snake_case) والمستحقات (camelCase) — يُوحَّدان هنا

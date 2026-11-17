@@ -10,8 +10,8 @@ export function ruleText(r) {
   if (!r) return 'بلا'
   const kind = r.kind ?? r.share_kind
   const value = Number(r.value ?? r.share_value)
-  if (kind === 'percent' && value === 0) return '0٪ — كامل المبلغ للشفاء'
-  return kind === 'percent' ? `${value}٪ بعد المواد` : `مبلغ ثابت ${fmtMoney(value)}`
+  if (kind === 'percent' && value === 0) return '0% — كامل المبلغ للشفاء'
+  return kind === 'percent' ? `${value}% بعد المواد` : `مبلغ ثابت ${fmtMoney(value)}`
 }
 
 // لا حصّة سالبة: المبلغ الثابت فوق الباقي يُسقَّف به (يطابق FIXED_ABOVE_PRICE_WARNING في الخادم)
@@ -27,21 +27,21 @@ export function checkRule(kind, raw, price) {
   if (/^-\s*\d/.test(t)) return { error: `${label}: لا يُقبل رقمٌ سالب — أدخل صفراً أو أكثر`, warning: null, value: null }
   if (!/^\d+(\.\d{1,2})?$/.test(t)) return { error: `${label}: أدخل رقماً (خانتان عشريتان على الأكثر)`, warning: null, value: null }
   const value = Number(t)
-  if (kind === 'percent' && value > 100) return { error: 'النسبة: بين ٠ و١٠٠ — لا تتجاوز ١٠٠٪', warning: null, value: null }
+  if (kind === 'percent' && value > 100) return { error: 'النسبة: بين 0 و100 — لا تتجاوز 100%', warning: null, value: null }
   const warning = kind === 'fixed' && price != null && value > Number(price) ? FIXED_ABOVE_PRICE : null
   return { error: null, warning, value }
 }
 
 /** ما يقوله «الحذف» عن مصير الدكتور: نسبته العامّة، أو صفر إن لم تكن */
 export function afterDeleteText(doctor) {
-  if (doctor.share_kind === 'percent') return `بعد الحذف سيُحسب له حسب النسبة العامّة ${Number(doctor.share_value)}٪`
+  if (doctor.share_kind === 'percent') return `بعد الحذف سيُحسب له حسب النسبة العامّة ${Number(doctor.share_value)}%`
   if (doctor.share_kind === 'fixed') return `بعد الحذف سيُحسب له حسب قاعدته العامّة: مبلغ ثابت ${fmtMoney(doctor.share_value)}`
   return 'بعد الحذف لن يُقبل إجراءٌ من هذا النوع له — لا نسبة عامّة له'
 }
 
 /** ما يقوله «الإيقاف» عن مصير الإجراءات القادمة — كالحذف، والقاعدة تبقى محفوظة */
 export function afterPauseText(doctor) {
-  if (doctor.share_kind === 'percent') return `الإجراءات القادمة تُحسب بالنسبة العامّة ${Number(doctor.share_value)}٪`
+  if (doctor.share_kind === 'percent') return `الإجراءات القادمة تُحسب بالنسبة العامّة ${Number(doctor.share_value)}%`
   if (doctor.share_kind === 'fixed') return `الإجراءات القادمة تُحسب بقاعدته العامّة: مبلغ ثابت ${fmtMoney(doctor.share_value)}`
   return '⚠ لا نسبة عامّة له: لن يُقبل له إجراءٌ قاعدته موقوفة حتى تُضبط النسبة'
 }
@@ -51,7 +51,7 @@ export function afterPauseText(doctor) {
 export const doctorsCount = (n) => (n === 1 ? 'دكتور واحد' : n === 2 ? 'دكتورَين'
   : n <= 10 ? `${n} دكاترة` : `${n} دكتوراً`)
 const pct = (r) => (!r ? 'بلا نسبة' : r.kind === 'percent'
-  ? (Number(r.value) === 0 ? '0٪ (كامل المبلغ للشفاء)' : `${r.value}٪`) : `مبلغ ثابت ${fmtMoney(r.value)} (قديمة)`)
+  ? (Number(r.value) === 0 ? '0% (كامل المبلغ للشفاء)' : `${r.value}%`) : `مبلغ ثابت ${fmtMoney(r.value)} (قديمة)`)
 
 /** @param {'procedure'|'doctor'} side */
 export function pricingText(h, side) {

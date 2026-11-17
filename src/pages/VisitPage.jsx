@@ -125,13 +125,13 @@ function ReprintButton({ appt, session, onToast }) {
     // كم نسخة؟ واحدة افتراضاً — الإعادة غالباً بطاقةٌ ضاعت من المريض
     const answer = await dlg.prompt({
       title: 'طباعة البطاقة',
-      body: `كم نسخة؟ (من ١ إلى ${MAX_COPIES.toLocaleString('ar-SY')})`,
+      body: `كم نسخة؟ (من 1 إلى ${MAX_COPIES.toLocaleString('ar-SY-u-nu-latn')})`,
       defaultValue: '1', confirmLabel: 'طباعة', required: true,
     })
     if (answer == null) return
     const copies = Math.round(Number(toLatinDigits(answer)))
     if (!Number.isInteger(copies) || copies < 1 || copies > MAX_COPIES) {
-      onToast(`عدد النسخ بين ١ و${MAX_COPIES.toLocaleString('ar-SY')}`)
+      onToast(`عدد النسخ بين 1 و${MAX_COPIES.toLocaleString('ar-SY-u-nu-latn')}`)
       return
     }
     setReprinting(true)

@@ -27,7 +27,7 @@ export default function MySettingsPage() {
       const now = returnModeOf(r.return_after_minutes)
       setValue(now); setSaved(now)
       showToast(r.return_after_minutes == null ? 'حُفظ: الخروج المؤقت لحين ما تخبّر الاستقبال'
-        : `حُفظ: يرجع على الدور تلقائياً بعد ${Number(r.return_after_minutes).toLocaleString('ar-SY')} دقيقة`, 'success', 4000)
+        : `حُفظ: يرجع على الدور تلقائياً بعد ${Number(r.return_after_minutes).toLocaleString('ar-SY-u-nu-latn')} دقيقة`, 'success', 4000)
     } catch (ex) { setErr(ex.message) } finally { setBusy(false) }
   }
   return (

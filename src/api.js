@@ -633,7 +633,7 @@ export const STATUSES = {
 
 export const DECISION_TYPES = {
   full_approval: 'موافقة كاملة',
-  percentage: 'موافقة بنسبة ٪',
+  percentage: 'موافقة بنسبة %',
   fixed_amount: 'مبلغ مقطوع',
   exemption: 'إعفاء',
   rejected: 'رفض',
@@ -777,15 +777,46 @@ export const committedFromDecision = (decisionType, decisionValue, expectedCost)
   return 0
 }
 
+// ═══ الأرقام في كل النظام لاتينية (قرار المستخدم 2026-11-16) ═══
+// العرض: ar-SY بنظام أرقام latn — فاصل الآلاف «,» والعشري «.»، والكلمات (ص/م، أسماء الأيام) عربية.
+// والتاريخ رقميّ كلّه يوم/شهر/سنة «16/11/2026» — بلا أسماء أشهر.
+// والإدخال: كلّ خانة تُحوِّل ٠-٩ و۰-۹ لحظة الكتابة (latin-input.js)، والخادم يطبّع الطلبات أيضاً.
+export const NUM_LOCALE = 'ar-SY-u-nu-latn'
+
 export const fmtMoney = (n) =>
-  n == null ? '—' : Number(n).toLocaleString('ar-SY') + ' ل.س'
+  n == null ? '—' : Number(n).toLocaleString(NUM_LOCALE) + ' ل.س'
 
-export const fmtDate = (d) =>
-  d ? new Date(d).toLocaleDateString('ar-SY', { year: 'numeric', month: 'long', day: 'numeric' }) : '—'
+/**
+ * تاريخٌ رقميّ: «16/11/2026».
+ * weekday: يسبقه اسم اليوم «الاثنين 16/11/2026»؛ year:false ⇒ «16/11»؛
+ * utc: لتاريخٍ بلا وقت مبنيٍّ بـ Z (YYYY-MM-DDT12:00:00Z) كي لا يقفز يوماً.
+ */
+export function fmtDay(d, { weekday = false, year = true, utc = false } = {}) {
+  if (d == null || d === '') return '—'
+  const x = d instanceof Date ? d : new Date(d)
+  if (Number.isNaN(x.getTime())) return '—'
+  const [dd, mm, yy] = utc
+    ? [x.getUTCDate(), x.getUTCMonth() + 1, x.getUTCFullYear()]
+    : [x.getDate(), x.getMonth() + 1, x.getFullYear()]
+  const s = year ? `${dd}/${mm}/${yy}` : `${dd}/${mm}`
+  if (!weekday) return s
+  return `${x.toLocaleDateString(NUM_LOCALE, utc ? { weekday: 'long', timeZone: 'UTC' } : { weekday: 'long' })} ${s}`
+}
+// شهرٌ وسنة: «11/2026» — m إمّا Date أو «YYYY-MM»
+export const fmtMonth = (m) => {
+  if (!m) return '—'
+  const t = /^(\d{4})-(\d{2})/.exec(String(m))
+  if (t) return `${Number(t[2])}/${t[1]}`
+  const x = new Date(m)
+  return Number.isNaN(x.getTime()) ? '—' : `${x.getMonth() + 1}/${x.getFullYear()}`
+}
+export const fmtClock = (d) =>
+  (d ? new Date(d).toLocaleTimeString(NUM_LOCALE, { hour: '2-digit', minute: '2-digit' }) : '')
 
-// تاريخ ووقت — لسجل التعديلات (متى غُيّر الحقل بالضبط)
-export const fmtDateTime = (d) =>
-  d ? new Date(d).toLocaleString('ar-SY', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'
+export const fmtDate = (d) => (d ? fmtDay(d) : '—')
+
+// تاريخ ووقت — لسجل التعديلات (متى غُيّر الحقل بالضبط): «16/11/2026 10:05 ص»
+export const fmtDateTime = (d) => (d ? `${fmtDay(d)} ${fmtClock(d)}` : '—')
 
 // ═══ بثّ الموظفين: «تغيّر شيءٌ في جلسة كذا» ═══
 // يفتح /api/clinic/events ويستدعي onEvent(name, data) لكل حدث. بـ fetch لا EventSource:

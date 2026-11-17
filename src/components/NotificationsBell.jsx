@@ -41,7 +41,7 @@ export default function NotificationsBell() {
       <button type="button" className="notif-btn" onClick={() => { setOpen(true); load() }}
         aria-label={`الإشعارات${data.unread ? ` — ${data.unread} غير مقروء` : ''}`}>
         الإشعارات
-        {data.unread > 0 && <span className="notif-count">{data.unread.toLocaleString('ar-SY')}</span>}
+        {data.unread > 0 && <span className="notif-count">{data.unread.toLocaleString('ar-SY-u-nu-latn')}</span>}
       </button>
       {open && (
         <div className="modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) setOpen(false) }}>

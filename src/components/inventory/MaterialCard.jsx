@@ -120,7 +120,7 @@ function Story({ material, refreshKey, canWrite, onPurchase }) {
       </ol>
       {more && (
         <button type="button" className="ghost invx-older" onClick={() => setPages((p) => p + 1)}>
-          عرض الأقدم ({(moves.total - moves.rows.length).toLocaleString('ar-SY')} حركة كمان)
+          عرض الأقدم ({(moves.total - moves.rows.length).toLocaleString('ar-SY-u-nu-latn')} حركة كمان)
         </button>
       )}
     </>
@@ -193,7 +193,7 @@ export default function MaterialCard({ id, refreshKey, canWrite, onBack, onPurch
             warn={m.selling_at_loss ? 'عم تنباع بأقلّ من سعر شرائها' : null}
             action={write ? 'تغيير السعر' : null} onAction={() => onEditPrice(m)} />
         )}
-        {/* المتوسّط المرجّح قد يكون بكسور (١٩٧٫١٤): يُعرض مقرّباً بكلمة «حوالي» كي لا يبدو خطأً */}
+        {/* المتوسّط المرجّح قد يكون بكسور (197٫14): يُعرض مقرّباً بكلمة «حوالي» كي لا يبدو خطأً */}
         <Tile label="سعر الشراء (للواحدة)"
           value={m.purchase_price === null ? <span className="invx-tile-none">ما انكتب</span>
             : costText(m.purchase_price)}

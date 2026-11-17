@@ -13,7 +13,7 @@ import { PATIENT_SCOPES, PAY_PARTS, partsTitle, patientsLabel, ratesText } from 
 const CYCLES = [['daily', 'يومي'], ['monthly', 'شهري']]
 const cycleText = (c) => (c === 'daily' ? 'يومي' : c === 'monthly' ? 'شهري' : null)
 const EXAMPLE = { patients: 20, days: 4, minutes: 12 * 60 }
-const EXAMPLE_QTY = { patients: '٢٠ مريضاً', days: '٤ أيام', hours: '١٢ ساعة' }
+const EXAMPLE_QTY = { patients: '20 مريضاً', days: '4 أيام', hours: '12 ساعة' }
 const SCOPE_NOTE = {
   all: 'كل المرضى: كلّ زيارةٍ انتهت في الفترة — معاينة ومراجعة و«إجراء فقط».',
   consultation: 'المعاينات فقط: لا تُعدّ المراجعات ولا زيارات «إجراء فقط».',
@@ -166,7 +166,7 @@ export default function DoctorPayCard({ doctorId, canEdit, showToast }) {
                     ))}
                   </div>
                   <div className="pay-example">
-                    مثلاً {chosen.map((p) => (p.key === 'patients' && scope === 'consultation' ? '٢٠ معاينة' : EXAMPLE_QTY[p.key])).join(' و')} ⇐ <strong>{fmtMoney(example)}</strong>
+                    مثلاً {chosen.map((p) => (p.key === 'patients' && scope === 'consultation' ? '20 معاينة' : EXAMPLE_QTY[p.key])).join(' و')} ⇐ <strong>{fmtMoney(example)}</strong>
                   </div>
                 </>
               )}

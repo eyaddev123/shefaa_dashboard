@@ -17,26 +17,26 @@ export const AppointmentsBadge = () => (
   <span className="badge blue sm" title="يعطي مرضاه مواعيد بنفسه — لا يُحسب عليه تأخير ولا يدخل نسبة الالتزام">
     {APPOINTMENTS_LABEL}</span>
 )
-const fmtInt = (n) => Number(n || 0).toLocaleString('ar-SY')
+const fmtInt = (n) => Number(n || 0).toLocaleString('ar-SY-u-nu-latn')
 // السماح من الخادم (LATE_GRACE_MINUTES): «١٥ دقيقة»، «١٠ دقائق»
-export const fmtMinutes = (n) => `${Number(n).toLocaleString('ar-SY')} ${n >= 3 && n <= 10 ? 'دقائق' : 'دقيقة'}`
+export const fmtMinutes = (n) => `${Number(n).toLocaleString('ar-SY-u-nu-latn')} ${n >= 3 && n <= 10 ? 'دقائق' : 'دقيقة'}`
 // مدّة الدوام: «٣ س ١٥ د» · «٤٥ د» — للانصراف والساعات
 export const fmtDuration = (m) => {
   const h = Math.floor((m || 0) / 60), r = (m || 0) % 60
-  const n = (x) => Number(x).toLocaleString('ar-SY')
+  const n = (x) => Number(x).toLocaleString('ar-SY-u-nu-latn')
   return h ? `${n(h)} س${r ? ` ${n(r)} د` : ''}` : `${n(r)} د`
 }
 // ساعات العمل ساعةً:دقيقة — «١٤:٤٢» = ١٤ ساعة و٤٢ دقيقة (قرار المستخدم: لا كسر عشريّ ١٤٫٧).
 // الأرقام الهندية والنقطتان تبقى بترتيبها داخل النصّ العربي (رقمٌ عربيّ مفصولٌ بفاصلٍ مشترك).
 export const fmtClock = (m) => {
   const t = Math.max(0, Math.round(m || 0)), h = Math.floor(t / 60), r = t % 60
-  return `${h.toLocaleString('ar-SY')}:${r.toLocaleString('ar-SY', { minimumIntegerDigits: 2 })}`
+  return `${h.toLocaleString('ar-SY-u-nu-latn')}:${r.toLocaleString('ar-SY-u-nu-latn', { minimumIntegerDigits: 2 })}`
 }
 export const clockTitle = (m) => {
   const t = Math.max(0, Math.round(m || 0)), h = Math.floor(t / 60), r = t % 60
-  return `${h.toLocaleString('ar-SY')} ساعة${r ? ` و${r.toLocaleString('ar-SY')} دقيقة` : ''}`
+  return `${h.toLocaleString('ar-SY-u-nu-latn')} ساعة${r ? ` و${r.toLocaleString('ar-SY-u-nu-latn')} دقيقة` : ''}`
 }
-export const fmtPct = (c) => (c === null || c === undefined ? '—' : `${Math.round(c * 100).toLocaleString('ar-SY')}٪`)
+export const fmtPct = (c) => (c === null || c === undefined ? '—' : `${Math.round(c * 100).toLocaleString('ar-SY-u-nu-latn')}%`)
 const minutes = (n) => `${fmtInt(n)} د`
 
 /** بطاقات الالتزام: أيام الدوام / حضر / غاب، النسبة، متوسّط التأخير */
@@ -121,7 +121,7 @@ export function DutyCalendar({ from, to, days, apologies = [] }) {
             <div key={ymd} role="gridcell" title={title}
               className={`pn-cell${out ? ' is-out' : ''}${apologized ? ' is-apology' : d ? ` is-${d.status}` : ''}`}
               aria-label={title ? `${ymd}: ${title}` : ymd}>
-              <span className="pn-cell-n">{dayN.toLocaleString('ar-SY')}</span>
+              <span className="pn-cell-n">{dayN.toLocaleString('ar-SY-u-nu-latn')}</span>
               {tag ? <span className="pn-cell-tag">{tag}</span>
                 : dayN === 1 && !out && <span className="pn-cell-m">{MONTHS[Number(ymd.slice(5, 7)) - 1]}</span>}
               {d?.status === 'estimated' && <span className="pn-cell-mark" aria-hidden="true">≈</span>}
@@ -150,7 +150,7 @@ const LOG_KINDS = [
   ['apology', 'اعتذر'], ['absent', 'غاب'], ['late', 'تأخّر'], ['on_time', 'بالوقت'],
   ['estimated', 'تقديري'], ['appointments', APPOINTMENTS_LABEL], ['pending', 'لم يُحسم'],
 ]
-const longDay = (ymd) => new Date(`${ymd}T12:00:00Z`).toLocaleDateString('ar-SY', { weekday: 'long', timeZone: 'UTC' })
+const longDay = (ymd) => new Date(`${ymd}T12:00:00Z`).toLocaleDateString('ar-SY-u-nu-latn', { weekday: 'long', timeZone: 'UTC' })
 const T = ({ v }) => <bdi dir="ltr" className="pn-log-t">{v}</bdi>
 
 function LogDetail({ e }) {
@@ -194,7 +194,7 @@ export function AttendanceLog({ days, apologies = [], today }) {
         {shown.map((e) => (
           <li key={`${e.date}-${e.status}`} className={`pn-log-row is-${e.status}`}>
             <div className="pn-log-date">
-              <strong>{Number(e.date.slice(8)).toLocaleString('ar-SY')}</strong>
+              <strong>{Number(e.date.slice(8)).toLocaleString('ar-SY-u-nu-latn')}</strong>
               <span>{MONTHS[Number(e.date.slice(5, 7)) - 1]}</span>
               <span>{longDay(e.date)}</span>
             </div>

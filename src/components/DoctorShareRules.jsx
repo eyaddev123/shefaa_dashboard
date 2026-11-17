@@ -47,13 +47,13 @@ export default function DoctorShareRules({ doctor, canEdit, onSaved, showToast }
   const saveGeneral = async () => {
     const t = value.trim()
     if (t !== '' && (!/^\d+(\.\d{1,2})?$/.test(t) || Number(t) > 100)) {
-      setMsg({ text: /^-/.test(t) ? 'النسبة العامّة: لا يُقبل رقمٌ سالب' : 'النسبة العامّة: رقمٌ بين ٠ و١٠٠' }); return
+      setMsg({ text: /^-/.test(t) ? 'النسبة العامّة: لا يُقبل رقمٌ سالب' : 'النسبة العامّة: رقمٌ بين 0 و100' }); return
     }
     setBusy(true); setMsg(null)
     try {
       await api.clinic.setDoctorShare(doctor.id, t === '' ? { share_kind: null } : { share_kind: 'percent', share_value: t })
       notify(t === '' ? 'أُزيلت النسبة العامّة — لا يُضاف له إجراءٌ بلا حالةٍ خاصّة حتى تُضبط'
-        : Number(t) === 0 ? 'حُفظت النسبة العامّة 0٪ — كامل مبلغ إجراءاته للشفاء' : `حُفظت النسبة العامّة ${t}٪`)
+        : Number(t) === 0 ? 'حُفظت النسبة العامّة 0% — كامل مبلغ إجراءاته للشفاء' : `حُفظت النسبة العامّة ${t}%`)
       if (onSaved) onSaved()
     } catch (e) { setMsg({ text: e.message }) }
     finally { setBusy(false) }
@@ -112,8 +112,8 @@ export default function DoctorShareRules({ doctor, canEdit, onSaved, showToast }
   const pausedN = (rules || []).filter((r) => r.paused_at).length
   const activeN = (rules || []).length - pausedN
   const generalText = !doctor.share_kind ? null
-    : doctor.share_kind === 'percent' ? (Number(doctor.share_value) === 0 ? '0٪ — كامل المبلغ للشفاء'
-      : `${Number(doctor.share_value)}٪ بعد خصم المواد والمستهلكات`)
+    : doctor.share_kind === 'percent' ? (Number(doctor.share_value) === 0 ? '0% — كامل المبلغ للشفاء'
+      : `${Number(doctor.share_value)}% بعد خصم المواد والمستهلكات`)
     : `مبلغ ثابت ${fmtMoney(doctor.share_value)} (قاعدة قديمة)`
 
   return (
@@ -123,12 +123,12 @@ export default function DoctorShareRules({ doctor, canEdit, onSaved, showToast }
         النسبة تُحسب <strong>بعد خصم المواد والمستهلكات</strong>: (السعر − المواد − المستهلكات) × النسبة،
         وتُقرَّب حصّة الدكتور <strong>لفوق لأقرب 50</strong> بما لا يتجاوز الباقي. والمبلغ الثابت لا يُقرَّب.
         والشفاء تأخذ الباقي. <strong>بلا قاعدة لا يُضاف للدكتور إجراء</strong> — ولمن مبلغ إجراءاته كلّه للشفاء
-        سجّلوا نسبة 0٪. تغيير القواعد يسري على الإجراءات القادمة وحدها.
+        سجّلوا نسبة 0%. تغيير القواعد يسري على الإجراءات القادمة وحدها.
       </p>
 
       {!doctor.share_kind && (
         <p className="share-warn">⚠ لا نسبة عامّة لهذا الدكتور — <strong>لا يُقبل له إجراءٌ</strong> إلا ما له حالةٌ خاصّة أدناه.
-          اضبطوا نسبته (أو 0٪ إن كان مبلغ إجراءاته كلّه للشفاء).</p>
+          اضبطوا نسبته (أو 0% إن كان مبلغ إجراءاته كلّه للشفاء).</p>
       )}
       {legacyFixed && (
         <p className="share-warn">قاعدته العامّة مبلغٌ ثابت من التصميم السابق ({fmtMoney(doctor.share_value)}) —
@@ -138,11 +138,11 @@ export default function DoctorShareRules({ doctor, canEdit, onSaved, showToast }
       {canEdit ? (
         <div className="share-general">
           <div className="field">
-            <label htmlFor={`gen-share-${doctor.id}`}>النسبة العامّة لكل إجراءاته ٪</label>
+            <label htmlFor={`gen-share-${doctor.id}`}>النسبة العامّة لكل إجراءاته %</label>
             <input id={`gen-share-${doctor.id}`} value={value} inputMode="decimal" placeholder="مثلاً 50"
               onChange={(e) => setValue(toLatinDigits(e.target.value))} />
           </div>
-          {value.trim() !== '' && Number(value) === 0 && <span className="muted">0٪ — كامل المبلغ للشفاء</span>}
+          {value.trim() !== '' && Number(value) === 0 && <span className="muted">0% — كامل المبلغ للشفاء</span>}
           <button type="button" disabled={busy || value.trim() === generalOf(doctor)} onClick={saveGeneral}>حفظ النسبة</button>
         </div>
       ) : (

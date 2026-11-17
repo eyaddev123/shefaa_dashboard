@@ -573,13 +573,13 @@ export function ImportDialog({ onClose, onDone, showToast }) {
           <p className="inv-modal-sub">{file?.name} — معاينة فقط، لم يُكتب شيء بعد.</p>
           <div className="inv-imp-summary">
             <span className="badge good">{materialsCount(s.new)} جديدة</span>
-            {s.consumable > 0 && <span className="badge good">{s.consumable.toLocaleString('ar-SY')} استهلاكية</span>}
+            {s.consumable > 0 && <span className="badge good">{s.consumable.toLocaleString('ar-SY-u-nu-latn')} استهلاكية</span>}
             {preview.as_opening
-              ? <span className="badge blue">{s.opening.toLocaleString('ar-SY')} رصيد على موجودة</span>
-              : <span className="badge blue">{s.purchase.toLocaleString('ar-SY')} شراء على موجودة</span>}
-            {s.skipped > 0 && <span className="badge">{s.skipped.toLocaleString('ar-SY')} تخطٍّ</span>}
-            <span className={`badge${s.rejected ? ' bad' : ''}`}>{s.rejected.toLocaleString('ar-SY')} مرفوضة</span>
-            {s.new_units > 0 && <span className="inv-muted">· {s.new_units.toLocaleString('ar-SY')} وحدة جديدة</span>}
+              ? <span className="badge blue">{s.opening.toLocaleString('ar-SY-u-nu-latn')} رصيد على موجودة</span>
+              : <span className="badge blue">{s.purchase.toLocaleString('ar-SY-u-nu-latn')} شراء على موجودة</span>}
+            {s.skipped > 0 && <span className="badge">{s.skipped.toLocaleString('ar-SY-u-nu-latn')} تخطٍّ</span>}
+            <span className={`badge${s.rejected ? ' bad' : ''}`}>{s.rejected.toLocaleString('ar-SY-u-nu-latn')} مرفوضة</span>
+            {s.new_units > 0 && <span className="inv-muted">· {s.new_units.toLocaleString('ar-SY-u-nu-latn')} وحدة جديدة</span>}
           </div>
           <div className="field-check inv-imp-opening"><label>
             <input type="checkbox" checked={asOpening} disabled={busy} onChange={(e) => toggleOpening(e.target.checked)} />
@@ -603,7 +603,7 @@ export function ImportDialog({ onClose, onDone, showToast }) {
                   const effect = importEffect(r)
                   return (
                     <tr key={r.row} className={st.row}>
-                      <td className="num" data-label="السطر">{r.row.toLocaleString('ar-SY')}</td>
+                      <td className="num" data-label="السطر">{r.row.toLocaleString('ar-SY-u-nu-latn')}</td>
                       <td className="rt-title">{r.name || <span className="inv-muted">—</span>}</td>
                       <td data-label="الوحدة">{r.unit || '—'}</td>
                       <td data-label="النوع">{IMPORT_KINDS[r.kind] || '—'}</td>
@@ -632,7 +632,7 @@ export function ImportDialog({ onClose, onDone, showToast }) {
         <button type="button" className="ghost" disabled={busy} onClick={onClose}>إلغاء</button>
         {preview && (
           <button type="button" disabled={busy || doable === 0} onClick={commit}>
-            {busy ? 'جارٍ الاستيراد…' : `تأكيد الاستيراد (${doable.toLocaleString('ar-SY')})`}
+            {busy ? 'جارٍ الاستيراد…' : `تأكيد الاستيراد (${doable.toLocaleString('ar-SY-u-nu-latn')})`}
           </button>
         )}
       </div>

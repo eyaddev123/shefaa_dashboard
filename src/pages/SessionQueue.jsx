@@ -970,7 +970,7 @@ function AttendanceCurrentCard({ current, returning = [], recalled, onRecalled, 
             <RecallButton apptId={current.id} onError={onError} onDone={onRecalled} />
             {recalled && (
               <div className="attn-compact-hint">
-                أُعيد النداء {new Date(recalled).toLocaleTimeString('ar', { hour: '2-digit', minute: '2-digit' })}
+                أُعيد النداء {new Date(recalled).toLocaleTimeString('ar-SY-u-nu-latn', { hour: '2-digit', minute: '2-digit' })}
               </div>
             )}
           </div>}
@@ -1127,7 +1127,7 @@ function FeeCell({ appt }) {
           إجراء: {names} — خذي {fmtMoney(r ? appt.patient_total - appt.patient_fee : appt.procedures_total)}{isProcedureOnly(appt) ? '' : ' زيادة'}
         </span>
       )}
-      {unpaid > 0 && <span className="pay-badge is-unpaid">⏳ بانتظار المحاسبة {unpaid.toLocaleString('ar-SY')}</span>}
+      {unpaid > 0 && <span className="pay-badge is-unpaid">⏳ بانتظار المحاسبة {unpaid.toLocaleString('ar-SY-u-nu-latn')}</span>}
     </span>
   )
 }
@@ -1331,7 +1331,7 @@ function ReferralsTable({ rows, all, attendance }) {
 // كما كانا (والموضع من useRestoreScroll)، ورابطٌ منسوخ يفتح على التبويب نفسه.
 const TAB_HINTS = {
   attendance: {
-    present: <>رقم الدور يُعطى عند <strong>الحضور</strong> (١، ٢، ٣…) ولا يتغيّر، والنداء بترتيبه —
+    present: <>رقم الدور يُعطى عند <strong>الحضور</strong> (1، 2، 3…) ولا يتغيّر، والنداء بترتيبه —
       الإسعافي الحاضر أولاً. تحته صغيراً: رقم الحجز والوقت التقريبي.</>,
     pending: <>محجوزون لم يحضروا بعد، بترتيب وقت الحجز. لا يظهرون للطبيب ولا يوقفون أحداً —
       وعند الإقفال يقرّر الاستقبال لكلٍّ منهم.</>,
@@ -1761,7 +1761,7 @@ export default function SessionQueue() {
                   style={{ padding: '12px 20px', fontSize: 15 }} />
                 {recalled && (
                   <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 5 }}>
-                    أُعيد النداء {new Date(recalled).toLocaleTimeString('ar', { hour: '2-digit', minute: '2-digit' })}
+                    أُعيد النداء {new Date(recalled).toLocaleTimeString('ar-SY-u-nu-latn', { hour: '2-digit', minute: '2-digit' })}
                   </div>
                 )}
               </div>}

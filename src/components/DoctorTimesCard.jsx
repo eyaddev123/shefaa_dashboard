@@ -16,7 +16,7 @@ const STATE = {
   no_arrival: ['', 'لا حضور مسجَّل'],
 }
 const FIELD = { arrival: 'الحضور', departure: 'الانصراف' }
-const fmtInt = (n) => Number(n || 0).toLocaleString('ar-SY')
+const fmtInt = (n) => Number(n || 0).toLocaleString('ar-SY-u-nu-latn')
 // ولا «·» بجانب رقمٍ هنديّ — يُقرأ صفراً
 const days = (n) => (n === 1 ? 'يوم واحد' : n === 2 ? 'يومان' : `${fmtInt(n)} ${n >= 3 && n <= 10 ? 'أيام' : 'يوماً'}`)
 

@@ -44,7 +44,7 @@ export default function PurchasePrices({ materials, canWrite, onSaved, initialOn
       {missing > 0 && (
         <button type="button" className={`rev-flag${onlyMissing ? ' is-on' : ''}`} aria-pressed={onlyMissing}
           onClick={() => setOnlyMissing(!onlyMissing)}>
-          بس اللي بلا سعر شراء <span className="rev-flag-n">{missing.toLocaleString('ar-SY')}</span>
+          بس اللي بلا سعر شراء <span className="rev-flag-n">{missing.toLocaleString('ar-SY-u-nu-latn')}</span>
         </button>
       )}
       <table className="inv-table rtable" style={{ marginTop: 10 }}>

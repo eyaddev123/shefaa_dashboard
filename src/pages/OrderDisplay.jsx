@@ -23,8 +23,6 @@ const RETRY_MS = [1000, 2000, 5000, 10000, 30000]
 
 const two = (n) => String(n).padStart(2, '0')
 const AR_DAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
-const AR_MONTHS = ['كانون الثاني', 'شباط', 'آذار', 'نيسان', 'أيار', 'حزيران',
-  'تموز', 'آب', 'أيلول', 'تشرين الأول', 'تشرين الثاني', 'كانون الأول']
 
 // ═══ مقاسات بطاقة الدور ═══
 // تختلف عن بطاقة النداء: هناك رقمٌ ضخم واحد، وهنا قائمةٌ تطول وتقصر. فالمقاس
@@ -69,9 +67,8 @@ export function visibleRows(listPx, itemFont, total) {
   return Math.max(1, capacity - 1)             // سطرٌ محجوزٌ لـ«+N»
 }
 
-// الأرقام العربية للترتيب: ١) ٢) ٣) — أوضح للقارئ العربي من 1) 2)
-const AR_DIGITS = '٠١٢٣٤٥٦٧٨٩'
-const arNum = (n) => String(n).replace(/\d/g, (d) => AR_DIGITS[Number(d)])
+// الترتيب: 1) 2) 3) — أرقام النظام لاتينية كلّها (2026-11-16)
+const arNum = (n) => String(n)
 
 export default function OrderDisplay() {
   const [data, setData] = useState(null)
@@ -260,7 +257,7 @@ export default function OrderDisplay() {
 
   const offlineLong = offlineSince && Date.now() - offlineSince > OFFLINE_ALERT_MS
   const clock = `${two(now.getHours())}:${two(now.getMinutes())}`
-  const dateText = `${AR_DAYS[now.getDay()]} ${now.getDate()} ${AR_MONTHS[now.getMonth()]} ${now.getFullYear()}`
+  const dateText = `${AR_DAYS[now.getDay()]} ${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}`
 
   return (
     <div className="pd-root" dir="rtl" style={viewH ? { height: `${viewH}px` } : undefined}>

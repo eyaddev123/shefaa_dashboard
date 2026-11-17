@@ -23,7 +23,7 @@ import { blankReferral, draftFromIronReferral, ironDraftDiscount, ironReferralPa
 // الإحالة على السطر: «المبلغ» هو المقبوض (السعر − الخصم) والسعر تحته، وزرّ «إحالة» يضيف أو يعدّل أو يحذف —
 // للاستقبال يوم الجلسة وحده وللمشرفة أيّ وقت (والخادم يحرس الاثنين).
 
-const fmtNum = (n) => Number(n || 0).toLocaleString('ar-SY', { maximumFractionDigits: 2 })
+const fmtNum = (n) => Number(n || 0).toLocaleString('ar-SY-u-nu-latn', { maximumFractionDigits: 2 })
 function Money({ value }) {
   return <>{fmtNum(value)}<span className="cash-unit">ل.س</span></>
 }
@@ -157,7 +157,7 @@ function ReferralDialog({ row, onClose, onSaved }) {
           </p>
           <small className="hint">توزيع الجلسة (الممرضة والدكتور والشفاء والصندوق) لا يتغيّر — الخصم وحده على الجهة.</small>
         </div>
-        {tried && !ready && <p className="iron-err" role="alert">{!draft.referral_source_id ? 'اختاري الجهة المحيلة' : 'قيمة الخصم رقمٌ أكبر من صفر (النسبة حتى ١٠٠٪)'}</p>}
+        {tried && !ready && <p className="iron-err" role="alert">{!draft.referral_source_id ? 'اختاري الجهة المحيلة' : 'قيمة الخصم رقمٌ أكبر من صفر (النسبة حتى 100%)'}</p>}
         <div className="field">
           <label htmlFor="iron-ref-reason">السبب <span className="opt">(اختياري — يبقى في أثر الجلسة)</span></label>
           <input id="iron-ref-reason" value={reason} maxLength={300} onChange={(e) => setReason(e.target.value)} />

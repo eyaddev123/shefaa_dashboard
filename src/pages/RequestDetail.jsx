@@ -185,7 +185,7 @@ export default function RequestDetail() {
       const msg =
         `السلام عليكم، جمعية الشفاء الخيرية.\n` +
         `تمت الموافقة على طلبكم رقم ${r.request_no} (ملف ${r.file_number}) — ${DECISION_TYPES[r.decision_type]}` +
-        (r.decision_value ? ` (${r.decision_type === 'percentage' ? r.decision_value + '٪' : fmtMoney(r.decision_value)})` : '') +
+        (r.decision_value ? ` (${r.decision_type === 'percentage' ? r.decision_value + '%' : fmtMoney(r.decision_value)})` : '') +
         `.\nالرجاء الحضور إلى مقر الجمعية لاستلام الوصل.`
       window.open(`https://wa.me/${waNumber(r.mobile || r.family_mobile || '')}?text=${encodeURIComponent(msg)}`, '_blank')
       load()
@@ -362,7 +362,7 @@ export default function RequestDetail() {
               <div className={`decision-box ${r.decision_type === 'rejected' ? 'rejected' : ''}`}>
                 <strong>{DECISION_TYPES[r.decision_type]}</strong>
                 {r.decision_value != null && (
-                  <> — {r.decision_type === 'percentage' ? `${Number(r.decision_value)}٪` : fmtMoney(r.decision_value)}</>
+                  <> — {r.decision_type === 'percentage' ? `${Number(r.decision_value)}%` : fmtMoney(r.decision_value)}</>
                 )}
                 <p style={{ fontSize: 13, marginTop: 6 }}>{r.decision_text}</p>
                 <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>

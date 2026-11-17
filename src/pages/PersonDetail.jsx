@@ -100,7 +100,7 @@ function EditForm({ person, onSaved, onCancel }) {
         <div className="field"><label>الدخل الشهري</label><input type="number" value={form.monthly_wage} onChange={set('monthly_wage')} /></div>
         <div className="field"><label>الرقم الوطني</label><input value={form.national_id} onChange={set('national_id')} dir="ltr" /></div>
       </div>
-      <div className="field"><label>ملاحظات (٥٠٠ حرف كحدّ أقصى)</label>
+      <div className="field"><label>ملاحظات (500 حرف كحدّ أقصى)</label>
         <textarea rows={2} maxLength={500} value={form.notes} onChange={set('notes')} /></div>
       {err && <p className="error">{err}</p>}
       <div className="inline" style={{ marginTop: 8 }}>
@@ -209,7 +209,7 @@ export default function PersonDetail() {
                 <td className="num">{r.reviews_count}/5 ({r.approvals_count} موافقة)</td>
                 <td>
                   {r.decision_type
-                    ? <>{DECISION_TYPES[r.decision_type]}{r.decision_value != null && ` — ${r.decision_type === 'percentage' ? Number(r.decision_value) + '٪' : fmtMoney(r.decision_value)}`}</>
+                    ? <>{DECISION_TYPES[r.decision_type]}{r.decision_value != null && ` — ${r.decision_type === 'percentage' ? Number(r.decision_value) + '%' : fmtMoney(r.decision_value)}`}</>
                     : '—'}
                 </td>
                 <td>{statusBadge(r.status)}</td>

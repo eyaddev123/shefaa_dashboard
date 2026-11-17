@@ -22,7 +22,7 @@ let pass = 0
 const failures = []
 const ok = (cond, label, extra = '') => { if (cond) { pass++; console.log(`  ✔ ${label}`) } else { failures.push(label); console.log(`  ✖ ${label} ${extra}`) } }
 
-console.log('\n── ١) ملخّص الردّ ──')
+console.log('\n── 1) ملخّص الردّ ──')
 const D = '2026-11-04' // الأربعاء
 ok(generateLabel(D) === 'توليد جلسات الأربعاء 4/11', 'الزرّ يسمّي اليوم', generateLabel(D))
 ok(generateLabel('') === 'توليد الجلسات', 'حقل تاريخ ممسوح لا يكسر الزرّ')
@@ -75,7 +75,7 @@ const run = async () => {
   await page.goto(`${BASE}/clinic/board`, { waitUntil: 'load' })
   await page.waitForSelector('table.rtable tbody tr', { timeout: 15000 })
 
-  console.log('\n── ٢) الزرّ واليوم المختار ──')
+  console.log('\n── 2) الزرّ واليوم المختار ──')
   const today = todayLocal()
   const pick = addDays(today, 2)
   const { weekday, day, month } = dayLabel(pick)
@@ -93,7 +93,7 @@ const run = async () => {
   ok(toast.includes(`${weekday} ${day}/${month}`) && toast.includes('موجودة مسبقاً: 1') && toast.includes('معتذر: 1'), '★ النتيجة تظهر مع اليوم والسبب', toast)
   ok(await page.locator('.toast-info').count() === 1, 'كبسةٌ بلا جديد: info لا success')
 
-  console.log('\n── ٣) جلسة المعتذر في الجدول ──')
+  console.log('\n── 3) جلسة المعتذر في الجدول ──')
   const row = (name) => page.locator('table.rtable tbody tr', { hasText: name })
   const healthy = row('د. سليم'), excused = row('د. معتذر')
   ok((await healthy.locator('.rt-badge').textContent()).includes('مفتوحة'), 'السليم «مفتوحة» كما كان')

@@ -68,7 +68,7 @@ export default function NewFamily() {
       <form onSubmit={submit}>
         <div className="card">
           <h3 style={{ justifyContent: 'space-between' }}>
-            ١ · بيانات الملف
+            1 · بيانات الملف
             {savedAt && !restored && <span className="draft-saved">يُحفظ تلقائياً ✓ {fmtDraftTime(savedAt)}</span>}
           </h3>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-end' }}>
@@ -79,7 +79,7 @@ export default function NewFamily() {
         </div>
 
         <div className="card">
-          <h3>٢ · رب العائلة ومقدّم الطلب</h3>
+          <h3>2 · رب العائلة ومقدّم الطلب</h3>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-end' }}>
             <div className="field" style={{ minWidth: 220 }}><label>اسم رب العائلة *</label><input value={form.head_name} onChange={set('head_name')} required /></div>
             <div className="field" style={{ minWidth: 220 }}><label>مقدّم الطلب (إن اختلف)</label><input value={form.applicant_name} onChange={set('applicant_name')} /></div>
@@ -87,7 +87,7 @@ export default function NewFamily() {
         </div>
 
         <div className="card">
-          <h3>٣ · العنوان والتواصل</h3>
+          <h3>3 · العنوان والتواصل</h3>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-end' }}>
             <div className="field" style={{ minWidth: 260 }}><label>العنوان الحالي</label><input value={form.current_address} onChange={set('current_address')} /></div>
             <div className="field" style={{ minWidth: 260 }}><label>العنوان السابق</label><input value={form.previous_address} onChange={set('previous_address')} /></div>
@@ -97,7 +97,7 @@ export default function NewFamily() {
         </div>
 
         <div className="card">
-          <h3>٤ · ملاحظات</h3>
+          <h3>4 · ملاحظات</h3>
           <textarea rows={3} style={{ width: '100%' }} value={form.notes} onChange={set('notes')}
                     placeholder="أرملة تعيل ثلاثة أولاد / عائلة نازحة / …" />
         </div>

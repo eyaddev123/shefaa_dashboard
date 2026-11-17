@@ -56,7 +56,7 @@ export default function PrinterSetup() {
     <>
       <h2>إعداد الطابعة</h2>
       <p className="subtitle">
-        بطاقة الدور تُطبع على الطابعة الحرارية (Xprinter XP‑T80Q، ورق ٨٠مم) عند تعليم حضور
+        بطاقة الدور تُطبع على الطابعة الحرارية (Xprinter XP‑T80Q، ورق 80مم) عند تعليم حضور
         المريض. الإعداد في الأعلى يخصّ <strong>هذا الجهاز وحده</strong>، والدليل تحته
         يُتَّبع مرّةً واحدة على كلّ حاسوب.
       </p>
@@ -90,7 +90,7 @@ export default function PrinterSetup() {
                       {' '}<code dir="ltr">{helper.printer_port}</code>
                     </div>
                   )}
-                  {/* الإصدار ١ لا يعرف النسخ في مهمّةٍ واحدة: يطبعها النظام نسخةً نسخة
+                  {/* الإصدار 1 لا يعرف النسخ في مهمّةٍ واحدة: يطبعها النظام نسخةً نسخة
                       (الورق نفسه)، والتحديث يجعلها مهمّةً واحدة — انظر «التحديث» في الدليل */}
                   {!(helper.version >= 2) && (
                     <div className="ps-status-sub">
@@ -128,8 +128,8 @@ export default function PrinterSetup() {
             <label htmlFor="ps-w">عرض الورق</label>
             <select id="ps-w" value={printer.width}
               onChange={(e) => update({ width: Number(e.target.value) })}>
-              <option value={80}>٨٠ مم (الافتراضي)</option>
-              <option value={58}>٥٨ مم</option>
+              <option value={80}>80 مم (الافتراضي)</option>
+              <option value={58}>58 مم</option>
             </select>
           </div>
 
@@ -184,16 +184,16 @@ export default function PrinterSetup() {
           إعدادات الموقع ← السماح بالوصول إلى الشبكة المحلية.
         </div>
         <ol className="ps-steps">
-          <Step n="١">
+          <Step n="1">
             انسخ مجلّد <code dir="ltr">print-helper</code> إلى الجهاز، مثلاً إلى
             {' '}<code dir="ltr">~/shefaa-print</code>.
           </Step>
-          <Step n="٢">
-            تأكّد من وجود Node (الإصدار ١٨ فأعلى): افتح <strong>Terminal</strong> ونفّذ
+          <Step n="2">
+            تأكّد من وجود Node (الإصدار 18 فأعلى): افتح <strong>Terminal</strong> ونفّذ
             <pre dir="ltr" className="ps-cmd">node --version</pre>
             إن لم يكن مثبّتاً فنزّله من <code dir="ltr">nodejs.org</code>.
           </Step>
-          <Step n="٣">
+          <Step n="3">
             افتح <code dir="ltr">config.json</code> داخل المجلّد واكتب عنوان الطابعة في
             {' '}<code dir="ltr">printer_ip</code>:
             <pre dir="ltr" className="ps-cmd">{`"printer_ip": "192.168.1.50",
@@ -221,7 +221,7 @@ export default function PrinterSetup() {
               </details>
             )}
           </Step>
-          <Step n="٤">
+          <Step n="4">
             ثبّته ليعمل تلقائياً عند الدخول:
             <div className="ps-note">
               <strong>ماك:</strong>
@@ -240,7 +240,7 @@ export default function PrinterSetup() {
               <pre dir="ltr" className="ps-cmd">{`powershell -ExecutionPolicy Bypass -File .\\install-windows.ps1`}</pre>
             </div>
           </Step>
-          <Step n="٥">
+          <Step n="5">
             تأكّد: آخر سطر يطبعه سكربت التثبيت يقول
             {' '}<strong>«الوسيط يعمل بوضع: الشبكة — الطابعة 192.168.1.50:9100»</strong>،
             واللافتة في أعلى هذه الصفحة <strong>خضراء</strong> وتحتها العنوان والمنفذ.
@@ -270,12 +270,12 @@ export default function PrinterSetup() {
           ينتظر أحدهما الآخر ويعيد المحاولة وحده.
         </p>
         <ol className="ps-steps">
-          <Step n="١">
+          <Step n="1">
             <strong>لمعرفة عنوانها:</strong> أطفئ الطابعة، ثمّ شغّلها مع الضغط المستمرّ على زرّ
             {' '}<strong>FEED</strong> حتى تطبع ورقة <strong>الفحص الذاتي</strong> (Self Test). فيها سطر
             {' '}<code dir="ltr">IP Address</code> — يجب أن يكون <code dir="ltr">192.168.1.50</code>.
           </Step>
-          <Step n="٢">
+          <Step n="2">
             <strong>لتغيير العنوان</strong> (نادراً، مثلاً إن تغيّر الراوتر): من حاسوبٍ على الشبكة نفسها
             افتح في المتصفّح <code dir="ltr">http://192.168.1.50</code> (أو العنوان الذي في ورقة الفحص)،
             فتظهر صفحة <code dir="ltr">Ethernet WebConfig</code> ← تبويب
@@ -286,11 +286,11 @@ export default function PrinterSetup() {
             ثمّ اكتب العنوان الجديد في <code dir="ltr">printer_ip</code> على <strong>كلّ</strong> جهاز
             وأعد تشغيل سكربت التثبيت.
           </Step>
-          <Step n="٣">
+          <Step n="3">
             إن ظهر في ورقة الفحص <code dir="ltr">0.0.0.0</code> أو عنوانٌ لا يبدأ بـ
             {' '}<code dir="ltr">192.168.1.</code>، فالإعداد ضاع (أو أُعيدت الطابعة لإعدادات المصنع:
             {' '}<code dir="ltr">192.168.123.100</code>): تأكّد من الكبل ومن أنّ ضوء المنفذ يومض،
-            ثمّ أعد ضبط العنوان كما في الخطوة ٢.
+            ثمّ أعد ضبط العنوان كما في الخطوة 2.
           </Step>
         </ol>
       </div>
@@ -311,37 +311,37 @@ export default function PrinterSetup() {
       <div className="card">
         <h3>{isNet ? 'اختياري — تعريف الطابعة على ويندوز (لاحتياط المتصفّح)' : 'على حاسوب ويندوز'}</h3>
         <ol className="ps-steps">
-          <Step n="١">
+          <Step n="1">
             نزّل تعريف <strong>Xprinter</strong> المناسب للموديل (80mm / XP‑T80Q) من موقع الشركة،
             واضغط عليه بالزرّ الأيمن ثمّ <strong>تشغيل كمسؤول</strong> (Run as administrator).
             التعريف المثبَّت بلا صلاحية مسؤول يفشل بصمت عند الطباعة.
           </Step>
-          <Step n="٢">
+          <Step n="2">
             أثناء التثبيت اختر المنفذ <strong>شبكة / TCP‑IP</strong> وأدخل رقم الطابعة الذي
             كتبته من ورقة الفحص الذاتي.
             <div className="ps-note">
               إن كانت موصولةً بـ USB بدل الشبكة فاختر منفذ <code dir="ltr">USB</code> الظاهر في القائمة.
             </div>
           </Step>
-          <Step n="٣">
+          <Step n="3">
             بعد التثبيت: <strong>الإعدادات ← الأجهزة ← الطابعات والماسحات</strong> ← اختر الطابعة ←
             <strong> تعيين كطابعة افتراضية</strong>. وأطفئ خيار
             «<span dir="ltr">Let Windows manage my default printer</span>» وإلّا بدّلها ويندوز وحده.
           </Step>
-          <Step n="٤">
+          <Step n="4">
             <strong>حجم الورق — وهو سبب الورق الأبيض الزائد:</strong> خصائص الطابعة ←
             <strong> تفضيلات</strong> ← حجم الورق: اختر مقاس <strong>الرول</strong>
             {' '}(<code dir="ltr">72 x 3276 mm</code> أو ما يُسمّى <code dir="ltr">Roll</code>
             {' '}/ <code dir="ltr">Receipt</code>) — <strong>لا</strong> {' '}
             <code dir="ltr">72 x 210 mm</code>.
             <div className="ps-note">
-              المقاس الثابت (٢١٠مم) يجعل الطابعة تُخرج ورقةً بطول ٢١٠مم مهما قصرت البطاقة،
-              فتخرج نحو <strong>١٠٠مم ورقاً أبيض</strong> بعد كلّ بطاقة. ومقاس الرول يجعلها
+              المقاس الثابت (210مم) يجعل الطابعة تُخرج ورقةً بطول 210مم مهما قصرت البطاقة،
+              فتخرج نحو <strong>100مم ورقاً أبيض</strong> بعد كلّ بطاقة. ومقاس الرول يجعلها
               تقطع بعد المحتوى مباشرةً — والنظام يرسل طول البطاقة الحقيقي مع كلّ طباعة.
             </div>
             ثمّ <strong>طباعة صفحة اختبار</strong> للتأكّد.
           </Step>
-          <Step n="٥">
+          <Step n="5">
             <strong>لتختفي نافذة الطباعة:</strong> انسخ اختصار كروم على سطح المكتب، ثمّ بالزرّ
             الأيمن ← خصائص ← في خانة <strong>الهدف</strong> (Target) أضف في آخر السطر بعد مسافة:
             <pre dir="ltr" className="ps-cmd">--kiosk-printing</pre>
@@ -355,23 +355,23 @@ export default function PrinterSetup() {
       <div className="card">
         <h3>{isNet ? 'اختياري — تعريف الطابعة على ماك (لاحتياط المتصفّح)' : 'على حاسوب ماك'}</h3>
         <ol className="ps-steps">
-          <Step n="١">
+          <Step n="1">
             نزّل تعريف Xprinter الخاصّ بـ <strong>macOS</strong> وثبّته. قد يطلب السماح له من
             <strong> إعدادات النظام ← الخصوصية والأمان</strong> بعد التثبيت.
           </Step>
-          <Step n="٢">
+          <Step n="2">
             <strong>إعدادات النظام ← الطابعات والماسحات ← إضافة طابعة</strong> ← بطاقة
             <strong> IP</strong> ← أدخل رقم الطابعة من ورقة الفحص الذاتي، والبروتوكول
             <code dir="ltr"> Line Printer Daemon – LPD</code>، واختر تعريف Xprinter في خانة
             «الاستخدام» (Use).
           </Step>
-          <Step n="٣">
+          <Step n="3">
             اجعلها <strong>الطابعة الافتراضية</strong> من القائمة نفسها.
             <div className="ps-note">
               <strong>حجم الورق — سبب الورق الأبيض الزائد:</strong> في نافذة الطباعة اختر
               {' '}<strong>حجم الورق</strong> = <code dir="ltr">X72MMY3276MM</code>
               {' '}(مقاس الرول)، <strong>لا</strong> <code dir="ltr">X72MMY210MM</code>.
-              الأخير يُخرج ورقةً بطول ٢١٠مم دائماً — نحو ١٠٠مم ورقٍ أبيض بعد كلّ بطاقة.
+              الأخير يُخرج ورقةً بطول 210مم دائماً — نحو 100مم ورقٍ أبيض بعد كلّ بطاقة.
             </div>
             <div className="ps-note">
               ولجعله الافتراضَ الدائم (فتستعمله الطباعة الصامتة بلا اختيار)، افتح
@@ -383,7 +383,7 @@ export default function PrinterSetup() {
               النجمة <code dir="ltr">*</code> تسبق المقاس المضبوط حالياً.
             </div>
           </Step>
-          <Step n="٤">
+          <Step n="4">
             <strong>لتختفي نافذة الطباعة:</strong> افتح <strong>Terminal</strong> وشغّل كروم بالأمر:
             <pre dir="ltr" className="ps-cmd">open -a "Google Chrome" --args --kiosk-printing</pre>
             ثمّ افتح النظام من النافذة التي فُتحت بهذا الأمر.
@@ -411,7 +411,7 @@ export default function PrinterSetup() {
           {isNet ? (
             <>
               <li>
-                <strong>«الطابعة مشغولة أو غير متاحة»:</strong> الوسيط أعاد المحاولة ٥ مرّات ولم
+                <strong>«الطابعة مشغولة أو غير متاحة»:</strong> الوسيط أعاد المحاولة 5 مرّات ولم
                 يصل. تأكّد أنّ الطابعة مشغّلة وكبل الشبكة موصول، وأنّ هذا الجهاز على شبكة الشفاء،
                 وأنّ <code dir="ltr">printer_ip</code> مطابقٌ لورقة الفحص الذاتي — ثمّ أعد الطباعة.
               </li>
@@ -432,8 +432,8 @@ export default function PrinterSetup() {
             تعريف الموديل الصحيح (80mm) كمسؤول.
           </li>
           <li>
-            <strong>النصّ مقصوص من الجانب:</strong> حجم الورق في تفضيلات الطابعة ليس ٨٠مم،
-            أو أنّ عرض الورق هنا في الأعلى مضبوطٌ على ٥٨ والورق ٨٠ (أو العكس).
+            <strong>النصّ مقصوص من الجانب:</strong> حجم الورق في تفضيلات الطابعة ليس 80مم،
+            أو أنّ عرض الورق هنا في الأعلى مضبوطٌ على 58 والورق 80 (أو العكس).
           </li>
           <li>
             <strong>تطبع نصف البطاقة ثمّ تقطع:</strong> حجم الورق مضبوطٌ على طولٍ ثابت —

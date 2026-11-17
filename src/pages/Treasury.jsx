@@ -105,7 +105,7 @@ export default function Treasury() {
                     <Link className="plain" to={`/requests/${c.id}`}>{c.file_number} / طلب {c.request_no}</Link>
                     <div style={{ fontSize: 11.5, color: 'var(--muted)' }}>{c.head_name} · {AID_TYPES[c.aid_type]}</div>
                   </td>
-                  <td style={{ fontSize: 12.5 }}>{DECISION_TYPES[c.decision_type]}{c.decision_type === 'percentage' && ` ${Number(c.decision_value)}٪`}</td>
+                  <td style={{ fontSize: 12.5 }}>{DECISION_TYPES[c.decision_type]}{c.decision_type === 'percentage' && ` ${Number(c.decision_value)}%`}</td>
                   <td className="num">{fmtMoney(c.remaining)}</td>
                 </tr>
               ))}

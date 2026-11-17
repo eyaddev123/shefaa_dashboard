@@ -117,8 +117,6 @@ function UpcomingChips({ next, ret, fonts }) {
 
 const two = (n) => String(n).padStart(2, '0')
 const AR_DAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
-const AR_MONTHS = ['كانون الثاني', 'شباط', 'آذار', 'نيسان', 'أيار', 'حزيران',
-  'تموز', 'آب', 'أيلول', 'تشرين الأول', 'تشرين الثاني', 'كانون الأول']
 
 export default function PublicDisplay() {
   const [data, setData] = useState(null)
@@ -492,7 +490,7 @@ export default function PublicDisplay() {
 
   const offlineLong = offlineSince && Date.now() - offlineSince > OFFLINE_ALERT_MS
   const clock = `${two(now.getHours())}:${two(now.getMinutes())}`
-  const dateText = `${AR_DAYS[now.getDay()]} ${now.getDate()} ${AR_MONTHS[now.getMonth()]} ${now.getFullYear()}`
+  const dateText = `${AR_DAYS[now.getDay()]} ${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}`
 
   return (
     <div className="pd-root" dir="rtl" ref={rootRef} style={viewH ? { height: `${viewH}px` } : undefined}>

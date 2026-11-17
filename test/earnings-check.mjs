@@ -35,7 +35,7 @@ let pass = 0
 const failures = []
 const ok = (cond, label) => { if (cond) { pass++; return true } failures.push(label); console.log(`  ✖ ${label}`); return false }
 const digits = (t) => Number(String(t).replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/٬/g, '').replace(/[^\d-]/g, ''))
-const words = (d) => new Date(`${d}T00:00:00`).toLocaleDateString('ar-SY', { day: 'numeric', month: 'long' })
+const words = (d) => { const [y, m, dd] = d.split('-').map(Number); return `${dd}/${m}` }   // «28/10» كالواجهة (fmtDay بلا سنة)
 
 const UNPAID = { today: '2026-10-29', total: 1500, lines: [
   { id: 901, appointment_id: 77, name: 'ضماد صغير', patient_name: 'هند سمير', doctor_name: 'د. علي', price: 1000, session_date: '2026-10-28', added_at: '2026-10-28T09:00:00Z' },
@@ -114,7 +114,7 @@ const summaryRows = (page) => page.$$eval('.pex-doc', (rs) => rs.map((r) => ({
   cols: [...r.querySelectorAll('.pex-doc-col')].map((c) => c.childNodes[1]?.textContent ?? ''),
   badges: [...r.querySelectorAll('.badge')].map((b) => b.textContent),
 })))
-const countIn = (meta, n) => (n === 1 ? meta.includes('إجراء واحد') : n === 2 ? meta.includes('إجراءان') : meta.includes(Number(n).toLocaleString('ar-SY')))
+const countIn = (meta, n) => (n === 1 ? meta.includes('إجراء واحد') : n === 2 ? meta.includes('إجراءان') : meta.includes(Number(n).toLocaleString('ar-SY-u-nu-latn')))
 
 const run = async () => {
   const vite = spawn('npx', ['vite', '--port', String(PORT), '--strictPort', '--host', '127.0.0.1'],
@@ -130,7 +130,7 @@ const run = async () => {
   const browser = await chromium.launch()
 
   // ═══ ١ و٢) الملخّص والتفصيل × المقاسات × الثيمات ═══
-  console.log('\n── ١) الملخّص والتفصيل × المقاسات × الثيمات ──')
+  console.log('\n── 1) الملخّص والتفصيل × المقاسات × الثيمات ──')
   for (const [w, h] of [[1366, 800], [390, 844]]) for (const theme of ['light', 'dark']) {
     const tag = `${w}-${theme}`
     const { ctx, page, errors } = await open(browser, { w, h, theme })
@@ -147,7 +147,7 @@ const run = async () => {
     const big = await page.$$eval('.pex-totals .pex-big-value', (t) => t.map((x) => x.textContent))
     ok(big.map(digits).join('/') === [T.doctor, T.shifa, T.materials].join('/'), `[${tag}] ★ الأرقام الكبيرة: للدكاترة، للشفاء، المواد (${big})`)
     const sentence = await page.$eval('.pex-sentence', (x) => x.textContent)
-    ok(sentence.includes(Number(T.price).toLocaleString('ar-SY')), `[${tag}] الجملة بالقيمة الكاملة (${sentence.slice(0, 40)})`)
+    ok(sentence.includes(Number(T.price).toLocaleString('ar-SY-u-nu-latn')), `[${tag}] الجملة بالقيمة الكاملة (${sentence.slice(0, 40)})`)
     ok(await page.$eval('.earn-periods [aria-pressed=true]', (b) => b.textContent) === 'اليوم', `[${tag}] «اليوم» افتراضاً`)
     let L = await layout(page)
     ok(!L.hscroll, `[${tag}] ★ الملخّص بلا تمرير أفقي`)
@@ -167,10 +167,10 @@ const run = async () => {
     ok(lines.length === A.lines.length, `[${tag}] ★ إجراء إجراء (${lines.length})`)
     for (const l of A.lines) {
       const x = lines.find((y) => y.proc === l.procedure && y.text.includes(l.patient))
-      const want = l.rule.replace(/[\d,]+/g, (n) => Number(n.replace(/,/g, '')).toLocaleString('ar-SY')).replace('%', '٪')
+      const want = l.rule.replace(/[\d,]+/g, (n) => Number(n.replace(/,/g, '')).toLocaleString('ar-SY-u-nu-latn')).replace('%', '%')
       ok(x && x.rule === want && digits(x.doc) === l.doctor, `[${tag}] ${l.procedure}: ${want} ⇒ ${l.doctor} (${x?.rule} ${x?.doc})`)
     }
-    ok(lines.some((x) => x.text.includes('جبس ×٢')), `[${tag}] المواد بأسمائها وكمّياتها`)
+    ok(lines.some((x) => x.text.includes('جبس ×2')), `[${tag}] المواد بأسمائها وكمّياتها`)
     ok(lines.some((x) => x.text.includes('بلا مواد')), `[${tag}] «بلا مواد» لإجراءٍ بلا مواد`)
     L = await layout(page)
     ok(!L.hscroll, `[${tag}] ★ التفصيل بلا تمرير أفقي`)
@@ -190,7 +190,7 @@ const run = async () => {
   }
 
   // ═══ ٣) الفترات ═══
-  console.log('\n── ٣) الفترات ──')
+  console.log('\n── 3) الفترات ──')
   {
     const { ctx, page, calls } = await open(browser)
     await page.waitForSelector('.pex-doc')
@@ -225,7 +225,7 @@ const run = async () => {
   }
 
   // ═══ ٤) التحذيرات ═══
-  console.log('\n── ٤) بلا قاعدة والشفاء سالبة ──')
+  console.log('\n── 4) بلا قاعدة والشفاء سالبة ──')
   for (const [w, theme] of [[1366, 'light'], [390, 'dark'], [390, 'light'], [1366, 'dark']]) {
     const { ctx, page } = await open(browser, { w, h: w === 390 ? 844 : 800, theme, today: 'rich' })
     await page.waitForSelector('.pex-doc')
@@ -251,12 +251,12 @@ const run = async () => {
   }
 
   // ═══ ٥) يحتاج انتباهك ═══
-  console.log('\n── ٥) بانتظار المحاسبة و«إجراء فقط» بلا إجراء ──')
+  console.log('\n── 5) بانتظار المحاسبة و«إجراء فقط» بلا إجراء ──')
   {
     const { ctx, page, calls, errors } = await open(browser)
     await page.waitForSelector('.pex-chip')
     const chips = await page.$$eval('.pex-chip', (c) => c.map((x) => x.textContent))
-    ok(chips.some((c) => c.includes('بانتظار المحاسبة') && c.includes('٢') && c.includes('١٬٥٠٠')), `★ بانتظار المحاسبة بعدده ومبلغه (${chips})`)
+    ok(chips.some((c) => c.includes('بانتظار المحاسبة') && c.includes('2') && c.includes('1,500')), `★ بانتظار المحاسبة بعدده ومبلغه (${chips})`)
     ok(chips.some((c) => c.includes('بلا إجراء')), '★ و«إجراء فقط» بلا إجراء')
     await page.click('.pex-chip:has-text("بانتظار المحاسبة")')
     await page.waitForSelector('.pex-attn-body .pay-btn')
@@ -289,7 +289,7 @@ const run = async () => {
   }
 
   // ═══ ٦) تصحيح المواد والأثر ═══
-  console.log('\n── ٦) تصحيح المواد والأثر ──')
+  console.log('\n── 6) تصحيح المواد والأثر ──')
   {
     const { ctx, page, calls } = await open(browser)
     const A = FX.today.doctors[0]
@@ -316,7 +316,7 @@ const run = async () => {
   }
 
   // ═══ ٧) الصلاحيات ═══
-  console.log('\n── ٧) الصلاحيات ──')
+  console.log('\n── 7) الصلاحيات ──')
   for (const role of ['mgr', 'sup']) {
     const { ctx, page } = await open(browser, { role })
     await page.waitForSelector('.pex-doc')
@@ -348,7 +348,7 @@ const run = async () => {
   }
 
   // ═══ ٨) الإكسل ═══
-  console.log('\n── ٨) الإكسل ──')
+  console.log('\n── 8) الإكسل ──')
   {
     const { ctx, page, calls } = await open(browser, { path: `${PATH}&period=week` })
     await page.waitForSelector('.pex-doc')

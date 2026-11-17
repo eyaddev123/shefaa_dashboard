@@ -29,7 +29,7 @@ const PERIODS = [
 // صفحة الصندوق بالفصحى (طلب المستخدم 2026-11-14) — والحديد يبقى بكلامه
 const FORMAL = { today: 'اليوم', week: 'هذا الأسبوع', month: 'هذا الشهر', custom: 'من — إلى' }
 
-const fmtNum = (n) => Number(n || 0).toLocaleString('ar-SY', { maximumFractionDigits: 2 })
+const fmtNum = (n) => Number(n || 0).toLocaleString('ar-SY-u-nu-latn', { maximumFractionDigits: 2 })
 const rangeText = (d) => (d.from === d.to ? d.from : `${d.from} ← ${d.to}`)
 
 // ═══ الفترة: أزرارٌ وحقلا تاريخ، والحالة في الرابط ═══

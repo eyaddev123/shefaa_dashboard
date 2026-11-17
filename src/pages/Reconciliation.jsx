@@ -101,7 +101,7 @@ export default function Reconciliation() {
                 <td className="num">{r.file_number}</td>
                 <td>{r.head_name}</td>
                 <td>{AID_TYPES[r.aid_type]}</td>
-                <td>{DECISION_TYPES[r.decision_type]}{r.decision_value != null && ` — ${r.decision_type === 'percentage' ? Number(r.decision_value) + '٪' : fmtMoney(r.decision_value)}`}</td>
+                <td>{DECISION_TYPES[r.decision_type]}{r.decision_value != null && ` — ${r.decision_type === 'percentage' ? Number(r.decision_value) + '%' : fmtMoney(r.decision_value)}`}</td>
                 <td>{fmtDate(r.decided_at)}</td>
                 <td>{r.notified_at ? <span className="badge good">نعم</span> : <span className="badge warn">لا</span>}</td>
               </tr>

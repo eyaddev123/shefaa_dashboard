@@ -6000,3 +6000,16 @@ button.nurse-alert-btn:hover:not(:disabled) { filter: none; background: #fff3f3;
 /* شريط «إجراءات اليوم»: لا يغطّي القائمة الجانبية — عرضها ٢٢٤ بين ١٠٢٤ و١٢٨٠، ويختفي والدرج مفتوح (التابلت) */
 @media (min-width: 1024px) and (max-width: 1280px) { .dk-today { right: 224px; } }
 .layout.drawer-open .dk-today, .layout.drawer-open .dk-toast-float { visibility: hidden; }
+
+/* ═══ أسعار ورقة الإضافة عند الطبيب (2026-11-16): سعر الإجراء تحت اسمه، ومبلغ المادة بجانب وحدتها ═══ */
+.dk-pick-price { font-size: 12.5px; font-weight: 600; color: var(--text-secondary); }
+button.dk-pick:disabled .dk-pick-price { opacity: 0.7; }
+.dk-sel-row .dk-sel-name { flex: 1 1 auto; }
+.dk-sel-price { font-size: 13px; font-weight: 600; color: var(--text-secondary); white-space: nowrap; }
+.mat-price { font-size: 12.5px; font-weight: 600; color: var(--text-secondary); white-space: nowrap; margin-inline-start: auto; }
+/* في ورقة الطبيب: الاسم ينكمش كي يبقى المبلغ و× على سطر المادة نفسه (التابلت)؛ الجوال يلفّهما معاً */
+.dk-mats-body .mat-chosen li .mat-name { flex: 1 1 110px; min-width: 0; }
+.dk-total { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px;
+  margin-bottom: 10px; font-size: 14px; }
+.dk-total strong { font-size: 16px; }
+.dk-total-mats { font-size: 13px; color: var(--text-secondary); }

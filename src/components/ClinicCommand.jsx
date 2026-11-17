@@ -17,7 +17,7 @@ import { CC } from './cc-icons.jsx'
 // في بطاقةٍ كبيرة، فاللوحة تقوله كلاماً: ما هو صفرٌ يُحذف من السطر أو يصير جملة.
 
 const REFRESH_MS = 60000
-const fmtNum = (n) => Number(n || 0).toLocaleString('ar-SY', { maximumFractionDigits: 0 })
+const fmtNum = (n) => Number(n || 0).toLocaleString('ar-SY-u-nu-latn', { maximumFractionDigits: 0 })
 function Money({ value }) {
   // سالبٌ بجانب رقمٍ هنديّ: bdi باتجاهٍ صريح كي لا تقفز الإشارة
   return <bdi dir="rtl" className="cc-money">{Number(value) === 0 ? 'صفر' : fmtNum(value)}<span className="cash-unit">ل.س</span></bdi>

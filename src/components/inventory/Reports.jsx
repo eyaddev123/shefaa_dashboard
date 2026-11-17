@@ -88,7 +88,7 @@ function Consumption({ showToast, withCost }) {
                         {!r.is_active && <span className="badge sm" style={{ marginInlineStart: 6 }}>معطَّلة</span>}
                       </td>
                       <td className="num" data-label="الكمّية المستهلكة"><strong>{fmtQty(r.qty)}</strong> {r.unit}</td>
-                      <td className="num" data-label="في إجراءات">{r.lines.toLocaleString('ar-SY')}</td>
+                      <td className="num" data-label="في إجراءات">{r.lines.toLocaleString('ar-SY-u-nu-latn')}</td>
                       <td className="num" data-label="قيمة البيع">{fmtMoney(r.sale_value)}</td>
                       {withCost && (
                         <>
@@ -166,7 +166,7 @@ function Purchases({ showToast }) {
                 </tr>
               ))}
               <tr className="rev-total-row">
-                <td colSpan={5} className="rt-title">الإجمالي{data.missing_cost ? <span className="inv-muted"> — {data.missing_cost.toLocaleString('ar-SY')} بلا سعر لا تدخل فيه</span> : ''}</td>
+                <td colSpan={5} className="rt-title">الإجمالي{data.missing_cost ? <span className="inv-muted"> — {data.missing_cost.toLocaleString('ar-SY-u-nu-latn')} بلا سعر لا تدخل فيه</span> : ''}</td>
                 <td className="num">{fmtMoney(data.total)}</td>
               </tr>
             </tbody>

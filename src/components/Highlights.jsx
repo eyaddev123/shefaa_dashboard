@@ -14,8 +14,8 @@ import { CC } from './cc-icons.jsx'
 
 const KEY = 'board-highlights-open'
 const readOpen = () => { try { return localStorage.getItem(KEY) !== '0' } catch { return true } }
-const fmtInt = (n) => Number(n || 0).toLocaleString('ar-SY')
-const fmtMoney = (n) => `${Number(n || 0).toLocaleString('ar-SY', { maximumFractionDigits: 0 })} ل.س`
+const fmtInt = (n) => Number(n || 0).toLocaleString('ar-SY-u-nu-latn')
+const fmtMoney = (n) => `${Number(n || 0).toLocaleString('ar-SY-u-nu-latn', { maximumFractionDigits: 0 })} ل.س`
 const days = (n) => (n === 1 ? 'يوم' : n === 2 ? 'يومين' : `${fmtInt(n)} ${n <= 10 ? 'أيام' : 'يوماً'}`)
 const mins = (m) => {
   const h = Math.floor(m / 60), r = m % 60
@@ -23,7 +23,7 @@ const mins = (m) => {
 }
 // الوحدة «دوام» = دكتورٌ في يوم: «دوام واحد» · «دوامان» · «٥ دوامات» · «١٤ دواماً»
 const shifts = (n) => (n === 1 ? 'دوام واحد' : n === 2 ? 'دوامين' : `${fmtInt(n)} ${n <= 10 ? 'دوامات' : 'دواماً'}`)
-const pct = (x) => `${Math.round(x * 100).toLocaleString('ar-SY')}٪`
+const pct = (x) => `${Math.round(x * 100).toLocaleString('ar-SY-u-nu-latn')}%`
 const docLink = (id) => ({ pathname: `/clinic/doctors/${id}/dashboard`, search: '?period=week' })
 const SHORT = 3, SHORT_PEOPLE = 6
 
@@ -60,7 +60,7 @@ function Punctuality({ data, full }) {
 
   return (
     <div className="hl-punct">
-      {/* بكلامٍ لا بنسبةٍ وحدها: الوحدة «دوام» (دكتور × يوم) لا «يوم» — ١٤ يوماً في أسبوعٍ من ٥ أيام كانت تُربك */}
+      {/* بكلامٍ لا بنسبةٍ وحدها: الوحدة «دوام» (دكتور × يوم) لا «يوم» — 14 يوماً في أسبوعٍ من 5 أيام كانت تُربك */}
       <div className="hl-punct-sum">
         <span className="hl-punct-lbl">الالتزام بالدوام هالأسبوع</span>
         {actual ? <>

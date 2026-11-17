@@ -1,16 +1,18 @@
-import { useState } from 'react'
-import { matchesAr } from '../arabic-search.js'
-import { toLatinDigits } from '../api.js'
+import { useId } from 'react'
+import { toLatinDigits, fmtMoney } from '../api.js'
 import { ComboAdd } from './Combobox.jsx'
 
 // ═══ محرّر مواد سطر إجراء ═══
-// بحثٌ في كتالوج المواد **كاملاً** (لا ربط بين الإجراء وموادّه: الإجراء نفسه
-// قد يستهلك مواد مختلفة كلّ مرّة)، ولكلّ مادة كمّيتها. بلا أسعار إطلاقاً:
-// الاستقبال لا يرى سعر مادة، والخادم لا يرسله له أصلاً.
+// قائمةٌ منسدلة من كتالوج المواد **كاملاً** (لا ربط بين الإجراء وموادّه: الإجراء نفسه
+// قد يستهلك مواد مختلفة كلّ مرّة)، ولكلّ مادة كمّيتها. الكبسة تعرضها كلّها والكتابة تفلترها
+// — في كلّ مكان (طلب المستخدم 2026-11-16: «دروب داون، يعرضون ويبحث نفس الوقت»؛ كان البحث
+// الأعمى في صفحة الزيارة وأداة المراجعة).
+// الاستقبال لا يرى سعر مادة (الخادم لا يرسله لها). withPrice: الطبيب يرى سعر **البيع** لكلّ مادة
+// ومبلغ السطر (unit_price من الكتالوج — طلب المستخدم 2026-11-16)، وسعر الشراء لا يصله أصلاً.
 //
 // value: [{material_id, name, unit, qty}] — qty نصٌّ كما كُتب، يُتحقَّق منه بـ qtyValid.
 // والمادّة المعطَّلة القائمة على سطرٍ تبقى في value وإن غابت عن البحث.
-// combo: الكبسة تفتح القائمة كاملةً بدل البحث وحده (ComboAdd)، ومعها الرصيد إن وصل مع الكتالوج.
+// ومع كلّ مادة الرصيد إن وصل مع الكتالوج (الاستقبال، ومخزون المشرفة في الحديد).
 //
 // ★ الكمّية: [➖] الرقم [➕] — كبسةٌ = ±1، والكتابة باليد باقية احتياطاً (للكميات الكبيرة).
 //   الأدنى 1: ➖ معطّل عنده (الحذف بزرّ ×). الأعلى: الرصيد المتوفر إن وصل مع الكتالوج (الاستقبال؛ ومخزون
@@ -19,7 +21,6 @@ import { ComboAdd } from './Combobox.jsx'
 //   جديدة هنا. وبلا رصيدٍ في الكتالوج (الطبيب، المراجعة) الأعلى حدّ الخادم وحده.
 //   الأزرار تغيّر الحالة المحلّية وحدها: الحفظ بزرّ الشاشة كما كان، بطلبٍ واحد بالكمّية النهائية.
 
-const MAX_RESULTS = 8
 export const MAX_QTY = 9999999999.99   // NUMERIC(12,2) — حدّ الخادم (parseQty)
 const round2 = (n) => Math.round(n * 100) / 100
 
@@ -35,12 +36,24 @@ export const fmtQty = (q) => String(Number(q))
 export const materialsSummary = (items) =>
   (items || []).map((m) => `${m.name} ×${fmtQty(m.qty)} ${m.unit}`).join('، ')
 
-const fmtBalance = (n) => Number(n).toLocaleString('ar-SY', { maximumFractionDigits: 2 })
-const materialOption = (m) => ({
+const fmtBalance = (n) => Number(n).toLocaleString('ar-SY-u-nu-latn', { maximumFractionDigits: 2 })
+const hasPrice = (m) => m && m.unit_price !== undefined && m.unit_price !== null
+const materialOption = (m, withPrice) => ({
   value: String(m.id), label: m.name, m,
-  meta: m.balance === undefined ? m.unit : `${m.unit} — الرصيد ${fmtBalance(m.balance)}`,
+  meta: [m.unit, withPrice && hasPrice(m) && fmtMoney(m.unit_price),
+    m.balance !== undefined && `الرصيد ${fmtBalance(m.balance)}`].filter(Boolean).join(' — '),
   warn: m.balance !== undefined && Number(m.balance) <= 0,
 })
+
+/** قيمة المواد بسعر البيع: Σ الكمّية × unit_price من الكتالوج (الكمّية غير الصالحة لا تُحسب) */
+export function materialsValue(items, catalog) {
+  const byId = new Map((catalog || []).map((m) => [String(m.id), m]))
+  return round2((items || []).reduce((t, it) => {
+    const c = byId.get(String(it.material_id))
+    const q = parseQtyInput(it.qty)
+    return hasPrice(c) && q !== null ? t + Number(c.unit_price) * q : t
+  }, 0))
+}
 
 /**
  * الحدّ الأعلى لكمّية مادة: الرصيد المتوفر (+ ما صُرف عليها في السطر المحفوظ) إن عُرف، وإلا حدّ الخادم.
@@ -56,16 +69,16 @@ export function qtyLimit(material, catalog, saved) {
 }
 
 // comboHint: نصّ خانة القائمة المنسدلة — الافتراضيّ للاستقبال (مؤنّث)، وشاشة الطبيب تمرّر نصّاً محايداً
-export default function MaterialsEditor({ catalog, value, onChange, disabled, combo, saved, comboHint = 'اكبسي لعرض المواد، أو اكتبي للفلترة…' }) {
-  const [query, setQuery] = useState('')
+export default function MaterialsEditor({ catalog, value, onChange, disabled, saved, withPrice = false, comboHint = 'اكبسي لعرض المواد، أو اكتبي للفلترة…' }) {
+  const comboId = `mat-combo-${useId().replace(/:/g, '')}`   // أكثر من محرّر في الصفحة (ورقة الطبيب، الزيارة)
   const chosen = new Set(value.map((m) => String(m.material_id)))
-  const results = query.trim() === '' ? [] : (catalog || [])
-    .filter((m) => !chosen.has(String(m.id)) && matchesAr(m.name, query))
-    .slice(0, MAX_RESULTS)
+  const priceOf = (id) => {
+    const c = (catalog || []).find((x) => String(x.id) === String(id))
+    return withPrice && hasPrice(c) ? Number(c.unit_price) : null
+  }
 
   const add = (m) => {
     onChange([...value, { material_id: m.id, name: m.name, unit: m.unit, qty: '1' }])
-    setQuery('')
   }
   const setQty = (id, qty) => onChange(value.map((m) => (String(m.material_id) === String(id) ? { ...m, qty } : m)))
   const remove = (id) => onChange(value.filter((m) => String(m.material_id) !== String(id)))
@@ -88,7 +101,7 @@ export default function MaterialsEditor({ catalog, value, onChange, disabled, co
                 <span className="mat-name">{m.name}</span>
                 <span className="mat-step">
                   <button type="button" className="mat-minus" disabled={disabled || bad || q <= 1}
-                    aria-label={`إنقاص كمّية ${m.name}`} title={q <= 1 ? 'الأقلّ ١ — للحذف زرّ ×' : `إنقاص ${m.name}`}
+                    aria-label={`إنقاص كمّية ${m.name}`} title={q <= 1 ? 'الأقلّ 1 — للحذف زرّ ×' : `إنقاص ${m.name}`}
                     onClick={minus}>−</button>
                   <input className={`mat-qty${bad ? ' is-bad' : ''}`} value={m.qty} inputMode="decimal"
                     disabled={disabled} aria-label={`كمّية ${m.name}`} aria-invalid={bad}
@@ -98,6 +111,11 @@ export default function MaterialsEditor({ catalog, value, onChange, disabled, co
                     onClick={plus}>+</button>
                 </span>
                 <span className="mat-unit">{m.unit}</span>
+                {priceOf(m.material_id) !== null && (
+                  <span className="mat-price" title={`سعر البيع ${fmtMoney(priceOf(m.material_id))} للـ${m.unit}`}>
+                    {fmtMoney(bad ? priceOf(m.material_id) : round2(priceOf(m.material_id) * q))}
+                  </span>
+                )}
                 <button type="button" className="mat-x" disabled={disabled}
                   aria-label={`إزالة ${m.name}`} title={`إزالة ${m.name}`}
                   onClick={() => remove(m.material_id)}>×</button>
@@ -108,39 +126,12 @@ export default function MaterialsEditor({ catalog, value, onChange, disabled, co
           })}
         </ul>
       )}
-      {combo ? (
-        <div className="mat-search">
-          <ComboAdd id="mat-combo" ariaLabel="ابحث عن مادة" disabled={disabled || !catalog}
-            placeholder={catalog ? comboHint : 'جارٍ تحميل المواد…'}
-            options={(catalog || []).filter((m) => !chosen.has(String(m.id))).map(materialOption)}
-            emptyText="لا مواد متاحة" onPick={(o) => add(o.m)} />
-        </div>
-      ) : (
       <div className="mat-search">
-        <input type="search" value={query} disabled={disabled || !catalog}
-          placeholder={catalog ? 'ابحث عن مادة لإضافتها… (شاش، جبس…)' : 'جارٍ تحميل المواد…'}
-          aria-label="ابحث عن مادة"
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => {
-            // Enter يضيف أوّل نتيجة — الاستقبال يكتب بسرعة وهو يسمع الممرّضة
-            if (e.key === 'Enter') { e.preventDefault(); if (results[0]) add(results[0]) }
-            if (e.key === 'Escape') setQuery('')
-          }} />
-        {query.trim() !== '' && (
-          <ul className="mat-results" role="listbox">
-            {results.length === 0
-              ? <li className="mat-none">لا مادة بهذا الاسم{chosen.size ? ' (أو مضافة مسبقاً)' : ''}.</li>
-              : results.map((m) => (
-                <li key={m.id}>
-                  <button type="button" onClick={() => add(m)}>
-                    {m.name} <span className="mat-unit">— {m.unit}</span>
-                  </button>
-                </li>
-              ))}
-          </ul>
-        )}
+        <ComboAdd id={comboId} ariaLabel="ابحث عن مادة" disabled={disabled || !catalog}
+          placeholder={catalog ? comboHint : 'جارٍ تحميل المواد…'}
+          options={(catalog || []).filter((m) => !chosen.has(String(m.id))).map((m) => materialOption(m, withPrice))}
+          emptyText="لا مواد متاحة" onPick={(o) => add(o.m)} />
       </div>
-      )}
     </div>
   )
 }

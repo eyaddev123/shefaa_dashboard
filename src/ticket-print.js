@@ -121,7 +121,7 @@ export function ticketHtml(data, width = 80, heightMm = null, origin = '', copy 
      الاستقبال قد يعمل بلا إنترنت (شبكةٌ محلّية والطابعة عليها)، وخطٌّ من CDN
      يسقط صامتاً فتُطبع البطاقة بخطٍّ آخر. والمسار مطلقٌ من جذر الموقع: الإطار
      مستندٌ بلا عنوانٍ خاصٍّ به (about:blank) فالمسار النسبيّ لا يُحَلّ.
-     ونُحمّل الوزنين اللذين تستعملهما البطاقة وحدهما (٤٠٠ و٧٠٠). */
+     ونُحمّل الوزنين اللذين تستعملهما البطاقة وحدهما (400 و700). */
   @font-face {
     font-family: 'Cairo'; font-style: normal; font-weight: 400 700;
     font-display: block;   /* block لا swap: لا نريد ومضة خطٍّ بديلٍ تُطبع */
@@ -174,7 +174,7 @@ export function ticketHtml(data, width = 80, heightMm = null, origin = '', copy 
   .when { font-size: ${base - 2}pt; margin-top: 2mm; direction: ltr; }
   /* ★ فراغ النهاية: القاطع يبعد عن رأس الطباعة بنحو ٨مم، فبلا هذا الفراغ
      يقطع في آخر سطرٍ من النصّ. وهو داخلٌ في القياس فيصير طول الصفحة =
-     المحتوى + ٨مم بالضبط، لا ورقةً كاملة. */
+     المحتوى + 8مم بالضبط، لا ورقةً كاملة. */
   .cut { height: 8mm; }
 </style></head>
 <body><div class="t">

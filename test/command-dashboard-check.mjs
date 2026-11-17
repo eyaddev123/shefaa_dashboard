@@ -111,25 +111,25 @@ const run = async () => {
   if (!up) { console.error('لم يقلع vite'); process.exit(1) }
   const browser = await chromium.launch()
 
-  console.log('\n── ١) المشرفة: كلّ الأقسام، وطلبان فقط ──')
+  console.log('\n── 1) المشرفة: كلّ الأقسام، وطلبان فقط ──')
   {
     const { ctx, page, calls, errors } = await open(browser)
     await page.waitForSelector('.hl-grid')
     ok(await page.$$eval('.cc-stat', (x) => x.length) === 4, 'أربع بطاقات علوية')
-    ok((await text(page, '.cc-stats')).includes('٢٨'), 'مرضى اليوم بالأرقام')
+    ok((await text(page, '.cc-stats')).includes('28'), 'مرضى اليوم بالأرقام')
     ok(await has(page, '.cc-finance') && await has(page, '.cc-alerts') && await has(page, '.cc-scards'), 'المالية والتنبيهات والجلسات (بطاقات)')
-    ok((await text(page, '.cc-finance')).includes('من ٣٢ مريضاً'), 'عدد مرضى المقبوضات')
+    ok((await text(page, '.cc-finance')).includes('من 32 مريضاً'), 'عدد مرضى المقبوضات')
     const fin = (await text(page, '.cc-finance')).replace(/\s+/g, ' ')
-    ok(/إحالات اليوم/.test(fin) && /٦٧٥/.test(fin) && /مستحقّ على ٤ جهات عن ٦ مرضى/.test(fin), `★ إحالات اليوم بمبلغها وعددها (${fin.slice(-160)})`)
-    ok(/الهلال الأحمر\s*٣ مرضى\s*٣٧٥/.test(fin) && /مفوضية اللاجئين\s*مريض واحد\s*٧٥/.test(fin) && /وجهة واحدة غيرها/.test(fin), `★ الجهات الثلاث الأولى والباقي (${fin.slice(-150)})`)
+    ok(/إحالات اليوم/.test(fin) && /675/.test(fin) && /مستحقّ على 4 جهات عن 6 مرضى/.test(fin), `★ إحالات اليوم بمبلغها وعددها (${fin.slice(-160)})`)
+    ok(/الهلال الأحمر\s*3 مرضى\s*375/.test(fin) && /مفوضية اللاجئين\s*مريض واحد\s*75/.test(fin) && /وجهة واحدة غيرها/.test(fin), `★ الجهات الثلاث الأولى والباقي (${fin.slice(-150)})`)
     ok(await page.getAttribute('.cc-finance a[href="/clinic/referrals"]', 'href') === '/clinic/referrals', 'رابط الإحالات')
     ok((await text(page, '.cc-alerts')).includes('إجراءان بانتظار المحاسبة'), '★ مثنّى الإجراء')
     ok((await text(page, '.cc-alerts')).includes('مادتان عند الحدّ الأدنى'), '★ مثنّى المادة')
     ok((await text(page, '.cc-alerts')).includes('يومان بلا انصراف'), '★ مثنّى اليوم')
-    ok(await page.$eval('.cc-scard[href="/clinic/session/1"] .cc-scard-turn strong', (e) => e.textContent) === '٧', '★ الدور الحالي');
+    ok(await page.$eval('.cc-scard[href="/clinic/session/1"] .cc-scard-turn strong', (e) => e.textContent) === '7', '★ الدور الحالي');
     ok(await page.$eval('.cc-scard[href="/clinic/session/2"] .cc-scard-turn strong', (e) => e.textContent) === '—', 'بلا كشفٍ جارٍ: شرطة')
     ok(JSON.stringify(await page.$$eval('.cc-scard', (x) => x.map((a) => a.getAttribute('href').split('/').pop()))) === '["1","2","3"]', '★ الترتيب: شغّالة ⇐ جاهزة ⇐ منتهية')
-    ok((await text(page, '.cc-scard[href="/clinic/session/1"]')).includes('انتهى ٧ من ١٤'), 'التقدّم في البطاقة')
+    ok((await text(page, '.cc-scard[href="/clinic/session/1"]')).includes('انتهى 7 من 14'), 'التقدّم في البطاقة')
     // ‏/nurse-calls: تنبيه «أحتاج ممرضة» في كلّ صفحات المشرفة والاستقبال (App)، لا طلبٌ من اللوحة
     const api = calls.filter((c) => !c.includes('/auth/me') && !c.includes('notifications') && !c.includes('/unpaid') && !c.includes('/events')
       && !c.includes('/nurse-calls'))
@@ -141,13 +141,13 @@ const run = async () => {
     ok(await page.$$eval('.hl-box:first-child .hl-list li', (x) => x.length) === 5, '★ وبكبسة الخمسة')
     ok(await page.$$eval('.hl-box', (x) => x.length) === 3, '★ ثلاثة أوائل: مرضى · إجراءات · حصّة')
     const pu = await text(page, '.hl-punct')
-    ok(/الالتزام بالدوام/.test(pu) && /٧٥٪/.test(pu), `★ النسبة الكلّية بلا «بمواعيد خاصة»: ٦ من ٨ (${pu.slice(0, 80)})`)
+    ok(/الالتزام بالدوام/.test(pu) && /75%/.test(pu), `★ النسبة الكلّية بلا «بمواعيد خاصة»: 6 من 8 (${pu.slice(0, 80)})`)
     ok((await text(page, '.hl-col.is-on')).includes('د. رقم 1') && !(await text(page, '.hl-col.is-on')).includes('د. رقم 2'), '★ «بالوقت دائماً» من لم يتأخّر')
-    ok(/د\. رقم 2[\s\S]*تأخّر يومين من ٣، متوسّط ٣٥ د/.test(await text(page, '.hl-col.is-late')), '★ «يتأخّرون» بكم من كم ومتوسّط')
+    ok(/د\. رقم 2[\s\S]*تأخّر يومين من 3، متوسّط 35 د/.test(await text(page, '.hl-col.is-late')), '★ «يتأخّرون» بكم من كم ومتوسّط')
     ok(/غاب يوم/.test(await text(page, '.hl-col.is-away')) && /اعتذر يومين/.test(await text(page, '.hl-col.is-away')), '★ غياب واعتذار')
     ok((await text(page, '.hl-appt')).includes('د. رقم 5') && !(await text(page, '.hl-punct-cols')).includes('د. رقم 5'), '★ «بمواعيد خاصة» سطرٌ وحده')
-    ok((await text(page, '.hl-punct')).includes('خلال ٢٠ دقيقة'), 'السماح مكتوب')
-    ok(/من أصل ٨ دوامات سُجّل فيها وصول الدكتور، وصل ٦ بالوقت و٢ متأخّراً/.test((await text(page, '.hl-punct-lead')).replace(/\s+/g, ' ')), `★ الجملة بالكلام (${await text(page, '.hl-punct-lead')})`)
+    ok((await text(page, '.hl-punct')).includes('خلال 20 دقيقة'), 'السماح مكتوب')
+    ok(/من أصل 8 دوامات سُجّل فيها وصول الدكتور، وصل 6 بالوقت و2 متأخّراً/.test((await text(page, '.hl-punct-lead')).replace(/\s+/g, ' ')), `★ الجملة بالكلام (${await text(page, '.hl-punct-lead')})`)
     ok(/اعتذر\s*دوامين/.test(await text(page, '.hl-punct-legend')) && /غاب\s*دوام واحد/.test(await text(page, '.hl-punct-legend')), '★ كلّ سطرٍ بعدده ومعناه')
     ok(await page.getAttribute('.hl-who a', 'href') === '/clinic/doctors/1/dashboard?period=week', 'الاسم يفتح لوحة الدكتور بالأسبوع')
     ok(!/·\s*[٠-٩]|[٠-٩]\s*·/.test(await text(page, '.cc')), '★ لا «·» بجانب رقم هنديّ')
@@ -157,7 +157,7 @@ const run = async () => {
     await ctx.close()
   }
 
-  console.log('\n── ٢) الاستقبال ──')
+  console.log('\n── 2) الاستقبال ──')
   {
     const { ctx, page, calls } = await open(browser, { role: 'rec' })
     await page.waitForSelector('.cc-stats')
@@ -173,7 +173,7 @@ const run = async () => {
     await ctx.close()
   }
 
-  console.log('\n── ٣) الفراغ والتوليد ──')
+  console.log('\n── 3) الفراغ والتوليد ──')
   {
     const { ctx, page, calls } = await open(browser, { empty: true })
     await page.waitForSelector('.cc-empty')
@@ -196,7 +196,7 @@ const run = async () => {
     await ctx.close()
   }
 
-  console.log('\n── ٤) من له قسمان، والباقون ──')
+  console.log('\n── 4) من له قسمان، والباقون ──')
   {
     const { ctx, page, calls } = await open(browser, { role: 'mgr' })
     await page.waitForSelector('.cc-stats')
@@ -246,7 +246,7 @@ const run = async () => {
     await ctx.close()
   }
 
-  console.log('\n── ٥) لوحة الدكتور بلا «الأبرز» ──')
+  console.log('\n── 5) لوحة الدكتور بلا «الأبرز» ──')
   {
     const { ctx, page, calls } = await open(browser, { path: '/clinic/doctors/1/dashboard' })
     await page.waitForSelector('h2')
@@ -256,7 +256,7 @@ const run = async () => {
     await ctx.close()
   }
 
-  console.log('\n── ٦) المقاسات والثيمان ──')
+  console.log('\n── 6) المقاسات والثيمان ──')
   for (const [w, h] of [[1920, 1080], [1366, 768], [1024, 768], [768, 1024], [390, 844]]) for (const theme of ['light', 'dark']) for (const empty of [false, true]) {
     const { ctx, page, errors } = await open(browser, { w, h, theme, empty })
     await page.waitForSelector('.hl-grid')

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { api } from '../../api.js'
+import { api, fmtDay as fmtNumDay, fmtMonth } from '../../api.js'
 import { Modal, fmtDay } from '../inventory/shared.jsx'
 
 // ═══ «كل المواد وأرباحها» — الصفحة تحت الصندوق (?view=materials)، ونافذة المادة، والرسم ═══
@@ -8,14 +8,13 @@ import { Modal, fmtDay } from '../inventory/shared.jsx'
 // (buildProfitBoard) — هنا عرضٌ وترتيبٌ وبحثٌ محلّي. والنسبة فوق سعر الشراء: ربح ٤٠ على ١٨٠ = ٢٢٪.
 // الشكل كشبكة المخزون: بطاقاتٌ محايدة بلا «برقعة ألوان»، وشارةٌ صغيرة للمشكلة وحدها.
 
-export const fmtNum = (n) => Number(n || 0).toLocaleString('ar-SY', { maximumFractionDigits: 2 })
-const fmtInt = (n) => Number(n || 0).toLocaleString('ar-SY', { maximumFractionDigits: 0 })
+export const fmtNum = (n) => Number(n || 0).toLocaleString('ar-SY-u-nu-latn', { maximumFractionDigits: 2 })
+const fmtInt = (n) => Number(n || 0).toLocaleString('ar-SY-u-nu-latn', { maximumFractionDigits: 0 })
 export const signed = (n) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${fmtNum(Math.abs(n))}`
-export const pctText = (p) => (p === null || p === undefined ? null : `${Number(p).toLocaleString('ar-SY', { maximumFractionDigits: 1 })}٪`)
+export const pctText = (p) => (p === null || p === undefined ? null : `${Number(p).toLocaleString('ar-SY-u-nu-latn', { maximumFractionDigits: 1 })}%`)
 const qtyText = (q, unit) => `${fmtNum(q)} ${unit}`
-// «١٤ تشرين الثاني» للأيام و«تشرين الثاني» للأشهر
-const shortDay = (k) => new Date(`${k.length === 7 ? `${k}-01` : k}T00:00:00`)
-  .toLocaleDateString('ar-SY', k.length === 7 ? { month: 'long' } : { day: 'numeric', month: 'long' })
+// «14/11» للأيام و«11/2026» للأشهر
+const shortDay = (k) => (k.length === 7 ? fmtMonth(k) : fmtNumDay(`${k}T00:00:00`, { year: false }))
 
 // ═══ الرسم: عمودٌ لكلّ يوم (أو شهر) — البيع خفيف خلف الربح ═══
 export function DailyChart({ daily, title = 'الربح اليومي' }) {
@@ -111,7 +110,7 @@ export function MaterialsView({ data, query, periodLabel, onBack, initial = null
       )}
       <p className="earn-note">
         ربح القطعة = سعر البيع الحالي − متوسّط سعر الشراء الحالي، والنسبة فوق سعر الشراء. ربح الفترة من مواد الإجراءات المقبوضة (بيوم القبض)
-        ومواد جلسات الحديد (بيوم الجلسة)، بكلفة القطعة لحظة صرفها، فالشراء اللاحق لا يغيّر ربح ما بيع. جلسات الحديد قبل ١٤ تشرين الثاني ٢٠٢٦
+        ومواد جلسات الحديد (بيوم الجلسة)، بكلفة القطعة لحظة صرفها، فالشراء اللاحق لا يغيّر ربح ما بيع. جلسات الحديد قبل 14 تشرين الثاني 2026
         طُرحت موادّها بسعر الشراء فلا ربح لها.
       </p>
       {open && <MaterialProfitDialog row={open} query={query} onClose={() => setOpen(null)} />}

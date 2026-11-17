@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { api, VISIT_TYPES, todayLocal } from '../api.js'
+import { api, VISIT_TYPES, todayLocal, fmtDay } from '../api.js'
 import { AttendanceBadge, usePolling } from '../attendance-ui.jsx'
 import BottomSheet from '../components/BottomSheet.jsx'
 
@@ -15,9 +15,9 @@ import BottomSheet from '../components/BottomSheet.jsx'
 //   • جملة ملخّص وترشيحٌ بنوع الزيارة: «مين إجا معاينات ومين إجا مراجعات».
 // ═══════════════════════════════════════════════════════════════════
 
-const n = (x) => Number(x || 0).toLocaleString('ar-SY')
-const dayTitle = (ymd) => new Date(`${ymd}T12:00:00`).toLocaleDateString('ar-SY', { weekday: 'long', day: 'numeric', month: 'long' })
-const longDay = (ymd) => new Date(`${ymd}T12:00:00`).toLocaleDateString('ar-SY', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+const n = (x) => Number(x || 0).toLocaleString('ar-SY-u-nu-latn')
+const dayTitle = (ymd) => fmtDay(`${ymd}T12:00:00`, { weekday: true, year: false })
+const longDay = (ymd) => fmtDay(`${ymd}T12:00:00`, { weekday: true })
 // جمع المعدود: «مريض واحد»، «مريضان»، «٣ مرضى»، «١١ مريضاً»
 const count = (k, [one, two, few, many]) => (k === 1 ? one : k === 2 ? two : `${n(k)} ${k >= 3 && k <= 10 ? few : many}`)
 const PATIENTS = ['مريض واحد', 'مريضان', 'مرضى', 'مريضاً']

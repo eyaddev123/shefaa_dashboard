@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ProcedureSpecialties, specialtiesText } from '../../SpecialtyPicker.jsx'
 import { useDialogs } from '../../dialogs.jsx'
-import { api, fmtMoney, toLatinDigits } from '../../api.js'
+import { api, fmtMoney, toLatinDigits, fmtDay } from '../../api.js'
 import { Modal } from '../inventory/shared.jsx'
 
 // ═══ نافذة الإجراء: إضافة جديد، أو فتح إجراءٍ قائم ═══
@@ -11,7 +11,7 @@ import { Modal } from '../inventory/shared.jsx'
 // تعديل السعر أو المستهلكات يسري على ما يُضاف بعده فقط — ويُسأل عنه بتأكيدٍ صريح كما كان.
 
 const specKey = (sp) => (sp.isGeneral ? 'general' : [...sp.specialtyIds].map(String).sort().join(','))
-const fmtNum = (n) => Number(n || 0).toLocaleString('ar-SY', { maximumFractionDigits: 2 })
+const fmtNum = (n) => Number(n || 0).toLocaleString('ar-SY-u-nu-latn', { maximumFractionDigits: 2 })
 const timesText = (n) => (n === 0 ? 'لم يُستعمل بعد' : n === 1 ? 'استُعمل مرّةً واحدة' : n === 2 ? 'استُعمل مرّتين'
   : `استُعمل ${fmtNum(n)} ${n % 100 >= 3 && n % 100 <= 10 ? 'مرّات' : 'مرّة'}`)
 
@@ -105,7 +105,7 @@ export default function ProcedureDialog({ proc, canEdit, canHistory, seesConsuma
     <Modal title={isNew ? 'إجراء جديد' : proc.name} sheet onClose={onClose} busy={busy}
       subtitle={isNew
         ? 'يظهر للاستقبال عند دكاترة اختصاصاته. والسعر هو ما يدفعه المريض.'
-        : `${proc.is_active ? '' : 'معطَّل — '}${timesText(proc.times_used)}${by ? `، آخر تعديل: ${by}` : ''}${at ? ` (${new Date(at).toLocaleDateString('ar-SY', { day: 'numeric', month: 'long', year: 'numeric' })})` : ''}`}>
+        : `${proc.is_active ? '' : 'معطَّل — '}${timesText(proc.times_used)}${by ? `، آخر تعديل: ${by}` : ''}${at ? ` (${fmtDay(at)})` : ''}`}>
       <form className="inv-form pcx-form" onSubmit={submit}>
         <div className="field"><label htmlFor="pcx-name">اسم الإجراء</label>
           <input id="pcx-name" value={name} maxLength={150} autoFocus={isNew} placeholder="مثال: تخطيط قلب"

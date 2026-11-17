@@ -122,7 +122,7 @@ export default function CloseSweepDialog({ session, pending: initial, onDone, on
         {unpaid.length > 0 && (
           <div className="cs-line cs-group cs-unpaid">
             <p>
-              <b>إجراءات بانتظار المحاسبة</b> ({unpaid.length.toLocaleString('ar-SY')}) —{' '}
+              <b>إجراءات بانتظار المحاسبة</b> ({unpaid.length.toLocaleString('ar-SY-u-nu-latn')}) —{' '}
               <span className="cs-effect">للعلم: الإغلاق لا يعلّمها مدفوعة ولا يحذفها — تبقى معلّقة.</span>
             </p>
             <ul className="cs-names">

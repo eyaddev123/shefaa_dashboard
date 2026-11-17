@@ -25,7 +25,7 @@ const BASE = `http://127.0.0.1:${PORT}`
 // ★ خارج 17625 (منفذ الوسيط الحقيقيّ): تصادمٌ كان سيطبع فعلاً
 const P58 = 18100 + Math.floor(Math.random() * 800)
 const P80 = P58 + 1
-const HEAD = 576, STRIP = 384      // ٧٢مم و٤٨مم على ٢٠٣dpi
+const HEAD = 576, STRIP = 384      // 72مم و48مم على 203dpi
 
 let pass = 0
 const failures = []
@@ -92,7 +92,7 @@ const run = async () => {
     const jobs = join(work, `jobs-${printable}`)
     const cfg = join(work, `cfg-${printable}.json`)
     const conf = { port, printer: 'DRY-RUN-NO-SUCH-PRINTER', token: 'tk', origins: [BASE], log: join(work, `h${printable}.log`) }
-    if (printable === 58) conf.printable_width = 58      // ٨٠ = الإعداد القديم بلا المفتاح أصلاً
+    if (printable === 58) conf.printable_width = 58      // 80 = الإعداد القديم بلا المفتاح أصلاً
     writeFileSync(cfg, JSON.stringify(conf))
     const p = spawn(process.execPath, [resolve(ROOT, 'print-helper/src/server.js')],
       { env: { ...process.env, SHEFAA_PRINT_CONFIG: cfg, SHEFAA_PRINT_DRY_RUN: jobs }, stdio: ['ignore', 'pipe', 'pipe'] })
@@ -118,7 +118,7 @@ const run = async () => {
   if (!up) { console.error('✖ لم يُقلع خادم Vite'); stop(); process.exit(1) }
 
   // ★ حارس: المجيبان وسيطانا الجافّان — وإلّا لا طباعة إطلاقاً
-  console.log('\n── ١) الوسيط يعلن عرض الورق ──')
+  console.log('\n── 1) الوسيط يعلن عرض الورق ──')
   const health = {}
   for (const [w, port] of [[58, P58], [80, P80]]) {
     health[w] = await fetch(`http://127.0.0.1:${port}/health`, { headers: { Origin: BASE } }).then((r) => r.json()).catch(() => ({}))
@@ -126,7 +126,7 @@ const run = async () => {
   }
   ok(health[58].printable_width === 58, '★ printable_width: 58 ⇒ /health يقول 58', JSON.stringify(health[58]))
   ok(health[80].printable_width === 80, '★ config.json بلا المفتاح ⇒ 80 (كما كان)', String(health[80].printable_width))
-  ok(/ورق 58مم/.test(h58.log), 'سجلّ الإقلاع يذكر ورق ٥٨مم', h58.log.slice(0, 160))
+  ok(/ورق 58مم/.test(h58.log), 'سجلّ الإقلاع يذكر ورق 58مم', h58.log.slice(0, 160))
 
   const browser = await chromium.launch()
   const page = await browser.newPage()
@@ -154,22 +154,22 @@ const run = async () => {
   }
 
   // ── ٢) ٥٨: نسختان، اللوحة ٥٧٦، والحبر كلّه في الشريط الأيسر ──
-  console.log('\n── ٢) ورق ٥٨مم: نسختان ──')
+  console.log('\n── 2) ورق 58مم: نسختان ──')
   const r58 = await printVia(DATA, P58, 2)
   ok(r58.ok && r58.copies === 2 && r58.mode === 'one-job' && r58.printable === 58,
-    '★ الطباعة نجحت: نسختان في مهمّةٍ واحدة، مرسومتان لـ٥٨', JSON.stringify(r58))
+    '★ الطباعة نجحت: نسختان في مهمّةٍ واحدة، مرسومتان لـ58', JSON.stringify(r58))
   const j58 = lastJob(h58)
   ok(j58.ops.join(',') === 'init,raster,feed,cut,raster,feed,cut', '★ القطع كما هو: اطبع، اقطع، اطبع، اقطع', j58.ops.join(' → '))
   j58.images.forEach((img, i) => {
     const mx = maxInkX(img)
-    ok(img.width === HEAD, `النسخة ${i + 1}: عرض السطر ٥٧٦ نقطة كما على ٨٠ (البروتوكول لم يتغيّر)`, String(img.width))
-    ok(mx >= 0 && mx < STRIP, `★★ النسخة ${i + 1}: لا بكسل أسود يمين حدّ ٥٨مم (أقصى حبر x=${mx} < ${STRIP})`, String(mx))
+    ok(img.width === HEAD, `النسخة ${i + 1}: عرض السطر 576 نقطة كما على 80 (البروتوكول لم يتغيّر)`, String(img.width))
+    ok(mx >= 0 && mx < STRIP, `★★ النسخة ${i + 1}: لا بكسل أسود يمين حدّ 58مم (أقصى حبر x=${mx} < ${STRIP})`, String(mx))
     shot(img, `paper58-copy-${i + 1}.png`)
   })
   ok(!/حبرٌ يمين/.test(h58.log), 'الوسيط لم يرَ حبراً خارج الشريط')
 
   // ── ٣) المحاذاة: المتوسّط على ٨٠ صار متوسّطاً على الشريط ──
-  console.log('\n── ٣) المحاذاة ورقم الدور ──')
+  console.log('\n── 3) المحاذاة ورقم الدور ──')
   const b58 = bands(j58.images[0])
   const r80 = await printVia(DATA, P80, 1)
   const j80 = lastJob(h80)
@@ -178,27 +178,27 @@ const run = async () => {
   const q58 = queueOf(b58), q80 = queueOf(b80)
   ok(Math.abs(q58.cx - STRIP / 2) <= 8, `★ رقم الدور متوسّطٌ على الشريط (مركزه ${q58.cx} ≈ ${STRIP / 2})`, String(q58.cx))
   ok(Math.abs(b58[0].cx - STRIP / 2) <= 8, `★ اسم المجمع متوسّطٌ على الشريط (مركزه ${b58[0].cx})`, String(b58[0].cx))
-  ok(Math.abs(q80.cx - HEAD / 2) <= 8, `على ٨٠: رقم الدور متوسّطٌ على الرأس كما كان (${q80.cx} ≈ ${HEAD / 2})`, String(q80.cx))
+  ok(Math.abs(q80.cx - HEAD / 2) <= 8, `على 80: رقم الدور متوسّطٌ على الرأس كما كان (${q80.cx} ≈ ${HEAD / 2})`, String(q80.cx))
   const second58 = b58.filter((b) => b !== q58).reduce((a, b) => (b.h > a.h ? b : a))
   ok(q58.h >= 1.8 * second58.h, `★ رقم الدور أكبر عنصرٍ بفارق: ${q58.h} نقطة مقابل ${second58.h} للتالي`, `${q58.h}/${second58.h}`)
   ok(q58.h >= 50, `★ رقم الدور واضحٌ من بعيد (ارتفاع الحبر ${q58.h} نقطة ≈ ${(q58.h / 8).toFixed(1)}مم)`, String(q58.h))
   // أصغر سطرٍ مقروء: لا شريط أدنى من ١٠ نقاط (≈١.٢مم) — عدا خطوط الفصل
   const textBands = b58.filter((b) => b.x1 - b.x0 < STRIP - 40 || b.h > 4)
   const minH = Math.min(...textBands.filter((b) => b.h > 4).map((b) => b.h))
-  ok(minH >= 10, `أصغر سطرٍ ارتفاعه ${minH} نقطة (≥ ١٠)`, String(minH))
-  ok(b58.length >= b80.length, `المحتوى كاملاً: ${b58.length} شريطاً على ٥٨ مقابل ${b80.length} على ٨٠`)
+  ok(minH >= 10, `أصغر سطرٍ ارتفاعه ${minH} نقطة (≥ 10)`, String(minH))
+  ok(b58.length >= b80.length, `المحتوى كاملاً: ${b58.length} شريطاً على 58 مقابل ${b80.length} على 80`)
   shot(j80.images[0], 'paper80.png')
 
   // ── ٤) أطول بيانات: تلتفّ داخل الشريط ولا تخرج منه ──
-  console.log('\n── ٤) اسمٌ وإجراءٌ طويلان ──')
+  console.log('\n── 4) اسمٌ وإجراءٌ طويلان ──')
   const rl = await printVia(LONG, P58, 1)
   const jl = lastJob(h58)
   const mxl = maxInkX(jl.images[0])
-  ok(rl.ok && mxl >= 0 && mxl < STRIP, `★★ لا حبر يمين حدّ ٥٨مم حتى مع الأسماء الطويلة (x=${mxl})`, String(mxl))
+  ok(rl.ok && mxl >= 0 && mxl < STRIP, `★★ لا حبر يمين حدّ 58مم حتى مع الأسماء الطويلة (x=${mxl})`, String(mxl))
   shot(jl.images[0], 'paper58-long.png')
 
   // ── ٥) ٨٠ لم يتغيّر: الإعداد القديم يرسم كما كان، ومن غير المسار الجديد ──
-  console.log('\n── ٥) ٨٠مم كما كان ──')
+  console.log('\n── 5) 80مم كما كان ──')
   const same = await page.evaluate(async (d) => {
     const m = await import('/src/print-helper.js')
     const a = await m.renderTicketPng(d, 80, document, {})
@@ -206,10 +206,10 @@ const run = async () => {
     return a.png === b.png && a.width === 576
   }, DATA)
   ok(same, 'printable 80 ⇒ الرسم نفسه بايتاً بايتاً كالرسم بلا الإعداد')
-  ok(maxInkX(j80.images[0]) > STRIP, 'على ٨٠ المحتوى يمتدّ على الرأس كلّه (لم يُحشر في الشريط)')
+  ok(maxInkX(j80.images[0]) > STRIP, 'على 80 المحتوى يمتدّ على الرأس كلّه (لم يُحشر في الشريط)')
 
   // ── ٦) واجهةٌ أقدم ترسل بطاقة ٨٠ إلى وسيطٍ على ٥٨: تُطبع، ويُسجَّل تحذير ──
-  console.log('\n── ٦) تشخيص واجهةٍ قديمة ──')
+  console.log('\n── 6) تشخيص واجهةٍ قديمة ──')
   const old = await page.evaluate(async (d) => {
     const m = await import('/src/print-helper.js')
     return (await m.renderTicketPng(d, 80, document, {})).png
@@ -228,7 +228,7 @@ const run = async () => {
 
   console.log(`\n═══ ${pass} تحقّقاً ناجحاً، ${failures.length} فشلاً ═══`)
   if (failures.length) { failures.forEach((f) => console.error(`  ✖ ${f}`)); process.exit(1) }
-  console.log('✔ على ٥٨ كلّ الحبر في الشريط الأيسر ومتوسّطٌ عليه، و٨٠ كما كان\n')
+  console.log('✔ على 58 كلّ الحبر في الشريط الأيسر ومتوسّطٌ عليه، و80 كما كان\n')
 }
 
 run().catch((e) => { console.error(e); process.exit(1) })

@@ -85,7 +85,7 @@ async function run() {
   }
   const browser = await chromium.launch()
 
-  console.log('\n── ١) الحجز: الخيار وما يُرسله ──')
+  console.log('\n── 1) الحجز: الخيار وما يُرسله ──')
   for (const [w, h] of [[1366, 900], [390, 844]]) {
     const { ctx, page, calls } = await open(browser, `/clinic/session/${SID}`, { w, h })
     await page.click('text=+ حجز جديد')
@@ -118,7 +118,7 @@ async function run() {
     await ctx.close()
   }
 
-  console.log('\n── ٢) الطابور ──')
+  console.log('\n── 2) الطابور ──')
   {
     const { ctx, page } = await open(browser, `/clinic/session/${SID}?tab=all`)
     await page.waitForSelector(`text=${R.poArrived.full_name}`)
@@ -135,7 +135,7 @@ async function run() {
     await ctx.close()
   }
 
-  console.log('\n── ٣) صفحة الزيارة: المبلغ وقفل النوع ──')
+  console.log('\n── 3) صفحة الزيارة: المبلغ وقفل النوع ──')
   const visit = (a) => `/clinic/session/${SID}/visit/${a.id}`
   const editOptions = async (page) => {
     await page.locator('.visit-patient button:has-text("تعديل")').click()
@@ -186,7 +186,7 @@ async function run() {
     await ctx.close()
   }
 
-  console.log('\n── ٤) شاشة الطبيب ──')
+  console.log('\n── 4) شاشة الطبيب ──')
   {
     const { ctx, page } = await open(browser, '/clinic/doctor', { role: 'doctor', w: 390, h: 844 })
     await page.waitForSelector('.dk-current-who')
@@ -196,7 +196,7 @@ async function run() {
     await ctx.close()
   }
 
-  console.log('\n── ٥) البطاقتان: لا سطر كشفية ──')
+  console.log('\n── 5) البطاقتان: لا سطر كشفية ──')
   {
     const { ctx, page } = await open(browser, `/clinic/session/${SID}`)
     await page.waitForSelector('text=+ حجز جديد')
@@ -230,7 +230,7 @@ async function run() {
     await ctx.close()
   }
 
-  console.log('\n── ٦) الجرد ──')
+  console.log('\n── 6) الجرد ──')
   {
     const report = clone(CASH.four)
     const d = report.doctors[0]
@@ -241,7 +241,7 @@ async function run() {
     const feeCountBefore = d.totals.patients - 1
     const { ctx, page } = await open(browser, '/clinic/cash-report', { role: 'umosama', on: { '/reception/cash-report': () => report, '/clinic/doctors': () => [] } })
     await page.waitForSelector('.cash-doc-break')
-    const fa = (n) => Number(n).toLocaleString('ar-SY')
+    const fa = (n) => Number(n).toLocaleString('ar-SY-u-nu-latn')
     ok((await textOf(page.locator('.cash-doc-break').first())).includes(`الكشوف (${fa(feeCountBefore)})`), '★ «الكشوف» لا تعدّ مرضى «إجراء فقط»')
     await page.click('.cash-docs-head .link-btn')   // الكتل مطويّة افتراضاً
     const tr = page.locator('tr:has-text("مريض إجراء فقط")')
@@ -251,7 +251,7 @@ async function run() {
     await ctx.close()
   }
 
-  console.log('\n── ٧) المستحقات: «إجراء فقط» بلا إجراء في «يحتاج انتباهك» (تبويب المراجعة أُزيل) ──')
+  console.log('\n── 7) المستحقات: «إجراء فقط» بلا إجراء في «يحتاج انتباهك» (تبويب المراجعة أُزيل) ──')
   {
     const visits = [{ id: '104', session_id: SID, session_date: '2026-10-25', patient_name: 'مريض رقم 104', doctor_name: 'د. خالد' }]
     const earnings = { from: '2026-10-25', to: '2026-10-25', period: 'today', doctors: [],

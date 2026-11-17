@@ -92,7 +92,7 @@ const run = async () => {
   const browser = await chromium.launch()
 
   // ═══ ١) كل الحالات × المقاسين × الثيمين ═══
-  console.log('\n── ١) الحالات × المقاسات × الثيمات ──')
+  console.log('\n── 1) الحالات × المقاسات × الثيمات ──')
   for (const key of Object.keys(S)) {
     const a = apptOf(key)
     for (const [w, h] of [[1366, 768], [1920, 1080]]) {
@@ -147,7 +147,7 @@ const run = async () => {
   }
 
   // ═══ ٢) ما يخصّ كل حالة ═══
-  console.log('\n── ٢) الحالات الفارغة وما يخصّ كل حالة ──')
+  console.log('\n── 2) الحالات الفارغة وما يخصّ كل حالة ──')
   const text = (page, sel) => page.evaluate((s) => document.querySelector(s)?.innerText || '', sel)
   {
     const { ctx, page } = await open(browser, { path: visitPath('new') })
@@ -252,7 +252,7 @@ const run = async () => {
   }
 
   // ═══ ٣) الطبيب: لا يرى الطابور فلا يرى تفاصيل زيارة ═══
-  console.log('\n── ٣) الصلاحيات ──')
+  console.log('\n── 3) الصلاحيات ──')
   {
     const { ctx, page, calls } = await open(browser, { role: 'doctor', path: visitPath('procedures') })
     await page.waitForURL('**/clinic/doctor', { timeout: 5000 }).catch(() => {})
@@ -262,7 +262,7 @@ const run = async () => {
   }
 
   // ═══ ٤) الطابور ⇐ الزيارة ⇐ رجوع إلى الموضع نفسه ═══
-  console.log('\n── ٤) من الطابور وإليه ──')
+  console.log('\n── 4) من الطابور وإليه ──')
   {
     // تبويب «الكل»: الافتراضي «بانتظار الحضور» لا يُظهر من هو قيد الكشف أو حاضر
     const { ctx, page } = await open(browser, { h: 600, path: `/clinic/session/${S.procedures.session}?tab=all` })
@@ -300,7 +300,7 @@ const run = async () => {
   }
 
   // ═══ ٥) التحديث الحيّ عبر بثّ الموظفين ═══
-  console.log('\n── ٥) التحديث الحيّ ──')
+  console.log('\n── 5) التحديث الحيّ ──')
   {
     const sid = S.procedures.session
     const after = clone(FX.queues[sid])

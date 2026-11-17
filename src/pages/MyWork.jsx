@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { api, fmtMoney, openStaffStream, todayLocal } from '../api.js'
+import { api, fmtMoney, openStaffStream, todayLocal, fmtDay, fmtMonth } from '../api.js'
 import { useDialogs } from '../dialogs.jsx'
 import { useToast } from '../action-feedback.jsx'
 import { fmtDuration, fmtMinutes, clockTitle } from '../components/Punctuality.jsx'
@@ -22,13 +22,11 @@ import { partLines, partsOf } from '../pay-parts.js'
 // ═══════════════════════════════════════════════════════════════════
 
 const PERIODS = [['today', 'اليوم'], ['week', 'هذا الأسبوع'], ['month', 'هذا الشهر'], ['last_month', 'الشهر الماضي']]
-const MONTHS = ['كانون الثاني', 'شباط', 'آذار', 'نيسان', 'أيار', 'حزيران', 'تموز', 'آب', 'أيلول',
-  'تشرين الأول', 'تشرين الثاني', 'كانون الأول']
-const n = (x) => Number(x || 0).toLocaleString('ar-SY', { maximumFractionDigits: 2 })
-const monthTitle = (m) => (m ? `${MONTHS[Number(m.slice(5, 7)) - 1]} ${Number(m.slice(0, 4)).toLocaleString('ar-SY', { useGrouping: false })}` : '')
+const n = (x) => Number(x || 0).toLocaleString('ar-SY-u-nu-latn', { maximumFractionDigits: 2 })
+const monthTitle = (m) => (m ? fmtMonth(m) : '')
 const count = (k, [one, two, few, many]) => (k === 1 ? one : k === 2 ? two : `${n(k)} ${k >= 3 && k <= 10 ? few : many}`)
 const DAYS = ['يوم واحد', 'يومان', 'أيام', 'يوماً']
-const dayName = (ymd) => new Date(`${ymd}T12:00:00`).toLocaleDateString('ar-SY', { weekday: 'long', day: 'numeric', month: 'long' })
+const dayName = (ymd) => fmtDay(`${ymd}T12:00:00`, { weekday: true, year: false })
 
 // ═══ ١) كم عملت ═══
 function WorkCard({ work, withProcedures }) {
@@ -197,7 +195,7 @@ function DutyCard({ punct, sal, period, from, to }) {
 
 // ═══ ٤) كيف تُحسب حصّتي — مطويّ ═══
 const ruleText = (r) => (r.kind !== 'percent' ? `مبلغ ثابت ${fmtMoney(r.value)}`
-  : r.value === 0 ? 'بلا حصّة' : `${n(r.value)}٪ بعد المواد`)
+  : r.value === 0 ? 'بلا حصّة' : `${n(r.value)}% بعد المواد`)
 function ShareRule() {
   const [rule, setRule] = useState(null)
   const [err, setErr] = useState(null)

@@ -117,7 +117,7 @@ const run = async () => {
   const browser = await chromium.launch()
 
   // ═══ ١) الحالات × المقاسات × الثيمات ═══
-  console.log('\n── ١) الحالات × المقاسات × الثيمات ──')
+  console.log('\n── 1) الحالات × المقاسات × الثيمات ──')
   for (const state of ['four', 'two', 'empty']) {
     const R = FX[state]
     for (const [w, h] of [[1366, 768], [1920, 1080]]) {
@@ -158,7 +158,7 @@ const run = async () => {
             return x.startsWith(label) && nums[0] === Number(n) && nums[1] === Number(amount)
           })
         }), `${tag}: سطر التفصيل = الخادم (${m.docs.map((d) => d.brk.join(' | ')).join(' ‖ ')})`)
-        ok(m.docs.every((d) => d.brk.every((x) => !/\(٠\)/.test(x) && !x.includes('·'))), `${tag}: لا «(٠)» ولا «·» بجانب الأرقام في التفصيل`)
+        ok(m.docs.every((d) => d.brk.every((x) => !/\(0\)/.test(x) && !x.includes('·'))), `${tag}: لا «(0)» ولا «·» بجانب الأرقام في التفصيل`)
         ok(m.docs.filter((d, i) => R.doctors[i].totals.referralCount > 0).every((d) => d.brk.some((x) => x.includes('−') && x.includes('على الجهات'))),
           `${tag}: الإحالات بصيغة خصم «− … على الجهات»`)
         ok(m.docs.every((d) => d.brkTop > d.nameTop && d.brkTop >= d.totalBottom - 4 && Math.abs(d.nameTop - d.totalTop) < 14),
@@ -184,7 +184,7 @@ const run = async () => {
   console.log(`  ${pass} ✔ حتى الآن`)
 
   // ═══ ٢) محتوى الكتل المفتوحة ═══
-  console.log('\n── ٢) الكتل مفتوحة ──')
+  console.log('\n── 2) الكتل مفتوحة ──')
   {
     const R = FX.four
     const { ctx, page } = await open(browser, { report: R })
@@ -227,7 +227,7 @@ const run = async () => {
   }
 
   // ═══ ٣) فحص التطابق الأحمر ═══
-  console.log('\n── ٣) فرق بين الحسابين ──')
+  console.log('\n── 3) فرق بين الحسابين ──')
   for (const theme of ['light', 'dark']) {
     const bad = clone(FX.two)
     bad.check = { ...bad.check, ok: false, diff: 1000, independentTotal: bad.totals.total - 1000 }
@@ -243,7 +243,7 @@ const run = async () => {
   }
 
   // ═══ ٤) الصلاحيات والدخول ═══
-  console.log('\n── ٤) الصلاحيات ──')
+  console.log('\n── 4) الصلاحيات ──')
   {
     const { ctx, page, calls } = await open(browser, { role: 'doctor' })
     await page.waitForTimeout(600)
@@ -271,7 +271,7 @@ const run = async () => {
   }
 
   // ═══ ٥) التاريخ و«تحميل Excel» ═══
-  console.log('\n── ٥) التاريخ والملفّ ──')
+  console.log('\n── 5) التاريخ والملفّ ──')
   {
     const { ctx, page, calls } = await open(browser)
     await page.waitForSelector('.cash-doc')

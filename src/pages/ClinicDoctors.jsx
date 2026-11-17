@@ -61,7 +61,7 @@ function NewDoctorDialog({ onClose, onCreated }) {
       {/* رقم الغرفة يُشتقّ منه اسم المقطع الصوتي (room-3.mp3) — الخادم يطبّع
           الأرقام العربية والمسافات، والتنويه هنا يمنع المشكلة من أصلها (AUDIO.md) */}
       <div className="field"><label htmlFor={fid('room')}>الغرفة</label><input id={fid('room')} value={form.room} onChange={set('room')} placeholder="مثال: 3" />
-        <small className="hint">بالأرقام اللاتينية (3 لا ٣) — يُنطق على شاشة النداء</small></div>
+        <small className="hint">يُنطق على شاشة النداء</small></div>
       <div className="field"><label htmlFor={fid('consultation_fee')}>سعر المعاينة (ل.س)</label><input id={fid('consultation_fee')} type="number" min="0" value={form.consultation_fee} onChange={set('consultation_fee')} required /></div>
       <div className="field"><label htmlFor={fid('followup_fee')}>سعر المراجعة (ل.س)</label><input id={fid('followup_fee')} type="number" min="0" value={form.followup_fee} onChange={set('followup_fee')} required /></div>
       <div className="field"><label htmlFor={fid('followup_window_days')}>صلاحية المراجعة (يوم)</label><input id={fid('followup_window_days')} type="number" min="1" value={form.followup_window_days} onChange={set('followup_window_days')} required /></div>

@@ -1,26 +1,25 @@
 import { useEffect, useId, useState } from 'react'
-import { fmtMoney, toLatinDigits } from '../../api.js'
+import { fmtMoney, toLatinDigits, fmtDay as fmtNumDay } from '../../api.js'
 
 // ═══ أدوات صفحة المخزون المشتركة ═══
-// الأرقام بفواصل الآلاف وأرقامٍ عربية كبقية النظام (ar-SY)، والتواريخ بصيغته.
+// الأرقام بفواصل الآلاف وأرقامٍ لاتينية كبقية النظام (NUM_LOCALE)، والتواريخ بصيغته «16/11/2026».
 
 export const fmtQty = (q) => (q === null || q === undefined ? '—'
-  : Number(q).toLocaleString('ar-SY', { maximumFractionDigits: 2 }))
+  : Number(q).toLocaleString('ar-SY-u-nu-latn', { maximumFractionDigits: 2 }))
 // «+٢٠» و«−٣» — علامة الطرح الحقيقية لا الشرطة
-// مبلغٌ سالب بعلامة «−» صريحة: toLocaleString('ar-SY') يسبق السالب بعلامة ALM (U+061C)
+// مبلغٌ سالب بعلامة «−» صريحة: toLocaleString('ar-SY-u-nu-latn') يسبق السالب بعلامة ALM (U+061C)
 // يرسمها خطّ الواجهة شَرطةً ثانية («--٤٠٠») — فالإشارة هنا والرقم بلا إشارة، كما في fmtSigned
 export const fmtSignedMoney = (n) => (Number(n) < 0 ? '−' : '') + fmtMoney(Math.abs(Number(n)))
 export const fmtSigned = (q) => (Number(q) > 0 ? '+' : Number(q) < 0 ? '−' : '') + fmtQty(Math.abs(Number(q)))
 // يومٌ «YYYY-MM-DD» بتوقيت الجهاز (لا UTC) — بصيغة fmtDate في النظام
-export const fmtDay = (d) => (d
-  ? new Date(`${d}T00:00:00`).toLocaleDateString('ar-SY', { year: 'numeric', month: 'long', day: 'numeric' }) : '—')
-export const fmtPct = (n) => `${Number(n).toLocaleString('ar-SY', { maximumFractionDigits: 1 })}٪`
+export const fmtDay = (d) => (d ? fmtNumDay(`${d}T00:00:00`) : '—')
+export const fmtPct = (n) => `${Number(n).toLocaleString('ar-SY-u-nu-latn', { maximumFractionDigits: 1 })}%`
 
 // «مادة واحدة» · «مادتان» · «٣ مواد» · «١١ مادة»
 export function materialsCount(n) {
   if (n === 1) return 'مادة واحدة'
   if (n === 2) return 'مادتان'
-  const k = Number(n).toLocaleString('ar-SY')
+  const k = Number(n).toLocaleString('ar-SY-u-nu-latn')
   return n >= 3 && n <= 10 ? `${k} مواد` : `${k} مادة`
 }
 

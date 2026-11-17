@@ -66,7 +66,7 @@ export function ReferralRow({ value, onChange, scopes, options, optionsErr, keep
           <input id={idPrefix ? `${idPrefix}-value` : undefined} value={value.discount_value} inputMode="decimal" required disabled={disabled}
             placeholder={value.discount_type === 'percent' ? '50' : '10,000'}
             onChange={(e) => onChange({ ...value, discount_value: toLatinDigits(e.target.value) })} />
-          {pctTooBig && <small className="hint warn-hint">النسبة حتى ١٠٠٪</small>}
+          {pctTooBig && <small className="hint warn-hint">النسبة حتى 100%</small>}
         </div>
         {scopes && (
           <div className="field">

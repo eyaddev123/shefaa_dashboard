@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { api, todayLocal } from '../api.js'
+import { api, todayLocal, fmtDay } from '../api.js'
 import ProcedureMaterialsDetail from '../components/ProcedureMaterialsDetail.jsx'
 import { useUnpaid, UnpaidPanel, EmptyVisitsList, LineEditor, LineHistory } from '../components/procedures/LineTools.jsx'
 
@@ -23,13 +23,13 @@ const PERIODS = [
   { key: 'custom', label: 'من — إلى' },
 ]
 
-const fmtNum = (n) => Number(n || 0).toLocaleString('ar-SY', { maximumFractionDigits: 2 })
+const fmtNum = (n) => Number(n || 0).toLocaleString('ar-SY-u-nu-latn', { maximumFractionDigits: 2 })
 function Money({ value, className }) {
   return <span className={className}>{fmtNum(value)}<span className="cash-unit">ل.س</span></span>
 }
 const asDate = (s) => new Date(`${s}T00:00:00`)
-const fmtLong = (d) => asDate(d).toLocaleDateString('ar-SY', { day: 'numeric', month: 'long' })
-const fmtWeekday = (d) => asDate(d).toLocaleDateString('ar-SY', { weekday: 'long', day: 'numeric', month: 'long' })
+const fmtLong = (d) => fmtDay(asDate(d), { year: false })
+const fmtWeekday = (d) => fmtDay(asDate(d), { weekday: true, year: false })
 const rangeWords = (d) => (d.from === d.to ? fmtWeekday(d.from) : `من ${fmtLong(d.from)} إلى ${fmtLong(d.to)}`)
 function plural(n, one, two, few, many) {
   if (n === 1) return one
@@ -53,16 +53,16 @@ export function ruleText(l) {
   if (l.ruleSource === 'none') return 'بلا قاعدة'
   if (l.ruleSource === 'manual') return 'تجاوز يدوي'
   const v = fmtNum(l.ruleValue)
-  if (l.ruleKind === 'percent' && Number(l.ruleValue) === 0) return '٠٪ — للشفاء'
+  if (l.ruleKind === 'percent' && Number(l.ruleValue) === 0) return '0% — للشفاء'
   if (l.ruleKind === 'fixed') return l.ruleSource === 'doctor' ? `العامة ثابت ${v}` : `ثابت ${v}`
-  return l.ruleSource === 'doctor' ? `العامة ${v}٪` : `نسبة ${v}٪`
+  return l.ruleSource === 'doctor' ? `العامة ${v}%` : `نسبة ${v}%`
 }
 
 // الإصدار 2: المواد المعدودة تجاوزت السعر فطُرح السعر كلّه (المطروح = المواد المسقوفة + المستهلكات).
 // في الإصدار 1 المطروح = المعدودة + السابقة ≥ المعدودة، فلا يصدق الشرط عليه أبداً.
 export const overPrice = (l) => l.items.reduce((t, m) => t + m.cost, 0) > l.materials - (l.consumables || 0) + 0.005
 
-const qty = (q) => Number(q).toLocaleString('ar-SY', { maximumFractionDigits: 2 })
+const qty = (q) => Number(q).toLocaleString('ar-SY-u-nu-latn', { maximumFractionDigits: 2 })
 const itemsText = (l) => [
   ...l.items.map((m) => `${m.name} ×${qty(m.qty)}`),
   l.legacyMaterials > 0 && 'مواد سابقة',

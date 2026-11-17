@@ -40,7 +40,7 @@ export default function PatientTurn() {
             <label>رمز الوصول</label>
             <input value={accessCode} onChange={(e) => setAccessCode(e.target.value.replace(/\D/g, ''))}
                    dir="ltr" required inputMode="numeric" maxLength={6} autoComplete="off"
-                   placeholder="٦ أرقام مطبوعة على بطاقتك" />
+                   placeholder="6 أرقام مطبوعة على بطاقتك" />
           </div>
           <button type="submit" disabled={busy} style={{ width: '100%', padding: '13px', fontSize: 15 }}>
             {busy ? 'جارٍ البحث…' : 'اعرض دوري'}

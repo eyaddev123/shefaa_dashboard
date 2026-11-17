@@ -118,7 +118,7 @@ const run = async () => {
   await page.goto(`${BASE}/`, { waitUntil: 'load' })
 
   // ── ① الطباعة التلقائية: نسختان في طلبٍ واحد ──
-  console.log('\n── ١) نسختان: من المتصفّح إلى بايتات الطابعة ──')
+  console.log('\n── 1) نسختان: من المتصفّح إلى بايتات الطابعة ──')
   const DATA = { queue_number: 12, full_name: 'عبد الرحمن محمد الخطيب', birth_year: 1990,
     visit_type: 'consultation', fee: 15000, procedures: [{ name: 'تخطيط قلب', price: 25000 }],
     doctor_name: 'د. سامر الحلبي', room: '3', now: '2026-10-24T09:15:00' }
@@ -142,7 +142,7 @@ const run = async () => {
   ok(r.cairo, 'خطّ Cairo محمَّل في الرسم')
   ok(r.res.ok && r.res.copies === 2 && r.res.mode === 'one-job', '★ الطباعة نجحت: نسختان في مهمّةٍ واحدة', JSON.stringify(r.res))
   ok(r.labels[0] === 'نسخة المريض' && r.labels[1] === 'نسخة العيادة', 'الأولى «نسخة المريض» والثانية «نسخة العيادة»')
-  ok(r.orgFits, '★ «مجمع عيادات الشفاء الطبي» يسع ٧٢مم سطراً واحداً (٨٠مم)')
+  ok(r.orgFits, '★ «مجمع عيادات الشفاء الطبي» يسع 72مم سطراً واحداً (80مم)')
 
   const files = readdirSync(jobs)
   ok(files.length === 1, '★ طلبٌ واحد ⇒ مهمّةٌ واحدة إلى الطابعة', files.join(','))
@@ -182,7 +182,7 @@ const run = async () => {
   }
 
   // ── ② وسيطٌ قديم على الجهاز: نسخةً نسخة، فلا تنقطع الطباعة قبل التحديث ──
-  console.log('\n── ٢) وسيطٌ قديم (قبل النسخ) ──')
+  console.log('\n── 2) وسيطٌ قديم (قبل النسخ) ──')
   const o = await page.evaluate(async ([data, port]) => {
     const m = await import('/src/print-helper.js')
     return m.printViaHelper(data, 80, { port, token: '' }, document, { copies: 2 })
@@ -191,7 +191,7 @@ const run = async () => {
   ok(oldReqs.join('|') === 'images|image|image', 'الطلبات: محاولةٌ ثمّ نسخةٌ نسخة', oldReqs.join('|'))
 
   // ── ③ إعادة الطباعة بنسخةٍ واحدة (الافتراض) ──
-  console.log('\n── ٣) نسخة واحدة ──')
+  console.log('\n── 3) نسخة واحدة ──')
   rmSync(jobs, { recursive: true, force: true })
   const one = await page.evaluate(async ([data, port]) => {
     const m = await import('/src/print-helper.js')
@@ -202,7 +202,7 @@ const run = async () => {
   ok(one.ok && p1.ops.filter((x) => x === 'cut').length === 1 && p1.images.length === 1, 'نسخة واحدة ⇒ قطعٌ واحد', p1.ops.join(','))
 
   // ── ③ب) بطاقة دورٍ بلا رقم (لم يحضر بعد) لا تصل الوسيط أصلاً — حادثة الخميس 2026-11-12 ──
-  console.log('\n── ٣ب) بلا رقم دور ──')
+  console.log('\n── 3ب) بلا رقم دور ──')
   rmSync(jobs, { recursive: true, force: true })
   const none = await page.evaluate(async ([data, port]) => {
     const m = await import('/src/print-helper.js')
@@ -214,7 +214,7 @@ const run = async () => {
     '★ queue_number فارغ ⇒ رفضٌ بسببه ولا مهمّة طباعة', JSON.stringify(none) + ' ' + noneJobs.length)
 
   // ── ④ الإعداد: ٢ افتراضاً، ويُحفظ دون محو منفذ الوسيط ورمزه ──
-  console.log('\n── ٤) إعداد عدد النسخ ──')
+  console.log('\n── 4) إعداد عدد النسخ ──')
   const s = await page.evaluate(async () => {
     const t = await import('/src/ticket-print.js')
     localStorage.clear()

@@ -108,7 +108,7 @@ function MaterialsList({ data, canWrite, onOpen, onPurchase, onAdd, onImport }) 
             <button key={k} type="button" aria-pressed={filter === k}
               className={`invx-counter${tone ? ` tone-${tone}` : ''}${filter === k ? ' is-on' : ''}${n === 0 && k !== 'all' ? ' is-zero' : ''}`}
               onClick={() => setFilter(filter === k ? 'all' : k)}>
-              <span className="invx-counter-n">{n.toLocaleString('ar-SY')}</span>
+              <span className="invx-counter-n">{n.toLocaleString('ar-SY-u-nu-latn')}</span>
               <span className="invx-counter-label">{label}</span>
             </button>
           )
@@ -124,7 +124,7 @@ function MaterialsList({ data, canWrite, onOpen, onPurchase, onAdd, onImport }) 
               {secondary.map(([k, label]) => (
                 <button key={k} type="button" aria-pressed={filter === k} className={`invx-chip${filter === k ? ' is-on' : ''}`}
                   onClick={() => setFilter(filter === k ? 'all' : k)}>
-                  {label} <span className="invx-chip-n">{count(k).toLocaleString('ar-SY')}</span>
+                  {label} <span className="invx-chip-n">{count(k).toLocaleString('ar-SY-u-nu-latn')}</span>
                 </button>
               ))}
             </div>
@@ -182,7 +182,7 @@ function CatalogTable({ list }) {
   return (
     <div className="card">
       <div className="inv-toolbar">
-        <h3 style={{ margin: 0 }}>كتالوج المواد ({list.length.toLocaleString('ar-SY')} — المفعَّل {active.toLocaleString('ar-SY')})</h3>
+        <h3 style={{ margin: 0 }}>كتالوج المواد ({list.length.toLocaleString('ar-SY-u-nu-latn')} — المفعَّل {active.toLocaleString('ar-SY-u-nu-latn')})</h3>
         {list.length > 0 && (
           <input type="search" className="inv-search" value={query} placeholder="ابحث بالاسم…" aria-label="ابحث بالاسم"
             onChange={(e) => setQuery(e.target.value)} />
@@ -206,7 +206,7 @@ function CatalogTable({ list }) {
                   <td className="rt-badge">
                     {m.is_active ? <span className="badge sm good">مفعَّلة</span> : <span className="badge sm">معطَّلة</span>}
                   </td>
-                  <td className="num" data-label="استُعملت">{m.times_used.toLocaleString('ar-SY')} إجراء</td>
+                  <td className="num" data-label="استُعملت">{m.times_used.toLocaleString('ar-SY-u-nu-latn')} إجراء</td>
                   <td className="inv-who rt-full" data-label="آخر تعديل">
                     {m.updated_by_name || m.created_by_name || '—'}
                     {(m.updated_at || m.created_at) && (
@@ -398,13 +398,13 @@ function InventoryFull({ canWrite }) {
         <ImportDialog onClose={close} showToast={showToast}
           onDone={(r) => {
             close(); refresh()
-            const n = (v) => v.toLocaleString('ar-SY')
+            const n = (v) => v.toLocaleString('ar-SY-u-nu-latn')
             showToast(`تمّ الاستيراد: ${materialsCount(r.new)} جديدة`
               + (r.consumable ? ` و${n(r.consumable)} استهلاكية` : '')
               + (r.opening ? ` و${n(r.opening)} رصيد افتتاحي على موجودة` : '')
               + (r.purchase ? ` و${n(r.purchase)} شراء` : '')
               + (r.skipped ? ` — تخطٍّ: ${n(r.skipped)}` : '')
-              + (r.rejected ? ` — وتُجوهل ${r.rejected.toLocaleString('ar-SY')} سطراً مرفوضاً` : ''), 'success', 6000)
+              + (r.rejected ? ` — وتُجوهل ${r.rejected.toLocaleString('ar-SY-u-nu-latn')} سطراً مرفوضاً` : ''), 'success', 6000)
           }} />
       )}
     </div>

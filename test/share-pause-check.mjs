@@ -84,7 +84,7 @@ const run = async () => {
   if (!up) { console.error('لم يقلع vite'); process.exit(1) }
   const browser = await chromium.launch()
 
-  console.log('\n── ١) إيقاف قاعدةٍ واحدة وتشغيلها ──')
+  console.log('\n── 1) إيقاف قاعدةٍ واحدة وتشغيلها ──')
   {
     const { ctx, page, errors, posts } = await open(browser)
     await row(page, 'تجبير').waitFor()
@@ -97,9 +97,9 @@ const run = async () => {
     const title = await row(page, 'تجبير').locator('.badge', { hasText: 'موقوفة' }).getAttribute('title')
     ok(/المشرفة رنا/.test(title || ''), 'الشارة تقول مَن أوقف ومتى', title)
     const note = await card(page).locator('.share-paused-note').textContent()
-    ok(note.includes('١ من ٣') || note.includes('1 من 3'), '★ الملاحظة: ١ من ٣ موقوفة', note)
-    ok(/٦٠٪|60٪/.test(note) && note.includes('لا تتغيّر'), '★ الملاحظة تسمّي النسبة العامّة وتقول إن القديم لا يتغيّر', note)
-    ok(/منها (1|١) موقوفة/.test(await card(page).locator('.share-rules-head h4').textContent()), 'العنوان يعدّ الموقوفة')
+    ok(note.includes('1 من 3') || note.includes('1 من 3'), '★ الملاحظة: 1 من 3 موقوفة', note)
+    ok(/60%|60%/.test(note) && note.includes('لا تتغيّر'), '★ الملاحظة تسمّي النسبة العامّة وتقول إن القديم لا يتغيّر', note)
+    ok(/منها (1|1) موقوفة/.test(await card(page).locator('.share-rules-head h4').textContent()), 'العنوان يعدّ الموقوفة')
     ok(await card(page).locator('button', { hasText: 'تشغيل الكل' }).count() === 1, '«تشغيل الكل» يظهر حين توجد موقوفة')
     await shot(page, 'one-paused')
     await row(page, 'تجبير').locator('button', { hasText: 'تشغيل' }).click()
@@ -110,14 +110,14 @@ const run = async () => {
     await ctx.close()
   }
 
-  console.log('\n── ٢) إيقاف الكل وتشغيل الكل ──')
+  console.log('\n── 2) إيقاف الكل وتشغيل الكل ──')
   {
     const { ctx, page, posts } = await open(browser)
     await row(page, 'تجبير').waitFor()
     await card(page).locator('button', { hasText: 'إيقاف الكل' }).click()
     const body = await confirmDialog(page, 'إيقاف الكل')
-    ok(body.includes('(3)') || body.includes('(٣)'), '★ التأكيد يقول العدد', body)
-    ok(/٦٠٪|60٪/.test(body) && body.includes('محفوظة') && body.includes('لا يتغيّر'), '★ والتأكيد: النسبة العامّة، محفوظة، القديم لا يتغيّر', body)
+    ok(body.includes('(3)') || body.includes('(3)'), '★ التأكيد يقول العدد', body)
+    ok(/60%|60%/.test(body) && body.includes('محفوظة') && body.includes('لا يتغيّر'), '★ والتأكيد: النسبة العامّة، محفوظة، القديم لا يتغيّر', body)
     await card(page).locator('.share-paused-note', { hasText: 'كل الحالات الخاصّة موقوفة' }).waitFor()
     ok(posts.includes('/clinic/doctors/1/procedure-shares/pause-all'), '★ يطلب pause-all')
     ok(await card(page).locator('tbody tr.rule-paused').count() === 3, '★ الثلاثة موقوفة')
@@ -135,7 +135,7 @@ const run = async () => {
     await ctx.close()
   }
 
-  console.log('\n── ٣) بلا نسبة عامّة، والخطأ، والسجلّ ──')
+  console.log('\n── 3) بلا نسبة عامّة، والخطأ، والسجلّ ──')
   {
     const { ctx, page } = await open(browser, { doctor: DOCTOR({ share_kind: null, share_value: null }) })
     await row(page, 'تجبير').waitFor()
@@ -157,12 +157,12 @@ const run = async () => {
     const { ctx, page } = await open(browser)
     await page.waitForSelector('text=أُوقفت القاعدة')
     const t = await page.textContent('body')
-    ok(t.includes('قاعدة «قلع»: أُوقفت القاعدة (30٪ بعد المواد) — يُحسب بالنسبة العامّة'), '★ السجلّ: نصّ الإيقاف')
+    ok(t.includes('قاعدة «قلع»: أُوقفت القاعدة (30% بعد المواد) — يُحسب بالنسبة العامّة'), '★ السجلّ: نصّ الإيقاف')
     ok(t.includes('قاعدة «تجبير»: شُغّلت القاعدة من جديد'), '★ السجلّ: نصّ التشغيل')
     await ctx.close()
   }
 
-  console.log('\n── ٤) القراءة وحدها، والجوال، والوضع الداكن ──')
+  console.log('\n── 4) القراءة وحدها، والجوال، والوضع الداكن ──')
   {
     const { ctx, page, rules } = await open(browser, { role: 'brd' })
     rules[1].paused_at = '2026-11-12T08:00:00Z'
@@ -178,7 +178,7 @@ const run = async () => {
     await row(page, 'قلع').locator('button', { hasText: 'إيقاف' }).click()
     await row(page, 'قلع').locator('.badge', { hasText: 'موقوفة' }).waitFor()
     ok(await page.evaluate(() => document.scrollingElement.scrollWidth <= document.scrollingElement.clientWidth + 1), `بلا تمرير أفقي ${w} ${theme}`)
-    ok(!/·\s*[0-9٠-٩]|[0-9٠-٩]\s*·/.test(await card(page).textContent()), `لا «·» بجانب رقم ${w}`)
+    ok(!/·\s*[0-90-9]|[0-90-9]\s*·/.test(await card(page).textContent()), `لا «·» بجانب رقم ${w}`)
     if (w === 390) {
       const hs = await card(page).locator('.share-rules-head-actions > button').evaluateAll((bs) => bs.map((b) => b.getBoundingClientRect().height))
       ok(hs.length >= 2 && hs.every((x) => x >= 44), `أزرار الرأس ≥ 44px على الجوال (${hs.join(',')})`)

@@ -32,7 +32,7 @@ import { blankReferral, referralReady, ironReferralPayload, ironDraftDiscount, d
 // تُحسب في حدّ الرصيد (saved). سعر النوع الحاليّ سعرُ الجلسة نفسه، والآخر من الإعدادات. «ما سيتغيّر» يُعرض قبل الحفظ،
 // والفرق في المبلغ (يُقبض أو يُردّ)، والسبب إلزاميّ. الإحالة وتعديل الحصص لهما أزرارهما في تفاصيل الجلسة.
 
-const fmtNum = (n) => Number(n || 0).toLocaleString('ar-SY')
+const fmtNum = (n) => Number(n || 0).toLocaleString('ar-SY-u-nu-latn')
 const NO_DOCTOR = 'بلا دكتور / محوّل من خارج الجمعية'
 // الإغلاق لا يسبق هذه المدّة: ثانية ضغطتين سريعتين لا تقع على زرٍّ في السجلّ تحت النافذة
 const MIN_CLOSE_MS = 300
@@ -214,7 +214,7 @@ export default function IronSessionDialog({ onClose, onSaved, session = null }) 
     if (!qtyValid(items)) e.materials = 'صحّحي الكمّية المعلَّمة: رقمٌ أكبر من صفر'
     if (editing && !editReason.trim()) e.edit_reason = 'اكتبي سبب التعديل — يُحفظ مع الجلسة'
     if (referral && !referralReady(referral))
-      e.referral = !referral.referral_source_id ? 'اختاري الجهة المحيلة — أو ألغي «معه إحالة؟»' : 'قيمة الخصم رقمٌ أكبر من صفر (النسبة حتى ١٠٠٪)'
+      e.referral = !referral.referral_source_id ? 'اختاري الجهة المحيلة — أو ألغي «معه إحالة؟»' : 'قيمة الخصم رقمٌ أكبر من صفر (النسبة حتى 100%)'
     if (override) {
       const d = doctorId ? readAmountInput(override.doctor_share) : { empty: true }
       const n = readAmountInput(override.nurse_share)
@@ -303,7 +303,7 @@ export default function IronSessionDialog({ onClose, onSaved, session = null }) 
       onClose={onClose} busy={busy} wide sheet>
       {loadErr ? <p className="error">{loadErr}</p> : !opts ? <p className="empty">جارٍ التحميل…</p> : (
         <form onSubmit={submit} onKeyDown={noEnterSubmit} onChange={() => setServerField(null)} className="iron-form" noValidate>
-          <Section n="١" title="المريض">
+          <Section n="1" title="المريض">
             <div className="bf-row">
               <div className="field">
                 <label htmlFor="iron-name">اسم المريض الثلاثي</label>
@@ -343,7 +343,7 @@ export default function IronSessionDialog({ onClose, onSaved, session = null }) 
             )}
           </Section>
 
-          <Section n="٢" title="الطاقم">
+          <Section n="2" title="الطاقم">
             <div className="bf-row">
               <div className="field">
                 <label htmlFor="iron-nurse">الممرضة</label>
@@ -363,20 +363,20 @@ export default function IronSessionDialog({ onClose, onSaved, session = null }) 
             </div>
           </Section>
 
-          <Section n="٣" title="النوع" note="يحدّد المبلغ">
+          <Section n="3" title="النوع" note="يحدّد المبلغ">
             <DrugChoice value={withDrug} prices={prices} onPick={setWithDrug} />
             <FieldError id="iron-err-with_drug" msg={errors.with_drug} />
           </Section>
 
-          <Section n="٤" title="المواد" note="أمبولة، قسطرة، محلول…">
+          <Section n="4" title="المواد" note="أمبولة، قسطرة، محلول…">
             <div className="iron-materials">
-              <MaterialsEditor combo catalog={catalog} value={items} onChange={setItems} disabled={busy} saved={savedItems.current} />
+              <MaterialsEditor catalog={catalog} value={items} onChange={setItems} disabled={busy} saved={savedItems.current} />
               {items.length === 0 && <small className="hint">لم تُضف مواد بعد.</small>}
               <FieldError id="iron-err-materials" msg={errors.materials} />
             </div>
           </Section>
 
-          {!editing && <Section n="٥" title="الإحالة" note="اختياري">
+          {!editing && <Section n="5" title="الإحالة" note="اختياري">
             <div className={`ref-box iron-ref${referral ? ' open' : ''}`}>
               <label className="ref-toggle">
                 <input type="checkbox" checked={referral !== null} disabled={busy}
@@ -398,7 +398,7 @@ export default function IronSessionDialog({ onClose, onSaved, session = null }) 
           </Section>}
 
           {editing && (
-            <Section n="٥" title="ما سيتغيّر" note="يُحفظ مع سببه">
+            <Section n="5" title="ما سيتغيّر" note="يُحفظ مع سببه">
               <ChangePreview changes={changes} />
               {session.referral && <small className="hint">إحالة {session.referral.source}: خصمها يُعاد على السعر الجديد تلقائياً — وتُعدَّل من زرّ «الإحالة».</small>}
               <div className="field iron-edit-reason">

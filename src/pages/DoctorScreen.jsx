@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { api, fmtTime, todayLocal, openStaffStream } from '../api.js'
+import { api, fmtMoney, fmtTime, todayLocal, openStaffStream } from '../api.js'
 import VisitType from '../components/VisitType.jsx'
 import { AttendanceBadge, urgentRowClass, isAttendanceSession, usePolling, fmtClock, fmtTimeOfDay } from '../attendance-ui.jsx'
 import { useToast, RecallButton } from '../action-feedback.jsx'
@@ -10,7 +10,7 @@ import {
 import { ReturnState } from '../waiting-return-ui.jsx'
 import BottomSheet from '../components/BottomSheet.jsx'
 import { ProcedureOnlyBadge } from '../components/ProcedureOnly.jsx'
-import MaterialsEditor, { qtyValid, toPayload } from '../components/MaterialsEditor.jsx'
+import MaterialsEditor, { qtyValid, toPayload, materialsValue } from '../components/MaterialsEditor.jsx'
 import {
   ringDoctor, primeOnFirstGesture, onAudioState, audioReady, unlockAudio,
   shouldOfferPush, dismissPushOffer, enablePush, refreshPush,
@@ -63,6 +63,9 @@ function AddedProcedures({ added = [], pending = [] }) {
 // — من «قيد الكشف» إلى «مضاف» ثلاث لمسات.
 // المواد: لكلّ إجراءٍ مختار سطرٌ تحت الشبكة بـ«+ مواد» خاصّةٍ به — داخل الورقة نفسها، اختيارية.
 // draft: { selected: [{id, name, mats, open}], errorId, error } — يبقى في الأب فيعود كما كان إن رُفض.
+// الأسعار (طلب المستخدم 2026-11-16): سعر كلّ إجراءٍ تحت اسمه، وسعر **البيع** لكلّ مادة ومبلغ سطرها،
+// وتحت المختار مجموعٌ: «على المريض» = مجموع أسعار الإجراءات (ما يدفعه فعلاً)، و«المواد بسعر البيع»
+// سطرٌ وحده — المواد تُخصم من سعر الإجراء داخلياً ولا تُضاف على المريض، فجمعها معه كان يكذب.
 function AddProcedureSheet({ appt, catalog, usage, matCatalog, loadMaterials, draft, setDraft, onConfirm, onClose }) {
   const taken = new Set((appt.procedures || []).filter((l) => !l.removed_at).map((l) => String(l.procedure_id)))
   // الأكثر استعمالاً عنده أوّلاً (آخر ٩٠ يوماً)، ثمّ أبجدياً
@@ -76,14 +79,25 @@ function AddProcedureSheet({ appt, catalog, usage, matCatalog, loadMaterials, dr
     selected: isOn(p.id) ? d.selected.filter((x) => String(x.id) !== String(p.id))
       : [...d.selected, { id: p.id, name: p.name, mats: [], open: false }] }))
   const valid = sel.length > 0 && sel.every((x) => qtyValid(x.mats))
+  const priceOf = (id) => Number((catalog || []).find((p) => String(p.id) === String(id))?.price || 0)
+  const procTotal = sel.reduce((t, x) => t + priceOf(x.id), 0)
+  const matTotal = sel.reduce((t, x) => t + materialsValue(x.mats, matCatalog), 0)
   return (
     <BottomSheet title={`إجراء لـ ${appt.full_name}`}
       subtitle="علّم الإجراءات ثمّ «إضافة» — وتبقى «بانتظار المحاسبة» حتى يدفع المريض"
       onClose={onClose}
       footer={(
-        <button type="button" className="dk-confirm" disabled={!valid} onClick={onConfirm}>
-          إضافة ({sel.length.toLocaleString('ar-SY')})
-        </button>
+        <>
+          {sel.length > 0 && (
+            <div className="dk-total" role="status">
+              <span>على المريض <strong>{fmtMoney(procTotal)}</strong></span>
+              {matTotal > 0 && <span className="dk-total-mats">المواد بسعر البيع {fmtMoney(matTotal)}</span>}
+            </div>
+          )}
+          <button type="button" className="dk-confirm" disabled={!valid} onClick={onConfirm}>
+            إضافة ({sel.length.toLocaleString('ar-SY-u-nu-latn')})
+          </button>
+        </>
       )}>
       {draft.error && <p className="error dk-sheet-error" role="alert">{draft.error}</p>}
       {catalog == null ? <p className="empty">جارٍ التحميل…</p>
@@ -98,6 +112,7 @@ function AddProcedureSheet({ appt, catalog, usage, matCatalog, loadMaterials, dr
                   className={`dk-pick${on ? ' is-on' : ''}${bad ? ' is-bad' : ''}`} onClick={() => toggle(p)}>
                   {on && <span className="dk-pick-check" aria-hidden="true">✓</span>}
                   <span className="dk-pick-name">{p.name}</span>
+                  <span className="dk-pick-price">{fmtMoney(p.price)}</span>
                   {added && <span className="dk-pick-tag">✓ مضاف</span>}
                 </button>
               )
@@ -110,16 +125,17 @@ function AddProcedureSheet({ appt, catalog, usage, matCatalog, loadMaterials, dr
             <li key={x.id} className="dk-sel-item">
               <div className="dk-sel-row">
                 <span className="dk-sel-name">{x.name}</span>
+                <span className="dk-sel-price">{fmtMoney(priceOf(x.id))}</span>
                 <button type="button" className="ghost dk-sel-mats" aria-expanded={x.open}
                   onClick={() => { update(x.id, { open: !x.open }); loadMaterials() }}>
-                  {x.open ? '− المواد' : `+ مواد${x.mats.length ? ` (${x.mats.length.toLocaleString('ar-SY')})` : ''}`}
+                  {x.open ? '− المواد' : `+ مواد${x.mats.length ? ` (${x.mats.length.toLocaleString('ar-SY-u-nu-latn')})` : ''}`}
                 </button>
               </div>
               {x.open && (
                 <div className="dk-mats-body">
                   {matCatalog == null ? <p className="empty">جارٍ التحميل…</p>
-                    // combo: الكبسة تفتح قائمة المواد كاملةً منسدلة، والكتابة تُرشّحها (لا بحثٌ أعمى)
-                    : <MaterialsEditor combo comboHint="المواد: المس لعرضها كلّها، أو اكتب اسم مادة…" catalog={matCatalog} value={x.mats} onChange={(mats) => update(x.id, { mats })} />}
+                    // القائمة منسدلة: الكبسة تعرض المواد كلّها والكتابة تُرشّحها، ومع كلّ مادة سعر بيعها
+                    : <MaterialsEditor withPrice comboHint="المواد: المس لعرضها كلّها، أو اكتب اسم مادة…" catalog={matCatalog} value={x.mats} onChange={(mats) => update(x.id, { mats })} />}
                   {!qtyValid(x.mats) && <p className="error">صحّح الكمّية (رقم أكبر من صفر).</p>}
                 </div>
               )}
@@ -164,8 +180,8 @@ function TodayBar({ lines, toast }) {
         <span className="dk-today-grip" aria-hidden="true" />
         {lines.length === 0 ? <span className="dk-today-sum">لا إجراءات اليوم</span> : (
           <span className="dk-today-sum">
-            {/* «،» لا «·»: النقطة الوسطى بجانب رقمٍ هنديّ تُقرأ صفراً («٠ ·» ⇐ «٠٠») */}
-            إجراءات اليوم: تمت محاسبة {paid.toLocaleString('ar-SY')}، وبانتظار المحاسبة {pending.toLocaleString('ar-SY')}
+            {/* «،» لا «·»: النقطة الوسطى بجانب رقمٍ هنديّ تُقرأ صفراً («0 ·» ⇐ «00») */}
+            إجراءات اليوم: تمت محاسبة {paid.toLocaleString('ar-SY-u-nu-latn')}، وبانتظار المحاسبة {pending.toLocaleString('ar-SY-u-nu-latn')}
           </span>
         )}
         <span className="dk-today-caret" aria-hidden="true">{open ? '▾' : '▴'}</span>
@@ -326,7 +342,7 @@ export default function DoctorScreen() {
     if (!prev || String(prev.session) !== String(queue?.id)) return
     const fresh = list.filter((a) => ids.has(String(a.id)) && !prev.ids.has(String(a.id)))
     if (fresh.length === 1) showToast(`الدور ${shownNumber(fresh[0])} رجع من الخروج المؤقت — على الدور`, 'success', 6000)
-    else if (fresh.length > 1) showToast(`رجع ${fresh.length.toLocaleString('ar-SY')} من الخروج المؤقت — على الدور`, 'success', 6000)
+    else if (fresh.length > 1) showToast(`رجع ${fresh.length.toLocaleString('ar-SY-u-nu-latn')} من الخروج المؤقت — على الدور`, 'success', 6000)
   }, [queue, serverNow])
 
   // ═══ الإضافة: الورقة تُغلق فوراً، والشارة «تُضاف…» حتى يردّ الخادم ═══
@@ -351,7 +367,7 @@ export default function DoctorScreen() {
       await api.clinic.addAppointmentProcedures(apptId, chosen.map((x) => ({ procedure_id: x.id, materials: toPayload(x.mats) })))
       setDraft(emptyDraft)
       showToast(chosen.length === 1 ? `أُضيف «${chosen[0].name}» — بانتظار المحاسبة`
-        : `أُضيفت ${chosen.length.toLocaleString('ar-SY')} إجراءات — بانتظار المحاسبة`, 'success', 3500)
+        : `أُضيفت ${chosen.length.toLocaleString('ar-SY-u-nu-latn')} إجراءات — بانتظار المحاسبة`, 'success', 3500)
       await Promise.all([loadQueue(), loadMine()])
     } catch (ex) {
       setDraft((d) => ({ ...d, errorId: ex.data?.procedure_id ?? null, error: `لم يُضَف شيء: ${ex.message}` }))
@@ -490,7 +506,7 @@ export default function DoctorScreen() {
         <div className="dk-grid">
           <section className="dk-main" aria-label="عندك الآن">
             {/* ═══ عندك الآن ═══ زرٌّ أساسيٌّ واحد مُعبّأ بحسب الحالة («بدء كشف» لمن نودي، «إنهاء
-                الكشف» لمن بدأ) والباقي بإطار — كلّها بحجمٍ عاديّ يناسب التابلت (٤٤px لمساً). */}
+                الكشف» لمن بدأ) والباقي بإطار — كلّها بحجمٍ عاديّ يناسب التابلت (44px لمساً). */}
             <div className={`card dk-current${current ? '' : ' is-empty'}`}>
               <h3 className="dk-sec">عندك الآن</h3>
               {current ? (() => {
@@ -509,7 +525,7 @@ export default function DoctorScreen() {
                     </p>
                     <AddedProcedures added={current.procedures} pending={pendingFor(current.id)} />
                     {/* ═══ الأزرار: نظامٌ واحد لكلّ الشاشات ═══ الأساسيّ («بدء كشف» أو «إنهاء الكشف») سطرٌ
-                        كامل، وتحته البقيّة بعرضٍ متساوٍ بلا زرٍّ يتيم: أربعةٌ ⇒ ٢×٢ في بطاقةٍ ضيّقة (جوال،
+                        كامل، وتحته البقيّة بعرضٍ متساوٍ بلا زرٍّ يتيم: أربعةٌ ⇒ 2×2 في بطاقةٍ ضيّقة (جوال،
                         عمودا التابلت)، وثلاثةٌ ⇒ صفٌّ واحد. والبطاقة العريضة (لابتوب) ⇒ كلّها صفٌّ واحد،
                         الأساسيّ أعرض. القرار بعرض البطاقة نفسها (container query) لا بعرض الشاشة. */}
                     {(() => {
@@ -576,7 +592,7 @@ export default function DoctorScreen() {
                 لمن خرج لقطرة فأكمل وذهب (المتأخّر لم يُكشف عليه أصلاً فلا «إنهاء» له). */}
             {stillOut.length > 0 && (
               <div className="card wr-card">
-                <h3 className="dk-sec">خارج العيادة مؤقتاً <span className="dk-count">({stillOut.length.toLocaleString('ar-SY')})</span></h3>
+                <h3 className="dk-sec">خارج العيادة مؤقتاً <span className="dk-count">({stillOut.length.toLocaleString('ar-SY-u-nu-latn')})</span></h3>
                 <ul className="wr-list">
                   {stillOut.map((a) => (
                     <li key={a.id} className="wr-item">
@@ -612,9 +628,9 @@ export default function DoctorScreen() {
             <div className="card dk-waiting">
               <div className="dk-switch" role="tablist" aria-label="المرضى">
                 <button type="button" role="tab" aria-selected={side === 'line'} className={side === 'line' ? 'is-on' : ''}
-                  onClick={() => setSide('line')}>بانتظار الدور <span className="dk-count">{line.length.toLocaleString('ar-SY')}</span></button>
+                  onClick={() => setSide('line')}>بانتظار الدور <span className="dk-count">{line.length.toLocaleString('ar-SY-u-nu-latn')}</span></button>
                 <button type="button" role="tab" aria-selected={side === 'bookings'} className={side === 'bookings' ? 'is-on' : ''}
-                  onClick={() => setSide('bookings')}>محجوزون لم يصلوا بعد <span className="dk-count">{bookings.length.toLocaleString('ar-SY')}</span></button>
+                  onClick={() => setSide('bookings')}>محجوزون لم يصلوا بعد <span className="dk-count">{bookings.length.toLocaleString('ar-SY-u-nu-latn')}</span></button>
               </div>
               {side === 'bookings' ? (
                 bookings.length === 0 ? <p className="empty">لا حجوزات بانتظار الحضور.</p> : (

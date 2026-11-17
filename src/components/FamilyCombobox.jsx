@@ -167,7 +167,7 @@ export default function FamilyCombobox({ value, onChange, autoFocus }) {
             <li className="cb-more"
                 onMouseDown={(e) => e.preventDefault()}  // لا تسحب التركيز من الحقل
                 onClick={loadMore}>
-              عرض ٢٠ نتيجة أخرى
+              عرض 20 نتيجة أخرى
             </li>
           )}
         </ul>

@@ -104,7 +104,7 @@ for (let i = 0; i < 60 && !up; i++) {
 if (!up) { console.error('لم يقلع vite'); process.exit(1) }
 const browser = await chromium.launch()
 
-console.log('\n── ١) تنزيل القالب ──')
+console.log('\n── 1) تنزيل القالب ──')
 {
   const { ctx, page, st } = await open(browser)
   await page.click('.invx-more-btn')
@@ -120,7 +120,7 @@ console.log('\n── ١) تنزيل القالب ──')
   await mgr.ctx.close()
 }
 
-console.log('\n── ٢+٣+٤) المعاينة والخيار والتأكيد ──')
+console.log('\n── 2+3+4) المعاينة والخيار والتأكيد ──')
 {
   const { ctx, page, st, errors } = await open(browser)
   await startPreview(page)
@@ -130,7 +130,7 @@ console.log('\n── ٢+٣+٤) المعاينة والخيار والتأكيد
   for (const want of ['تُضاف', 'استهلاكية — تُضاف بلا رصيد', 'موجودة — رصيد افتتاحي', 'تخطٍّ', 'لن تُستورد', 'رصيد افتتاحي — بلا خصم من الصندوق',
     'استهلاكية — الكمية وسعر الشراء يُتجاهلان', 'نوع المادة «سائل» غير معروف', 'النوع', 'معدودة']) ok(txt.includes(want), `في الجدول «${want}»`)
   ok(!(await hint(page)).includes('المجموع'), 'مفعّلاً: لا مبلغ خصم')
-  ok(await page.getByRole('button', { name: /تأكيد الاستيراد/ }).innerText().then((t) => t.includes('٣')), 'الزرّ يعدّ ما يُنفَّذ (٣)')
+  ok(await page.getByRole('button', { name: /تأكيد الاستيراد/ }).innerText().then((t) => t.includes('3')), 'الزرّ يعدّ ما يُنفَّذ (3)')
 
   st.previewFail = true
   await box(page).uncheck()
@@ -150,7 +150,7 @@ console.log('\n── ٢+٣+٤) المعاينة والخيار والتأكيد
   await ctx.close()
 }
 
-console.log('\n── ٥) القالب القديم والمعاينة القديمة ──')
+console.log('\n── 5) القالب القديم والمعاينة القديمة ──')
 {
   const { ctx, page, st } = await open(browser)
   st.kindColumn = false
@@ -177,7 +177,7 @@ for (const w of [1366, 390]) for (const theme of ['light', 'dark']) {
   await ctx.close()
 }
 
-console.log('\n── ٦) بطاقات تحت 768 ──')
+console.log('\n── 6) بطاقات تحت 768 ──')
 for (const w of [390, 767, 768]) {
   const { ctx, page } = await open(browser, { w, theme: 'dark' })
   await startPreview(page)

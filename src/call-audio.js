@@ -8,7 +8,7 @@ import { ALL_NUMBER_CLIPS, CLIP_TEXT, FIXED_CLIPS, RECORDED_ROOMS, buildCallClip
 import { announcementText, speak, speechSupported } from './announce.js'
 
 const CLIP_DIR = '/audio/calls'
-const CLIP_EXT = '.mp3'    // مدعوم في كل متصفح حديث، وحجمه أصغر من wav لشاشةٍ تحمّل ٤٠ مقطعاً
+const CLIP_EXT = '.mp3'    // مدعوم في كل متصفح حديث، وحجمه أصغر من wav لشاشةٍ تحمّل 40 مقطعاً
 
 // ═══ نسخة التسجيلات — ارفعها **كلما تغيّر أي تسجيل** ═══
 // أسماء المقاطع ثابتة (room-3.mp3)، و/audio/ يُخدَم بـ max-age=7d وCloudflare يخزّنه

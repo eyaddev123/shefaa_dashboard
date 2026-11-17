@@ -68,7 +68,7 @@ export default function UnpaidBell({ role }) {
       <button type="button" className={`unpaid-fab${fresh ? ' is-fresh' : ''}`} onClick={() => setOpen(true)}
         aria-label={`إجراءات بانتظار المحاسبة: ${lines.length}`}>
         <span aria-hidden="true">⏳</span> بانتظار المحاسبة
-        <span className="unpaid-fab-count">{lines.length.toLocaleString('ar-SY')}</span>
+        <span className="unpaid-fab-count">{lines.length.toLocaleString('ar-SY-u-nu-latn')}</span>
       </button>
       {open && (
         <div className="modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) setOpen(false) }}>

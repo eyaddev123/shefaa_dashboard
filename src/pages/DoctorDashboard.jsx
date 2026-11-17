@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { api, todayLocal } from '../api.js'
+import { api, todayLocal, fmtDay } from '../api.js'
 import { PunctualityTiles, DutyCalendar, AttendanceLog, fmtMinutes, AppointmentsBadge, fmtClock, clockTitle } from '../components/Punctuality.jsx'
 import DoctorTimesCard from '../components/DoctorTimesCard.jsx'
 import { partLines, partsOf, salaryPatientsOf, accountLines } from '../pay-parts.js'
@@ -14,7 +14,7 @@ import { useRole } from '../RoleContext.jsx'
 // الفترة chips فورية: هالأسبوع (من السبت) · هالشهر · حرّ — وفي الرابط، فزرّ الرجوع يعود إليها.
 
 const PERIODS = [['week', 'هالأسبوع'], ['month', 'هالشهر'], ['custom', 'حرّ']]
-const fmtNum = (n) => Number(n || 0).toLocaleString('ar-SY', { maximumFractionDigits: 2 })
+const fmtNum = (n) => Number(n || 0).toLocaleString('ar-SY-u-nu-latn', { maximumFractionDigits: 2 })
 function Money({ value }) {
   return <>{fmtNum(value)}<span className="cash-unit">ل.س</span></>
 }
@@ -68,7 +68,7 @@ function FinanceCard({ f }) {
 
 // ═══ الحساب يوماً بيوم: ما يُستحقّ له كلّ يوم وبماذا (طلب المستخدم 2026-11-14) ═══
 // سطرٌ لكلّ يومٍ فيه حضورٌ أو مريضٌ أو إجراءٌ أو حديد؛ الضغط يفتح تفصيله: مكوّنات الراتب وكلّ إجراءٍ بمريضه وحصّته.
-const dayName = (d) => new Date(`${d}T12:00:00Z`).toLocaleDateString('ar-SY', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' })
+const dayName = (d) => fmtDay(`${d}T12:00:00Z`, { weekday: true, year: false, utc: true })
 function DayAccounts({ days, f }) {
   const [open, setOpen] = useState(null)
   if (!days?.length) return <p className="empty">لا حضور ولا مرضى ولا إجراءات في هذه الفترة.</p>
@@ -233,7 +233,7 @@ export default function DoctorDashboard() {
               <DutyCalendar from={shown.from} to={shown.to} days={shown.days} apologies={shown.apologies || []} />
             </div>
             <div className="card">
-              <h3>أكثر ٥ إجراءات</h3>
+              <h3>أكثر 5 إجراءات</h3>
               <TopProcedures list={shown.topProcedures} />
             </div>
           </div>

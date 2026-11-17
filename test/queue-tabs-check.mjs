@@ -93,7 +93,7 @@ const run = async () => {
   const browser = await chromium.launch()
 
   // ═══ ١) التوزيع والترتيب والعدّادات ═══
-  console.log('\n── ١) التوزيع والترتيب والعدّادات ──')
+  console.log('\n── 1) التوزيع والترتيب والعدّادات ──')
   {
     const { ctx, page, errors } = await open(browser, `/clinic/session/${ATT}`)
     ok(await selected(page) === 'present', '«الحضور» افتراضاً')
@@ -147,7 +147,7 @@ const run = async () => {
   }
 
   // ═══ ٢) العدّادات تتحدّث بحدث البثّ — والتبويب المفتوح غيره ═══
-  console.log('\n── ٢) العدّادات مع البثّ ──')
+  console.log('\n── 2) العدّادات مع البثّ ──')
   {
     const after = clone(FX.queues[ATT])
     const w = after.appointments.find((a) => a.status === 'waiting'); w.status = 'arrived'; w.arrival_number = 99
@@ -170,15 +170,15 @@ const run = async () => {
       const txt = (k) => document.querySelector(`.queue-tab[data-tab="${k}"]`)?.innerText || ''
       return txt('pending').includes(`(${b.pending - 1})`) && txt('done').includes(`(${b.done + 1})`)
     }, before, { timeout: 5000 }).then(() => true).catch(() => false)
-    ok(updated, 'حدث البثّ ⇐ «بانتظار الحضور» −١ و«انتهى» +١')
-    ok((await tabText(page, 'present')).includes(`(${before.present})`), 'الحضور: +١ حاضر −١ منتهٍ = كما هو')
+    ok(updated, 'حدث البثّ ⇐ «بانتظار الحضور» −1 و«انتهى» +1')
+    ok((await tabText(page, 'present')).includes(`(${before.present})`), 'الحضور: +1 حاضر −1 منتهٍ = كما هو')
     ok(await page.evaluate(() => window.__sameDoc === true), 'بلا تحديث للصفحة')
     ok(await selected(page) === 'absent', 'التبويب المفتوح باقٍ')
     await ctx.close()
   }
 
   // ═══ ٣) البحث ═══
-  console.log('\n── ٣) البحث ──')
+  console.log('\n── 3) البحث ──')
   {
     const { ctx, page } = await open(browser, `/clinic/session/${ATT}`)
     const search = page.locator('.queue-search input')
@@ -228,7 +228,7 @@ const run = async () => {
   }
 
   // ═══ ٤) الرجوع من صفحة الزيارة بالتبويب والبحث والموضع ═══
-  console.log('\n── ٤) الرجوع من صفحة الزيارة ──')
+  console.log('\n── 4) الرجوع من صفحة الزيارة ──')
   {
     const { ctx, page } = await open(browser, `/clinic/session/${ATT}?tab=done&q=${encodeURIComponent('ا')}`, { h: 500 })
     const names = await rowNames(page)
@@ -251,7 +251,7 @@ const run = async () => {
   }
 
   // ═══ ٦) «الإجراءات» و«الإحالات» ═══
-  console.log('\n── ٦) الإجراءات والإحالات ──')
+  console.log('\n── 6) الإجراءات والإحالات ──')
   const digits = (t) => Number(String(t).replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^\d]/g, ''))
   const live = (a) => (a.procedures || []).filter((l) => !l.removed_at)
   const PAYING = (a) => !['cancelled', 'no_show', 'postponed'].includes(a.status)
@@ -336,7 +336,7 @@ const run = async () => {
       const t = (k) => document.querySelector(`.queue-tab[data-tab="${k}"]`)?.innerText || ''
       return t('procedures').includes(`(${p + 1})`) && t('referrals').includes(`(${r + 1})`)
     }, [p0, r0], { timeout: 5000 }).then(() => true).catch(() => false)
-    ok(ok1, 'حدث البثّ ⇐ عدّادا الإجراءات والإحالات +١ بلا تحديث')
+    ok(ok1, 'حدث البثّ ⇐ عدّادا الإجراءات والإحالات +1 بلا تحديث')
     await page.locator('.queue-tab[data-tab="procedures"]').click()
     const tot = after.appointments.filter((a) => live(a).length && PAYING(a)).reduce((t, a) => t + Number(a.procedures_total), 0)
     ok(digits((await page.locator('.queue-extra-total').innerText()).split('(')[0]) === tot, 'وحدث المجموع')

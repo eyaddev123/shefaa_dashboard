@@ -79,7 +79,7 @@ const run = async () => {
   if (!up) { console.error('لم يقلع vite'); process.exit(1) }
   const browser = await chromium.launch()
 
-  console.log('\n── ١) الخيار تحت «سعر المريض» ──')
+  console.log('\n── 1) الخيار تحت «سعر المريض» ──')
   {
     const { ctx, page, errors, puts } = await open(browser)
     await payCard(page).locator('.pay-scope').waitFor({ timeout: 15000 })
@@ -93,7 +93,7 @@ const run = async () => {
     await scopeLabel(page, 'المعاينات فقط').click()
     ok(await saveBtn(page).isEnabled(), '★ تغيير الخيار يفتح الحفظ')
     const f = await payCard(page).locator('.pay-formula').textContent()
-    ok(f.includes('المعاينات ×') && f.includes('٢٠ معاينة'), '★ المعادلة: المعاينات × السعر، والمثال «٢٠ معاينة»', f)
+    ok(f.includes('المعاينات ×') && f.includes('20 معاينة'), '★ المعادلة: المعاينات × السعر، والمثال «20 معاينة»', f)
     ok((await payCard(page).textContent()).includes('لا تُعدّ المراجعات'), 'الشرح يتبدّل: لا مراجعات ولا «إجراء فقط»')
     ok(await payCard(page).locator('.share-warn', { hasText: 'الأشهر الماضية' }).count() === 1, '★ تنبيه: يغيّر حساب الأشهر الماضية')
     await shot(page, 'consultation-dirty')
@@ -117,7 +117,7 @@ const run = async () => {
     await ctx.close()
   }
 
-  console.log('\n── ٢) الاطّلاع (المدير المسؤول) و«راتبي» ──')
+  console.log('\n── 2) الاطّلاع (المدير المسؤول) و«راتبي» ──')
   {
     const { ctx, page } = await open(browser, { role: 'mgr', pay: PAY({ patient_scope: 'consultation' }) })
     await payCard(page).locator('.pay-readonly').waitFor({ timeout: 15000 })
@@ -126,7 +126,7 @@ const run = async () => {
     ok(await payCard(page).locator('.pay-scope').count() === 0, 'ولا خيار قابل للتغيير')
     await ctx.close()
   }
-  for (const [scope, qty, rest] of [['consultation', /(٣|3) معاينات/, 'مريض'], ['all', /(٦|6) مرضى/, 'معاينة']]) {
+  for (const [scope, qty, rest] of [['consultation', /(3|3) معاينات/, 'مريض'], ['all', /(6|6) مرضى/, 'معاينة']]) {
     const { ctx, page, errors } = await open(browser, { role: 'doc', path: '/clinic/my-work', scope })
     await page.locator('.dk-sal-calc').waitFor({ timeout: 15000 })
     const c = await page.locator('.dk-sal-calc').textContent()
@@ -135,7 +135,7 @@ const run = async () => {
     await ctx.close()
   }
 
-  console.log('\n── ٣) الجوال والوضع الليلي ──')
+  console.log('\n── 3) الجوال والوضع الليلي ──')
   for (const [w, theme] of [[390, 'light'], [390, 'dark'], [1366, 'dark']]) {
     const { ctx, page } = await open(browser, { w, h: 844, theme })
     await payCard(page).locator('.pay-scope').waitFor({ timeout: 15000 })

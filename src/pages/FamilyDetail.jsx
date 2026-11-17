@@ -172,7 +172,7 @@ export default function FamilyDetail() {
               <p>
                 <strong>{DECISION_TYPES[active.decision_type] || active.decision_type}</strong>
                 {active.decision_type === 'percentage' && active.decision_value != null &&
-                  <> — {Number(active.decision_value)}٪</>}
+                  <> — {Number(active.decision_value)}%</>}
                 {' · السقف لكل طلب: '}<strong>{fmtMoney(active.per_request_cap)}</strong>
                 {active.review_date && <> · تاريخ إعادة النظر: {fmtDate(active.review_date)}</>}
               </p>

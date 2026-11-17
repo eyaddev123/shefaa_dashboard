@@ -37,11 +37,11 @@ export function RuleFields({ kind, value, price, onChange, showErrors, autoFocus
         <label htmlFor={`${uid}-k`}>النوع</label>
         <select id={`${uid}-k`} value={kind} onChange={(e) => onChange({ kind: e.target.value, value })}>
           <option value="fixed">مبلغ ثابت</option>
-          <option value="percent">نسبة ٪ مختلفة</option>
+          <option value="percent">نسبة % مختلفة</option>
         </select>
       </div>
       <div className="field">
-        <label htmlFor={`${uid}-v`}>{kind === 'percent' ? 'النسبة ٪' : 'المبلغ (ل.س)'}</label>
+        <label htmlFor={`${uid}-v`}>{kind === 'percent' ? 'النسبة %' : 'المبلغ (ل.س)'}</label>
         <input id={`${uid}-v`} value={value} inputMode="decimal" autoFocus={autoFocus}
           placeholder={kind === 'percent' ? 'مثلاً 40' : 'مثلاً 20000'}
           aria-invalid={showErrors && !!chk.error}
@@ -52,7 +52,7 @@ export function RuleFields({ kind, value, price, onChange, showErrors, autoFocus
       <p className="hint rule-msg">
         {kind === 'percent'
           ? (value.trim() !== '' && Number(value) === 0 && !chk.error
-            ? '0٪ — كامل المبلغ للشفاء (قاعدةٌ مسجّلة مقصودة).'
+            ? '0% — كامل المبلغ للشفاء (قاعدةٌ مسجّلة مقصودة).'
             : 'تُحسب بعد خصم المواد والمستهلكات: (السعر − المواد − المستهلكات) × النسبة، مقرّبةً لفوق لأقرب 50.')
           : 'المبلغ كما هو للدكتور، لا تمسّه المواد ولا يُقرَّب — بما لا يتجاوز ما يبقى من السعر.'}
         {price != null && <> سعر الإجراء الحالي {fmtMoney(price)}.</>}

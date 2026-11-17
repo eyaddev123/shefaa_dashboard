@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { api, todayLocal } from '../api.js'
+import { api, todayLocal, fmtDay, fmtMonth } from '../api.js'
 import { matchesAr } from '../arabic-search.js'
 import { fmtClock, clockTitle } from '../components/Punctuality.jsx'
 import { accountLines, partsOf, salaryPatientsOf } from '../pay-parts.js'
@@ -13,8 +13,8 @@ import { accountLines, partsOf, salaryPatientsOf } from '../pay-parts.js'
 // الفترة في الرابط (?month= · ?day= · ?from=&to=)؛ البحث والترتيب في الصفحة وحدها.
 
 // المبالغ بالليرة الكاملة (الأسعار بالمئات — الكسر ضجيج)، والنسب بمنزلةٍ عشرية واحدة
-const fmtNum = (n) => Number(n || 0).toLocaleString('ar-SY', { maximumFractionDigits: 0 })
-const fmtOne = (h) => Number(h || 0).toLocaleString('ar-SY', { maximumFractionDigits: 1 })
+const fmtNum = (n) => Number(n || 0).toLocaleString('ar-SY-u-nu-latn', { maximumFractionDigits: 0 })
+const fmtOne = (h) => Number(h || 0).toLocaleString('ar-SY-u-nu-latn', { maximumFractionDigits: 1 })
 // «+١٦٬٠٠٠» و«−٦٠٬٠٠٠» — الإشارة نصّاً: toLocaleString يسبق السالب بعلامة اتجاه تُرسم شرطةً ثانية
 const signed = (n) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${fmtNum(Math.abs(n))}`
 // «يوم واحد» · «يومان» · «٥ أيام» · «١١ يوماً» — ولا «·» بجانب رقمٍ هنديّ (يُقرأ صفراً)
@@ -37,9 +37,9 @@ const shiftDay = (day, n) => {
 }
 const isDay = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v || '')
 // «تشرين الثاني ٢٠٢٦» و«الأربعاء ١١ تشرين الثاني» — منتصف النهار UTC فلا يقفز اليوم بفرق التوقيت
-const monthLabel = (m) => new Date(`${m}-01T12:00:00Z`).toLocaleDateString('ar-SY', { month: 'long', year: 'numeric', timeZone: 'UTC' })
-const dayLabel = (d) => new Date(`${d}T12:00:00Z`).toLocaleDateString('ar-SY', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' })
-const shortDay = (d) => new Date(`${d}T12:00:00Z`).toLocaleDateString('ar-SY', { day: 'numeric', month: 'long', timeZone: 'UTC' })
+const monthLabel = (m) => fmtMonth(m)
+const dayLabel = (d) => fmtDay(`${d}T12:00:00Z`, { weekday: true, year: false, utc: true })
+const shortDay = (d) => fmtDay(`${d}T12:00:00Z`, { year: false, utc: true })
 
 const MODES = [['month', 'شهر'], ['day', 'يوم'], ['custom', 'فترة']]
 const SORTS = [
@@ -51,7 +51,7 @@ const SORTS = [
 ]
 const hasActivity = (d) => d.patients > 0 || d.procedures > 0 || d.attendance.days > 0 || d.shifa > 0 || d.ironCount > 0
   || (d.p && (d.p.scheduled > 0 || d.p.apologized > 0))
-const pct = (x) => `${Math.round(x * 100).toLocaleString('ar-SY')}٪`
+const pct = (x) => `${Math.round(x * 100).toLocaleString('ar-SY-u-nu-latn')}%`
 const minText = (m) => {
   const h = Math.floor(m / 60), r = m % 60
   return h ? `${fmtNum(h)} س${r ? ` ${fmtNum(r)} د` : ''}` : `${fmtNum(r)} د`
@@ -94,7 +94,7 @@ function PunctStrip({ p }) {
         {p.onTime > 0 && <span className="on" style={{ width: `${onW}%` }} />}
         {p.late > 0 && <span className="late" style={{ width: `${100 - onW}%` }} />}
       </div>
-      {/* بلا «٠»: الصفر الهنديّ بجانب كلمة يُقرأ نقطة — فالجملة تُبنى على ما وقع */}
+      {/* بلا «0»: الصفر الهنديّ بجانب كلمة يُقرأ نقطة — فالجملة تُبنى على ما وقع */}
       <p className="dr-punct-sub">
         {p.late
           ? <>تأخّر في <b>{dayCount(p.late)}</b> من {fmtNum(p.actual)} — متوسّط التأخير <b>{minText(p.avgLate)}</b></>
@@ -320,7 +320,7 @@ function DoctorCard({ d, share, link }) {
       <div className="dr-share" title="حصّته من دخل الشفاء في الفترة">
         <div className="dr-meter" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={share}
           aria-label="حصّته من دخل الفترة"><span style={{ width: `${Math.max(share, share > 0 ? 2 : 0)}%` }} /></div>
-        <span className="dr-share-txt">{fmtOne(share)}٪ من دخل الفترة</span>
+        <span className="dr-share-txt">{fmtOne(share)}% من دخل الفترة</span>
       </div>
 
       {(a.noDeparture > 0 || a.onDuty > 0) && (

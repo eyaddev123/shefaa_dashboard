@@ -5,8 +5,11 @@ import App from './App.jsx'
 import './styles.css'
 import { initTheme } from './theme.js'
 import { DialogProvider } from './dialogs.jsx'
+import { installLatinInput } from './latin-input.js'
 
 initTheme()
+// كلّ خانة تكتب أرقاماً لاتينية ولو بالكيبورد العربي (latin-input.js)
+installLatinInput()
 
 // ═══ حارس الأخطاء: يحفظ «أيّ مكوّن» انهار، ثمّ يُعيد الخطأ نفسه لشاشة «تعذّر تشغيل الشاشة» ═══
 // (2026-11-16: خطأٌ متكرّر على صفحة الجلسة لم يُعرف مكانه — الشاشة كانت تعرض مكان رمي React
