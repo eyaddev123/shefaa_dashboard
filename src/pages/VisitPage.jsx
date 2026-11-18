@@ -26,15 +26,16 @@ import { useFeeMode } from '../fee-mode.js'
 import ConsumablesCounter from '../components/ConsumablesCounter.jsx'
 import RoomBadge from '../components/RoomBadge.jsx'
 import Combobox from '../components/Combobox.jsx'
+import BottomSheet from '../components/BottomSheet.jsx'
 import VisitTimeline from '../components/VisitTimeline.jsx'
 import { MissingBadge, StatusCell, VisitActions, missingOf, priorityBadge, useVisitActions } from './SessionQueue.jsx'
 
 // ═══ اختيارٌ بأزرارٍ جنب بعض — للقوائم القصيرة (طلب المستخدم 2026-11-18: «أزرار جنب بعض») ═══
 // كلّ الخيارات ظاهرة، وكبسةٌ واحدة تختار. options: [[value, label, disabled?]]
-function Choice({ label, value, options, onChange, disabled, hint }) {
+function Choice({ label, value, options, onChange, disabled, hint, badge }) {
   return (
     <div className="vf-field" role="radiogroup" aria-label={label}>
-      <span className="vf-label">{label}</span>
+      <span className="vf-label">{label} {badge}</span>
       <div className="vf-seg">
         {options.map(([v, l, off]) => (
           <button key={v} type="button" role="radio" aria-checked={value === v} data-value={v}
@@ -46,10 +47,65 @@ function Choice({ label, value, options, onChange, disabled, hint }) {
   )
 }
 
+// ═══ تغيير الحالة من شارتها في الرأس (2026-11-18 — خرجت من نموذج بيانات المريض) ═══
+// الشارة نفسها زرّ ▾: قائمةٌ صغيرة بالحالات، و«ملغى»/«لم يحضر» بتأكيدٍ باسم المريض كما كان في النموذج.
+// «بانتظار الحضور» ⇒ «حاضر» مسار حضورٍ كغيره (was_first_arrival ⇒ الطباعة التلقائية).
+function StatusMenu({ appt, data, onChanged, onToast, onArrived }) {
+  const dlg = useDialogs()
+  const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const choose = async (status) => {
+    setOpen(false)
+    if (status === appt.status) return
+    const who = `${turnLabel(appt, isAttendanceSession(data))}${appt.full_name ? ` (${appt.full_name})` : ''}`
+    const danger = ['cancelled', 'no_show'].includes(status)
+    const ok = await dlg.confirm({
+      title: status === 'cancelled' ? 'إلغاء الحجز' : status === 'no_show' ? 'تعليم «لم يحضر»' : 'تغيير الحالة',
+      body: status === 'cancelled' ? `إلغاء حجز ${who}؟` : status === 'no_show' ? `تعليم «لم يحضر» لـ ${who}؟`
+        : `تغيير حالة ${who} إلى «${APPOINTMENT_STATUSES[status]}»؟`,
+      confirmLabel: status === 'cancelled' ? 'إلغاء الحجز' : status === 'no_show' ? 'لم يحضر' : 'تغيير',
+      cancelLabel: 'تراجع', danger,
+    })
+    if (!ok) return
+    setBusy(true)
+    try {
+      const r = await api.clinic.saveAppointmentDetails(appt.id, { status })
+      onToast(r?.message || 'تغيّرت الحالة', 'success'); onChanged()
+      if (r?.was_first_arrival && onArrived) onArrived({ ...appt, ...(r || {}) }, r)
+    } catch (ex) { onToast(ex.message) } finally { setBusy(false) }
+  }
+  // «بانتظار العودة» لا يُختار من هنا (الطبيب وحده يُخرج مريضه)
+  const options = Object.entries(APPOINTMENT_STATUSES).filter(([k]) => k !== WAITING_RETURN)
+  return (
+    <span className="vs-menu">
+      <button type="button" className="vs-trigger" aria-haspopup="menu" aria-expanded={open} disabled={busy}
+        title="تغيير الحالة" onClick={() => setOpen((v) => !v)}>
+        <StatusCell appt={appt} offset={serverOffsetOf(data)} /><span className="vs-chev" aria-hidden="true">▾</span>
+      </button>
+      {open && (
+        <>
+          <span className="vs-backdrop" onClick={() => setOpen(false)} />
+          <span className="vs-panel" role="menu">
+            <span className="vs-title">تغيير الحالة إلى…</span>
+            {options.map(([k, label]) => (
+              <button key={k} type="button" role="menuitem" className={`vs-item${k === appt.status ? ' is-on' : ''}${['cancelled', 'no_show'].includes(k) ? ' is-danger' : ''}`}
+                onClick={() => choose(k)}>{label}{k === appt.status && ' ✓'}</button>
+            ))}
+          </span>
+        </>
+      )}
+    </span>
+  )
+}
+
 // ═══ رأس الصفحة — ثابتٌ مع التمرير ═══
 // الرقم كبيراً (هو ما يُنادى به)، والاسم والحالة، والعيادة والدكتور، وأزرار الصفّ نفسها.
-function VisitHeader({ appt, data, actions, onBack, onDone, onError }) {
+function VisitHeader({ appt, data, actions, onBack, onDone, onError, onChanged, onToast }) {
   const attendance = isAttendanceSession(data)
+  const { clinicRole: role } = useRole()
+  // من يعدّل الحجز يغيّر حالته (الشرط نفسه في بطاقة البيانات)
+  const canStatus = canEditBooking(role) && appt.status !== 'postponed'
+    && (role === 'clinic_admin' || data.session_day === data.server_today)
   // نمط الحضور: رقم الدور يُعطى عند الحضور — قبله «—» ورقم الحجز تحته صغيراً
   const num = attendance ? (appt.arrival_number ?? '—') : appt.queue_number
   return (
@@ -63,7 +119,9 @@ function VisitHeader({ appt, data, actions, onBack, onDone, onError }) {
       <div className="visit-who">
         <h2>
           {appt.full_name}
-          <StatusCell appt={appt} offset={serverOffsetOf(data)} />
+          {canStatus
+            ? <StatusMenu appt={appt} data={data} onChanged={onChanged} onToast={onToast} onArrived={actions.autoPrint} />
+            : <StatusCell appt={appt} offset={serverOffsetOf(data)} />}
           {priorityBadge(appt.priority)}
         </h2>
         <p className="visit-where">
@@ -190,13 +248,13 @@ function PatientCard({ appt, session, onChanged, onToast, onArrived }) {
     full_name: appt.full_name || '', mobile: appt.mobile || '',
     gender: appt.gender || '', birth_year: appt.birth_year || '',
     visit_type: appt.visit_type, priority: appt.priority || 'normal',
-    status: appt.status,
+    // «الحالة» خرجت من نموذج البيانات (2026-11-18) — تُغيَّر من شارتها في رأس الصفحة (StatusMenu)
     // ملاحظة الحجز نفسها (عمود reason) — حقلٌ كغيره: يبدأ بقيمته ويدخل فحص التغيير
     reason: appt.reason || '',
   })
   const [form, setForm] = useState(base)
   useEffect(() => { setForm(base()) }, [appt.id, appt.full_name, appt.mobile,
-    appt.gender, appt.birth_year, appt.visit_type, appt.priority, appt.status, appt.reason]) // eslint-disable-line
+    appt.gender, appt.birth_year, appt.visit_type, appt.priority, appt.reason]) // eslint-disable-line
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
 
   const dayOk = role === 'clinic_admin' || session.session_day === session.server_today
@@ -289,41 +347,55 @@ function PatientCard({ appt, session, onChanged, onToast, onArrived }) {
         )}
       </h3>
 
-      {editingForm ? (
-        <>
-          <div className="ad-fields">
-            <label>الاسم الثلاثي
-              <input value={form.full_name} onChange={set('full_name')} disabled={fieldsFrozen} /></label>
-            <label>الموبايل
-              <MobileInput value={form.mobile} onChange={(v) => setForm((f) => ({ ...f, mobile: v }))} disabled={fieldsFrozen} /></label>
-            <label>سنة الميلاد
-              <input value={form.birth_year} onChange={set('birth_year')} dir="ltr" disabled={fieldsFrozen} /></label>
-            <label className="ad-note">ملاحظة الحجز (اختيارية)
-              <input value={form.reason} onChange={set('reason')} disabled={fieldsFrozen} /></label>
+      {/* ★ التعديل شباكٌ مركّز (2026-11-18: «ما حبيته… بيطوّل ومش مركّز»): نافذةٌ بعمودين على اللابتوب،
+          وورقةٌ من تحت على الموبايل (BottomSheet)؛ الخانة الناقصة بإطارٍ برتقاليّ، والحفظ ثابتٌ تحت */}
+      {editingForm && (
+        <BottomSheet title="تعديل بيانات المريض" subtitle={appt.full_name}
+          onClose={() => { if (!busy) { setForm(base()); setEditingForm(false) } }}
+          footer={(
+            <div className="pe-foot">
+              <button disabled={busy || !hasChanges} onClick={save}>{busy ? 'يُحفظ…' : 'حفظ التعديلات'}</button>
+              <button className="ghost" disabled={busy} onClick={() => { setForm(base()); setEditingForm(false) }}>إلغاء</button>
+              {!hasChanges && <span className="pe-hint">ما في تعديل بعد</span>}
+            </div>
+          )}>
+          <div className="pe-grid">
+            <label className="pe-field">
+              <span>الاسم الثلاثي</span>
+              <input value={form.full_name} onChange={set('full_name')} disabled={fieldsFrozen} autoFocus />
+            </label>
+            <label className={`pe-field${!form.mobile ? ' is-missing' : ''}`}>
+              <span>الموبايل</span>
+              <MobileInput value={form.mobile} onChange={(v) => setForm((f) => ({ ...f, mobile: v }))} disabled={fieldsFrozen} />
+            </label>
+            <label className={`pe-field${!form.birth_year ? ' is-missing' : ''}`}>
+              <span>سنة الميلاد {!form.birth_year && <em>ناقصة</em>}</span>
+              <input value={form.birth_year} onChange={set('birth_year')} dir="ltr" inputMode="numeric" placeholder="مثلاً 1985" disabled={fieldsFrozen} />
+            </label>
+            <div className={`pe-field${!form.gender ? ' is-missing' : ''}`}>
+              <Choice label="الجنس" badge={!form.gender && <em>ناقص</em>} value={form.gender} disabled={fieldsFrozen}
+                options={[['male', 'ذكر'], ['female', 'أنثى']]} onChange={(v) => setForm((f) => ({ ...f, gender: v }))} />
+            </div>
+            <div className="pe-field">
+              <Choice label="نوع الزيارة" value={form.visit_type} disabled={fieldsFrozen}
+                options={Object.entries(VISIT_TYPES).map(([k, v]) => [k, k === PROCEDURE_ONLY ? 'إجراء فقط' : v, !!kindLock && crossesKind(k)])}
+                hint={kindLock ? `${kindLock} — لا تغيير بين «عادية» و«إجراء فقط»` : null}
+                onChange={(v) => setForm((f) => ({ ...f, visit_type: v }))} />
+            </div>
+            <div className="pe-field">
+              <span className="vf-label">الأولوية</span>
+              <Combobox id="pe-priority" value={form.priority}
+                options={[['normal', 'عادي'], ['urgent', 'إسعافي'], ['elderly', 'كبير بالعمر'], ['infant', 'رضيع']].map(([value, label]) => ({ value, label }))}
+                onChange={(v) => setForm((f) => ({ ...f, priority: v }))} />
+            </div>
+            <label className="pe-field pe-wide">
+              <span>ملاحظة الحجز (اختيارية)</span>
+              <input value={form.reason} onChange={set('reason')} disabled={fieldsFrozen} placeholder="مثلاً: يحتاج كرسي" />
+            </label>
           </div>
-          {/* القوائم القصيرة أزرارٌ جنب بعض (2026-11-18) */}
-          <div className="vf-choices">
-            <Choice label="الجنس" value={form.gender} disabled={fieldsFrozen}
-              options={[['male', 'ذكر'], ['female', 'أنثى']]} onChange={(v) => setForm((f) => ({ ...f, gender: v }))} />
-            <Choice label="نوع الزيارة" value={form.visit_type} disabled={fieldsFrozen}
-              options={Object.entries(VISIT_TYPES).map(([k, v]) => [k, k === PROCEDURE_ONLY ? 'إجراء فقط' : v, !!kindLock && crossesKind(k)])}
-              hint={kindLock ? `${kindLock} — لا تغيير بين «عادية» و«إجراء فقط»` : null}
-              onChange={(v) => setForm((f) => ({ ...f, visit_type: v }))} />
-            <Choice label="الأولوية" value={form.priority} disabled={fieldsFrozen}
-              options={[['normal', 'عادي'], ['urgent', 'إسعافي'], ['elderly', 'كبير بالعمر'], ['infant', 'رضيع']]}
-              onChange={(v) => setForm((f) => ({ ...f, priority: v }))} />
-            {/* «بانتظار العودة» لا يُختار من هنا (الطبيب وحده يُخرج مريضه) — يظهر فقط حين يكون الحالة الحالية */}
-            <Choice label="الحالة" value={form.status}
-              options={Object.entries(APPOINTMENT_STATUSES).filter(([k]) => k !== WAITING_RETURN || appt.status === WAITING_RETURN)}
-              onChange={(v) => setForm((f) => ({ ...f, status: v }))} />
-          </div>
-          <div className="ad-actions">
-            <button disabled={busy || !hasChanges} onClick={save}>حفظ التعديلات</button>
-            <button className="ghost" disabled={busy} onClick={() => { setForm(base()); setEditingForm(false) }}>إلغاء</button>
-            {missing.length > 0 && <span className="ad-missing">ينقص: {missing.map((f) => f.label).join('، ')}</span>}
-          </div>
-        </>
-      ) : (
+        </BottomSheet>
+      )}
+      {(
         <>
           <dl className="appt-details-grid visit-facts">
             {facts.map(([k, v]) => (
@@ -443,7 +515,7 @@ export default function VisitPage() {
   const liveCount = (appt.procedures || []).filter((l) => !l.removed_at).length
   return (
     <div className="visit-page">
-      <VisitHeader appt={appt} data={data} actions={actions} onBack={back}
+      <VisitHeader appt={appt} data={data} actions={actions} onBack={back} onChanged={load} onToast={toastFor}
         onDone={(msg) => { toastFor(msg, 'success'); load() }} onError={(msg) => { toastFor(msg); load() }} />
       {toast}
       {actions.dialogs}

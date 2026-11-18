@@ -165,10 +165,10 @@ const run = async () => {
     ok(!(await page.$('.ad-history')), 'السجل مطويّ افتراضاً')
     // «أكمل البيانات» يفتح النموذج نفسه بقيمه
     await page.locator('.visit-patient .link-btn', { hasText: 'أكمل البيانات' }).click()
-    ok(await page.locator('.visit-patient .ad-fields input').first().inputValue() === apptOf('new').full_name, 'التعديل: النموذج بقيمه')
+    ok(await page.locator('.visit-patient .pe-grid input').first().inputValue() === apptOf('new').full_name, 'التعديل: النموذج بقيمه')
     ok(await page.locator('.visit-patient button', { hasText: 'حفظ التعديلات' }).isDisabled(), 'التعديل: الحفظ معطّل بلا تغيير')
-    await page.locator('.visit-patient button', { hasText: 'إلغاء' }).click()
-    ok(!(await page.$('.visit-patient .ad-fields')), 'التعديل: «إلغاء» يعيد القراءة')
+    await page.locator('.visit-patient .pe-foot button', { hasText: 'إلغاء' }).click()
+    ok(!(await page.$('.visit-patient .pe-grid')), 'التعديل: «إلغاء» يعيد القراءة')
     await ctx.close()
   }
   {
