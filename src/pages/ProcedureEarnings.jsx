@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api, todayLocal, fmtDay } from '../api.js'
+import { PeriodBar } from './DoctorAccounts.jsx'
 import ProcedureMaterialsDetail from '../components/ProcedureMaterialsDetail.jsx'
 import { useUnpaid, UnpaidPanel, EmptyVisitsList, LineEditor, LineHistory } from '../components/procedures/LineTools.jsx'
 
@@ -15,13 +16,14 @@ import { useUnpaid, UnpaidPanel, EmptyVisitsList, LineEditor, LineHistory } from
 // وهو نفسه ما يُبنى منه الإكسل. والفترة تُحلّ في الخادم بتوقيت دمشق. الفترة والدكتور في الرابط.
 // المشرفة والمدير والمشرف العام وحدهم (EARNINGS_ROLES في الخادم) — المجلس والاستقبال 403.
 
-const PERIODS = [
-  { key: 'today', label: 'اليوم' },
-  { key: 'yesterday', label: 'أمس' },
-  { key: 'week', label: 'هذا الأسبوع' },
-  { key: 'month', label: 'هذا الشهر' },
-  { key: 'custom', label: 'من — إلى' },
-]
+// شريط الفترة نفسه في «كشوف الأجور» و«تقارير الدكاترة» (طلب المستخدم 2026-11-18: «بدي نفسهن بتفصيل
+// الإجراءات»): يوم ثمّ شهر ثمّ فترة. كلّها تُرسَل للخادم من–إلى (اليوم: من اليوم إليه، الشهر: أوّله إلى آخره).
+const MODES = [['day', 'يوم'], ['month', 'شهر'], ['custom', 'فترة']]
+const isDay = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v || '')
+const monthRange = (m) => {
+  const [y, mo] = m.split('-').map(Number)
+  return { from: `${m}-01`, to: `${m}-${String(new Date(y, mo, 0).getDate()).padStart(2, '0')}` }
+}
 
 const fmtNum = (n) => Number(n || 0).toLocaleString('ar-SY-u-nu-latn', { maximumFractionDigits: 2 })
 function Money({ value, className }) {
@@ -226,9 +228,12 @@ function Attention({ items, open, setOpen }) {
 
 export default function ProcedureEarnings({ showToast, canEdit }) {
   const [params, setParams] = useSearchParams()
-  const period = PERIODS.some((p) => p.key === params.get('period')) ? params.get('period') : 'today'
-  const from = params.get('from') || todayLocal()
-  const to = params.get('to') || from
+  // الافتراضيّ اليوم (كما كان «اليوم»)؛ ورابطٌ قديم بـ period=custom&from&to يبقى يعمل كفترة
+  const month = /^\d{4}-\d{2}$/.test(params.get('month') || '') ? params.get('month') : null
+  const from = isDay(params.get('from')) ? params.get('from') : null
+  const to = isDay(params.get('to')) ? params.get('to') : from
+  const day = isDay(params.get('day')) ? params.get('day') : todayLocal()
+  const mode = from ? 'custom' : month ? 'month' : 'day'
   const doctorId = params.get('doctor')
   const [loaded, setLoaded] = useState(null)
   const [err, setErr] = useState(null)
@@ -238,7 +243,7 @@ export default function ProcedureEarnings({ showToast, canEdit }) {
   const [unpaid, reloadUnpaid] = useUnpaid(showToast)
   const [empty, setEmpty] = useState(null)
 
-  const query = period === 'custom' ? { from, to } : { period }
+  const query = mode === 'custom' ? { from, to } : mode === 'month' ? monthRange(month) : { from: day, to: day }
   const qKey = JSON.stringify(query)
   useEffect(() => {
     let live = true
@@ -260,9 +265,9 @@ export default function ProcedureEarnings({ showToast, canEdit }) {
     for (const [k, v] of Object.entries(patch)) { if (v == null || v === '') next.delete(k); else next.set(k, v) }
     setParams(next, { replace: !push })
   }
-  const pickPeriod = (key) => update(key === 'custom'
-    ? { period: 'custom', from: data?.from || todayLocal(), to: data?.to || todayLocal(), doctor: null }
-    : { period: key, from: null, to: null, doctor: null })
+  // من PeriodBar: { day } أو { month } أو { from, to } أو {} (شهر بلا تحديد ⇒ الشهر الجاري)
+  const setPeriod = (p) => update({ period: null, day: null, month: null, from: null, to: null, doctor: null,
+    ...(Object.keys(p).length === 0 ? { month: todayLocal().slice(0, 7) } : p) })
   const open = (id) => { update({ doctor: id }, { push: true }); window.scrollTo?.(0, 0) }
   const refresh = () => { setReload((n) => n + 1); reloadUnpaid() }
 
@@ -318,26 +323,12 @@ export default function ProcedureEarnings({ showToast, canEdit }) {
   return (
     <div className="pex-page">
       <div className="pex-controls">
-        <div className="earn-periods" role="group" aria-label="الفترة">
-          {PERIODS.map((p) => (
-            <button key={p.key} type="button" aria-pressed={period === p.key}
-              className={`rev-flag${period === p.key ? ' is-on' : ''}`} onClick={() => pickPeriod(p.key)}>{p.label}</button>
-          ))}
-        </div>
+        <PeriodBar mode={mode} cur={month || todayLocal().slice(0, 7)} curDay={day} from={from} to={to}
+          data={data ? { ...data, today: todayLocal() } : null} set={setPeriod} modes={MODES} />
         <button type="button" className="ghost pex-export" disabled={exporting || !data || data.doctors.length === 0} onClick={doExport}>
           {exporting ? 'جارٍ التصدير…' : doctor ? 'إكسل هذا الدكتور' : 'إكسل الملخّص والتفصيل'}
         </button>
       </div>
-      {period === 'custom' && (
-        <div className="inline rev-filters earn-custom">
-          <div className="field"><label htmlFor="earn-from">من</label>
-            <input id="earn-from" type="date" value={from}
-              onChange={(e) => e.target.value && update({ from: e.target.value, to: e.target.value > to ? e.target.value : to, doctor: null })} /></div>
-          <div className="field"><label htmlFor="earn-to">إلى</label>
-            <input id="earn-to" type="date" value={to} min={from}
-              onChange={(e) => e.target.value && update({ to: e.target.value, doctor: null })} /></div>
-        </div>
-      )}
 
       {!doctorId && <Attention items={attention} open={attnOpen} setOpen={setAttnOpen} />}
 
@@ -361,7 +352,7 @@ export default function ProcedureEarnings({ showToast, canEdit }) {
         : data.doctors.length === 0 ? <p className="empty pex-empty">لا إجراءات مقبوضة {rangeWords(data)}.</p>
         : (
           <>
-            <p className="pex-range">{rangeWords(data)}{period === 'week' && ' (الأسبوع يبدأ السبت)'}</p>
+            <p className="pex-range">{rangeWords(data)}</p>
             <Totals t={data.totals} iron={data.iron} grand={data.grand} purchase={data.purchase} />
             <section className="card pex-card" aria-label="الدكاترة">
               <h3 className="pex-h">لكلّ دكتور</h3>

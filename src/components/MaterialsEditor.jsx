@@ -83,8 +83,19 @@ export default function MaterialsEditor({ catalog, value, onChange, disabled, sa
   const setQty = (id, qty) => onChange(value.map((m) => (String(m.material_id) === String(id) ? { ...m, qty } : m)))
   const remove = (id) => onChange(value.filter((m) => String(m.material_id) !== String(id)))
 
+  // ★ سطرٌ مضغوط لكلّ مادة (طلب المستخدم 2026-11-18، «كل مادة سطرين والبحث بينزل لتحت»): الاسم وتحته
+  //   «الوحدة · المبلغ»، وبجانبه العدّاد وزرّ الحذف. والبحث **فوق** القائمة فلا ينزل مع كلّ مادة تُضاف.
+  const search = (
+    <div className="mat-search">
+      <ComboAdd id={comboId} ariaLabel="ابحث عن مادة" disabled={disabled || !catalog}
+        placeholder={catalog ? comboHint : 'جارٍ تحميل المواد…'}
+        options={(catalog || []).filter((m) => !chosen.has(String(m.id))).map((m) => materialOption(m, withPrice))}
+        emptyText="لا مواد متاحة" onPick={(o) => add(o.m)} />
+    </div>
+  )
   return (
     <div className="mat-editor">
+      {search}
       {value.length > 0 && (
         <ul className="mat-chosen">
           {value.map((m) => {
@@ -99,6 +110,14 @@ export default function MaterialsEditor({ catalog, value, onChange, disabled, sa
             return (
               <li key={m.material_id}>
                 <span className="mat-name">{m.name}</span>
+                <span className="mat-meta">
+                  <span className="mat-unit">{m.unit}</span>
+                  {priceOf(m.material_id) !== null && (
+                    <span className="mat-price" title={`سعر البيع ${fmtMoney(priceOf(m.material_id))} للـ${m.unit}`}>
+                      {fmtMoney(bad ? priceOf(m.material_id) : round2(priceOf(m.material_id) * q))}
+                    </span>
+                  )}
+                </span>
                 <span className="mat-step">
                   <button type="button" className="mat-minus" disabled={disabled || bad || q <= 1}
                     aria-label={`إنقاص كمّية ${m.name}`} title={q <= 1 ? 'الأقلّ 1 — للحذف زرّ ×' : `إنقاص ${m.name}`}
@@ -110,12 +129,6 @@ export default function MaterialsEditor({ catalog, value, onChange, disabled, sa
                     aria-label={`زيادة كمّية ${m.name}`} title={atMax && hint ? hint : `زيادة ${m.name}`}
                     onClick={plus}>+</button>
                 </span>
-                <span className="mat-unit">{m.unit}</span>
-                {priceOf(m.material_id) !== null && (
-                  <span className="mat-price" title={`سعر البيع ${fmtMoney(priceOf(m.material_id))} للـ${m.unit}`}>
-                    {fmtMoney(bad ? priceOf(m.material_id) : round2(priceOf(m.material_id) * q))}
-                  </span>
-                )}
                 <button type="button" className="mat-x" disabled={disabled}
                   aria-label={`إزالة ${m.name}`} title={`إزالة ${m.name}`}
                   onClick={() => remove(m.material_id)}>×</button>
@@ -126,12 +139,6 @@ export default function MaterialsEditor({ catalog, value, onChange, disabled, sa
           })}
         </ul>
       )}
-      <div className="mat-search">
-        <ComboAdd id={comboId} ariaLabel="ابحث عن مادة" disabled={disabled || !catalog}
-          placeholder={catalog ? comboHint : 'جارٍ تحميل المواد…'}
-          options={(catalog || []).filter((m) => !chosen.has(String(m.id))).map((m) => materialOption(m, withPrice))}
-          emptyText="لا مواد متاحة" onPick={(o) => add(o.m)} />
-      </div>
     </div>
   )
 }

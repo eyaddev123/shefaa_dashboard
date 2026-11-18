@@ -25,7 +25,7 @@ import {
 // لونٌ مُعبّأ للزرّ الأساسيّ وحده، الشارات كلماتٌ صغيرة، والأزرار ٤٤px.
 //   • «نادِ التالي» شريطٌ ثابت أعلى الشاشة يقول من التالي — النداء من هنا وحده.
 //   • عمودان من ٨٢٠px (التابلت عمودياً وأفقياً): «عندك الآن» و«خارج العيادة مؤقتاً» | «بانتظار
-//     الدور» (أوّله «التالي» وعليه «بدء كشف» وحده) و«حجوزات لم تحضر بعد» مطويّة. عمودٌ على الجوال.
+//     الدور» (أوّله «التالي»، وزرّ «بدء كشف» له في شريط النداء) و«حجوزات لم تحضر بعد» مطويّة. عمودٌ على الجوال.
 //   • بجانب كلّ اسم: نوع الزيارة (معاينة/مراجعة) وشاراته — كلماتٌ لا فقاعات.
 //   • «+ إجراء» وشريط «إجراءات اليوم» لمن لاختصاصه إجراءات وحده (has_procedures من /my-profile)؛
 //     والصفحة تُفسح للشريط تحتها فلا يغطّي الأزرار على الجوال. ورقة الإضافة كما كانت (تحديدٌ
@@ -151,9 +151,15 @@ function AddProcedureSheet({ appt, catalog, usage, matCatalog, loadMaterials, dr
         <ul className="dk-sel">
           {sel.map((x) => (
             <li key={x.id} className={`dk-sel-item${String(draft.errorId) === String(x.id) ? ' is-bad' : ''}`}>
+              {/* رأس البطاقة: الإجراء وأجرته، ومجموع موادّه ومستهلكاته حين توجد (جولة التصميم 2026-11-18) */}
               <div className="dk-sel-row">
                 <span className="dk-sel-name">{x.name}</span>
-                <span className="dk-sel-price">{fmtMoney(priceOf(x.id))}</span>
+                <span className="dk-sel-price">
+                  {fmtMoney(priceOf(x.id))}
+                  {feeMode && materialsValue(x.mats, matCatalog) + Number(x.cons || 0) > 0 && (
+                    <small> + مواد {fmtMoney(materialsValue(x.mats, matCatalog) + Number(x.cons || 0))}</small>
+                  )}
+                </span>
               </div>
               <div className="dk-mats-body">
                 {matCatalog == null ? <p className="empty">جارٍ تحميل المواد…</p>
@@ -607,10 +613,21 @@ export default function DoctorScreen() {
               : nextUp ? <>التالي: <strong>الدور {shownNumber(nextUp)}</strong> — {nextUp.full_name} <VisitType appt={nextUp} /></>
               : 'لا أحد بانتظار الدور'}
           </span>
-          <button type="button" className="dk-callbar-btn" disabled={busy || !!current || !nextUp}
-            onClick={() => act(nextIsBack ? api.clinic.returnCall : api.clinic.call, nextUp.id)}>
-            نادِ التالي
-          </button>
+          {/* «بدء كشف» بجانبه بالحجم نفسه (طلب المستخدم 2026-11-18: «إذا فات المريض فوراً خليه يعمل
+              بداية كشف بدون ما ينادي») — للتالي نفسه، بلا نداء ولا صوت في الصالة؛ والعائد يكمّل كشفه */}
+          <div className="dk-callbar-btns">
+            <button type="button" className="dk-callbar-btn" disabled={busy || !!current || !nextUp}
+              onClick={() => act(nextIsBack ? api.clinic.returnCall : api.clinic.call, nextUp.id)}>
+              نادِ التالي
+            </button>
+            <button type="button" className="ghost dk-callbar-btn dk-callbar-start" disabled={busy || !!current || !nextUp}
+              title="المريض دخل وحده — يبدأ كشفه بلا نداء ولا صوت في الصالة"
+              onClick={() => (nextIsBack
+                ? act(api.clinic.resume, nextUp.id, { ok: `بدأ كشف الدور ${shownNumber(nextUp)} (بلا نداء)`, undo: 'resume' })
+                : act(api.clinic.walkIn, nextUp.id, { ok: `بدأ كشف الدور ${shownNumber(nextUp)} (بلا نداء)`, undo: 'walk_in' }))}>
+              بدء كشف
+            </button>
+          </div>
         </div>
 
         <div className="dk-grid">
@@ -706,7 +723,7 @@ export default function DoctorScreen() {
                   </>
                 )
               })() : (
-                <p className="empty">لا أحد عندك الآن{nextUp ? ' — نادِ التالي من الأعلى' : ''}.</p>
+                <p className="empty">لا أحد عندك الآن{nextUp ? ' — نادِ التالي أو ابدأ كشفه من الأعلى' : ''}.</p>
               )}
             </div>
 
@@ -781,16 +798,10 @@ export default function DoctorScreen() {
                           {a.full_name}{tags(a)}
                           {isNext && a.reason && <small className="dk-next-note">{a.reason}</small>}
                         </span>
+                        {/* «بدء كشف» انتقل لشريط النداء (2026-11-18) — هنا كلمة «التالي» وحدها */}
                         {isNext && (
                           <span className="dk-next-actions">
                             <span className="doc-next-tag">التالي</span>
-                            <button className="ghost dk-tap" disabled={busy || !!current}
-                              title="المريض دخل وحده — يبدأ كشفه بلا نداء ولا صوت في الصالة"
-                              onClick={() => (nextIsBack
-                                ? act(api.clinic.resume, a.id, { ok: `بدأ كشف الدور ${shownNumber(a)} (بلا نداء)`, undo: 'resume' })
-                                : act(api.clinic.walkIn, a.id, { ok: `بدأ كشف الدور ${shownNumber(a)} (بلا نداء)`, undo: 'walk_in' }))}>
-                              بدء كشف
-                            </button>
                           </span>
                         )}
                       </li>

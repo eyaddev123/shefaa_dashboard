@@ -16,7 +16,8 @@ import { matchesAr } from '../arabic-search.js'
 // قراءةٌ وحدها: لا تسجيل «استلم» (قرار المستخدم: ورقةٌ تُوقَّع).
 
 const TABS = [['statements', 'كشوف الأجور'], ['procedures', 'تفصيل الإجراءات']]
-const MODES = [['month', 'شهر'], ['custom', 'فترة']]
+// «يوم» كـ«تقارير الدكاترة» (طلب المستخدم 2026-11-18: «بدي يوم وشهر وفترة») — اليوم = من اليوم إلى اليوم نفسه
+const MODES = [['day', 'يوم'], ['month', 'شهر'], ['custom', 'فترة']]   // الترتيب بطلب المستخدم: يوم ثمّ شهر ثمّ فترة
 const isDay = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v || '')
 const n = (v) => Number(v || 0).toLocaleString('ar-SY-u-nu-latn', { maximumFractionDigits: 2 })
 const hm = (m) => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`
@@ -40,15 +41,16 @@ function usePeriod() {
   const month = /^\d{4}-\d{2}$/.test(params.get('month') || '') ? params.get('month') : null
   const from = isDay(params.get('from')) ? params.get('from') : null
   const to = isDay(params.get('to')) ? params.get('to') : from
-  const mode = from ? 'custom' : 'month'
-  const query = mode === 'custom' ? { from, to } : { month }
+  const day = isDay(params.get('day')) ? params.get('day') : null
+  const mode = from ? 'custom' : day ? 'day' : 'month'
+  const query = mode === 'custom' ? { from, to } : mode === 'day' ? { from: day, to: day } : { month }
   const set = (patch) => {
     const next = new URLSearchParams(params)
     for (const k of ['month', 'from', 'to', 'day']) next.delete(k)
     for (const [k, v] of Object.entries(patch)) if (v) next.set(k, v)
     setParams(next, { replace: true })
   }
-  return { params, setParams, mode, month, from, to, query, set }
+  return { params, setParams, mode, month, day, from, to, query, set }
 }
 
 // ═══ الكشف في الصفحة: بطاقاتٌ وجداول بسمة النظام (لا ورقة A4 مرسومة — طلب المستخدم 2026-11-18:
@@ -197,7 +199,7 @@ function StatementView({ doctorId, query, onBack, showToast }) {
 }
 
 function StatementsTab({ showToast }) {
-  const { params, setParams, mode, month, from, to, query, set } = usePeriod()
+  const { params, setParams, mode, month, day, from, to, query, set } = usePeriod()
   const doctorId = /^\d+$/.test(params.get('doctor') || '') ? params.get('doctor') : null
   const [data, setData] = useState(null)
   const [err, setErr] = useState(null)
@@ -240,8 +242,11 @@ function StatementsTab({ showToast }) {
 
   return (
     <>
-      <PeriodBar mode={mode} cur={data?.month || month} from={from || data?.from} to={to || data?.to} data={data}
-        set={(p) => set(p)} modes={MODES} />
+      {/* كشريط «تقارير الدكاترة»: مسافةٌ عن خطّ التبويبات وعمّا تحته (طلب المستخدم 2026-11-18) */}
+      <div className="pr-period">
+        <PeriodBar mode={mode} cur={data?.month || month} curDay={day} from={from || data?.from} to={to || data?.to} data={data}
+          set={(p) => set(p)} modes={MODES} />
+      </div>
       {doctorId ? (
         <StatementView doctorId={doctorId} query={query} onBack={() => openDoctor(null)} showToast={showToast} />
       ) : err ? <p className="error">{err}</p> : !data ? <p className="empty">جارٍ التحميل…</p> : (
@@ -326,7 +331,7 @@ export default function Payroll() {
         <h2>الرواتب والأجور</h2>
         <p className="subtitle pcx-lead">
           {tab === 'statements'
-            ? <>كشف كلّ دكتور للفترة: مرضاه، ودوامه بالساعات، وحصّته من الإجراءات، والمستحقّ له، بملف Excel أو PDF للطباعة والتوقيع. الحساب نفسه في <Link to="/clinic/doctor-reports">تقارير الدكاترة</Link>.</>
+            ? <>كشف كلّ دكتور للفترة: مرضاه، ودوامه بالساعات، وحصّته من الإجراءات، والمستحقّ له، بملف Excel أو PDF للطباعة والتوقيع.{/* بلا رابطٍ لتقارير الدكاترة (طلب المستخدم 2026-11-18) */}</>
             : 'ما طلع لكلّ دكتور من الإجراءات، وحصّة الشفاء منها — من لحظة القبض، كما سُجّل.'}
         </p>
       </div>

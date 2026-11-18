@@ -62,11 +62,12 @@ async function mockApi(page, { role, today, unpaid = UNPAID, empty = EMPTY_VISIT
         return route.fulfill({ status: 200, body: Buffer.from('PK-fake'),
           headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             'Content-Disposition': "attachment; filename=\"earnings.xlsx\"; filename*=UTF-8''%D9%85.xlsx" } })
+      // 2026-11-18: شريط الفترة المشترك (يوم/شهر/فترة) يرسل من–إلى دائماً — يُطابَق بالتجهيزات بتاريخ البداية
       const q = url.searchParams
-      const per = q.get('period')
-      if (per === 'today') return json(FX[today])
-      if (per) return json(FX[per])
-      return json(q.get('from') === '2020-01-01' ? FX.empty : FX.custom)
+      const from = q.get('from'), to = q.get('to')
+      if (from === '2020-01-01') return json(FX.empty)
+      if (from === to) return json(from === FX.yesterday.from ? FX.yesterday : FX[today])
+      return json(from === FX.month.from ? FX.month : from === FX.week.from ? FX.week : FX.custom)
     }
     if (p === '/clinic/procedures/unpaid') return json(state.unpaid)
     if (/\/mark-paid$/.test(p)) {
@@ -148,7 +149,7 @@ const run = async () => {
     ok(big.map(digits).join('/') === [T.doctor, T.shifa, T.materials].join('/'), `[${tag}] ★ الأرقام الكبيرة: للدكاترة، للشفاء، المواد (${big})`)
     const sentence = await page.$eval('.pex-sentence', (x) => x.textContent)
     ok(sentence.includes(Number(T.price).toLocaleString('ar-SY-u-nu-latn')), `[${tag}] الجملة بالقيمة الكاملة (${sentence.slice(0, 40)})`)
-    ok(await page.$eval('.earn-periods [aria-pressed=true]', (b) => b.textContent) === 'اليوم', `[${tag}] «اليوم» افتراضاً`)
+    ok(await page.$eval('.dr-seg [aria-pressed=true]', (b) => b.textContent) === 'يوم', `[${tag}] «يوم» افتراضاً`)
     let L = await layout(page)
     ok(!L.hscroll, `[${tag}] ★ الملخّص بلا تمرير أفقي`)
     if (w === 390) ok(L.small.length === 0, `[${tag}] ★ كل الأزرار ≥ 44px (${L.small})`)
@@ -189,35 +190,45 @@ const run = async () => {
     await ctx.close()
   }
 
-  // ═══ ٣) الفترات ═══
+  // ═══ ٣) الفترات — شريط «كشوف الأجور» نفسه: يوم ثمّ شهر ثمّ فترة (2026-11-18) ═══
   console.log('\n── 3) الفترات ──')
   {
-    const { ctx, page, calls } = await open(browser)
+    const d = new Date(), pad = (n) => String(n).padStart(2, '0')
+    const today = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+    let { ctx, page, calls } = await open(browser)
     await page.waitForSelector('.pex-doc')
-    ok(calls.some((c) => c === '/clinic/procedures/earnings?period=today'), '★ اليوم يُطلب باسمه (الخادم يحلّه بتوقيت دمشق)')
-    for (const [label, key] of [['أمس', 'yesterday'], ['هذا الأسبوع', 'week'], ['هذا الشهر', 'month']]) {
-      await page.click(`.earn-periods >> text=${label}`)
-      await page.waitForSelector('.pex-doc')
-      ok(calls.includes(`/clinic/procedures/earnings?period=${key}`), `★ «${label}» ⇒ period=${key}`)
-      const range = await page.$eval('.pex-range', (x) => x.textContent)
-      ok(range.includes(words(FX[key].from)) && range.includes(words(FX[key].to)), `«${label}»: الفترة المحلولة ظاهرة (${range})`)
-      ok(new URL(page.url()).searchParams.get('period') === key, `«${label}» في الرابط`)
-      ok(calls.some((c) => c.startsWith(`/clinic/procedures/empty-visits?from=${FX[key].from}&to=${FX[key].to}`)), `«${label}»: «إجراء فقط» بلا إجراء بمدى الفترة`)
-    }
+    ok(JSON.stringify(await page.$$eval('.dr-seg button', (bs) => bs.map((b) => b.textContent))) === JSON.stringify(['يوم', 'شهر', 'فترة']), '★ الترتيب: يوم، شهر، فترة')
+    ok(calls.some((c) => c === `/clinic/procedures/earnings?from=${today}&to=${today}`), `★ الافتراضيّ اليوم: من اليوم إليه (${calls.filter((c) => c.includes('earnings?'))})`)
+    await page.click('.dr-seg >> text=شهر')
+    await page.waitForTimeout(300)
+    const ym = today.slice(0, 7), last = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()
+    ok(calls.includes(`/clinic/procedures/earnings?from=${ym}-01&to=${ym}-${pad(last)}`), '★ «شهر» ⇒ من أوّل الشهر إلى آخره')
+    ok(new URL(page.url()).searchParams.get('month') === ym, '«شهر» في الرابط')
+    await ctx.close()
+    ;({ ctx, page, calls } = await open(browser, { path: `${PATH}&day=${FX.yesterday.from}` }))
+    await page.waitForSelector('.pex-doc')
+    ok(calls.includes(`/clinic/procedures/earnings?from=${FX.yesterday.from}&to=${FX.yesterday.from}`), '★ يومٌ من الرابط')
+    ok((await page.$eval('.pex-range', (x) => x.textContent)).includes(words(FX.yesterday.from)), 'اليوم المحلول ظاهر')
+    await ctx.close()
+    ;({ ctx, page, calls } = await open(browser, { path: `${PATH}&month=2026-10` }))
+    await page.waitForSelector('.pex-doc')
+    ok(calls.includes('/clinic/procedures/earnings?from=2026-10-01&to=2026-10-31'), '★ شهرٌ من الرابط ⇒ 1 إلى 31')
+    ok(calls.some((c) => c.startsWith(`/clinic/procedures/empty-visits?from=${FX.month.from}&to=${FX.month.to}`)), '«إجراء فقط» بلا إجراء بمدى الفترة')
     // تفصيلٌ بفترةٍ متعدّدة الأيام: الأيام عناوين
     const M = FX.month.doctors[0]
     await page.click(`.pex-doc:has-text("${M.doctor}")`)
     await page.waitForSelector('.pex-line')
-    ok(await page.$$eval('.pex-day', (d) => d.length) === new Set(M.lines.map((l) => l.date)).size, 'بفترة أيام: يومٌ لكلّ تاريخ')
-    await page.click('.earn-periods >> text=من — إلى')
-    await page.waitForSelector('#earn-from')
-    ok(!new URL(page.url()).searchParams.get('doctor'), 'تغيير الفترة يُغلق التفصيل')
-    await page.fill('#earn-from', FX.custom.from)
-    await page.fill('#earn-to', FX.custom.to)
+    ok(await page.$$eval('.pex-day', (x) => x.length) === new Set(M.lines.map((l) => l.date)).size, 'بفترة أيام: يومٌ لكلّ تاريخ')
+    await page.click('.dr-seg >> text=يوم')
     await page.waitForTimeout(300)
-    ok(calls.some((c) => c === `/clinic/procedures/earnings?from=${FX.custom.from}&to=${FX.custom.to}`), '★ «من — إلى» يُرسل التاريخين')
-    await page.fill('#earn-from', '2020-01-01')
-    await page.fill('#earn-to', '2020-01-01')
+    ok(!new URL(page.url()).searchParams.get('doctor'), 'تغيير الفترة يُغلق التفصيل')
+    await ctx.close()
+    ;({ ctx, page, calls } = await open(browser, { path: `${PATH}&from=${FX.custom.from}&to=${FX.custom.to}` }))
+    await page.waitForSelector('.pex-doc')
+    ok(calls.some((c) => c === `/clinic/procedures/earnings?from=${FX.custom.from}&to=${FX.custom.to}`), '★ «فترة» يُرسل التاريخين')
+    ok(await page.$eval('.dr-seg [aria-pressed=true]', (b) => b.textContent) === 'فترة', '«فترة» مختارة')
+    await ctx.close()
+    ;({ ctx, page, calls } = await open(browser, { path: `${PATH}&from=2020-01-01&to=2020-01-01` }))
     await page.waitForSelector('text=لا إجراءات مقبوضة')
     ok(await page.$('.pex-doc') === null, 'فترةٌ بلا إجراءات: رسالةٌ لا جدولٌ فارغ')
     ok(await page.$eval('.pex-export', (b) => b.disabled), 'والإكسل معطَّل')
@@ -352,16 +363,16 @@ const run = async () => {
   // ═══ ٨) الإكسل ═══
   console.log('\n── 8) الإكسل ──')
   {
-    const { ctx, page, calls } = await open(browser, { path: `${PATH}&period=week` })
+    const { ctx, page, calls } = await open(browser, { path: `${PATH}&from=${FX.week.from}&to=${FX.week.to}` })
     await page.waitForSelector('.pex-doc')
     const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 5000 }).catch(() => null), page.click('.pex-export')])
     ok(!!dl, '★ زرّ الإكسل يُنزّل ملفّاً')
-    ok(calls.includes('/clinic/procedures/earnings/export?period=week'), '★ بالفترة نفسها')
+    ok(calls.includes(`/clinic/procedures/earnings/export?from=${FX.week.from}&to=${FX.week.to}`), '★ بالفترة نفسها')
     await page.click(`.pex-doc:has-text("${FX.week.doctors[0].doctor}")`)
     await page.waitForSelector('.pex-line')
     ok(await page.$eval('.pex-export', (b) => b.textContent) === 'إكسل هذا الدكتور', 'من التفصيل: «إكسل هذا الدكتور»')
     await Promise.all([page.waitForEvent('download', { timeout: 5000 }).catch(() => null), page.click('.pex-export')])
-    ok(calls.includes(`/clinic/procedures/earnings/export?period=week&doctor_id=${FX.week.doctors[0].doctorId}`), '★ وبالدكتور')
+    ok(calls.includes(`/clinic/procedures/earnings/export?from=${FX.week.from}&to=${FX.week.to}&doctor_id=${FX.week.doctors[0].doctorId}`), '★ وبالدكتور')
     await ctx.close()
   }
 

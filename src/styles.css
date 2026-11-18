@@ -2451,7 +2451,6 @@ button.danger:hover:not(:disabled) { filter: brightness(1.08); }
 }
 .mat-x:hover { background: var(--status-bad-bg); }
 /* ➖ الرقم ➕: أزرارٌ ٤٤px على الأقلّ والرقم كبير — الاستقبال على الجوال والتابلت */
-.mat-chosen li { flex-wrap: wrap; }
 .mat-step { display: inline-flex; align-items: center; gap: 6px; flex: none; }
 .mat-step .mat-qty { width: 76px !important; min-height: 44px; font-size: 20px !important; font-weight: 700; padding: 4px 6px !important; }
 .mat-minus, .mat-plus {
@@ -2462,6 +2461,24 @@ button.danger:hover:not(:disabled) { filter: brightness(1.08); }
 .mat-minus:disabled, .mat-plus:disabled { opacity: .4; cursor: not-allowed; }
 .mat-chosen .mat-x { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; }
 .mat-limit { flex-basis: 100%; font-size: 12.5px; font-weight: 600; color: var(--status-pending); }
+/* ═══ سطرٌ مضغوط لكلّ مادة (2026-11-18، بكلّ مكان: ورقة الطبيب، صفحة الزيارة، تصحيح المشرفة، الحديد) ═══
+   الاسم وتحته «الوحدة  المبلغ»، والعدّاد و× بجانبهما على ارتفاع السطرين — مادةٌ واحدة = سطرٌ واحد
+   حتى على الجوال (كانت سطرين: الوحدة والمبلغ و× تلتفّ تحت). الأزرار تبقى ٤٤px (اللمس). */
+.mat-chosen { gap: 0; }
+.mat-chosen li {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-areas: "name step x" "meta step x"; column-gap: 8px; row-gap: 1px;
+  align-items: center; padding: 6px 0;
+}
+.mat-chosen li + li { border-top: 1px solid var(--grid); }
+.mat-chosen .mat-name { grid-area: name; align-self: end; min-width: 0; font-size: 14px; overflow-wrap: anywhere; }
+.mat-chosen .mat-meta { grid-area: meta; align-self: start; display: flex; flex-wrap: wrap; gap: 0 10px; min-width: 0; }
+.mat-chosen .mat-meta .mat-price { margin: 0; font-size: 12.5px; }
+.mat-chosen .mat-step { grid-area: step; gap: 4px; }
+.mat-chosen .mat-step .mat-qty { width: 52px !important; font-size: 17px !important; }
+.mat-chosen .mat-minus, .mat-chosen .mat-plus { border-radius: 10px; font-size: 20px !important; }
+.mat-chosen .mat-x { grid-area: x; }
+.mat-chosen .mat-limit { grid-column: 1 / -1; }
 .mat-search { position: relative; max-width: 360px; }
 .mat-search input { width: 100%; font-size: 13px; padding: 6px 10px; }
 .mat-results {
@@ -4253,7 +4270,6 @@ button.ghost.iron-cancel-btn { color: var(--status-bad); }
 .iron-materials .mat-chosen li { padding: 8px 12px; border-bottom: 1px solid var(--border); }
 .iron-materials .mat-chosen li:last-child { border-bottom: 0; }
 .iron-materials .mat-name { flex: 1 1 auto; min-width: 0; font-size: 14px; }
-.iron-materials .mat-name::after { content: ' ×'; color: var(--muted); font-weight: 500; }
 .iron-materials .mat-qty { flex: none; }
 .iron-materials .mat-unit { flex: none; }
 .iron-materials .mat-x { flex: none; width: 44px; height: 44px; font-size: 18px; }
@@ -5614,6 +5630,14 @@ button.pcx-card:focus-visible { outline: 2px solid var(--primary); outline-offse
 .pex-page { display: flex; flex-direction: column; gap: 14px; }
 .pex-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
 .pex-controls .earn-periods { margin: 0; }
+/* شريط الفترة المشترك (يوم/شهر/فترة) بمسافة «كشوف الأجور» نفسها عن التبويبات وعمّا تحته (2026-11-18) */
+.pex-controls { margin: 18px 0; }
+/* الجوال: أزرار شريط الفترة ٤٤px لمساً في صفحة الأجور بتبويبيها (تقارير الدكاترة لم تُمسّ بقرار المستخدم) */
+@media (max-width: 600px) {
+  :is(.pr-period, .pex-controls) .dr-seg button { min-height: 44px; }
+  :is(.pr-period, .pex-controls) .dr-step { width: 44px; height: 44px; }
+  :is(.pr-period, .pex-controls) .dr-date { min-height: 44px; }
+}
 .pex-range { margin: 0; font-size: 13px; color: var(--text-secondary); }
 .pex-allclear { margin: 0; padding: 10px 14px; border-radius: 10px; background: var(--status-good-bg); color: var(--status-good); font-size: 13px; font-weight: 700; }
 .pex-attn { padding: 14px 16px; border-radius: var(--radius); background: var(--surface-1); border: 1px solid var(--border); border-inline-start: 4px solid var(--status-pending); }
@@ -5750,6 +5774,10 @@ button.dk-audio.is-on:disabled { color: var(--text-secondary); background: trans
 .dk .dk-callbar-who { font-size: 15px; flex: 1 1 220px; min-width: 0; }
 button.dk-callbar-btn { min-height: 44px; padding: 0 24px; font-size: 15.5px; font-weight: 700; border-radius: 10px; }
 @media (max-width: 600px) { button.dk-callbar-btn { width: 100%; } }
+/* «نادِ التالي» و«بدء كشف» جنب بعض بالحجم نفسه — نص بنص على الجوال (2026-11-18) */
+.dk .dk-callbar-btns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; flex: 0 1 380px; }
+.dk .dk-callbar-btns > button.dk-callbar-btn { width: 100%; padding: 0 12px; }
+@media (max-width: 600px) { .dk .dk-callbar-btns { flex: 1 1 100%; } }
 
 .dk .dk-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0 16px; max-width: none; }
 @media (min-width: 820px) { .dk .dk-grid { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); } }
@@ -5778,6 +5806,14 @@ button.dk-callbar-btn { min-height: 44px; padding: 0 24px; font-size: 15.5px; fo
 .dk .dk-proc-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .dk .dk-proc-row > button { width: 100%; min-height: 44px; font-size: 14px; font-weight: 600; }
 .dk-step-back { align-self: flex-start; margin: 0 0 10px; min-height: 40px; }
+/* الخطوة 2: كلّ إجراءٍ بطاقة — رأسها الاسم والأجرة، ثمّ البحث، ثمّ المواد سطراً سطراً، ثمّ المستهلكات */
+.dk-sel { border-top: 0; margin-top: 4px; padding-top: 0; }
+.dk-sel-item { border: 1px solid var(--grid); border-radius: 12px; padding: 4px 12px 10px; }
+.dk-sel-item + .dk-sel-item { margin-top: 10px; }
+.dk-sel-item .dk-sel-row { min-height: 44px; border-bottom: 1px solid var(--grid); margin-bottom: 8px; }
+.dk-sel-item .dk-sel-name { font-weight: 800; }
+.dk-sel-price small { font-size: 12px; font-weight: 600; color: var(--accent-text); }
+.dk-sel-item .cons-counter { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--grid); }
 .dk-sel-item.is-bad { outline: 2px solid var(--status-bad, #c0392b); outline-offset: 2px; border-radius: 10px; }
 .dk-today-item .dk-mats-btn { margin-inline-start: 6px; flex: none; }
 .dk-mats-now { margin: 0 0 6px; font-size: 14px; color: var(--text-secondary); }
@@ -6019,8 +6055,6 @@ button.dk-pick:disabled .dk-pick-price { opacity: 0.7; }
 .dk-sel-row .dk-sel-name { flex: 1 1 auto; }
 .dk-sel-price { font-size: 13px; font-weight: 600; color: var(--text-secondary); white-space: nowrap; }
 .mat-price { font-size: 12.5px; font-weight: 600; color: var(--text-secondary); white-space: nowrap; margin-inline-start: auto; }
-/* في ورقة الطبيب: الاسم ينكمش كي يبقى المبلغ و× على سطر المادة نفسه (التابلت)؛ الجوال يلفّهما معاً */
-.dk-mats-body .mat-chosen li .mat-name { flex: 1 1 110px; min-width: 0; }
 .dk-total { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px;
   margin-bottom: 10px; font-size: 14px; }
 .dk-total strong { font-size: 16px; }
@@ -6053,6 +6087,7 @@ button.dk-pick:disabled .dk-pick-price { opacity: 0.7; }
 
 /* ═══ الرواتب والأجور (2026-11-18): القائمة والكشف — بطاقاتٌ محايدة بلا ألوان ═══ */
 .pr-page { min-width: 0; }
+.pr-period { margin: 18px 0; }
 .pr-summary { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
   border: 1px solid var(--grid); border-radius: 12px; padding: 14px 16px; margin: 12px 0; }
 .pr-summary > div:first-child { display: grid; gap: 2px; }
