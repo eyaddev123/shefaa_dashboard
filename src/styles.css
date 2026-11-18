@@ -6038,3 +6038,71 @@ button.dk-pick:disabled .dk-pick-price { opacity: 0.7; }
 .cons-label { font-weight: 600; font-size: 13.5px; }
 .cons-value { min-width: 84px; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; }
 .cons-hint { margin: 2px 0 0; font-size: 12px; color: var(--muted); line-height: 1.7; }
+
+/* ═══ الرواتب والأجور (2026-11-18): القائمة والكشف — بطاقاتٌ محايدة بلا ألوان ═══ */
+.pr-page { min-width: 0; }
+.pr-summary { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
+  border: 1px solid var(--grid); border-radius: 12px; padding: 14px 16px; margin: 12px 0; }
+.pr-summary > div:first-child { display: grid; gap: 2px; }
+.pr-summary > div:first-child span { font-size: 13px; color: var(--text-secondary); }
+.pr-summary > div:first-child strong { font-size: 24px; }
+.pr-summary > div:first-child em { font-style: normal; font-size: 12.5px; color: var(--muted); }
+.pr-toolbar { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; align-items: center; margin: 12px 0; }
+.pr-toolbar-end { display: flex; flex-wrap: wrap; gap: 8px; }
+.pr-toolbar-end button, .pr-toolbar > button { min-height: 44px; }
+.pr-note { font-size: 13px; color: var(--text-secondary); margin: 4px 0 10px; }
+.pr-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.pr-card { width: 100%; display: grid; grid-template-columns: 1fr auto; grid-template-areas: "name due" "facts open";
+  gap: 4px 12px; text-align: start; padding: 12px 14px; border: 1px solid var(--grid); border-radius: 12px;
+  background: var(--card, transparent); color: inherit; cursor: pointer; min-height: 44px; }
+.pr-card:hover { border-color: var(--text-secondary); }
+.pr-name { grid-area: name; font-weight: 700; font-size: 15px; }
+.pr-name small { font-weight: 400; color: var(--muted); }
+.pr-facts { grid-area: facts; display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12.5px; color: var(--text-secondary); }
+.pr-flag { color: var(--status-bad); }
+.pr-due { grid-area: due; font-weight: 800; font-size: 17px; white-space: nowrap; }
+.pr-open { grid-area: open; font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+.pr-idle { margin-top: 12px; font-size: 13px; }
+.pr-idle-names { color: var(--muted); margin: 6px 0 0; }
+.pr-warn ul { margin: 6px 0 0; padding-inline-start: 18px; }
+.pay-paper { overflow-x: auto; background: #e9ecef; border-radius: 12px; padding: 16px; }
+.pay-paper .pay-sheet { margin: 0 auto; max-width: 718px; box-shadow: 0 1px 6px rgba(0,0,0,.15); }
+.pay-host { position: fixed; left: -12000px; top: 0; background: #fff; }
+
+/* ورقة الكشف: ألوانٌ ثابتة فاتحة — تُطبع بيضاء ولو كانت الشاشة داكنة */
+.pay-sheet { background: #fff; color: #111; padding: 22px 24px 28px; font-size: 12.5px; line-height: 1.55; }
+.pay-head { text-align: center; border-bottom: 2px solid #111; padding-bottom: 10px; margin-bottom: 6px; }
+.pay-brand { font-size: 13px; color: #444; }
+.pay-head h1 { font-size: 20px; margin: 2px 0 10px; color: #111; }
+.pay-meta { display: grid; gap: 3px; text-align: start; font-size: 13px; }
+.pay-meta span { display: inline-block; min-width: 92px; color: #555; }
+.pay-meta em { font-style: normal; color: #555; }
+.pay-h2 { font-size: 14px; margin: 16px 0 6px; color: #111; padding-top: 2px; }
+.pay-empty { color: #666; }
+.pay-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.pay-table th, .pay-table td { border: 1px solid #c8cdd2; padding: 4px 6px; text-align: start; vertical-align: top; color: #111; background: #fff; }
+.pay-table th { background: #f1f3f5; font-weight: 700; }
+.pay-table .pay-num { width: 28px; text-align: center; color: #555; }
+.pay-table .pay-date { white-space: nowrap; width: 78px; }
+.pay-table .pay-name { font-weight: 600; }
+.pay-table .pay-amt { width: 76px; text-align: end; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pay-table small { color: #666; }
+.pay-procs .pay-pending { color: #777; }
+.pay-total td { background: #f1f3f5; font-weight: 700; }
+.pay-shifts td, .pay-shifts th { text-align: center; }
+.pay-calc { margin-top: 6px; border: 1.5px solid #111; border-radius: 6px; padding: 8px 12px 10px; }
+.pay-calc .pay-h2 { margin-top: 0; }
+.pay-calc dl { margin: 0; display: grid; gap: 3px; }
+.pay-calc dl > div { display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px dotted #bbb; padding: 2px 0; }
+.pay-calc dt { color: #222; }
+.pay-calc dd { margin: 0; font-weight: 600; white-space: nowrap; }
+.pay-due { display: flex; justify-content: space-between; align-items: baseline; margin-top: 8px; font-size: 15px; }
+.pay-due strong { font-size: 20px; }
+.pay-note { margin: 6px 0 0; font-size: 11.5px; color: #555; }
+.pay-sign { margin-top: 22px; display: grid; gap: 22px; padding-top: 4px; }
+.pay-sign-row { display: flex; align-items: flex-end; gap: 8px; font-size: 13.5px; font-weight: 600; }
+.pay-sign-row i { flex: 1; border-bottom: 1.5px solid #333; height: 30px; }
+.pay-sign-wide i { height: 34px; }
+.pay-sign-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.pay-sign-date { max-width: 50%; }
+.pay-printed { margin: 4px 0 0; font-size: 10.5px; color: #777; text-align: end; font-weight: 400; }

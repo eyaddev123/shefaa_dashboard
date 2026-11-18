@@ -31,6 +31,8 @@
     "test:patient-scope": "node test/patient-scope-check.mjs"
   },
   "dependencies": {
+    "html2canvas": "1.4.1",
+    "jspdf": "2.5.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.28.0"

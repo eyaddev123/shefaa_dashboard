@@ -525,7 +525,7 @@ function DuesTab() {
         <>
           <DuesTable title="مستحقات الممرضات" rows={data.nurses} empty="لا مستحقات." />
           <DuesTable title="مستحقات الدكاترة من الحديد" rows={data.doctors} empty="لا جلسات بدكتور في هذه الفترة."
-            note={<>تظهر أيضاً مميَّزةً في <Link to="/clinic/procedures?tab=earnings">الإجراءات والمستحقات</Link> مع حصصهم من الإجراءات.</>} />
+            note={<>تظهر أيضاً مميَّزةً في <Link to="/clinic/payroll">الرواتب والأجور</Link> مع حصصهم من الإجراءات.</>} />
         </>
       )}
     </>

@@ -251,7 +251,7 @@ function AlertsCard({ a, role }) {
           {unpaid.n > 0 && (
             <Alert icon={CC.receipt} title={<>{plural(unpaid.n, 'إجراء واحد', 'إجراءان', 'إجراءات', 'إجراءً')} بانتظار المحاسبة</>}>
               <Money value={unpaid.total} />
-              {canSeeEarnings(role) && <Link className="plain" to="/clinic/procedures?tab=earnings">المستحقات</Link>}
+              {canSeeEarnings(role) && <Link className="plain" to="/clinic/payroll">الرواتب والأجور</Link>}
             </Alert>
           )}
           {lowStock?.n > 0 && (

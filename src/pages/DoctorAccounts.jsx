@@ -25,7 +25,7 @@ const countText = (n, one, two, few, many) => (n === 1 ? one : n === 2 ? two : `
 const procText = (n) => (n ? countText(n, 'إجراء واحد', 'إجراءان', 'إجراءات', 'إجراءً') : 'بلا إجراءات')
 const initial = (name) => String(name || '').replace(/^د\.\s*/, '').trim().charAt(0) || '؟'
 
-const shiftMonth = (m, n) => {
+export const shiftMonth = (m, n) => {
   const [y, mm] = m.split('-').map(Number)
   const d = new Date(Date.UTC(y, mm - 1 + n, 1))
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`
@@ -127,7 +127,7 @@ function useAccounts(query) {
 }
 
 // حقل تاريخٍ بنصٍّ عربيّ: الحقل الأصليّ شفّافٌ فوق النصّ، والضغط يفتح منتقي المتصفّح
-function DateField({ type, value, label, onChange, min }) {
+export function DateField({ type, value, label, onChange, min }) {
   return (
     <label className="dr-date">
       <span>{label}</span>
@@ -140,13 +140,14 @@ function DateField({ type, value, label, onChange, min }) {
   )
 }
 
-function PeriodBar({ mode, cur, curDay, from, to, data, set }) {
+// modes: الأوضاع المعروضة (الرواتب والأجور: شهر وفترة وحدهما)
+export function PeriodBar({ mode, cur, curDay, from, to, data, set, modes = MODES }) {
   const pickMode = (m) => set(m === 'day' ? { day: data?.today || todayLocal() }
     : m === 'custom' ? { from: data?.from || todayLocal(), to: data?.to || todayLocal() } : {})
   return (
     <div className="dr-period">
       <div className="dr-seg" role="group" aria-label="الفترة">
-        {MODES.map(([k, label]) => (
+        {modes.map(([k, label]) => (
           <button key={k} type="button" aria-pressed={mode === k} className={mode === k ? 'is-on' : ''}
             onClick={() => pickMode(k)}>{label}</button>
         ))}

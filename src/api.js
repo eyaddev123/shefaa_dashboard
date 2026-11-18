@@ -41,6 +41,10 @@ async function http(path, options = {}) {
 // رابطٌ عاديّ <a href> لا يحمل ترويسة Authorization، فالخادم يردّ 401.
 // فنجلبه بـ fetch ونصنع رابطاً مؤقّتاً من الـblob — والاسم العربي يُقرأ
 // من Content-Disposition الذي يرسله الخادم.
+// { month } أو { from, to } ⇒ نصّ الاستعلام (بلا شيء: الشهر الجاري)
+const payrollQuery = ({ month, from, to } = {}) =>
+  String(from ? new URLSearchParams({ from, to: to || from }) : month ? new URLSearchParams({ month }) : '')
+
 async function downloadFile(url, fallbackName) {
   const res = await fetch(url, { headers: { Authorization: `Bearer ${getToken()}` } })
   if (!res.ok) {
@@ -256,6 +260,12 @@ export const api = {
     // حسابات الدكاترة: { month } شهرٌ (بلاه الحالي) أو { from, to } يومٌ أو فترة
     doctorAccounts: ({ month, from, to } = {}) => http(`/clinic/doctor-accounts${
       from ? `?${new URLSearchParams({ from, to: to || from })}` : month ? `?month=${month}` : ''}`),
+    // الرواتب والأجور: القائمة، وكشف دكتور، وكلّ الكشوف (لـ PDF الكلّ)، والإكسل (doctorId اختياري)
+    payroll: (q) => http(`/clinic/payroll?${payrollQuery(q)}`),
+    payrollStatement: (doctorId, q) => http(`/clinic/payroll/${doctorId}?${payrollQuery(q)}`),
+    payrollStatements: (q) => http(`/clinic/payroll/statements?${payrollQuery(q)}`),
+    exportPayroll: (q, doctorId) => downloadFile(
+      `/api/clinic/payroll/export?${payrollQuery(q)}${doctorId ? `&doctor_id=${doctorId}` : ''}`, 'كشف-أجور.xlsx'),
     // الالتزام بالدوام لكلّ الدكاترة بالفترة نفسها: { doctors: { [id]: ملخّص } }
     doctorsPunctuality: ({ month, from, to } = {}) => http(`/clinic/doctors-punctuality${
       from ? `?${new URLSearchParams({ from, to: to || from })}` : month ? `?month=${month}` : ''}`),

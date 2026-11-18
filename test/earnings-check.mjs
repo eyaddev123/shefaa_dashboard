@@ -184,7 +184,7 @@ const run = async () => {
     await page.waitForSelector('.pex-line')
     await page.goBack()
     await page.waitForSelector('.pex-doc')
-    ok(new URL(page.url()).searchParams.get('tab') === 'earnings', `[${tag}] ★ زرّ رجوع المتصفّح يعود من التفصيل إلى الملخّص`)
+    ok(new URL(page.url()).searchParams.get('tab') === 'procedures' && new URL(page.url()).pathname === '/clinic/payroll', `[${tag}] ★ زرّ رجوع المتصفّح يعود من التفصيل إلى الملخّص`)
     ok(errors.length === 0, `[${tag}] بلا أخطاء (${errors})`)
     await ctx.close()
   }
@@ -326,9 +326,11 @@ const run = async () => {
   {
     const { ctx, page } = await open(browser, { path: '/clinic/procedures?tab=review' })
     await page.waitForSelector('.pex-doc')
+    // 2026-11-18: «المستحقات» خرجت إلى «الرواتب والأجور» — الرابط القديم يُحوَّل إلى تبويب «تفصيل الإجراءات» فيها
     const tabs = await page.$$eval('.pcx-tabs [role=tab]', (t) => t.map((x) => x.childNodes[0].textContent))
-    ok(tabs.join('|') === 'الإجراءات|المستحقات', `★ تبويبان لا ثلاثة — «المراجعة» أُزيل (${tabs})`)
-    ok(await page.$eval('.pcx-tab.is-on', (t) => t.textContent) === 'المستحقات', '★ ?tab=review القديم يفتح المستحقات')
+    ok(tabs.join('|') === 'كشوف الأجور|تفصيل الإجراءات', `★ صفحة الرواتب والأجور بتبويبيها (${tabs})`)
+    ok(await page.$eval('.pcx-tab.is-on', (t) => t.textContent) === 'تفصيل الإجراءات', '★ ?tab=review القديم يفتح «تفصيل الإجراءات»')
+    ok(new URL(page.url()).pathname === '/clinic/payroll', `★ والعنوان صار /clinic/payroll (${page.url()})`)
     await ctx.close()
   }
   {

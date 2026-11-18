@@ -1,13 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { useDialogs } from '../dialogs.jsx'
 import { api, fmtDay } from '../api.js'
 import { resetFeeMode } from '../fee-mode.js'
 import { useRole } from '../RoleContext.jsx'
+import { canSeeClinicFunds } from '../permissions.js'
 import { useToast } from '../action-feedback.jsx'
-import ProcedureEarnings from './ProcedureEarnings.jsx'
 import ProcedureDialog, { splitText } from '../components/procedures/ProcedureDialog.jsx'
-import { canSeeEarnings } from '../permissions.js'
 import { matchesAr } from '../arabic-search.js'
 import { DistributeRuleDialog, PricingHistoryDialog } from '../components/ShareRuleDialogs.jsx'
 import { doctorsCount } from '../share-rule.js'
@@ -24,10 +23,8 @@ import { doctorsCount } from '../share-rule.js'
 const PRICING_HISTORY_READERS = ['clinic_admin', 'manager']
 // المستهلكات تُرسل لمن يرى التقسيم وحده — يطابق SETTLEMENT_VIEWERS في الخادم.
 const SETTLEMENT_VIEWERS = ['clinic_admin', 'board', 'super_admin', 'manager']
-const TABS = [
-  { key: 'catalog', label: 'الإجراءات' },
-  { key: 'earnings', label: 'المستحقات', allow: canSeeEarnings },
-]
+// «المستحقات» خرجت إلى «الرواتب والأجور» (طلب المستخدم 2026-11-18) — هذه الصفحة الكتالوج وحده.
+// ?tab=earnings و?tab=review القديمان (روابط وإشعارات سابقة) يُحوَّلان إليها بمعاييرهما.
 const SORTS = [['used', 'الأكثر استعمالاً'], ['name', 'أبجدياً'], ['price', 'الأعلى سعراً']]
 
 const fmtNum = (n) => Number(n || 0).toLocaleString('ar-SY-u-nu-latn', { maximumFractionDigits: 2 })
@@ -242,11 +239,8 @@ export default function ClinicProcedures() {
   const [params, setParams] = useSearchParams()
   const [toast, showToast] = useToast()
   const { clinicRole: role } = useRole()
-  const tabs = TABS.filter((t) => !t.allow || t.allow(role))
-  // ?tab=review (رابطٌ قديم أو من لوحة القيادة) ⇐ المستحقات، فأدوات المراجعة فيها الآن
-  const asked = params.get('tab') === 'review' ? 'earnings' : params.get('tab')
-  const tab = tabs.some((t) => t.key === asked) ? asked : 'catalog'
-  const setTab = (key) => setParams(key === 'catalog' ? {} : { tab: key }, { replace: true })
+  // من لا يرى المستحقات (المجلس) يبقى على الكتالوج كما كان — التحويل لمن يدخل «الرواتب والأجور» وحده
+  const oldTab = (params.get('tab') === 'earnings' || params.get('tab') === 'review') && canSeeClinicFunds(role)
 
   const load = () => {
     api.clinic.feeMode().then(setFee).catch(() => setFee(null))
@@ -254,15 +248,17 @@ export default function ClinicProcedures() {
   }
   useEffect(() => { load() }, [])
 
-  const active = list ? list.filter((p) => p.is_active).length : 0
+  if (oldTab) {
+    const next = new URLSearchParams(params)
+    next.set('tab', 'procedures')
+    return <Navigate to={`/clinic/payroll?${next}`} replace />
+  }
   return (
     <div className="pcx-page">
       <div className="pcx-head">
         <h2>الإجراءات</h2>
         <p className="subtitle pcx-lead">
-          {tab === 'earnings'
-            ? 'ما طلع لكلّ دكتور من الإجراءات، وحصّة الشفاء منها — من لحظة القبض، كما سُجّل.'
-            : fee?.since
+          {fee?.since
             ? <>منذ {fmtDay(fee.since)}: سعر الإجراء أجرة الإيد، تُقسم بين الدكتور والشفاء كما على كلّ إجراء، والمواد والمستهلكات فوقها على المريض.
               {' '}المواد وأسعارها في <Link to="/inventory">المخزون</Link>.</>
             : <>الاستقبال يضيف الإجراء بعد دخول المريض ومعه موادّه، فتُحسب الحصص فوراً وتنزل المواد من المخزون.
@@ -270,18 +266,7 @@ export default function ClinicProcedures() {
         </p>
       </div>
       {toast}
-      {tabs.length > 1 && (
-        <div className="pcx-tabs" role="tablist">
-          {tabs.map((t) => (
-            <button key={t.key} type="button" role="tab" aria-selected={tab === t.key}
-              className={`pcx-tab${tab === t.key ? ' is-on' : ''}`} onClick={() => setTab(t.key)}>
-              {t.label}{t.key === 'catalog' && list && <span className="pcx-tab-n">{fmtNum(active)}</span>}
-            </button>
-          ))}
-        </div>
-      )}
-      {tab === 'earnings' ? <ProcedureEarnings showToast={showToast} canEdit={role === 'clinic_admin'} />
-        : err && !list ? <p className="error">{err}</p>
+      {err && !list ? <p className="error">{err}</p>
         : !list ? <p className="empty">جارٍ التحميل…</p>
         : <Catalog list={list} fee={fee} role={role} reload={load} showToast={showToast} />}
     </div>
