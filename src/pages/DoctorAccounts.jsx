@@ -30,7 +30,9 @@ export const shiftMonth = (m, n) => {
   const d = new Date(Date.UTC(y, mm - 1 + n, 1))
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`
 }
-const shiftDay = (day, n) => {
+// السبت الذي يبدأ أسبوع اليوم (الأسبوع من السبت — قرار المستخدم 2026-10-30)
+export const weekStartOf = (day) => shiftDay(day, -((new Date(`${day}T12:00:00Z`).getUTCDay() + 1) % 7))
+export const shiftDay = (day, n) => {
   const [y, m, d] = day.split('-').map(Number)
   const x = new Date(Date.UTC(y, m - 1, d + n))
   return `${x.getUTCFullYear()}-${String(x.getUTCMonth() + 1).padStart(2, '0')}-${String(x.getUTCDate()).padStart(2, '0')}`
@@ -141,9 +143,29 @@ export function DateField({ type, value, label, onChange, min }) {
 }
 
 // modes: الأوضاع المعروضة (الرواتب والأجور: شهر وفترة وحدهما)
+// 'week' (أعمالي عند الطبيب، 2026-11-18): curDay = سبت الأسبوع، والسهمان ±7، والمنتقي أيّ يومٍ ⇒ سبته
 export function PeriodBar({ mode, cur, curDay, from, to, data, set, modes = MODES }) {
   const pickMode = (m) => set(m === 'day' ? { day: data?.today || todayLocal() }
+    : m === 'week' ? { week: weekStartOf(data?.today || todayLocal()) }
     : m === 'custom' ? { from: data?.from || todayLocal(), to: data?.to || todayLocal() } : {})
+  if (mode === 'week') return (
+    <div className="dr-period">
+      <div className="dr-seg" role="group" aria-label="الفترة">
+        {modes.map(([k, label]) => (
+          <button key={k} type="button" aria-pressed={mode === k} className={mode === k ? 'is-on' : ''}
+            onClick={() => pickMode(k)}>{label}</button>
+        ))}
+      </div>
+      <div className="dr-nav" role="group" aria-label="الأسبوع">
+        <button type="button" className="dr-step" disabled={!curDay} onClick={() => set({ week: shiftDay(curDay, -7) })}
+          aria-label="الأسبوع السابق">›</button>
+        <DateField type="date" value={curDay} label={curDay ? `${shortDay(curDay)} – ${shortDay(shiftDay(curDay, 6))}` : '…'}
+          onChange={(v) => set({ week: weekStartOf(v) })} />
+        <button type="button" className="dr-step" disabled={!curDay} onClick={() => set({ week: shiftDay(curDay, 7) })}
+          aria-label="الأسبوع التالي">‹</button>
+      </div>
+    </div>
+  )
   return (
     <div className="dr-period">
       <div className="dr-seg" role="group" aria-label="الفترة">

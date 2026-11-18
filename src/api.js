@@ -482,10 +482,11 @@ export const api = {
     // شاشة الطبيب: أسطر مرضاه اليوم بحصّته، وعدد مرّات كلّ إجراء (لترتيب أزرار الإضافة)
     myProcedures: (date) => http(`/clinic/my-procedures${date ? `?date=${date}` : ''}`),
     // «أعمالي»: period = today | week | month — المرضى والإجراءات وحصّته المقبوضة (حساب المستحقات)
-    myWork: (period) => http(`/clinic/my-work?period=${period}`),
-    myPunctuality: (period) => http(`/clinic/my-punctuality?period=${period}`),
+    // r: 'today'… (القديم) أو { from, to } (أعمالي 2026-11-18: يوم/أسبوع/شهر/فترة)
+    myWork: (r) => http(`/clinic/my-work?${typeof r === 'string' ? `period=${r}` : new URLSearchParams(r)}`),
+    myPunctuality: (r) => http(`/clinic/my-punctuality?${typeof r === 'string' ? `period=${r}` : new URLSearchParams(r)}`),
     myShareRule: () => http('/clinic/my-share-rule'),
-    mySalary: (month) => http(`/clinic/my-salary${month ? `?month=${month}` : ''}`),
+    mySalary: (m) => http(`/clinic/my-salary${!m ? '' : typeof m === 'string' ? `?month=${m}` : `?${new URLSearchParams(m)}`}`),
     // صفحات الطبيب: has_procedures يقرّر إظهار آثار الإجراءات، و«مرضاي» ليومٍ واحد
     myProfile: () => http('/clinic/my-profile'),
     // «أحتاج ممرضة»: الطبيب يطلب ويُلغي، والاستقبال تُجيب

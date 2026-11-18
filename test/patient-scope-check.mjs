@@ -54,9 +54,11 @@ async function open(browser, { role = 'adm', path = '/clinic/doctors/1', w = 136
       return json({ ...b, changed: true })
     }
     if (p === '/clinic/doctors/1/pay') return json(state)
-    if (p === '/clinic/my-salary') return json(SALARY(scope))
+    // أعمالي 2026-11-18: الطلبات من–إلى، والواجهة تعرض الردّ تحت مداه ⇒ الردّ يعيد المدى المطلوب
+    const span = { from: url.searchParams.get('from'), to: url.searchParams.get('to') }
+    if (p === '/clinic/my-salary') return json({ ...SALARY(scope), month: undefined, ...span })
     if (p === '/clinic/my-share-rule') return json({ general: { kind: 'percent', value: 60 }, procedures: [] })
-    if (p === '/clinic/my-work') return json({ period: 'today', from: '2026-10-01', to: '2026-10-20', patients: 0, procedures: 0, lines: [], total: 0, totals: {} })
+    if (p === '/clinic/my-work') return json({ period: 'custom', ...span, patients: 0, procedures: 0, lines: [], total: 0, totals: {} })
     if (p === '/clinic/my-punctuality') return json({ error: 'off' }, 500)
     if (p === '/clinic/my-procedures') return json({ lines: [] })
     if (p === '/clinic/specialties') return json([{ id: '1', name: 'عظمية' }])

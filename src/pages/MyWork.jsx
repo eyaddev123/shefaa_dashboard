@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { api, fmtMoney, openStaffStream, todayLocal, fmtDay, fmtMonth } from '../api.js'
 import { useDialogs } from '../dialogs.jsx'
 import { useToast } from '../action-feedback.jsx'
 import { fmtDuration, fmtMinutes, clockTitle } from '../components/Punctuality.jsx'
+import { PeriodBar, weekStartOf, shiftDay } from './DoctorAccounts.jsx'
 import { partLines, partsOf } from '../pay-parts.js'
 import { useFeeMode } from '../fee-mode.js'
 
@@ -22,7 +24,35 @@ import { useFeeMode } from '../fee-mode.js'
 // الشكل محايد: بطاقات بحدٍّ رفيع، أرقامٌ بلون النصّ، ولا ألوان إلا لتنبيهٍ حقيقيّ.
 // ═══════════════════════════════════════════════════════════════════
 
-const PERIODS = [['today', 'اليوم'], ['week', 'هذا الأسبوع'], ['month', 'هذا الشهر'], ['last_month', 'الشهر الماضي']]
+// شريط الفترة كصفحة الأجور (طلب المستخدم 2026-11-18): يوم ثمّ أسبوع (من السبت) ثمّ شهر ثمّ فترة، بأسهم.
+// كلّها مدى من–إلى للخادم (أعمالي والتزامي وراتبي)، والفترة في الرابط. الافتراضيّ اليوم.
+const MODES = [['day', 'يوم'], ['week', 'أسبوع'], ['month', 'شهر'], ['custom', 'فترة']]
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/, MONTH_RE = /^\d{4}-\d{2}$/
+const monthSpan = (m) => {
+  const [y, mo] = m.split('-').map(Number)
+  return { from: `${m}-01`, to: `${m}-${String(new Date(y, mo, 0).getDate()).padStart(2, '0')}` }
+}
+function usePeriod() {
+  const [params, setParams] = useSearchParams()
+  const today = todayLocal()
+  const get = (k, re) => (re.test(params.get(k) || '') ? params.get(k) : null)
+  const from = get('from', DAY_RE), to = get('to', DAY_RE) || from
+  const week = get('week', DAY_RE) && weekStartOf(get('week', DAY_RE))
+  const month = get('month', MONTH_RE), day = get('day', DAY_RE) || today
+  const mode = from ? 'custom' : week ? 'week' : month ? 'month' : 'day'
+  const range = mode === 'custom' ? { from, to } : mode === 'week' ? { from: week, to: shiftDay(week, 6) }
+    : mode === 'month' ? monthSpan(month) : { from: day, to: day }
+  // من PeriodBar: { day } | { week } | { month } | { from, to } | {} (شهر ⇒ الجاري)
+  const set = (p) => {
+    const next = new URLSearchParams()
+    const patch = Object.keys(p).length === 0 ? { month: today.slice(0, 7) } : p
+    for (const [k, v] of Object.entries(patch)) if (v) next.set(k, v)
+    setParams(next, { replace: true })
+  }
+  return { mode, range, today, day, week, month: month || today.slice(0, 7), from, to, set }
+}
+const rangeTitle = (r) => (r.from === r.to ? fmtDay(`${r.from}T12:00:00`, { weekday: true, year: false })
+  : `من ${fmtDay(`${r.from}T12:00:00`, { year: false })} إلى ${fmtDay(`${r.to}T12:00:00`, { year: false })}`)
 const n = (x) => Number(x || 0).toLocaleString('ar-SY-u-nu-latn', { maximumFractionDigits: 2 })
 const monthTitle = (m) => (m ? fmtMonth(m) : '')
 const count = (k, [one, two, few, many]) => (k === 1 ? one : k === 2 ? two : `${n(k)} ${k >= 3 && k <= 10 ? few : many}`)
@@ -49,7 +79,7 @@ function SalaryBlock({ sal }) {
   return (
     <div className="dk-salary dw-sub">
       <div className="dw-row dw-row-head">
-        <span>الراتب — {monthTitle(sal.month)}</span>
+        <span>الراتب — {sal.month ? monthTitle(sal.month) : rangeTitle(sal)}</span>
         <strong>{s ? <>{s.total === 0 ? 'صفر' : n(s.total)} ل.س</> : '—'}</strong>
       </div>
       {!s ? <p className="dk-sal-unset">لم تُحدَّد إعدادات راتبك بعد — تحدّدها مشرفة العيادات.</p> : (
@@ -70,7 +100,7 @@ function SalaryBlock({ sal }) {
               {count(a.noDeparture, DAYS)} «انصراف غير مسجَّل»: {parts?.includes('hours') ? 'ساعاتها لا تُحسب، ' : ''}وتصحّحها المشرفة.
             </p>
           )}
-          <p className="dw-note">{sal.month === sal.today?.slice(0, 7) ? 'حسب الحضور المسجَّل حتى الآن.' : 'حسب الحضور المسجَّل في ذلك الشهر.'}</p>
+          <p className="dw-note">{sal.to >= sal.today ? 'حسب الحضور المسجَّل حتى الآن.' : 'حسب الحضور المسجَّل في تلك الفترة.'}</p>
         </>
       )}
     </div>
@@ -133,18 +163,22 @@ const STATE = {
   pending: () => 'لم يصل بعد',
   appointments: () => 'بمواعيد خاصة',
 }
-function DutyCard({ punct, sal, period, from, to }) {
+// (جُرِّب تقويم الدوام هنا 2026-11-18 ثمّ أُزيل بطلب المستخدم: «طلع ما حلو… ما عاد بدنا ياه» — يبقى الجدول)
+function DutyCard({ punct, sal, mode, from, to }) {
   const p = punct.punctuality
   const days = punct.days.filter((d) => d.date >= from && d.date <= to)
   const times = new Map((sal?.days || []).map((d) => [d.date, d]))
-  const today = days.find((d) => d.date === punct.today)
   let sentence
-  if (period === 'today') {
-    sentence = !today ? 'لا دوام لك اليوم.'
-      : today.status === 'pending' ? `دوامك اليوم يبدأ ${today.start}، ولم يُسجَّل وصولك بعد.`
-      : today.status === 'on_time' ? `وصلتَ اليوم ${today.arrival} — بالوقت.`
-      : today.status === 'late' ? `وصلتَ اليوم ${today.arrival} — بعد بداية الدوام بـ${fmtMinutes(today.late)}.`
-      : today.arrival ? `وصلتَ اليوم ${today.arrival}.` : 'لم يُسجَّل وصولك اليوم.'
+  if (mode === 'day') {
+    const d = days[0]
+    const isToday = from === punct.today
+    const w = isToday ? 'اليوم' : `يوم ${dayName(from)}`
+    sentence = !d ? `لا دوام لك ${w}.`
+      : d.status === 'pending' ? `دوامك اليوم يبدأ ${d.start}، ولم يُسجَّل وصولك بعد.`
+      : d.status === 'on_time' ? `وصلتَ ${w} ${d.arrival} — بالوقت.`
+      : d.status === 'late' ? `وصلتَ ${w} ${d.arrival} — بعد بداية الدوام بـ${fmtMinutes(d.late)}.`
+      : d.status === 'absent' ? `لم يُسجَّل حضورك ${w}.`
+      : d.arrival ? `وصلتَ ${w} ${d.arrival}.` : `لم يُسجَّل وصولك ${w}.`
   } else {
     const att = days.filter((d) => ['on_time', 'late', 'estimated', 'appointments'].includes(d.status)).length
     const sched = days.filter((d) => d.status !== 'pending').length
@@ -165,7 +199,7 @@ function DutyCard({ punct, sal, period, from, to }) {
     <section className="card dw-card" aria-label="دوامي">
       <h3 className="dw-h">دوامي</h3>
       <p className="dw-sentence">{sentence}</p>
-      {days.length > 0 && period !== 'today' && (
+      {days.length > 0 && mode !== 'day' && (
         <table className="rtable dw-days">
           <thead><tr><th>اليوم</th><th>الوصول</th><th>الانصراف</th><th>المدّة</th><th>الحالة</th></tr></thead>
           <tbody>
@@ -223,12 +257,6 @@ function ShareRule() {
   )
 }
 
-// الشهر السابق للشهر الجاري ('YYYY-MM') — لراتب «الشهر الماضي»
-const lastMonth = () => {
-  const [y, m] = todayLocal().split('-').map(Number)
-  const d = new Date(y, m - 2, 1)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-}
 // كلّ قسمٍ يحمّل وحده ويفشل وحده: تعطّل الالتزام لا يُخفي الراتب (كما كانت الأقسام القديمة)
 function useLoad(fn, deps) {
   const [state, setState] = useState({ data: null, err: null })
@@ -245,7 +273,8 @@ function useLoad(fn, deps) {
 export default function MyWorkPage() {
   const dialogs = useDialogs()
   const [toast, showToast] = useToast()
-  const [period, setPeriod] = useState('today')
+  const { mode, range, today, day, week, month, from, to, set } = usePeriod()
+  const rk = `${range.from}|${range.to}`
   const [profile, setProfile] = useState(null)
   const [mine, setMine] = useState(null)
   const [key, setKey] = useState(0)
@@ -253,11 +282,9 @@ export default function MyWorkPage() {
   useEffect(() => { api.clinic.myProfile().then(setProfile).catch(() => setProfile({})) }, [])
   const loadMine = useCallback(() => api.clinic.myProcedures().then(setMine).catch(() => {}), [])
   useEffect(() => { loadMine() }, [loadMine])
-  const pp = period === 'month' || period === 'last_month' ? period : 'week'
-  const salMonth = period === 'last_month' ? lastMonth() : null
-  const W = useLoad(() => api.clinic.myWork(period), [period, key])
-  const P = useLoad(() => api.clinic.myPunctuality(pp), [pp])
-  const S = useLoad(() => api.clinic.mySalary(salMonth), [salMonth, key])
+  const W = useLoad(() => api.clinic.myWork(range), [rk, key])
+  const P = useLoad(() => api.clinic.myPunctuality(range), [rk])
+  const S = useLoad(() => api.clinic.mySalary(range), [rk, key])
   // حيّة: حدث «procedure» على بثّ الموظفين (بلا أرقام) ⇒ إعادة تحميل من المسارات المحميّة
   useEffect(() => {
     let timer = null
@@ -284,14 +311,12 @@ export default function MyWorkPage() {
   const withProcedures = profile?.has_procedures !== false || (mine?.lines || []).length > 0
   // «كيف تُحسب حصّتي» تشرح قواعد الطريقة القديمة — بعد «أجرة + مواد» لا تنطبق فتُخفى
   const { since: feeMode, loading: feeLoading } = useFeeMode()
-  const work = W.data && W.data.period === period ? W.data : null
-  const punct = P.data && P.data.period === pp ? P.data : null
-  // الراتب المعروض يطابق الفترة: «الشهر الماضي» شهرُه، وغيره الشهر الجاري
-  const sal = S.data && (salMonth ? S.data.month === salMonth : S.data.month === S.data.today?.slice(0, 7)) ? S.data : null
+  // كلّ ردٍّ يُعرض تحت فترته وحدها (ردّ فترةٍ سابقة لا يظهر تحت الجديدة)
+  const mine_ = (x) => x && x.from === range.from && x.to === range.to
+  const work = mine_(W.data) ? W.data : null
+  const punct = mine_(P.data) ? P.data : null
+  const sal = mine_(S.data) ? S.data : null
   const pending = (mine?.lines || []).filter((l) => !l.paid_at)
-  // مدى «دوامي»: مدى العمل إن وصل، وإلا مدى الالتزام نفسه
-  const range = work ? { from: work.from, to: work.to }
-    : punct ? (period === 'today' ? { from: punct.today, to: punct.today } : { from: punct.from, to: punct.to }) : null
   const failed = (err) => <section className="card dw-card"><p className="error">{err}</p></section>
 
   return (
@@ -301,19 +326,17 @@ export default function MyWorkPage() {
           <h2>أعمالي</h2>
           <p className="subtitle">ما أنجزتَه، وما يحقّ لك، والتزامك بالدوام</p>
         </div>
-        <div className="dp-period" role="group" aria-label="الفترة">
-          {PERIODS.map(([k, label]) => (
-            <button key={k} type="button" aria-pressed={period === k} className={period === k ? 'is-on' : ''}
-              onClick={() => setPeriod(k)}>{label}</button>
-          ))}
-        </div>
+      </div>
+      <div className="dw-period">
+        <PeriodBar mode={mode} cur={month} curDay={mode === 'week' ? week : day} from={from} to={to}
+          data={{ today, from: range.from, to: range.to }} set={set} modes={MODES} />
       </div>
       {toast}
       {W.err ? failed(W.err) : !work ? <p className="empty">جارٍ التحميل…</p> : <WorkCard work={work} withProcedures={withProcedures} />}
       {S.err && !work ? failed(S.err) : (
         <DuesCard work={work} sal={sal} salErr={S.err} withProcedures={withProcedures} pending={pending} onRemove={remove} />
       )}
-      {P.err ? failed(P.err) : punct && range && <DutyCard punct={punct} sal={sal} period={period} from={range.from} to={range.to} />}
+      {P.err ? failed(P.err) : punct && <DutyCard punct={punct} sal={sal} mode={mode} from={range.from} to={range.to} />}
       {withProcedures && !feeMode && !feeLoading && <ShareRule />}
     </div>
   )

@@ -6184,3 +6184,11 @@ button.dk-pick:disabled .dk-pick-price { opacity: 0.7; }
 .pr-doctors .pr-due { font-weight: 800; font-size: 15px; }
 .pr-chev { width: 18px; color: var(--muted); font-size: 18px; text-align: center; }
 @media (max-width: 720px) { table.rtable.pr-doctors td.pr-chev { display: none !important; } }
+
+/* ═══ «أعمالي» عند الطبيب (2026-11-18): شريط الفترة المشترك (يوم/أسبوع/شهر/فترة) ═══ */
+.dw-period { margin: 4px 0 14px; }
+@media (max-width: 600px) {
+  .dw-period .dr-seg button { min-height: 44px; }
+  .dw-period .dr-step { width: 44px; height: 44px; }
+  .dw-period .dr-date { min-height: 44px; }
+}

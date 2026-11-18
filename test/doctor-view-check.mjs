@@ -29,6 +29,7 @@ const FULL = { month: '2026-10', from: '2026-10-01', to: '2026-10-31', today: '2
   salary: { kind: 'daily_hourly', dailyRate: 50000, hourlyRate: 10000, salaryDays: 250000, salaryHours: 140000, total: 390000 },
   days: [day('2026-10-12', '09:00', null, null, 'no_departure'), day('2026-10-05', '09:00', '12:00', 180, 'complete')] }
 const UNSET = { ...FULL, salary: null }
+const PREV_MONTH = () => { const n = new Date(), d = new Date(n.getFullYear(), n.getMonth() - 1, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` }
 const SEP = { ...FULL, month: '2026-09', attendance: { days: 0, minutes: 0, hours: 0, noDeparture: 0, onDuty: 0 }, salary: null, days: [] }
 const DOCTOR = { id: '1', name: 'د. خالد', specialty: 'عظمية', specialty_id: '1', phone: '', room: '1', consultation_fee: 2000, followup_fee: 1000, followup_window_days: 7, expected_visit_minutes: 15, hourly_buffer_minutes: null, is_active: true, accepts_urgent: true, schedules: [], share_kind: 'percent', share_value: 50 }
 const SESSION = (o) => ({ id: 1, start_time: '09:00:00', end_time: '14:00:00', status: 'open', active_count: 0, flow_mode: 'attendance', apologized: false, ...o })
@@ -47,8 +48,10 @@ async function open(browser, { role = 'doc', path = '/clinic/my-work', w = 1366,
     const json = (b, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(b) })
     if (p === '/auth/me') return json(ME[role])
     if (p === '/clinic/my-share-rule') return json({ general: { kind: 'percent', value: 40 }, procedures: [{ name: 'خياطة', kind: 'fixed', value: 20000 }] })
-    if (p === '/clinic/my-salary') return json(url.searchParams.get('month') === '2026-09' ? SEP : salary)
-    if (p === '/clinic/my-work') return json({ period: url.searchParams.get('period'), from: '2026-10-01', to: '2026-10-20', patients: 0, procedures: 0, lines: [], total: 0, totals: {} })
+    // أعمالي 2026-11-18: الطلبات من–إلى، والواجهة تعرض الردّ تحت مداه وحده ⇒ الردّ يعيد المدى المطلوب
+    const q = url.searchParams, span = { from: q.get('from'), to: q.get('to') }
+    if (p === '/clinic/my-salary') return json({ ...(span.from?.slice(0, 7) === PREV_MONTH() ? SEP : salary), month: undefined, ...span })
+    if (p === '/clinic/my-work') return json({ period: 'custom', ...span, patients: 0, procedures: 0, lines: [], total: 0, totals: {} })
     if (p === '/clinic/my-punctuality') return json({ error: 'off' }, 500)
     if (p === '/clinic/my-procedures') return json({ lines: [] })
     if (p === '/clinic/my-sessions') return json(sessions)
@@ -90,18 +93,20 @@ const run = async () => {
     ok(ruleTxt.includes('40%') && ruleTxt.includes('خياطة') && /20,?000/.test(ruleTxt), '★ «قاعدة حصّتي»: العامّة والخاصّة', ruleTxt)
     ok(await page.locator('.dk-rule :is(input, select, button)').count() === 0, '★ عرضٌ بلا أيّ حقل أو زرّ تعديل')
     ok(!/الشفاء|مستهلك|سعر/.test(ruleTxt), '★ بلا شفاء ولا مستهلكات ولا سعر')
-    ok(await page.locator('.dp-period button').count() === 4 && await page.locator('.dk-sal-month').count() === 0,
-      '★ أداة فترةٍ واحدة (اليوم · الأسبوع · الشهر · الشهر الماضي) — لا أسهم شهرٍ للراتب')
+    ok(JSON.stringify(await page.locator('.dw-period .dr-seg button').allInnerTexts()) === JSON.stringify(['يوم', 'أسبوع', 'شهر', 'فترة'])
+      && await page.locator('.dk-sal-month').count() === 0, '★ شريط فترةٍ واحد: يوم · أسبوع · شهر · فترة (2026-11-18)')
     ok(!/·\s*[٠-٩]|[٠-٩]\s*·/.test(t), 'لا «·» بجانب رقم')
     // تعطّل «الالتزام» (500 في هذا الفحص) لا يُخفي الراتب — كلّ قسمٍ وحده
     ok(await page.locator('.dw .error').count() >= 1 && await has(page, '.dk-sal-calc'), '★ فشل قسمٍ لا يُخفي غيره')
     await shot(page, 'salary-light')
     const now = new Date(); const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1)
     const want = `${lm.getFullYear()}-${String(lm.getMonth() + 1).padStart(2, '0')}`
-    await page.click('.dp-period button:has-text("الشهر الماضي")')
+    await page.click('.dw-period .dr-seg button:has-text("شهر")')
+    await page.waitForTimeout(400)
+    await page.click('.dw-period [aria-label="الشهر السابق"]')
     await page.waitForTimeout(600)
-    ok(calls.includes(`/clinic/my-salary?month=${want}`) && calls.some((c) => c.startsWith('/clinic/my-work?period=last_month')),
-      '★ «الشهر الماضي» يطلب راتب الشهر السابق وعمله', JSON.stringify(calls.filter((c) => c.includes('my-'))))
+    ok(calls.some((c) => c.startsWith(`/clinic/my-salary?from=${want}-01&to=`)) && calls.some((c) => c.startsWith(`/clinic/my-work?from=${want}-01&to=`)),
+      '★ «شهر» ثمّ السهم: راتب الشهر السابق وعمله بمداه', JSON.stringify(calls.filter((c) => c.includes('my-'))))
     ok(errors.length === 0, `بلا أخطاء (${errors[0] || ''})`)
     await ctx.close()
   }
