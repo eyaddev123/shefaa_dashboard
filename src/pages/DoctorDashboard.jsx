@@ -211,7 +211,7 @@ export default function DoctorDashboard() {
         <>
           <PunctualityTiles p={shown.punctuality} apologized={(shown.apologies || []).filter((x) => x.date <= shown.today).length} extra={<>
             <div className="tile"><div className="label">المرضى</div><div className="value">{fmtNum(shown.finance.patients)}</div>
-              <div className="pn-sub">الكشوف المنتهية</div></div>
+              <div className="pn-sub">من حضر وقُطع وصله</div></div>
             <div className="tile"><div className="label">الإجراءات</div><div className="value">{fmtNum(shown.finance.procedures)}</div>
               <div className="pn-sub">المقبوضة في الفترة</div></div>
           </>} />

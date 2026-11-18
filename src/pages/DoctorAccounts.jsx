@@ -221,7 +221,7 @@ function Summary({ data, active }) {
       <div className="dr-stat">
         <span className="dr-stat-lbl">المرضى</span>
         <strong className="dr-stat-val">{fmtNum(t.patients)}</strong>
-        <span className="dr-stat-sub">كشفٌ منتهٍ</span>
+        <span className="dr-stat-sub">من حضر وقُطع وصله</span>
         <span className="dr-stat-foot">ومعها {procText(t.procedures)}</span>
       </div>
       <div className="dr-stat">

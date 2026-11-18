@@ -67,7 +67,7 @@ export const ratesText = (parts, src) => PAY_PARTS.filter((p) => parts?.includes
   .map((p) => `${fmt(src[p.rate])} ل.س ${{ patients: consult(src.patientScope) ? 'للمعاينة' : 'للمريض', days: 'لليوم', hours: 'للساعة' }[p.key]}`)
   .join(' + ')
 
-/** مَن يُضرب بسعر المريض في سطر حساب: المعاينات وحدها أو كلّ المنتهين */
+/** مَن يُضرب بسعر المريض في سطر حساب: المعاينات وحدها أو كلّ من حضر (منذ الوصل كالجرد — 2026-11-18) */
 export const salaryPatientsOf = (d) => d.salaryPatientCount ?? d.patients
 
 /**
