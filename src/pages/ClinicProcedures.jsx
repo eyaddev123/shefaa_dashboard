@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useDialogs } from '../dialogs.jsx'
-import { api } from '../api.js'
+import { api, fmtDay } from '../api.js'
+import { resetFeeMode } from '../fee-mode.js'
 import { useRole } from '../RoleContext.jsx'
 import { useToast } from '../action-feedback.jsx'
 import ProcedureEarnings from './ProcedureEarnings.jsx'
-import ProcedureDialog from '../components/procedures/ProcedureDialog.jsx'
+import ProcedureDialog, { splitText } from '../components/procedures/ProcedureDialog.jsx'
 import { canSeeEarnings } from '../permissions.js'
 import { matchesAr } from '../arabic-search.js'
 import { DistributeRuleDialog, PricingHistoryDialog } from '../components/ShareRuleDialogs.jsx'
@@ -34,7 +35,55 @@ const usedText = (n) => (n === 0 ? 'لم يُستعمل' : n === 1 ? 'مرّة �
   : `${fmtNum(n)} ${n % 100 >= 3 && n % 100 <= 10 ? 'مرّات' : 'مرّة'}`)
 const specsOf = (p) => (p.is_general || !(p.specialties || []).length ? [] : p.specialties)
 
-function Catalog({ list, role, reload, showToast }) {
+// ═══ «أجرة + مواد» قبل التفعيل: كم إجراءً جاهز، وأيّها ناقص، وزرّ التفعيل (المشرفة) ═══
+// الناقص بالاسم يفتح نافذته مباشرةً. والتفعيل مرّةً واحدة بتأكيدٍ يقول ما سيحدث بالضبط.
+function FeeSwitch({ fee, canEdit, onOpen, onActivated, showToast }) {
+  const dlg = useDialogs()
+  const [busy, setBusy] = useState(false)
+  if (!fee || fee.since || fee.active === undefined) return null
+  const left = fee.missing.length
+  const activate = async () => {
+    const ok = await dlg.confirm({
+      title: 'تفعيل الطريقة الجديدة',
+      body: `من الآن: سعر كلّ إجراء = أجرة الإيد التي كتبتِها، وتُقسم بين الدكتور والشفاء كما حدّدتِ لكلّ إجراء.\n`
+        + 'المواد والمستهلكات تُضاف فوق الأجرة على المريض، وقواعد الدكاترة لا تدخل الإجراءات الجديدة.\n'
+        + 'الإجراءات المسجّلة قبل الآن تبقى بأرقامها. ولا رجوع من الشاشة.',
+      confirmLabel: 'فعّلي الطريقة الجديدة',
+    })
+    if (!ok) return
+    setBusy(true)
+    try {
+      const r = await api.clinic.activateFeeMode()
+      resetFeeMode()
+      showToast(`فُعّلت الطريقة الجديدة — ${r.switched} إجراء بأجرته الجديدة`, 'success', 6000)
+      onActivated()
+    } catch (ex) { showToast(ex.message) } finally { setBusy(false) }
+  }
+  return (
+    <section className="pcx-switch" aria-label="الطريقة الجديدة">
+      <div className="pcx-switch-head">
+        <strong>الطريقة الجديدة: أجرة + مواد</strong>
+        <span>{left === 0 ? `كلّ الإجراءات المفعَّلة جاهزة (${fee.active})` : `جاهز ${fee.ready} من ${fee.active}`}</span>
+      </div>
+      <p className="pcx-hint">لكلّ إجراء: أجرة شغل الإيد وحدها وحصّة الدكتور منها (افتحي الإجراء). المواد بعد التفعيل تُضاف فوق الأجرة على المريض.</p>
+      {left > 0 && (
+        <ul className="pcx-missing">
+          {fee.missing.map((m) => (
+            <li key={m.id}><button type="button" className="link-btn" onClick={() => onOpen(m.id)}>{m.name}</button>
+              <small> — {m.reason}</small></li>
+          ))}
+        </ul>
+      )}
+      {canEdit && (
+        <button type="button" disabled={busy || left > 0} onClick={activate}
+          title={left > 0 ? 'أكملي الإجراءات الناقصة أوّلاً' : undefined}>
+          {busy ? 'جارٍ التفعيل…' : 'تفعيل الطريقة الجديدة'}</button>
+      )}
+    </section>
+  )
+}
+
+function Catalog({ list, fee, role, reload, showToast }) {
   const dlg = useDialogs()
   const [params, setParams] = useSearchParams()
   const q = params.get('q') || ''
@@ -93,8 +142,10 @@ function Catalog({ list, role, reload, showToast }) {
     } catch (ex) { showToast(ex.message) }
   }
 
+  const feeMode = fee ? fee.since : null
   return (
     <>
+      {seesConsumables && <FeeSwitch fee={fee} canEdit={canEdit} onOpen={setOpenId} onActivated={reload} showToast={showToast} />}
       <div className="pcx-bar">
         <input type="search" className="pcx-search" value={q} placeholder="ابحث عن إجراء بالاسم"
           aria-label="بحث عن إجراء" onChange={(e) => set({ q: e.target.value })} />
@@ -139,7 +190,9 @@ function Catalog({ list, role, reload, showToast }) {
                 </span>
                 <span className="pcx-foot">
                   <span>{usedText(p.times_used)}</span>
-                  {seesConsumables && Number(p.consumables_cost) > 0 && <span>مستهلكات {fmtNum(p.consumables_cost)}</span>}
+                  {seesConsumables && !feeMode && Number(p.consumables_cost) > 0 && <span>مستهلكات {fmtNum(p.consumables_cost)}</span>}
+                  {seesConsumables && p.doctor_split_kind && <span>الدكتور {splitText(p).replace(' من الأجرة', '')}</span>}
+                  {seesConsumables && !feeMode && p.draft_price != null && <span>الأجرة الجديدة {fmtNum(p.draft_price)}</span>}
                 </span>
               </>
             )
@@ -155,7 +208,7 @@ function Catalog({ list, role, reload, showToast }) {
       )}
 
       {(openId === 'new' || open) && (
-        <ProcedureDialog key={openId} proc={open} canEdit={canEdit} canHistory={canHistory} seesConsumables={seesConsumables}
+        <ProcedureDialog key={openId} proc={open} feeMode={feeMode} canEdit={canEdit} canHistory={canHistory} seesConsumables={seesConsumables}
           onClose={() => setOpenId(null)}
           onSaved={(text, warnings) => {
             setOpenId(null); reload()
@@ -184,6 +237,7 @@ function Catalog({ list, role, reload, showToast }) {
 
 export default function ClinicProcedures() {
   const [list, setList] = useState(null)
+  const [fee, setFee] = useState(null)   // {since, active?, ready?, missing?} — الطريقة الجديدة
   const [err, setErr] = useState(null)
   const [params, setParams] = useSearchParams()
   const [toast, showToast] = useToast()
@@ -194,7 +248,10 @@ export default function ClinicProcedures() {
   const tab = tabs.some((t) => t.key === asked) ? asked : 'catalog'
   const setTab = (key) => setParams(key === 'catalog' ? {} : { tab: key }, { replace: true })
 
-  const load = () => api.clinic.procedures().then((r) => { setList(r); setErr(null) }).catch((e) => setErr(e.message))
+  const load = () => {
+    api.clinic.feeMode().then(setFee).catch(() => setFee(null))
+    return api.clinic.procedures().then((r) => { setList(r); setErr(null) }).catch((e) => setErr(e.message))
+  }
   useEffect(() => { load() }, [])
 
   const active = list ? list.filter((p) => p.is_active).length : 0
@@ -205,6 +262,9 @@ export default function ClinicProcedures() {
         <p className="subtitle pcx-lead">
           {tab === 'earnings'
             ? 'ما طلع لكلّ دكتور من الإجراءات، وحصّة الشفاء منها — من لحظة القبض، كما سُجّل.'
+            : fee?.since
+            ? <>منذ {fmtDay(fee.since)}: سعر الإجراء أجرة الإيد، تُقسم بين الدكتور والشفاء كما على كلّ إجراء، والمواد والمستهلكات فوقها على المريض.
+              {' '}المواد وأسعارها في <Link to="/inventory">المخزون</Link>.</>
             : <>الاستقبال يضيف الإجراء بعد دخول المريض ومعه موادّه، فتُحسب الحصص فوراً وتنزل المواد من المخزون.
               {' '}المواد وأسعارها في <Link to="/inventory">المخزون</Link>.</>}
         </p>
@@ -223,7 +283,7 @@ export default function ClinicProcedures() {
       {tab === 'earnings' ? <ProcedureEarnings showToast={showToast} canEdit={role === 'clinic_admin'} />
         : err && !list ? <p className="error">{err}</p>
         : !list ? <p className="empty">جارٍ التحميل…</p>
-        : <Catalog list={list} role={role} reload={load} showToast={showToast} />}
+        : <Catalog list={list} fee={fee} role={role} reload={load} showToast={showToast} />}
     </div>
   )
 }

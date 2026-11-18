@@ -21,7 +21,9 @@ import { WAITING_RETURN, serverOffsetOf, useStaffEvents } from '../waiting-retur
 import { ReferralRow, ReferralTotals, useReferralOptions } from '../components/ReferralFields.jsx'
 import { DISCOUNT_SCOPES, amountText, availableScopes, blankReferral, coverageFull, draftDiscount, draftFromReferral,
   referralPayload, referralReady } from '../referral.js'
-import MaterialsEditor, { qtyValid, toPayload, fmtQty, materialsSummary } from '../components/MaterialsEditor.jsx'
+import MaterialsEditor, { qtyValid, toPayload, fmtQty, materialsSummary, materialsValue } from '../components/MaterialsEditor.jsx'
+import { useFeeMode } from '../fee-mode.js'
+import ConsumablesCounter from '../components/ConsumablesCounter.jsx'
 import RoomBadge from '../components/RoomBadge.jsx'
 import VisitTimeline from '../components/VisitTimeline.jsx'
 import { MissingBadge, StatusCell, VisitActions, missingOf, priorityBadge, useVisitActions } from './SessionQueue.jsx'
@@ -702,6 +704,9 @@ function AddError({ err, doctorId, isSupervisor, onClose }) {
       {err.code === 'DOCTOR_NO_SHARE_RULE' && isSupervisor && doctorId && (
         <Link to={`/clinic/doctors/${doctorId}`}>سجّلي قاعدة الدكتور من بروفايله ←</Link>
       )}
+      {err.code === 'PROCEDURE_NO_SPLIT' && isSupervisor && (
+        <Link to="/clinic/procedures">حدّدي حصّة الدكتور من صفحة الإجراءات ←</Link>
+      )}
       <button type="button" className="ghost" onClick={onClose}>حسناً</button>
     </div>
   )
@@ -709,13 +714,16 @@ function AddError({ err, doctorId, isSupervisor, onClose }) {
 
 // ═══ ملخّص توزيع آخر إضافة — للمشرفة وحدها (الخادم لا يرسل التقسيم لغيرها) ═══
 // المستهلكات بندٌ للقراءة من قيمة نوع الإجراء؛ تعديلها الاستثنائي من «المراجعة» بسبب.
+// الإصدار 3: الأجرة تُقسم والمواد فوقها — «على المريض» = الأجرة + المواد + المستهلكات
 function SplitSummary({ s, onClose }) {
   const counted = Number(s.materials_cost) - Number(s.consumables_cost || 0)
+  const v3 = s.fee_snapshot != null
   return (
     <div className="split-summary" role="status">
       <strong>«{s.name}» — التوزيع</strong>
       <dl>
-        <div><dt>السعر</dt><dd>{fmtMoney(s.price)}</dd></div>
+        {v3 && <div><dt>على المريض</dt><dd>{fmtMoney(s.price_snapshot)}</dd></div>}
+        <div><dt>{v3 ? 'الأجرة' : 'السعر'}</dt><dd>{fmtMoney(v3 ? s.fee_snapshot : s.price)}</dd></div>
         <div><dt>المواد</dt><dd>{fmtMoney(counted)}</dd></div>
         <div><dt>المستهلكات</dt><dd>{fmtMoney(s.consumables_cost || 0)}</dd></div>
         <div><dt>الدكتور</dt><dd>{fmtMoney(s.doctor_share)}</dd></div>
@@ -729,10 +737,13 @@ function SplitSummary({ s, onClose }) {
 
 function AppointmentProcedures({ appt, session, onChanged, onToast }) {
   const { clinicRole: role, user } = useRole()
+  const { since: feeMode } = useFeeMode()
   const [catalog, setCatalog] = useState(null)
   const [matCatalog, setMatCatalog] = useState(null)
   const [pick, setPick] = useState('')
   const [newMats, setNewMats] = useState([])
+  const [newCons, setNewCons] = useState(0)        // عدّاد المستهلكات للإضافة (بعد القلبة)
+  const [editCons, setEditCons] = useState(0)      // وللسطر الجاري تعديله
   const [busy, setBusy] = useState(false)
   const [removing, setRemoving] = useState(null)   // id السطر الجاري إزالته
   const [reason, setReason] = useState('')
@@ -779,17 +790,23 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
   const activeIds = new Set(lines.filter((l) => !l.removed_at).map((l) => String(l.procedure_id)))
   const choices = (catalog || []).filter((p) => !activeIds.has(String(p.id)))
   const chosen = choices.find((p) => String(p.id) === pick)
+  // بعد القلبة: المريض يدفع الأجرة + المستهلكات + المواد بسعر بيعها — تُعرض قبل الحفظ
+  const chosenCons = chosen && feeMode ? newCons : 0
+  const newMatsValue = chosen && feeMode ? materialsValue(newMats, matCatalog) : 0
+  const chosenTotal = chosen ? Number(chosen.price) + chosenCons + newMatsValue : 0
 
   const add = async () => {
     if (!chosen || !qtyValid(newMats)) return
     setBusy(true); setAddErr(null)
     try {
-      const r = await api.clinic.addAppointmentProcedure(appt.id, chosen.id, toPayload(newMats))
+      const r = await api.clinic.addAppointmentProcedure(appt.id, chosen.id, toPayload(newMats), feeMode ? newCons : 0)
       setStockWarns(r.stock_warnings || [])
       setSplit(r.doctor_share !== undefined ? { ...r, name: chosen.name, price: chosen.price } : null)
       const withMats = newMats.length ? ` + ${newMats.length} ${newMats.length === 1 ? 'مادة' : 'مواد'}` : ''
-      onToast(`أُضيف «${chosen.name}» — ${fmtMoney(chosen.price)}${withMats}`, 'success')
-      setPick(''); setNewMats([]); onChanged()
+      onToast(r.fee_snapshot != null
+        ? `أُضيف «${chosen.name}» — على المريض ${fmtMoney(r.price_snapshot)}`
+        : `أُضيف «${chosen.name}» — ${fmtMoney(chosen.price)}${withMats}`, 'success')
+      setPick(''); setNewMats([]); setNewCons(0); onChanged()
     } catch (ex) { setAddErr({ message: ex.message, code: ex.data?.code }) }
     finally { setBusy(false) }
   }
@@ -805,15 +822,24 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
   const startEdit = (line) => {
     setRemoving(null); setEditing(line.id)
     setEditMats((line.materials || []).map((m) => ({ ...m, qty: fmtQty(m.qty) })))
+    setEditCons(Number(line.consumables || 0))
   }
   const saveEdit = async (line) => {
     if (!qtyValid(editMats)) return
     setBusy(true)
     try {
-      const r = await api.clinic.setLineMaterials(appt.id, line.id, { materials: toPayload(editMats) })
+      // سطر «أجرة + مواد»: العدّاد يُرسَل معه (الاستقبال تقدّره كالمواد)
+      const r = await api.clinic.setLineMaterials(appt.id, line.id, { materials: toPayload(editMats),
+        ...(line.fee != null ? { consumables: editCons } : {}) })
       setStockWarns(r.stock_warnings || [])
       if (r.doctor_share !== undefined && !r.unchanged) setSplit({ ...r, name: line.name, price: line.price })
-      onToast(r.unchanged ? 'لا تغيير في المواد' : `حُدّثت مواد «${line.name}»`, 'success')
+      // الإصدار 3: المواد على المريض — تغيُّرها يغيّر ما يدفعه. مقبوضٌ ⇒ اقبضي الفرق أو رُدّيه
+      const pc = r.price_change
+      if (pc && pc.paid) {
+        const diff = Math.round((pc.new - pc.old) * 100) / 100
+        onToast(`حُدّثت مواد «${line.name}» — المجموع صار ${fmtMoney(pc.new)} (كان ${fmtMoney(pc.old)}): `
+          + (diff > 0 ? `اقبضي ${fmtMoney(diff)} من المريض` : `رُدّي ${fmtMoney(-diff)} للمريض`), 'warning', 10000)
+      } else onToast(r.unchanged ? 'لا تغيير في المواد' : `حُدّثت مواد «${line.name}»${pc ? ` — المجموع ${fmtMoney(pc.new)}` : ''}`, 'success')
       setEditing(null); onChanged()
     } catch (ex) {
       // لم يُحفظ شيء: الكمّيات ترجع لآخر قيمةٍ محفوظة، والرسالة تقول ذلك
@@ -847,6 +873,12 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
                   </td>
                   <td className="num rt-badge">
                     {fmtMoney(l.price)}
+                    {/* الإصدار 3: السعر = الأجرة + المواد — التفصيل تحت المبلغ */}
+                    {l.fee != null && !l.removed_at && Number(l.price) !== Number(l.fee) && (
+                      <small className="proc-fee-break">أجرة {fmtMoney(l.fee)}
+                        {Number(l.price) - Number(l.fee) - Number(l.consumables || 0) > 0 && <> + مواد {fmtMoney(Number(l.price) - Number(l.fee) - Number(l.consumables || 0))}</>}
+                        {Number(l.consumables) > 0 && <> + مستهلكات {fmtMoney(l.consumables)}</>}</small>
+                    )}
                     {/* الدفع: إجراء الطبيب «بانتظار المحاسبة» حتى يُقبض */}
                     {!l.removed_at && (l.paid_at
                       ? <span className="pay-badge is-paid" title={`قبضه ${l.paid_by_name || '—'}`}>مدفوع ✓</span>
@@ -889,7 +921,8 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
                 {!l.removed_at && (editing === l.id ? (
                   <tr className="proc-mats-row rt-sub">
                     <td colSpan={4}>
-                      <MaterialsEditor catalog={matCatalog} value={editMats} onChange={setEditMats} disabled={busy} saved={l.materials} />
+                      <MaterialsEditor withPrice={!!feeMode} catalog={matCatalog} value={editMats} onChange={setEditMats} disabled={busy} saved={l.materials} />
+                      {l.fee != null && <ConsumablesCounter value={editCons} onChange={setEditCons} disabled={busy} />}
                       <div className="mat-actions">
                         <button disabled={busy || !qtyValid(editMats)} onClick={() => saveEdit(l)}>حفظ المواد</button>
                         <button className="ghost" disabled={busy} onClick={() => setEditing(null)}>إلغاء</button>
@@ -902,6 +935,7 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
                       {(l.materials || []).length
                         ? <>المواد: {materialsSummary(l.materials)}</>
                         : <span className="muted">بلا مواد</span>}
+                      {l.fee != null && Number(l.consumables) > 0 && <> · مستهلكات {fmtMoney(l.consumables)}</>}
                     </td>
                   </tr>
                 ))}
@@ -914,16 +948,23 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
         canEdit ? (
           <div className="proc-add-box">
             <div className="proc-add">
-              <select value={pick} onChange={(e) => { setPick(e.target.value); setAddErr(null) }} aria-label="الإجراء">
+              <select value={pick} onChange={(e) => { setPick(e.target.value); setAddErr(null); setNewCons(0) }} aria-label="الإجراء">
                 <option value="">{catalog === null ? 'جارٍ التحميل…' : choices.length ? '— اختر إجراءً —' : 'لا إجراءات متاحة'}</option>
                 {choices.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
-              {/* السعر للقراءة فقط — من الكتالوج، ولا يُرسَل للخادم أصلاً */}
-              <span className="proc-add-price">{chosen ? fmtMoney(chosen.price) : '—'}</span>
+              {/* السعر للقراءة فقط — من الكتالوج، ولا يُرسَل للخادم أصلاً. وبعد القلبة: المجموع مع المواد */}
+              <span className="proc-add-price">{chosen ? fmtMoney(feeMode ? chosenTotal : chosen.price) : '—'}</span>
               <button disabled={!chosen || busy || !qtyValid(newMats)} onClick={add}>+ إجراء</button>
             </div>
+            {chosen && feeMode && (chosenCons > 0 || newMatsValue > 0) && (
+              <p className="proc-add-consumables">
+                على المريض <strong>{fmtMoney(chosenTotal)}</strong>: أجرة {fmtMoney(chosen.price)}
+                {chosenCons > 0 && <> + مستهلكات {fmtMoney(chosenCons)}</>}
+                {newMatsValue > 0 && <> + مواد {fmtMoney(newMatsValue)}</>}
+              </p>
+            )}
             {/* المستهلكات المقدّرة لنوع الإجراء — للمشرفة وحدها (الخادم لا يرسلها للاستقبال): قراءةٌ فقط */}
-            {chosen && isSupervisor && Number(chosen.consumables_cost) > 0 && (
+            {chosen && isSupervisor && !feeMode && Number(chosen.consumables_cost) > 0 && (
               <p className="proc-add-consumables">
                 المستهلكات المقدّرة لـ«{chosen.name}»: <strong>{fmtMoney(chosen.consumables_cost)}</strong> — تُطرح لصندوق العيادات
                 مع المواد قبل حصّة الدكتور. (تعديلها على سطرٍ بعينه من «المراجعة»، بسبب.)
@@ -934,7 +975,8 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
             {chosen && (
               <div className="proc-add-mats">
                 <span className="proc-add-mats-label">المواد المستعملة (اختياري):</span>
-                <MaterialsEditor catalog={matCatalog} value={newMats} onChange={setNewMats} disabled={busy} />
+                <MaterialsEditor withPrice={!!feeMode} catalog={matCatalog} value={newMats} onChange={setNewMats} disabled={busy} />
+                {feeMode && <ConsumablesCounter value={newCons} onChange={setNewCons} disabled={busy} />}
               </div>
             )}
           </div>

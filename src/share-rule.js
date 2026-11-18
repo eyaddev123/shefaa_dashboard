@@ -53,6 +53,8 @@ export const doctorsCount = (n) => (n === 1 ? 'دكتور واحد' : n === 2 ? 
 const pct = (r) => (!r ? 'بلا نسبة' : r.kind === 'percent'
   ? (Number(r.value) === 0 ? '0% (كامل المبلغ للشفاء)' : `${r.value}%`) : `مبلغ ثابت ${fmtMoney(r.value)} (قديمة)`)
 
+const splitWords = (r) => (!r ? 'بلا حصّة' : r.kind === 'percent' ? `${r.value}%` : fmtMoney(r.value))
+
 /** @param {'procedure'|'doctor'} side */
 export function pricingText(h, side) {
   const o = h.old_value, n = h.new_value
@@ -73,6 +75,11 @@ export function pricingText(h, side) {
         n.skipped && `تُخطّي ${doctorsCount(n.skipped)} لهم قاعدة`].filter(Boolean)
       return `وُزِّعت قاعدة ${ruleText(n)} على ${doctorsCount(n.doctors)} — ${parts.join('، ')}`
     }
+    // الإصدار 3 «أجرة + مواد» (2026-11-17): حصّة الدكتور على الإجراء، والأجرة قبل القلبة، والقلبة نفسها
+    case 'split': return o ? `حصّة الدكتور من الأجرة: ${splitWords(o)} ← ${splitWords(n)}` : `حصّة الدكتور من الأجرة: ${splitWords(n)}`
+    case 'draft_price': return !n ? 'مُسحت الأجرة الجديدة'
+      : o ? `الأجرة الجديدة: ${fmtMoney(o.draft_price)} ← ${fmtMoney(n.draft_price)}` : `الأجرة الجديدة (قبل التفعيل): ${fmtMoney(n.draft_price)}`
+    case 'fee_switch': return `فُعّلت «أجرة + مواد»: السعر ${fmtMoney(o.price)} ← أجرة ${fmtMoney(n.price)}${n.split ? `، الدكتور ${splitWords(n.split)}` : ''}`
     default: return 'تغيير في التسعيرة'
   }
 }

@@ -6013,3 +6013,28 @@ button.dk-pick:disabled .dk-pick-price { opacity: 0.7; }
   margin-bottom: 10px; font-size: 14px; }
 .dk-total strong { font-size: 16px; }
 .dk-total-mats { font-size: 13px; color: var(--text-secondary); }
+
+/* ═══ الإصدار 3: «أجرة + مواد» (2026-11-17) — حقول التقسيم، بطاقة الجاهزيّة، تفصيل السطر ═══ */
+.pcx-split { border: 1px solid var(--grid); border-radius: 10px; padding: 10px 12px 8px; margin: 4px 0 0; min-width: 0; }
+.pcx-split legend { font-size: 13px; color: var(--text-secondary); padding: 0 4px; }
+.pcx-split-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.pcx-split-row input { width: 120px; min-height: 40px; }
+.pcx-split-unit { color: var(--muted); font-size: 13px; }
+.pcx-split-out { margin: 8px 0 0; font-size: 13px; color: var(--text-secondary); }
+.pcx-next { margin-top: 6px; padding-top: 12px; border-top: 1px dashed var(--grid); display: grid; gap: 10px; }
+.pcx-next h4 { margin: 0; font-size: 13.5px; }
+.pcx-draft-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.pcx-draft-row input { flex: 1 1 140px; min-width: 0; }
+.pcx-switch { border: 1px solid var(--grid); border-radius: 12px; padding: 12px 14px; margin: 0 0 14px; display: grid; gap: 8px; background: var(--surface, transparent); }
+.pcx-switch-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; align-items: baseline; }
+.pcx-switch-head span { font-size: 13px; color: var(--text-secondary); }
+.pcx-switch > button { justify-self: start; min-height: 44px; }
+.pcx-missing { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; }
+.pcx-missing small { color: var(--muted); }
+.proc-fee-break { display: block; font-size: 11px; font-weight: 400; color: var(--muted); white-space: nowrap; }
+/* عدّاد المستهلكات (أجرة + مواد): [−] المبلغ [+] بخطوة 10 — يعيد أزرار ➖➕ من محرّر المواد */
+.cons-counter { margin-top: 8px; display: grid; gap: 4px; }
+.cons-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.cons-label { font-weight: 600; font-size: 13.5px; }
+.cons-value { min-width: 84px; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; }
+.cons-hint { margin: 2px 0 0; font-size: 12px; color: var(--muted); line-height: 1.7; }

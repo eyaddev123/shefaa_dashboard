@@ -447,11 +447,16 @@ export const api = {
       http(`/clinic/procedures/${id}/specialties`, { method: 'PUT', body: JSON.stringify(body) }),
     addProcedure: (body) => http('/clinic/procedures', { method: 'POST', body: JSON.stringify(body) }),
     updateProcedure: (id, body) => http(`/clinic/procedures/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+    // الإصدار 3: «أجرة + مواد» — الحالة (since) وجاهزيّة القلبة للمشرفة، والتفعيل مرّةً واحدة
+    feeMode: () => http('/clinic/procedures/fee-mode'),
+    activateFeeMode: () => http('/clinic/procedures/fee-mode/activate', { method: 'POST' }),
     // على الحجز: لا سعر يُرسَل — الخادم ينسخه من الكتالوج، ويحسب المواد والحصص لحظتها
     // materials: [{material_id, qty}]
-    addAppointmentProcedure: (appointmentId, procedureId, materials = []) =>
+    // consumables: عدّاد المستهلكات (0–100 بخطوة 10) — بعد قلبة «أجرة + مواد» وحدها
+    addAppointmentProcedure: (appointmentId, procedureId, materials = [], consumables) =>
       http(`/clinic/appointments/${appointmentId}/procedures`,
-        { method: 'POST', body: JSON.stringify({ procedure_id: procedureId, materials }) }),
+        { method: 'POST', body: JSON.stringify({ procedure_id: procedureId, materials,
+          ...(consumables ? { consumables } : {}) }) }),
     // القائمة كاملةً تحلّ محلّ السابقة؛ legacy_materials للمشرف وحده
     setLineMaterials: (appointmentId, lineId, body) =>
       http(`/clinic/appointments/${appointmentId}/procedures/${lineId}/materials`,

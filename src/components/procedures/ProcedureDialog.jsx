@@ -10,17 +10,63 @@ import { Modal } from '../inventory/shared.jsx'
 // و«تاريخ التسعيرة» و«تعطيل». المشرفة تكتب، والمدير يطالع ويرى التاريخ (PRICING_HISTORY_READERS).
 // تعديل السعر أو المستهلكات يسري على ما يُضاف بعده فقط — ويُسأل عنه بتأكيدٍ صريح كما كان.
 
+// ═══ الإصدار 3 (قرار المستخدم 2026-11-17): السعر أجرة الإيد، وتقسيمها هنا على الإجراء نفسه ═══
+// نسبةٌ للدكتور (مقرّبة لفوق لأقرب 50 كما في الخادم) أو مبلغٌ ثابت، والباقي للشفاء. والمواد والمستهلكات
+// فوق الأجرة على المريض — لا تمسّ الحصّتين. قبل «التفعيل» تُكتب «الأجرة الجديدة» بجانب السعر القائم.
+const ROUND_STEP = 50
+export function splitPreview(fee, kind, value) {
+  const f = Number(fee), v = Number(value)
+  if (!(f >= 0) || String(fee).trim() === '' || !['percent', 'fixed'].includes(kind) || String(value).trim() === '' || !(v >= 0)) return null
+  const raw = kind === 'percent' ? f * (v / 100) : v
+  const doctor = kind === 'percent' ? Math.min(raw <= 0 ? 0 : Math.ceil(Math.round(raw * 100) / (ROUND_STEP * 100)) * ROUND_STEP, f) : Math.min(v, f)
+  return { doctor, shifa: Math.round((f - doctor) * 100) / 100, over: kind === 'fixed' && v > f }
+}
+export const splitText = (p) => (!p?.doctor_split_kind ? 'لم تُحدَّد'
+  : p.doctor_split_kind === 'percent' ? `${fmtNum(p.doctor_split_value)}% من الأجرة` : `${fmtMoney(p.doctor_split_value)} من الأجرة`)
+
+function SplitFields({ fee, kind, value, onKind, onValue, idp }) {
+  const pv = splitPreview(fee, kind, value)
+  return (
+    <fieldset className="pcx-split">
+      <legend>حصّة الدكتور من الأجرة</legend>
+      <div className="pcx-split-row">
+        <div className="pcx-sort" role="group" aria-label="طريقة التقسيم">
+          {[['percent', 'نسبة'], ['fixed', 'مبلغ ثابت']].map(([k, label]) => (
+            <button key={k} type="button" aria-pressed={kind === k} className={`rev-flag${kind === k ? ' is-on' : ''}`}
+              onClick={() => onKind(k)}>{label}</button>
+          ))}
+        </div>
+        <input id={`${idp}-split`} value={value} inputMode="decimal" placeholder={kind === 'percent' ? 'مثلاً 65' : 'مثلاً 100'}
+          aria-label={kind === 'percent' ? 'نسبة الدكتور %' : 'مبلغ الدكتور'} disabled={!kind}
+          onChange={(e) => onValue(toLatinDigits(e.target.value))} />
+        <span className="pcx-split-unit">{kind === 'percent' ? '%' : kind ? 'ل.س' : ''}</span>
+      </div>
+      {pv && (pv.over
+        ? <p className="error">مبلغ الدكتور أكبر من الأجرة.</p>
+        : <p className="pcx-split-out">من أجرة {fmtMoney(fee)}: <strong>الدكتور {fmtMoney(pv.doctor)}</strong> · <strong>الشفاء {fmtMoney(pv.shifa)}</strong></p>)}
+    </fieldset>
+  )
+}
+
 const specKey = (sp) => (sp.isGeneral ? 'general' : [...sp.specialtyIds].map(String).sort().join(','))
 const fmtNum = (n) => Number(n || 0).toLocaleString('ar-SY-u-nu-latn', { maximumFractionDigits: 2 })
 const timesText = (n) => (n === 0 ? 'لم يُستعمل بعد' : n === 1 ? 'استُعمل مرّةً واحدة' : n === 2 ? 'استُعمل مرّتين'
   : `استُعمل ${fmtNum(n)} ${n % 100 >= 3 && n % 100 <= 10 ? 'مرّات' : 'مرّة'}`)
 
-export default function ProcedureDialog({ proc, canEdit, canHistory, seesConsumables, onClose, onSaved, onDistribute, onHistory, onToggle }) {
+export default function ProcedureDialog({ proc, feeMode, canEdit, canHistory, seesConsumables, onClose, onSaved, onDistribute, onHistory, onToggle }) {
   const dlg = useDialogs()
   const isNew = !proc
   const [name, setName] = useState(proc?.name || '')
   const [price, setPrice] = useState(proc ? String(Number(proc.price)) : '')
   const [cons, setCons] = useState(proc ? String(Number(proc.consumables_cost || 0)) : '')
+  const [kind, setKind] = useState(proc?.doctor_split_kind || '')
+  const [splitVal, setSplitVal] = useState(proc?.doctor_split_value != null ? String(Number(proc.doctor_split_value)) : '')
+  const [draft, setDraft] = useState(proc?.draft_price != null ? String(Number(proc.draft_price)) : '')
+  // الأجرة التي يُقسَّم منها: بعد القلبة السعر نفسه، وقبلها الأجرة الجديدة
+  const fee = feeMode ? price : draft
+  const splitChanged = kind !== (proc?.doctor_split_kind || '')
+    || (kind && Number(splitVal) !== Number(proc?.doctor_split_value ?? NaN))
+  const draftChanged = !feeMode && (draft.trim() === '' ? proc?.draft_price != null : Number(draft) !== Number(proc?.draft_price ?? NaN))
   const initialSpec = proc
     ? { isGeneral: !!proc.is_general || !(proc.specialties || []).length,
         specialtyIds: proc.is_general ? [] : (proc.specialties || []).map((x) => String(x.id)) }
@@ -33,11 +79,18 @@ export default function ProcedureDialog({ proc, canEdit, canHistory, seesConsuma
     e.preventDefault()
     setErr(null)
     if (!name.trim()) return setErr('اكتب اسم الإجراء')
-    if (price.trim() === '') return setErr('اكتب السعر')
+    if (price.trim() === '') return setErr(feeMode ? 'اكتب الأجرة' : 'اكتب السعر')
+    if (feeMode && !kind) return setErr('حدّد حصّة الدكتور من الأجرة: نسبة أو مبلغ ثابت')
+    if (kind && splitVal.trim() === '') return setErr(kind === 'percent' ? 'اكتب نسبة الدكتور' : 'اكتب مبلغ الدكتور')
+    if (splitPreview(fee, kind, splitVal)?.over) return setErr('مبلغ الدكتور أكبر من الأجرة')
+    const feeBody = {
+      ...(kind && (isNew || splitChanged) ? { doctor_split_kind: kind, doctor_split_value: splitVal } : {}),
+      ...(!feeMode && (isNew ? draft.trim() !== '' : draftChanged) ? { draft_price: draft.trim() } : {}),
+    }
     if (isNew) {
       setBusy(true)
       try {
-        const created = await api.clinic.addProcedure({ name, price, consumables_cost: cons })
+        const created = await api.clinic.addProcedure({ name, price, consumables_cost: cons, ...feeBody })
         let warn = created?.warnings || []
         if (!spec.isGeneral && created?.id) {
           try {
@@ -52,12 +105,13 @@ export default function ProcedureDialog({ proc, canEdit, canHistory, seesConsuma
     if (name.trim() !== proc.name) body.name = name
     if (Number(price) !== Number(proc.price)) body.price = price
     if (Number(cons || 0) !== Number(proc.consumables_cost || 0)) body.consumables_cost = cons || '0'
+    Object.assign(body, feeBody)
     const specChanged = specKey(spec) !== specKey(initialSpec)
     if (Object.keys(body).length === 0 && !specChanged) return onClose()
     if (body.price !== undefined) {
       const ok = await dlg.confirm({
-        title: 'تغيير السعر',
-        body: `تغيير سعر «${proc.name}» من ${fmtMoney(proc.price)} إلى ${fmtMoney(price)}؟\n`
+        title: feeMode ? 'تغيير الأجرة' : 'تغيير السعر',
+        body: `تغيير ${feeMode ? 'أجرة' : 'سعر'} «${proc.name}» من ${fmtMoney(proc.price)} إلى ${fmtMoney(price)}؟\n`
           + 'يسري على ما يُضاف بعد الحفظ فقط — ما أُضيف لحجوزات سابقة يبقى بسعره.',
         confirmLabel: 'غيّر السعر',
       })
@@ -87,8 +141,10 @@ export default function ProcedureDialog({ proc, canEdit, canHistory, seesConsuma
       <Modal title={proc.name} sheet onClose={onClose}
         subtitle={proc.is_active ? timesText(proc.times_used) : `معطَّل — ${timesText(proc.times_used)}`}>
         <dl className="pcx-facts">
-          <div><dt>السعر</dt><dd>{fmtMoney(proc.price)}</dd></div>
-          {seesConsumables && <div><dt>المستهلكات المقدّرة</dt><dd>{Number(proc.consumables_cost) > 0 ? fmtMoney(proc.consumables_cost) : 'لا شيء'}</dd></div>}
+          <div><dt>{feeMode ? 'الأجرة' : 'السعر'}</dt><dd>{fmtMoney(proc.price)}</dd></div>
+          {seesConsumables && !feeMode && <div><dt>المستهلكات المقدّرة</dt><dd>{Number(proc.consumables_cost) > 0 ? fmtMoney(proc.consumables_cost) : 'لا شيء'}</dd></div>}
+          {seesConsumables && <div><dt>حصّة الدكتور</dt><dd>{splitText(proc)}</dd></div>}
+          {seesConsumables && !feeMode && proc.draft_price != null && <div><dt>الأجرة الجديدة</dt><dd>{fmtMoney(proc.draft_price)}</dd></div>}
           <div><dt>الاختصاصات</dt><dd>{specialtiesText(proc)}</dd></div>
         </dl>
         <div className="bf-actions inv-actions">
@@ -104,7 +160,8 @@ export default function ProcedureDialog({ proc, canEdit, canHistory, seesConsuma
   return (
     <Modal title={isNew ? 'إجراء جديد' : proc.name} sheet onClose={onClose} busy={busy}
       subtitle={isNew
-        ? 'يظهر للاستقبال عند دكاترة اختصاصاته. والسعر هو ما يدفعه المريض.'
+        ? (feeMode ? 'يظهر للاستقبال عند دكاترة اختصاصاته. الأجرة تُقسم بين الدكتور والشفاء، والمواد فوقها على المريض.'
+          : 'يظهر للاستقبال عند دكاترة اختصاصاته. والسعر هو ما يدفعه المريض.')
         : `${proc.is_active ? '' : 'معطَّل — '}${timesText(proc.times_used)}${by ? `، آخر تعديل: ${by}` : ''}${at ? ` (${fmtDay(at)})` : ''}`}>
       <form className="inv-form pcx-form" onSubmit={submit}>
         <div className="field"><label htmlFor="pcx-name">اسم الإجراء</label>
@@ -112,15 +169,40 @@ export default function ProcedureDialog({ proc, canEdit, canHistory, seesConsuma
             onChange={(e) => setName(e.target.value)} /></div>
         <div className="pcx-row">
           {/* نصّ لا number: حقل الرقم يبتلع الأرقام العربية */}
-          <div className="field"><label htmlFor="pcx-price">السعر (ل.س)</label>
+          <div className="field"><label htmlFor="pcx-price">{feeMode ? 'الأجرة — شغل الإيد (ل.س)' : 'السعر الحالي — يشمل المواد (ل.س)'}</label>
             <input id="pcx-price" value={price} inputMode="decimal" placeholder="0"
               onChange={(e) => setPrice(toLatinDigits(e.target.value))} /></div>
-          <div className="field"><label htmlFor="pcx-cons">المستهلكات المقدّرة (ل.س)</label>
+          {/* بعد القلبة المستهلكات عدّادٌ على كلّ إجراءٍ مسجّل (الاستقبال أو الدكتور) — لا قيمة ثابتة هنا */}
+          {!feeMode && <div className="field"><label htmlFor="pcx-cons">المستهلكات المقدّرة (ل.س)</label>
             <input id="pcx-cons" value={cons} inputMode="decimal" placeholder="0"
-              onChange={(e) => setCons(toLatinDigits(e.target.value))} /></div>
+              onChange={(e) => setCons(toLatinDigits(e.target.value))} /></div>}
         </div>
-        <p className="pcx-hint">المستهلكات: قطنٌ وشاشٌ وبيتادين يستهلكها الإجراء كلّ مرّة — تُطرح من مبلغه لصندوق العيادات مع المواد.
-          {!isNew && ' وتغيير السعر أو المستهلكات يسري على ما يُضاف بعد الحفظ فقط.'}</p>
+        <p className="pcx-hint">
+          {feeMode
+            ? 'المستهلكات (بوفيدون، قطن، شاش، كفوف، لاصق) لا تُكتب هنا: يقدّرها الاستقبال أو الدكتور على كلّ إجراء بعدّادٍ من 10 إلى 100، وتُضاف على المريض فوق الأجرة مع المواد، ولا تمسّ حصّة الدكتور.'
+            : 'المستهلكات: قطنٌ وشاشٌ وبيتادين يستهلكها الإجراء كلّ مرّة — تُطرح من مبلغه لصندوق العيادات مع المواد.'}
+          {!isNew && (feeMode ? ' وتغيير الأجرة أو الحصّة يسري على ما يُضاف بعد الحفظ فقط.'
+            : ' وتغيير السعر أو المستهلكات أو الحصّة يسري على ما يُضاف بعد الحفظ فقط.')}</p>
+        {feeMode ? (
+          <SplitFields idp="pcx" fee={price} kind={kind} value={splitVal}
+            onKind={(k) => { setKind(k); setSplitVal('') }} onValue={setSplitVal} />
+        ) : (
+          <div className="pcx-next">
+            <h4>الطريقة الجديدة: أجرة + مواد</h4>
+            <p className="pcx-hint">السعر الحالي يشمل المواد. اكتب أجرة شغل الإيد وحدها وحصّة الدكتور منها —
+              تبقى جاهزةً ولا تُطبَّق حتى «تفعيل الطريقة الجديدة» في صفحة الإجراءات.</p>
+            <div className="field"><label htmlFor="pcx-draft">الأجرة الجديدة (ل.س)</label>
+              <div className="pcx-draft-row">
+                <input id="pcx-draft" value={draft} inputMode="decimal" placeholder="أجرة شغل الإيد"
+                  onChange={(e) => setDraft(toLatinDigits(e.target.value))} />
+                {price.trim() !== '' && draft !== price && (
+                  <button type="button" className="ghost" onClick={() => setDraft(price)}>نفس السعر الحالي</button>
+                )}
+              </div></div>
+            <SplitFields idp="pcx-n" fee={draft} kind={kind} value={splitVal}
+              onKind={(k) => { setKind(k); setSplitVal('') }} onValue={setSplitVal} />
+          </div>
+        )}
         <ProcedureSpecialties id="pcx-spec" isGeneral={spec.isGeneral} specialtyIds={spec.specialtyIds} canAdd onChange={setSpec} />
         {err && <p className="error">{err}</p>}
         <div className="bf-actions inv-actions">
@@ -132,7 +214,8 @@ export default function ProcedureDialog({ proc, canEdit, canHistory, seesConsuma
         <div className="pcx-more">
           <h4>أدوات أخرى</h4>
           <div className="pcx-more-btns">
-            {proc.is_active && <button type="button" className="ghost" disabled={busy} onClick={onDistribute}>تطبيق قاعدة على دكاترة</button>}
+            {/* قواعد الدكاترة لا تدخل الإجراءات بعد القلبة — التقسيم أعلاه وحده */}
+            {proc.is_active && !feeMode && <button type="button" className="ghost" disabled={busy} onClick={onDistribute}>تطبيق قاعدة على دكاترة</button>}
             {canHistory && <button type="button" className="ghost" disabled={busy} onClick={onHistory}>تاريخ التسعيرة</button>}
             <button type="button" className={`ghost${proc.is_active ? ' refx-danger' : ''}`} disabled={busy} onClick={onToggle}>
               {proc.is_active ? 'تعطيل الإجراء' : 'تفعيل الإجراء'}</button>

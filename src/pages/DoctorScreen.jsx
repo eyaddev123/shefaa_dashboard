@@ -11,6 +11,8 @@ import { ReturnState } from '../waiting-return-ui.jsx'
 import BottomSheet from '../components/BottomSheet.jsx'
 import { ProcedureOnlyBadge } from '../components/ProcedureOnly.jsx'
 import MaterialsEditor, { qtyValid, toPayload, materialsValue } from '../components/MaterialsEditor.jsx'
+import { useFeeMode } from '../fee-mode.js'
+import ConsumablesCounter, { CONSUMABLES_HINT } from '../components/ConsumablesCounter.jsx'
 import {
   ringDoctor, primeOnFirstGesture, onAudioState, audioReady, unlockAudio,
   shouldOfferPush, dismissPushOffer, enablePush, refreshPush,
@@ -66,7 +68,13 @@ function AddedProcedures({ added = [], pending = [] }) {
 // الأسعار (طلب المستخدم 2026-11-16): سعر كلّ إجراءٍ تحت اسمه، وسعر **البيع** لكلّ مادة ومبلغ سطرها،
 // وتحت المختار مجموعٌ: «على المريض» = مجموع أسعار الإجراءات (ما يدفعه فعلاً)، و«المواد بسعر البيع»
 // سطرٌ وحده — المواد تُخصم من سعر الإجراء داخلياً ولا تُضاف على المريض، فجمعها معه كان يكذب.
+// ★ بعد قلبة «أجرة + مواد» (2026-11-17): السعر أجرة الإيد، والمستهلكات والمواد **فوقها** على المريض —
+//   فـ«على المريض» = الأجور + المستهلكات + المواد، وتحته تفصيله.
 function AddProcedureSheet({ appt, catalog, usage, matCatalog, loadMaterials, draft, setDraft, onConfirm, onClose }) {
+  const { since: feeMode } = useFeeMode()
+  // المواد تُحمَّل مع فتح الورقة: قائمتها المنسدلة تظهر فوراً تحت كلّ إجراءٍ مختار (طلب المستخدم 2026-11-17:
+  // «المواد على كبسة ما طلعت واضحة — تطلع فوراً dropdown مع بحث»؛ كانت خلف زرّ «+ مواد»)
+  useEffect(() => { loadMaterials() }, [])
   const taken = new Set((appt.procedures || []).filter((l) => !l.removed_at).map((l) => String(l.procedure_id)))
   // الأكثر استعمالاً عنده أوّلاً (آخر ٩٠ يوماً)، ثمّ أبجدياً
   const items = (catalog || []).filter((p) => p.is_active)
@@ -77,11 +85,14 @@ function AddProcedureSheet({ appt, catalog, usage, matCatalog, loadMaterials, dr
     selected: d.selected.map((x) => (String(x.id) === String(id) ? { ...x, ...patch } : x)) }))
   const toggle = (p) => setDraft((d) => ({ ...d, errorId: null, error: null,
     selected: isOn(p.id) ? d.selected.filter((x) => String(x.id) !== String(p.id))
-      : [...d.selected, { id: p.id, name: p.name, mats: [], open: false }] }))
+      : [...d.selected, { id: p.id, name: p.name, mats: [], cons: 0 }] }))
   const valid = sel.length > 0 && sel.every((x) => qtyValid(x.mats))
   const priceOf = (id) => Number((catalog || []).find((p) => String(p.id) === String(id))?.price || 0)
   const procTotal = sel.reduce((t, x) => t + priceOf(x.id), 0)
   const matTotal = sel.reduce((t, x) => t + materialsValue(x.mats, matCatalog), 0)
+  // عدّاد المستهلكات لكلّ إجراءٍ مختار (بعد القلبة) — تقديرٌ يضعه الدكتور
+  const consTotal = feeMode ? sel.reduce((t, x) => t + Number(x.cons || 0), 0) : 0
+  const onPatient = feeMode ? procTotal + consTotal + matTotal : procTotal
   return (
     <BottomSheet title={`إجراء لـ ${appt.full_name}`}
       subtitle="علّم الإجراءات ثمّ «إضافة» — وتبقى «بانتظار المحاسبة» حتى يدفع المريض"
@@ -90,8 +101,11 @@ function AddProcedureSheet({ appt, catalog, usage, matCatalog, loadMaterials, dr
         <>
           {sel.length > 0 && (
             <div className="dk-total" role="status">
-              <span>على المريض <strong>{fmtMoney(procTotal)}</strong></span>
-              {matTotal > 0 && <span className="dk-total-mats">المواد بسعر البيع {fmtMoney(matTotal)}</span>}
+              <span>على المريض <strong>{fmtMoney(onPatient)}</strong></span>
+              {feeMode
+                ? (consTotal + matTotal > 0 && <span className="dk-total-mats">
+                    الأجرة {fmtMoney(procTotal)}{consTotal > 0 && ` + مستهلكات ${fmtMoney(consTotal)}`}{matTotal > 0 && ` + مواد ${fmtMoney(matTotal)}`}</span>)
+                : matTotal > 0 && <span className="dk-total-mats">المواد بسعر البيع {fmtMoney(matTotal)}</span>}
             </div>
           )}
           <button type="button" className="dk-confirm" disabled={!valid} onClick={onConfirm}>
@@ -126,23 +140,21 @@ function AddProcedureSheet({ appt, catalog, usage, matCatalog, loadMaterials, dr
               <div className="dk-sel-row">
                 <span className="dk-sel-name">{x.name}</span>
                 <span className="dk-sel-price">{fmtMoney(priceOf(x.id))}</span>
-                <button type="button" className="ghost dk-sel-mats" aria-expanded={x.open}
-                  onClick={() => { update(x.id, { open: !x.open }); loadMaterials() }}>
-                  {x.open ? '− المواد' : `+ مواد${x.mats.length ? ` (${x.mats.length.toLocaleString('ar-SY-u-nu-latn')})` : ''}`}
-                </button>
               </div>
-              {x.open && (
-                <div className="dk-mats-body">
-                  {matCatalog == null ? <p className="empty">جارٍ التحميل…</p>
-                    // القائمة منسدلة: الكبسة تعرض المواد كلّها والكتابة تُرشّحها، ومع كلّ مادة سعر بيعها
-                    : <MaterialsEditor withPrice comboHint="المواد: المس لعرضها كلّها، أو اكتب اسم مادة…" catalog={matCatalog} value={x.mats} onChange={(mats) => update(x.id, { mats })} />}
-                  {!qtyValid(x.mats) && <p className="error">صحّح الكمّية (رقم أكبر من صفر).</p>}
-                </div>
+              <div className="dk-mats-body">
+                {matCatalog == null ? <p className="empty">جارٍ تحميل المواد…</p>
+                  // القائمة منسدلة ظاهرة دائماً: الكبسة تعرض المواد كلّها والكتابة تُرشّحها، ومع كلّ مادة سعر بيعها
+                  : <MaterialsEditor withPrice comboHint="المواد: اكتب اسم مادة للبحث، أو المس لعرضها كلّها…" catalog={matCatalog} value={x.mats} onChange={(mats) => update(x.id, { mats })} />}
+                {!qtyValid(x.mats) && <p className="error">صحّح الكمّية (رقم أكبر من صفر).</p>}
+              </div>
+              {feeMode && (
+                <ConsumablesCounter hint={false} value={x.cons || 0} onChange={(cons) => update(x.id, { cons })} />
               )}
             </li>
           ))}
         </ul>
       )}
+      {sel.length > 0 && feeMode && <p className="cons-hint">{CONSUMABLES_HINT}</p>}
     </BottomSheet>
   )
 }
@@ -364,7 +376,8 @@ export default function DoctorScreen() {
     setSheetFor(null)
     setAdding((a) => [...a, ...temps])
     try {
-      await api.clinic.addAppointmentProcedures(apptId, chosen.map((x) => ({ procedure_id: x.id, materials: toPayload(x.mats) })))
+      await api.clinic.addAppointmentProcedures(apptId, chosen.map((x) => ({ procedure_id: x.id, materials: toPayload(x.mats),
+        ...(x.cons ? { consumables: x.cons } : {}) })))
       setDraft(emptyDraft)
       showToast(chosen.length === 1 ? `أُضيف «${chosen[0].name}» — بانتظار المحاسبة`
         : `أُضيفت ${chosen.length.toLocaleString('ar-SY-u-nu-latn')} إجراءات — بانتظار المحاسبة`, 'success', 3500)

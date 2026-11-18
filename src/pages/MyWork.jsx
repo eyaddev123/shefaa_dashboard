@@ -4,6 +4,7 @@ import { useDialogs } from '../dialogs.jsx'
 import { useToast } from '../action-feedback.jsx'
 import { fmtDuration, fmtMinutes, clockTitle } from '../components/Punctuality.jsx'
 import { partLines, partsOf } from '../pay-parts.js'
+import { useFeeMode } from '../fee-mode.js'
 
 // ═══════════════════════════════════════════════════════════════════
 // «أعمالي» — أرقام الطبيب عن نفسه (doctor-pages-redesign، 2026-11-15)
@@ -281,6 +282,8 @@ export default function MyWorkPage() {
   }
 
   const withProcedures = profile?.has_procedures !== false || (mine?.lines || []).length > 0
+  // «كيف تُحسب حصّتي» تشرح قواعد الطريقة القديمة — بعد «أجرة + مواد» لا تنطبق فتُخفى
+  const { since: feeMode, loading: feeLoading } = useFeeMode()
   const work = W.data && W.data.period === period ? W.data : null
   const punct = P.data && P.data.period === pp ? P.data : null
   // الراتب المعروض يطابق الفترة: «الشهر الماضي» شهرُه، وغيره الشهر الجاري
@@ -311,7 +314,7 @@ export default function MyWorkPage() {
         <DuesCard work={work} sal={sal} salErr={S.err} withProcedures={withProcedures} pending={pending} onRemove={remove} />
       )}
       {P.err ? failed(P.err) : punct && range && <DutyCard punct={punct} sal={sal} period={period} from={range.from} to={range.to} />}
-      {withProcedures && <ShareRule />}
+      {withProcedures && !feeMode && !feeLoading && <ShareRule />}
     </div>
   )
 }

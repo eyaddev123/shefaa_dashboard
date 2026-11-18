@@ -4,6 +4,7 @@ import { useParams, Link } from 'react-router-dom'
 import { api, WEEKDAYS, fmtMoney, fmtTime, fmtDateTime } from '../api.js'
 import { useRole } from '../RoleContext.jsx'
 import DoctorShareRules from '../components/DoctorShareRules.jsx'
+import { useFeeMode } from '../fee-mode.js'
 import DoctorPayCard from '../components/DoctorPayCard.jsx'
 import { canSeeClinicFunds, canWriteClinicFunds, canSeeDoctorDashboard } from '../permissions.js'
 import { useToast } from '../action-feedback.jsx'
@@ -292,6 +293,8 @@ export default function DoctorProfile() {
       .catch(() => {})
   }, [])
 
+  // قبل أيّ return مبكّر — ترتيب الـ hooks ثابت في كلّ رسم
+  const { since: feeMode, loading: feeLoading } = useFeeMode()
   if (err) return <p className="error">{err}</p>
   if (!doctor) return <p className="empty">جارٍ التحميل…</p>
 
@@ -299,7 +302,9 @@ export default function DoctorProfile() {
   const weekDays = new Set(active.map((x) => x.weekday)).size
   const weekMinutes = active.reduce((t, x) => t + (x.repeat_weeks === 2 ? shiftMinutes(x) / 2 : shiftMinutes(x)), 0)
   const canPay = canSeeClinicFunds(role)
-  const canShares = SHARE_VIEWERS.includes(role)
+  // بعد قلبة «أجرة + مواد» حصّة الدكتور على الإجراء نفسه — بطاقة قواعده بلا معنى فتُزال كلّها
+  // (طلب المستخدم 2026-11-18: «إذا وجودها بلا معنى شيلها»)؛ والخادم يرفض الكتابة عليها (409)
+  const canShares = SHARE_VIEWERS.includes(role) && !feeMode && !feeLoading
   const sections = [
     ['pf-info', 'المعلومات'], ['pf-sched', 'الدوام'],
     ...(canShares ? [['pf-shares', 'الحصص']] : []), ...(canPay ? [['pf-pay', 'الراتب']] : []),
