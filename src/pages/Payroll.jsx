@@ -5,7 +5,6 @@ import { useRole } from '../RoleContext.jsx'
 import { useToast } from '../action-feedback.jsx'
 import { PeriodBar } from './DoctorAccounts.jsx'
 import ProcedureEarnings from './ProcedureEarnings.jsx'
-import StatementSheet from '../components/payroll/StatementSheet.jsx'
 
 // ═══ الرواتب والأجور (طلب المستخدم 2026-11-18) ═══
 // «صفحة مالية مخصّصة: رواتب الدكتور وأجوره وأجوره من الإجراءات» — و«المستحقات» خرجت من صفحة الإجراءات
@@ -51,6 +50,109 @@ function usePeriod() {
   return { params, setParams, mode, month, from, to, query, set }
 }
 
+// ═══ الكشف في الصفحة: بطاقاتٌ وجداول بسمة النظام (لا ورقة A4 مرسومة — طلب المستخدم 2026-11-18:
+// «بدي يعرضلي إياه جداول عادية بنفس ثيم المشروع»). الورقة البيضاء بمكان التوقيع للـ PDF وحده.
+// جدول المرضى واحدٌ بالتاريخ (قراره)، وعلى الجوال كلّ سطرٍ بطاقة (table.rtable).
+const dayOf = (d) => fmtDay(`${d}T12:00:00Z`, { utc: true })
+function StatementBody({ st }) {
+  const d = st.doctor, c = st.counts
+  const rounded = st.payable !== null && st.payable !== undefined && d.due !== null && st.payable !== d.due
+  return (
+    <>
+      <div className="dr-summary pr-stats">
+        <div className="dr-stat">
+          <span className="dr-stat-lbl">المستحقّ للطبيب</span>
+          <strong className="dr-stat-val">{st.payable === null || st.payable === undefined ? '—' : fmtMoney(st.payable)}</strong>
+          <span className="dr-stat-sub">{rounded ? `قبل التقريب لأقرب 5: ${fmtMoney(d.due)}` : (st.payKindLabel || 'بلا طريقة حساب')}</span>
+        </div>
+        <div className="dr-stat">
+          <span className="dr-stat-lbl">الدوام</span>
+          <strong className="dr-stat-val">{n(d.attendance.days)} يوم</strong>
+          <span className="dr-stat-sub">{d.attendance.minutes ? `${hm(d.attendance.minutes)} ساعة` : 'لا ساعات مسجّلة'}</span>
+        </div>
+        <div className="dr-stat">
+          <span className="dr-stat-lbl">المرضى</span>
+          <strong className="dr-stat-val">{n(c.visits)}</strong>
+          <span className="dr-stat-sub">معاينة {n(c.consultation)} · مراجعة {n(c.followup)}{c.procedureOnly ? ` · إجراء فقط ${n(c.procedureOnly)}` : ''}</span>
+        </div>
+        <div className="dr-stat">
+          <span className="dr-stat-lbl">من الإجراءات</span>
+          <strong className="dr-stat-val">{fmtMoney(d.procDoctor)}</strong>
+          <span className="dr-stat-sub">{n(c.procedures)} إجراء{d.ironCount ? ` · حديد ${fmtMoney(d.ironDoctor)}` : ''}</span>
+        </div>
+      </div>
+
+      <section className="card pr-section">
+        <h3>الحساب</h3>
+        <dl className="pcx-facts">
+          {st.payLines.map((l, i) => <div key={i}><dt>{l.label}</dt><dd>{fmtMoney(l.amount)}</dd></div>)}
+          {rounded && <div className="pr-calc-sub"><dt>المجموع قبل التقريب</dt><dd>{fmtMoney(d.due)}</dd></div>}
+          <div className="pr-calc-total"><dt>المستحقّ للطبيب</dt><dd>{st.payable === null || st.payable === undefined ? '—' : fmtMoney(st.payable)}</dd></div>
+        </dl>
+      </section>
+
+      <section className="card pr-section">
+        <h3>المرضى ({n(c.visits)})</h3>
+        {st.visits.length === 0 ? <p className="empty">لا زيارات في هذه الفترة.</p> : (
+          <table className="rtable pr-table">
+            <thead><tr><th>التاريخ</th><th>المريض</th><th>الزيارة</th><th>الإجراءات</th><th className="num">للطبيب</th></tr></thead>
+            <tbody>
+              {st.visits.map((v) => (
+                <tr key={v.id}>
+                  <td data-label="التاريخ" className="pr-nowrap">{dayOf(v.date)}</td>
+                  <td className="rt-title">{v.patient}</td>
+                  <td data-label="الزيارة">{v.visitType}{!v.inRange && <span className="muted"> (قبل الفترة)</span>}</td>
+                  <td data-label="الإجراءات">{v.procedures.length === 0 ? <span className="muted">—</span> : v.procedures.map((p, k) => (
+                    <span key={k} className={p.paid ? undefined : 'muted'}>{k > 0 && '، '}{p.name}{!p.paid && ' (بانتظار المحاسبة)'}</span>))}</td>
+                  <td data-label="للطبيب" className="num">{v.procShare ? fmtMoney(v.procShare) : <span className="muted">—</span>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
+
+      {st.shifts.length > 0 && (
+        <section className="card pr-section">
+          <h3>أيام الدوام ({n(d.attendance.days)})</h3>
+          <table className="rtable pr-table">
+            <thead><tr><th>التاريخ</th><th>الوصول</th><th>الانصراف</th><th className="num">الساعات</th></tr></thead>
+            <tbody>
+              {st.shifts.map((x, i) => (
+                <tr key={i}>
+                  <td className="rt-title">{dayOf(x.date)}</td>
+                  <td data-label="الوصول">{x.arrived}</td>
+                  <td data-label="الانصراف">{x.departed || <span className="muted">لم يُسجَّل</span>}</td>
+                  <td data-label="الساعات" className="num">{x.minutes === null ? '—' : hm(x.minutes)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
+
+      {st.iron.length > 0 && (
+        <section className="card pr-section">
+          <h3>جلسات الحديد ({n(st.iron.length)})</h3>
+          <table className="rtable pr-table">
+            <thead><tr><th>التاريخ</th><th>المريض</th><th>الجلسة</th><th className="num">للطبيب</th></tr></thead>
+            <tbody>
+              {st.iron.map((x, i) => (
+                <tr key={i}>
+                  <td data-label="التاريخ" className="pr-nowrap">{dayOf(x.date)}</td>
+                  <td className="rt-title">{x.patient}</td>
+                  <td data-label="الجلسة">{x.withDrug ? 'مع الدواء' : 'بلا دواء'}</td>
+                  <td data-label="للطبيب" className="num">{fmtMoney(x.share)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
+    </>
+  )
+}
+
 function StatementView({ doctorId, query, onBack, showToast }) {
   const [st, setSt] = useState(null)
   const [err, setErr] = useState(null)
@@ -88,7 +190,7 @@ function StatementView({ doctorId, query, onBack, showToast }) {
           </ul>
         </div>
       )}
-      <div className="pay-paper"><StatementSheet st={st} /></div>
+      <StatementBody st={st} />
     </div>
   )
 }
