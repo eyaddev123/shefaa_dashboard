@@ -78,9 +78,13 @@ function StatusMenu({ appt, data, onChanged, onToast, onArrived }) {
   const options = Object.entries(APPOINTMENT_STATUSES).filter(([k]) => k !== WAITING_RETURN)
   return (
     <span className="vs-menu">
-      <button type="button" className="vs-trigger" aria-haspopup="menu" aria-expanded={open} disabled={busy}
-        title="تغيير الحالة" onClick={() => setOpen((v) => !v)}>
-        <StatusCell appt={appt} offset={serverOffsetOf(data)} /><span className="vs-chev" aria-hidden="true">▾</span>
+      {/* زرٌّ واضح (2026-11-18: الاستقبال تغيّر الحالة كثيراً — «انتهى، قيد الكشف، بانتظار»): الحالة الحالية
+          بنقطتها ثمّ «تغيير ▾»، بإطارٍ وارتفاع لمسٍ كامل */}
+      <button type="button" className={`vs-trigger is-${appt.status}`} aria-haspopup="menu" aria-expanded={open} disabled={busy}
+        onClick={() => setOpen((v) => !v)}>
+        <span className="vs-dot" aria-hidden="true" />
+        <span className="vs-cur">{APPOINTMENT_STATUSES[appt.status] || appt.status}</span>
+        <span className="vs-change">{busy ? '…' : 'تغيير'} <span aria-hidden="true">▾</span></span>
       </button>
       {open && (
         <>
@@ -88,8 +92,13 @@ function StatusMenu({ appt, data, onChanged, onToast, onArrived }) {
           <span className="vs-panel" role="menu">
             <span className="vs-title">تغيير الحالة إلى…</span>
             {options.map(([k, label]) => (
-              <button key={k} type="button" role="menuitem" className={`vs-item${k === appt.status ? ' is-on' : ''}${['cancelled', 'no_show'].includes(k) ? ' is-danger' : ''}`}
-                onClick={() => choose(k)}>{label}{k === appt.status && ' ✓'}</button>
+              <Fragment key={k}>
+                {k === 'no_show' && <span className="vs-sep" />}
+                <button type="button" role="menuitem" className={`vs-item is-${k}${k === appt.status ? ' is-on' : ''}`}
+                  onClick={() => choose(k)}>
+                  <span className="vs-dot" aria-hidden="true" />{label}{k === appt.status && <span className="vs-now">الحالية</span>}
+                </button>
+              </Fragment>
             ))}
           </span>
         </>
@@ -242,7 +251,6 @@ function PatientCard({ appt, session, onChanged, onToast, onArrived }) {
   const { clinicRole: role } = useRole()
   const [busy, setBusy] = useState(false)
   const [editingForm, setEditingForm] = useState(false)
-  const [swap, setSwap] = useState(false)
 
   const base = () => ({
     full_name: appt.full_name || '', mobile: appt.mobile || '',
@@ -430,13 +438,7 @@ function PatientCard({ appt, session, onChanged, onToast, onArrived }) {
         </p>
       )}
 
-      {editable && !fieldsFrozen && (
-        <div className="ad-links">
-          <button className="link-btn" onClick={() => setSwap((v) => !v)}>تغيير المريض</button>
-        </div>
-      )}
-      {swap && <SwapPatient appt={appt} onToast={onToast}
-        onDone={() => { setSwap(false); onChanged() }} onCancel={() => setSwap(false)} />}
+      {/* «تغيير المريض» أُزيل بطلب المستخدم (2026-11-18: «ما بديها فكرة تغيير المريض أصلاً») */}
     </section>
   )
 }
