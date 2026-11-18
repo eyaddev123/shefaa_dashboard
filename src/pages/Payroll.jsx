@@ -5,6 +5,7 @@ import { useRole } from '../RoleContext.jsx'
 import { useToast } from '../action-feedback.jsx'
 import { PeriodBar } from './DoctorAccounts.jsx'
 import ProcedureEarnings from './ProcedureEarnings.jsx'
+import { matchesAr } from '../arabic-search.js'
 
 // ═══ الرواتب والأجور (طلب المستخدم 2026-11-18) ═══
 // «صفحة مالية مخصّصة: رواتب الدكتور وأجوره وأجوره من الإجراءات» — و«المستحقات» خرجت من صفحة الإجراءات
@@ -202,6 +203,9 @@ function StatementsTab({ showToast }) {
   const [err, setErr] = useState(null)
   const [busy, setBusy] = useState(false)
   const [showIdle, setShowIdle] = useState(false)
+  // البحث بالاسم أو الاختصاص («ال» والهمزات لا تفرق — matchesAr)، والترتيب (طلب المستخدم 2026-11-18)
+  const [q, setQ] = useState('')
+  const [sort, setSort] = useState('due')
   const key = JSON.stringify(query)
   useEffect(() => {
     let live = true
@@ -214,11 +218,15 @@ function StatementsTab({ showToast }) {
     if (id) next.set('doctor', id); else next.delete('doctor')
     setParams(next)
   }
-  const { active, idle } = useMemo(() => {
+  const { active, idle, shown } = useMemo(() => {
     const ds = data?.doctors || []
-    return { active: ds.filter(activityOf).sort((a, b) => (b.due ?? 0) - (a.due ?? 0) || a.doctor.localeCompare(b.doctor, 'ar')),
-      idle: ds.filter((d) => !activityOf(d)) }
-  }, [data])
+    const act = ds.filter(activityOf).sort(sort === 'name'
+      ? (a, b) => a.doctor.localeCompare(b.doctor, 'ar')
+      : (a, b) => (b.payable ?? b.due ?? 0) - (a.payable ?? a.due ?? 0) || a.doctor.localeCompare(b.doctor, 'ar'))
+    const needle = q.trim()
+    return { active: act, idle: ds.filter((d) => !activityOf(d)),
+      shown: needle ? act.filter((d) => matchesAr(d.doctor, needle) || matchesAr(d.specialty || '', needle)) : act }
+  }, [data, q, sort])
   const period = data ? (data.from === data.to ? fmtDay(`${data.from}T12:00:00Z`, { utc: true })
     : `من ${fmtDay(`${data.from}T12:00:00Z`, { utc: true })} إلى ${fmtDay(`${data.to}T12:00:00Z`, { utc: true })}`) : ''
   const allPdf = async () => {
@@ -238,8 +246,13 @@ function StatementsTab({ showToast }) {
         <StatementView doctorId={doctorId} query={query} onBack={() => openDoctor(null)} showToast={showToast} />
       ) : err ? <p className="error">{err}</p> : !data ? <p className="empty">جارٍ التحميل…</p> : (
         <>
+          {/* المجموع سطرٌ واحد نحيف، والأزرار على السطر نفسه */}
           <div className="pr-summary">
-            <div><span>المستحقّ لكلّ الدكاترة</span><strong>{fmtMoney(data.totals.payable ?? data.totals.due)}</strong><em>{period}</em></div>
+            <div className="pr-sum-text">
+              <span>المستحقّ لكلّ الدكاترة</span>
+              <strong>{fmtMoney(data.totals.payable ?? data.totals.due)}</strong>
+              <em>{n(active.length)} {active.length === 1 ? 'دكتور' : 'دكاترة'} · {period}</em>
+            </div>
             <div className="pr-toolbar-end">
               <button type="button" className="ghost" disabled={busy || !active.length}
                 onClick={() => api.clinic.exportPayroll(query).catch((e) => showToast(e.message))}>Excel للكلّ</button>
@@ -249,24 +262,43 @@ function StatementsTab({ showToast }) {
           </div>
           {data.noPay > 0 && <p className="pr-note">{n(data.noPay)} من الدكاترة بلا طريقة حساب — راتبهم صفر حتى تُضبط من البروفايل.</p>}
           {active.length === 0 ? <p className="empty">لا نشاط لأيّ دكتور في هذه الفترة.</p> : (
-            <ul className="pr-list">
-              {active.map((d) => (
-                <li key={d.doctorId}>
-                  <button type="button" className="pr-card" onClick={() => openDoctor(d.doctorId)}>
-                    <span className="pr-name">{d.doctor}{d.specialty && <small> — {d.specialty}</small>}</span>
-                    <span className="pr-facts">
-                      {d.attendance.days > 0 && <span>{n(d.attendance.days)} يوم دوام{d.attendance.minutes > 0 && ` · ${hm(d.attendance.minutes)} ساعة`}</span>}
-                      <span>{n(d.patients)} مريض</span>
-                      {d.procedures > 0 && <span>{n(d.procedures)} إجراء</span>}
-                      {d.ironCount > 0 && <span>{n(d.ironCount)} حديد</span>}
-                      {d.noPay && <span className="pr-flag">بلا طريقة حساب</span>}
-                    </span>
-                    <span className="pr-due">{d.payable === null || d.payable === undefined ? '—' : fmtMoney(d.payable)}</span>
-                    <span className="pr-open">الكشف ←</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
+            <>
+              <div className="pr-bar">
+                <input type="search" className="pr-search" value={q} placeholder="ابحث عن دكتور بالاسم أو الاختصاص"
+                  aria-label="بحث عن دكتور" onChange={(e) => setQ(e.target.value)} />
+                <div className="pcx-sort" role="group" aria-label="الترتيب">
+                  {[['due', 'الأعلى مستحقاً'], ['name', 'أبجدياً']].map(([k, label]) => (
+                    <button key={k} type="button" aria-pressed={sort === k} className={`rev-flag${sort === k ? ' is-on' : ''}`}
+                      onClick={() => setSort(k)}>{label}</button>
+                  ))}
+                </div>
+              </div>
+              {shown.length === 0 ? <p className="empty">لا دكتور يطابق «{q.trim()}».</p> : (
+                // جدول مرتّب (قرار المستخدم): سطرٌ لكلّ دكتور، والسطر كلّه يفتح الكشف؛ على الجوال كلّ سطرٍ بطاقة
+                <table className="rtable pr-doctors">
+                  <thead><tr><th>الطبيب</th><th>الدوام</th><th className="num">المرضى</th><th className="num">الإجراءات</th><th className="num">المستحقّ</th><th aria-hidden="true" /></tr></thead>
+                  <tbody>
+                    {shown.map((d) => (
+                      <tr key={d.doctorId} className="pr-row" onClick={() => openDoctor(d.doctorId)}>
+                        <td className="rt-title">
+                          <button type="button" className="pr-row-name" onClick={(e) => { e.stopPropagation(); openDoctor(d.doctorId) }}>
+                            {d.doctor}</button>
+                          {d.specialty && <small className="pr-spec">{d.specialty}</small>}
+                          {d.noPay && <small className="pr-flag"> · بلا طريقة حساب</small>}
+                        </td>
+                        <td data-label="الدوام">{d.attendance.days > 0
+                          ? <>{n(d.attendance.days)} {d.attendance.days === 1 ? 'يوم' : 'أيام'}{d.attendance.minutes > 0 && <span className="muted"> · {hm(d.attendance.minutes)}</span>}</>
+                          : <span className="muted">—</span>}</td>
+                        <td data-label="المرضى" className="num">{n(d.patients)}</td>
+                        <td data-label="الإجراءات" className="num">{d.procedures ? n(d.procedures) : <span className="muted">—</span>}</td>
+                        <td data-label="المستحقّ" className="num pr-due">{d.payable === null || d.payable === undefined ? '—' : fmtMoney(d.payable)}</td>
+                        <td className="pr-chev" aria-hidden="true">‹</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </>
           )}
           {idle.length > 0 && (
             <div className="pr-idle">
