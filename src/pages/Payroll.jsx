@@ -137,7 +137,7 @@ function StatementsTab({ showToast }) {
       ) : err ? <p className="error">{err}</p> : !data ? <p className="empty">جارٍ التحميل…</p> : (
         <>
           <div className="pr-summary">
-            <div><span>المستحقّ لكلّ الدكاترة</span><strong>{fmtMoney(data.totals.due)}</strong><em>{period}</em></div>
+            <div><span>المستحقّ لكلّ الدكاترة</span><strong>{fmtMoney(data.totals.payable ?? data.totals.due)}</strong><em>{period}</em></div>
             <div className="pr-toolbar-end">
               <button type="button" className="ghost" disabled={busy || !active.length}
                 onClick={() => api.clinic.exportPayroll(query).catch((e) => showToast(e.message))}>Excel للكلّ</button>
@@ -159,7 +159,7 @@ function StatementsTab({ showToast }) {
                       {d.ironCount > 0 && <span>{n(d.ironCount)} حديد</span>}
                       {d.noPay && <span className="pr-flag">بلا طريقة حساب</span>}
                     </span>
-                    <span className="pr-due">{d.due === null ? '—' : fmtMoney(d.due)}</span>
+                    <span className="pr-due">{d.payable === null || d.payable === undefined ? '—' : fmtMoney(d.payable)}</span>
                     <span className="pr-open">الكشف ←</span>
                   </button>
                 </li>

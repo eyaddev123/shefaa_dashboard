@@ -92,7 +92,11 @@ export default function StatementSheet({ st, printedAt }) {
             <div key={i}><dt>{l.label}</dt><dd>{fmtMoney(l.amount)}</dd></div>
           ))}
         </dl>
-        <div className="pay-due"><span>المستحقّ للطبيب</span><strong>{d.due === null ? '—' : fmtMoney(d.due)}</strong></div>
+        {/* ما يُسلَّم: بلا كسور، مجبوراً لفوق لأقرب 5 (طلب المستخدم 2026-11-18) — والمجموع قبله سطرٌ صغير إن اختلف */}
+        <div className="pay-due"><span>المستحقّ للطبيب</span><strong>{st.payable === null || st.payable === undefined ? '—' : fmtMoney(st.payable)}</strong></div>
+        {st.payable !== null && st.payable !== undefined && d.due !== null && st.payable !== d.due && (
+          <p className="pay-preround">قبل التقريب لأقرب 5: {fmtMoney(d.due)}</p>
+        )}
         {(st.warnings.pendingProcedures > 0 || st.warnings.noDeparture > 0) && (
           <p className="pay-note">
             {st.warnings.pendingProcedures > 0 && `${n(st.warnings.pendingProcedures)} إجراء بانتظار المحاسبة لا يدخل المجموع. `}
