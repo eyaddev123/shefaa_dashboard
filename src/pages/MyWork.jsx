@@ -155,9 +155,17 @@ function DuesCard({ work, sal, salErr, withProcedures, pending, onRemove }) {
 
 // ═══ ٣) كيف دوامي ═══
 // جملةٌ ثمّ جدول أيامٍ واحد: من «التزامي» (الحالة والتأخير) ومن «راتبي» (الانصراف والمدّة) بالتاريخ.
+// التأخير بالساعات والدقائق (طلب المستخدم 2026-11-18: «التأخير يكون ساعة و40 دقيقة»): 46 ⇒ «46 دقيقة»،
+// 100 ⇒ «ساعة و40 دقيقة»، 628 ⇒ «10 ساعات و28 دقيقة». المدّة تبقى مختصرة (fmtDuration) بقراره.
+const hoursWord = (h) => (h === 1 ? 'ساعة' : h === 2 ? 'ساعتين' : `${n(h)} ${h >= 3 && h <= 10 ? 'ساعات' : 'ساعة'}`)
+const minsWord = (m) => (m === 1 ? 'دقيقة' : m === 2 ? 'دقيقتين' : `${n(m)} ${m >= 3 && m <= 10 ? 'دقائق' : 'دقيقة'}`)
+export const lateText = (min) => {
+  const t = Math.max(0, Math.round(Number(min) || 0)), h = Math.floor(t / 60), m = t % 60
+  return h === 0 ? minsWord(m) : m === 0 ? hoursWord(h) : `${hoursWord(h)} و${minsWord(m)}`
+}
 const STATE = {
   on_time: () => 'بالوقت',
-  late: (d) => `متأخّر ${fmtMinutes(d.late)}`,
+  late: (d) => `متأخّر ${lateText(d.late)}`,
   absent: () => 'لم يحضر',
   estimated: () => 'بلا تسجيل وصول',
   pending: () => 'لم يصل بعد',
@@ -176,7 +184,7 @@ function DutyCard({ punct, sal, mode, from, to }) {
     sentence = !d ? `لا دوام لك ${w}.`
       : d.status === 'pending' ? `دوامك اليوم يبدأ ${d.start}، ولم يُسجَّل وصولك بعد.`
       : d.status === 'on_time' ? `وصلتَ ${w} ${d.arrival} — بالوقت.`
-      : d.status === 'late' ? `وصلتَ ${w} ${d.arrival} — بعد بداية الدوام بـ${fmtMinutes(d.late)}.`
+      : d.status === 'late' ? `وصلتَ ${w} ${d.arrival} — بعد بداية الدوام بـ${lateText(d.late)}.`
       : d.status === 'absent' ? `لم يُسجَّل حضورك ${w}.`
       : d.arrival ? `وصلتَ ${w} ${d.arrival}.` : `لم يُسجَّل وصولك ${w}.`
   } else {
@@ -191,35 +199,39 @@ function DutyCard({ punct, sal, mode, from, to }) {
     const punctual = p.appointmentsBased ? ' — وأنت «بمواعيد خاصة» فلا يُحسب عليك تأخير.'
       : att === 0 ? '.'
       : lateDays.length === 0 ? '، ووصلتَ بالوقت فيها كلّها.'
-      : onTime === 0 ? <>، وتأخّرتَ فيها كلّها بمتوسّط {fmtMinutes(lateAvg)}.</>
-      : <>، وصلتَ بالوقت في {count(onTime, DAYS)} وتأخّرتَ {count(lateDays.length, DAYS)} بمتوسّط {fmtMinutes(lateAvg)}.</>
+      : onTime === 0 ? <>، وتأخّرتَ فيها كلّها بمتوسّط {lateText(lateAvg)}.</>
+      : <>، وصلتَ بالوقت في {count(onTime, DAYS)} وتأخّرتَ {count(lateDays.length, DAYS)} بمتوسّط {lateText(lateAvg)}.</>
     sentence = sched === 0 ? 'لا أيام دوام في هذه الفترة.' : <>{attended}{punctual}</>
   }
   return (
     <section className="card dw-card" aria-label="دوامي">
       <h3 className="dw-h">دوامي</h3>
       <p className="dw-sentence">{sentence}</p>
+      {/* كلّ يومٍ سطران (طلب المستخدم 2026-11-18، بدل كرتٍ بأربع خاناتٍ معنونة): اليوم والحالة بلونها،
+          ثمّ الوصول والانصراف والمدّة بخطٍّ صغير */}
       {days.length > 0 && mode !== 'day' && (
-        <table className="rtable dw-days">
-          <thead><tr><th>اليوم</th><th>الوصول</th><th>الانصراف</th><th>المدّة</th><th>الحالة</th></tr></thead>
-          <tbody>
-            {days.map((d) => {
-              const t = times.get(d.date)
-              return (
-                <tr key={d.date}>
-                  <td className="rt-title">{dayName(d.date)}</td>
-                  <td className="num" data-label="الوصول" dir="ltr">{d.arrival || '—'}</td>
-                  <td className="num" data-label="الانصراف" dir="ltr">{t?.departed || '—'}</td>
-                  <td className="num" data-label="المدّة">{t?.minutes == null ? '—' : fmtDuration(t.minutes)}</td>
-                  <td data-label="الحالة" className={`dw-state is-${d.status}`}>
-                    {(STATE[d.status] || (() => d.status))(d)}
-                    {t?.state === 'no_departure' && <small>، انصراف غير مسجَّل</small>}
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+        <ul className="dw-days">
+          {days.map((d) => {
+            const t = times.get(d.date)
+            const arrival = d.arrival || t?.arrived
+            return (
+              <li key={d.date} className={`dw-day is-${d.status}`}>
+                <div className="dw-day-top">
+                  <strong>{dayName(d.date)}</strong>
+                  <span className={`dw-state is-${d.status}`}>{(STATE[d.status] || (() => d.status))(d)}</span>
+                </div>
+                <div className="dw-day-sub">
+                  {!arrival ? 'لا وصول مسجَّل' : <>
+                    وصول <bdi dir="ltr">{arrival}</bdi>
+                    {t?.departed ? <>، انصراف <bdi dir="ltr">{t.departed}</bdi></>
+                      : t?.state === 'no_departure' ? <>، <span className="dw-warn-text">انصراف غير مسجَّل</span></> : null}
+                    {t?.minutes != null && <>، {fmtDuration(t.minutes)}</>}
+                  </>}
+                </div>
+              </li>
+            )
+          })}
+        </ul>
       )}
       <p className="dw-note">{p.appointmentsBased
         ? 'يُسجَّل وصولك بكبسة «وصل الطبيب» عند الاستقبال ليُحسب يوم حضورك.'
