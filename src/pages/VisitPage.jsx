@@ -25,8 +25,26 @@ import MaterialsEditor, { qtyValid, toPayload, fmtQty, materialsSummary, materia
 import { useFeeMode } from '../fee-mode.js'
 import ConsumablesCounter from '../components/ConsumablesCounter.jsx'
 import RoomBadge from '../components/RoomBadge.jsx'
+import Combobox from '../components/Combobox.jsx'
 import VisitTimeline from '../components/VisitTimeline.jsx'
 import { MissingBadge, StatusCell, VisitActions, missingOf, priorityBadge, useVisitActions } from './SessionQueue.jsx'
+
+// ═══ اختيارٌ بأزرارٍ جنب بعض — للقوائم القصيرة (طلب المستخدم 2026-11-18: «أزرار جنب بعض») ═══
+// كلّ الخيارات ظاهرة، وكبسةٌ واحدة تختار. options: [[value, label, disabled?]]
+function Choice({ label, value, options, onChange, disabled, hint }) {
+  return (
+    <div className="vf-field" role="radiogroup" aria-label={label}>
+      <span className="vf-label">{label}</span>
+      <div className="vf-seg">
+        {options.map(([v, l, off]) => (
+          <button key={v} type="button" role="radio" aria-checked={value === v} data-value={v}
+            className={value === v ? 'is-on' : ''} disabled={disabled || off} onClick={() => onChange(v)}>{l}</button>
+        ))}
+      </div>
+      {hint && <small className="hint">{hint}</small>}
+    </div>
+  )
+}
 
 // ═══ رأس الصفحة — ثابتٌ مع التمرير ═══
 // الرقم كبيراً (هو ما يُنادى به)، والاسم والحالة، والعيادة والدكتور، وأزرار الصفّ نفسها.
@@ -278,37 +296,26 @@ function PatientCard({ appt, session, onChanged, onToast, onArrived }) {
               <input value={form.full_name} onChange={set('full_name')} disabled={fieldsFrozen} /></label>
             <label>الموبايل
               <MobileInput value={form.mobile} onChange={(v) => setForm((f) => ({ ...f, mobile: v }))} disabled={fieldsFrozen} /></label>
-            <label>الجنس
-              <select value={form.gender} onChange={set('gender')} disabled={fieldsFrozen}>
-                <option value="">—</option><option value="male">ذكر</option><option value="female">أنثى</option>
-              </select></label>
             <label>سنة الميلاد
               <input value={form.birth_year} onChange={set('birth_year')} dir="ltr" disabled={fieldsFrozen} /></label>
-            <label>نوع الزيارة
-              <select value={form.visit_type} onChange={set('visit_type')} disabled={fieldsFrozen}>
-                {Object.entries(VISIT_TYPES).map(([k, v]) => (
-                  <option key={k} value={k} disabled={!!kindLock && crossesKind(k)}>
-                    {k === PROCEDURE_ONLY ? 'إجراء فقط (بلا كشفية)' : v}
-                  </option>
-                ))}
-              </select>
-              {kindLock && <small className="hint">{kindLock} — لا تغيير بين «عادية» و«إجراء فقط»</small>}
-            </label>
-            <label>الأولوية
-              <select value={form.priority} onChange={set('priority')} disabled={fieldsFrozen}>
-                <option value="normal">عادي</option><option value="urgent">إسعافي</option>
-                <option value="elderly">كبير بالعمر</option><option value="infant">رضيع</option>
-              </select></label>
-            <label>الحالة
-              <select value={form.status} onChange={set('status')}>
-                {/* «بانتظار العودة» لا يُختار من هنا (الطبيب وحده يُخرج مريضه) — يظهر خياراً
-                    فقط حين يكون هو الحالة الحالية، فتُقرأ القائمة صحيحة ويُخرَج منها */}
-                {Object.entries(APPOINTMENT_STATUSES)
-                  .filter(([k]) => k !== WAITING_RETURN || appt.status === WAITING_RETURN)
-                  .map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-              </select></label>
             <label className="ad-note">ملاحظة الحجز (اختيارية)
               <input value={form.reason} onChange={set('reason')} disabled={fieldsFrozen} /></label>
+          </div>
+          {/* القوائم القصيرة أزرارٌ جنب بعض (2026-11-18) */}
+          <div className="vf-choices">
+            <Choice label="الجنس" value={form.gender} disabled={fieldsFrozen}
+              options={[['male', 'ذكر'], ['female', 'أنثى']]} onChange={(v) => setForm((f) => ({ ...f, gender: v }))} />
+            <Choice label="نوع الزيارة" value={form.visit_type} disabled={fieldsFrozen}
+              options={Object.entries(VISIT_TYPES).map(([k, v]) => [k, k === PROCEDURE_ONLY ? 'إجراء فقط' : v, !!kindLock && crossesKind(k)])}
+              hint={kindLock ? `${kindLock} — لا تغيير بين «عادية» و«إجراء فقط»` : null}
+              onChange={(v) => setForm((f) => ({ ...f, visit_type: v }))} />
+            <Choice label="الأولوية" value={form.priority} disabled={fieldsFrozen}
+              options={[['normal', 'عادي'], ['urgent', 'إسعافي'], ['elderly', 'كبير بالعمر'], ['infant', 'رضيع']]}
+              onChange={(v) => setForm((f) => ({ ...f, priority: v }))} />
+            {/* «بانتظار العودة» لا يُختار من هنا (الطبيب وحده يُخرج مريضه) — يظهر فقط حين يكون الحالة الحالية */}
+            <Choice label="الحالة" value={form.status}
+              options={Object.entries(APPOINTMENT_STATUSES).filter(([k]) => k !== WAITING_RETURN || appt.status === WAITING_RETURN)}
+              onChange={(v) => setForm((f) => ({ ...f, status: v }))} />
           </div>
           <div className="ad-actions">
             <button disabled={busy || !hasChanges} onClick={save}>حفظ التعديلات</button>
@@ -947,22 +954,14 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
       {canEditAppointmentProcedures(role) && (
         canEdit ? (
           <div className="proc-add-box">
+            {/* منسدلةٌ مع بحث بثيم النظام (2026-11-18)، وبجانب كلّ إجراءٍ أجرته — والمواد تحته فوراً */}
             <div className="proc-add">
-              <select value={pick} onChange={(e) => { setPick(e.target.value); setAddErr(null); setNewCons(0) }} aria-label="الإجراء">
-                <option value="">{catalog === null ? 'جارٍ التحميل…' : choices.length ? '— اختر إجراءً —' : 'لا إجراءات متاحة'}</option>
-                {choices.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-              {/* السعر للقراءة فقط — من الكتالوج، ولا يُرسَل للخادم أصلاً. وبعد القلبة: المجموع مع المواد */}
-              <span className="proc-add-price">{chosen ? fmtMoney(feeMode ? chosenTotal : chosen.price) : '—'}</span>
-              <button disabled={!chosen || busy || !qtyValid(newMats)} onClick={add}>+ إجراء</button>
+              <Combobox id="visit-proc-pick" value={pick}
+                placeholder={catalog === null ? 'جارٍ التحميل…' : choices.length ? 'اختاري إجراءً… (اكتبي للبحث)' : 'لا إجراءات متاحة'}
+                emptyText="لا إجراءات متاحة"
+                options={choices.map((p) => ({ value: String(p.id), label: p.name, meta: fmtMoney(p.price) }))}
+                onChange={(v) => { setPick(v); setAddErr(null); setNewCons(0) }} />
             </div>
-            {chosen && feeMode && (chosenCons > 0 || newMatsValue > 0) && (
-              <p className="proc-add-consumables">
-                على المريض <strong>{fmtMoney(chosenTotal)}</strong>: أجرة {fmtMoney(chosen.price)}
-                {chosenCons > 0 && <> + مستهلكات {fmtMoney(chosenCons)}</>}
-                {newMatsValue > 0 && <> + مواد {fmtMoney(newMatsValue)}</>}
-              </p>
-            )}
             {/* المستهلكات المقدّرة لنوع الإجراء — للمشرفة وحدها (الخادم لا يرسلها للاستقبال): قراءةٌ فقط */}
             {chosen && isSupervisor && !feeMode && Number(chosen.consumables_cost) > 0 && (
               <p className="proc-add-consumables">
@@ -971,12 +970,20 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
               </p>
             )}
             {addErr && <AddError err={addErr} doctorId={session.doctor_id} isSupervisor={isSupervisor} onClose={() => setAddErr(null)} />}
-            {/* المواد بعد اختيار الإجراء: اختيارية — إجراءٌ بلا مواد يُضاف كما هو */}
+            {/* المواد بعد اختيار الإجراء: اختيارية — إجراءٌ بلا مواد يُضاف كما هو. ثمّ المبلغ و«إضافة» */}
             {chosen && (
               <div className="proc-add-mats">
-                <span className="proc-add-mats-label">المواد المستعملة (اختياري):</span>
-                <MaterialsEditor withPrice={!!feeMode} catalog={matCatalog} value={newMats} onChange={setNewMats} disabled={busy} />
+                <div className="proc-add-head"><strong>{chosen.name}</strong><span>{fmtMoney(chosen.price)}</span></div>
+                <MaterialsEditor withPrice={!!feeMode} catalog={matCatalog} value={newMats} onChange={setNewMats} disabled={busy}
+                  comboHint="أضيفي مادة: اكتبي اسمها للبحث، أو اكبسي لعرضها كلّها…" />
                 {feeMode && <ConsumablesCounter value={newCons} onChange={setNewCons} disabled={busy} />}
+                <div className="proc-add-foot">
+                  <span>على المريض <strong>{fmtMoney(feeMode ? chosenTotal : chosen.price)}</strong>
+                    {feeMode && (chosenCons > 0 || newMatsValue > 0) && (
+                      <small> — أجرة {fmtMoney(chosen.price)}{chosenCons > 0 && ` + مستهلكات ${fmtMoney(chosenCons)}`}{newMatsValue > 0 && ` + مواد ${fmtMoney(newMatsValue)}`}</small>
+                    )}</span>
+                  <button disabled={busy || !qtyValid(newMats)} onClick={add}>إضافة الإجراء</button>
+                </div>
               </div>
             )}
           </div>

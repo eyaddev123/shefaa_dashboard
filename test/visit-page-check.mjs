@@ -177,7 +177,7 @@ const run = async () => {
     const a = apptOf('procedures')
     ok(await page.locator('.visit-procs .appt-procs-table tr.proc-removed').count() === 1, 'إجراءات: المُزال مشطوب')
     ok((await text(page, '.visit-procs')).includes('جبس'), 'إجراءات: المواد تحت الإجراء')
-    ok(await page.locator('.visit-procs select').isVisible(), 'إجراءات: قائمة الإضافة')
+    ok(await page.locator('.visit-procs #visit-proc-pick').isVisible(), 'إجراءات: قائمة الإضافة')
     const procRow = await text(page, '.visit-pay tbody tr:nth-child(2)')
     ok(digits(procRow.replace(/\(\d+\)|\([٠-٩]+\)/, '')) === Number(a.procedures_total), `إجراءات: مجموعها في «المطلوب» (${procRow})`)
     ok(!calls.some((c) => c.endsWith('/history')), 'السجل لا يُطلب قبل فتحه')
@@ -214,14 +214,14 @@ const run = async () => {
     await page.waitForSelector('.visit-page')
     ok(!(await page.locator('.visit-patient button', { hasText: 'تعديل' }).count()), 'جلسة أمس: لا «تعديل» للاستقبال')
     ok((await text(page, '.visit-patient')).includes('التعديل في يوم الجلسة فقط'), 'جلسة أمس: السبب ظاهر')
-    ok(!(await page.$('.visit-procs select')), 'جلسة أمس: لا إضافة إجراء للاستقبال')
+    ok(!(await page.$('.visit-procs #visit-proc-pick')), 'جلسة أمس: لا إضافة إجراء للاستقبال')
     ok(!(await page.$('.visit-refs .ref-add')), 'جلسة أمس: لا «+ إحالة» للاستقبال')
     ok(!(await page.$('.visit-reprint')), 'جلسة أمس: لا إعادة طباعة (شرط اللوحة القديمة)')
     await ctx.close()
     const adm = await open(browser, { role: 'umosama', path: visitPath('closed') })
     await adm.page.waitForSelector('.visit-page')
     ok(await adm.page.locator('.visit-patient button', { hasText: 'تعديل' }).isVisible(), 'جلسة أمس: المشرفة تعدّل')
-    ok(await adm.page.locator('.visit-procs select').isVisible(), 'جلسة أمس: المشرفة تضيف إجراءً')
+    ok(await adm.page.locator('.visit-procs #visit-proc-pick').isVisible(), 'جلسة أمس: المشرفة تضيف إجراءً')
     await adm.ctx.close()
   }
   {
@@ -283,10 +283,10 @@ const run = async () => {
     ok(new URL(page.url()).pathname === `/clinic/session/${S.procedures.session}`, 'رجوع ⇐ الطابور')
     ok(new URL(page.url()).searchParams.get('tab') === 'all', 'رجوع ⇐ التبويب نفسه')
     ok(Math.abs(y1 - y0) <= 4, `رجوع ⇐ الموضع نفسه (${y0} ⇐ ${y1})`)
-    // زرّ «تفاصيل» في الصفّ يفتحها أيضاً
-    await page.locator('tr', { hasText: apptOf('arrived').full_name }).locator('button', { hasText: 'تفاصيل' }).click()
+    // 2026-11-18: لا زرّ «تفاصيل» — السطر كلّه يفتحها (كبسةٌ على خانة الحالة مثلاً)
+    await page.locator('tr', { hasText: apptOf('arrived').full_name }).locator('td.rt-badge').click()
     await page.waitForSelector('.visit-page')
-    ok(new URL(page.url()).pathname === visitPath('arrived'), '«تفاصيل» في الصفّ يفتح الصفحة')
+    ok(new URL(page.url()).pathname === visitPath('arrived'), 'كبسة على السطر تفتح الصفحة')
     await ctx.close()
   }
   {

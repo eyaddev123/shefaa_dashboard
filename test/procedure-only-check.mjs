@@ -139,8 +139,9 @@ async function run() {
   const visit = (a) => `/clinic/session/${SID}/visit/${a.id}`
   const editOptions = async (page) => {
     await page.locator('.visit-patient button:has-text("تعديل")').click()
-    return page.locator('label:has-text("نوع الزيارة") select option').evaluateAll((os) =>
-      Object.fromEntries(os.map((o) => [o.value, o.disabled])))
+    // 2026-11-18: «نوع الزيارة» أزرارٌ جنب بعض (role=radio، data-value) بدل <select>
+    return page.locator('[role=radiogroup][aria-label="نوع الزيارة"] button').evaluateAll((os) =>
+      Object.fromEntries(os.map((o) => [o.dataset.value, o.disabled])))
   }
   {
     const { ctx, page } = await open(browser, visit(R.poProc))
@@ -149,7 +150,7 @@ async function run() {
     ok(pay.includes('بلا كشفية') && !pay.includes('رسم الكشف (معاينة)'), `بطاقة المبلغ: ${pay.slice(0, 70)}`)
     const o = await editOptions(page)
     ok(o.consultation && o.followup && !o[PO], '★ بعد الإجراء: العادية معطّلة')
-    ok((await textOf(page.locator('label:has-text("نوع الزيارة")'))).includes('أُضيف إجراء'), 'والسبب مكتوب')
+    ok((await textOf(page.locator('[role=radiogroup][aria-label="نوع الزيارة"]'))).includes('أُضيف إجراء'), 'والسبب مكتوب')
     await ctx.close()
   }
   {
@@ -157,7 +158,7 @@ async function run() {
     await page.waitForSelector('.visit-pay')
     const o = await editOptions(page)
     ok(o[PO] && !o.consultation && !o.followup, '★ عادية حاضرة: «إجراء فقط» معطّل، ومعاينة ↔ مراجعة كما كانتا')
-    ok((await textOf(page.locator('label:has-text("نوع الزيارة")'))).includes('قُبضت الكشفية'), 'والسبب: قُبضت الكشفية')
+    ok((await textOf(page.locator('[role=radiogroup][aria-label="نوع الزيارة"]'))).includes('قُبضت الكشفية'), 'والسبب: قُبضت الكشفية')
     await ctx.close()
   }
   {
@@ -172,7 +173,7 @@ async function run() {
     await page.waitForSelector('.visit-pay')
     const o = await editOptions(page)
     ok(!o.consultation && !o.followup, '★ «إجراء فقط» حاضرة بلا قبض: التصحيح مفتوح قبل الدخول')
-    await page.locator('label:has-text("نوع الزيارة") select').selectOption('consultation')
+    await page.locator('[role=radiogroup][aria-label="نوع الزيارة"] button[data-value="consultation"]').click()
     await page.click('button:has-text("حفظ التعديلات")')
     await page.waitForTimeout(300)
     ok(calls.find((c) => /\/details$/.test(c.p))?.body?.visit_type === 'consultation', 'الحفظ يرسل النوع الجديد')

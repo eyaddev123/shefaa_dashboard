@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { addDays, api, dayLabel, SESSION_STATUSES, fmtTime, todayLocal } from '../api.js'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { addDays, api, dayLabel, fmtTime, todayLocal } from '../api.js'
 import { useRole } from '../RoleContext.jsx'
 import { canSeeCashReport } from '../permissions.js'
 import { FlowModeTag } from '../attendance-ui.jsx'
@@ -15,10 +15,6 @@ import { generateLabel, generateSummary } from '../generate-summary.js'
 // الاستقبال غائبٌ عمداً: المعتذر لا وجود له عنده ذلك اليوم.
 const APOLOGY_VIEWERS = ['clinic_admin', 'board', 'super_admin', 'manager']
 
-function sessionBadge(status) {
-  const cls = status === 'in_progress' ? 'good' : status === 'cancelled' ? 'bad' : status === 'closed' ? '' : 'warn'
-  return <span className={`badge ${cls}`}>{SESSION_STATUSES[status] || status}</span>
-}
 
 // ═══ نافذة الاعتذار — من داخل النظام لا من المتصفّح ═══
 //
@@ -116,7 +112,7 @@ const patientsAr = (n) => n === 1 ? 'مريضٌ واحد' : n === 2 ? 'مريض�
   : n >= 3 && n <= 10 ? `${n} مرضى` : `${n} مريضاً`
 
 // ═══ نافذة تأكيد عامّة — بديل confirm() ═══
-function ConfirmDialog({ title, body, confirmLabel, onConfirm, onClose, busy }) {
+function ConfirmDialog({ title, body, confirmLabel, onConfirm, onClose, busy, cancelLabel = 'لا، اتركه' }) {
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape' && !busy) onClose() }
     window.addEventListener('keydown', onKey)
@@ -128,7 +124,7 @@ function ConfirmDialog({ title, body, confirmLabel, onConfirm, onClose, busy }) 
         <h3 id="confirm-title">{title}</h3>
         <p className="subtitle" style={{ marginTop: 6 }}>{body}</p>
         <div className="bf-actions" style={{ marginTop: 16 }}>
-          <button type="button" className="ghost" disabled={busy} onClick={onClose}>لا، اتركه</button>
+          <button type="button" className="ghost" disabled={busy} onClick={onClose}>{cancelLabel}</button>
           <button type="button" autoFocus disabled={busy} onClick={onConfirm}>{confirmLabel}</button>
         </div>
       </div>
@@ -226,10 +222,10 @@ function DayDoctors({ date, generation, canEdit, onChanged, allRooms, onRoomChan
 
   if (err && !data) return <p className="error">{err}</p>
   if (!data) return null
-  if (data.doctors.length === 0) return null
+  if (data.doctors.length === 0) return <div className="card cbx-dd"><p className="empty">لا دكاترة بالدوام في هذا اليوم حسب الجداول.</p></div>
 
   return (
-    <div className="card">
+    <div className="card cbx-dd">
       <div className="inline" style={{ justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
         <div>
           <h3 style={{ marginTop: 0, marginBottom: 2 }}>دكاترة اليوم ({data.doctors.length})</h3>
@@ -337,6 +333,132 @@ function DayDoctors({ date, generation, canEdit, onChanged, allRooms, onRoomChan
   )
 }
 
+// ═══ حالةٌ واحدة لكلّ عيادة — كلمةٌ ولون (2026-11-18: كانت «مفتوحة» و«مغلقة» تظهران معاً) ═══
+// الأولويّة: معتذر ⇐ ملغاة ⇐ أغلقها أحد ⇐ فيها مرضى لم ينتهوا ⇐ خدمت الكلّ ⇐ بعدُ بلا مرضى.
+// «خلص الدور» ليست إغلاقاً: الاستقبال تستطيع إضافة حاضرٍ جديد، والإغلاق زرٌّ صريح.
+function clinicState(s) {
+  if (s.apologized) return { key: 'apology', label: 'معتذر', tone: 'bad' }
+  if (s.status === 'cancelled') return { key: 'cancelled', label: 'ملغاة', tone: 'bad' }
+  if (s.manual_closed_at) return { key: 'closed', label: 'مغلقة', tone: 'muted' }
+  if (s.pending_count > 0) return { key: 'busy', label: 'شغّالة', tone: 'good' }
+  if (s.done_count > 0) return { key: 'served', label: 'خلص الدور', tone: 'info' }
+  return { key: 'open', label: 'مفتوحة', tone: 'info' }
+}
+
+// ═══ تبويب «العيادات» — ما تراه الاستقبال (وحده)، وأوّل تبويبٍ للمسؤولة والمدراء ═══
+// جدولٌ مرتّب (قرار المستخدم): الدكتور بغرفته واختصاصه، الوقت، الحالة، «باقي» و«خلصوا» رقمين،
+// و«فتح الدور» زرٌّ واضح، والإغلاق/إعادة الفتح بجانبه — الإغلاق بتأكيدٍ بسيط قبله، ومن له مرضى
+// معلَّقون يذهب مباشرةً إلى نافذة الملخّص القائمة (CloseSweepDialog — كما هي بطلب المستخدم).
+function ClinicsTab({ sessions, rooms, role, date, canCloseSession, onOpen, onChanged }) {
+  const [busyId, setBusyId] = useState(null)
+  const [err, setErr] = useState(null)
+  const [ask, setAsk] = useState(null)       // جلسةٌ تنتظر «تسكّري؟»
+  const [sweep, setSweep] = useState(null)   // { session, pending } — نافذة الإغلاق الكانس
+  const close = async (s) => {
+    setBusyId(s.id); setErr(null)
+    try { await api.clinic.closeSession(s.id); setAsk(null); await onChanged() }
+    catch (ex) {
+      setAsk(null)
+      if (ex.data && ex.data.code === 'CLOSE_PENDING' && ex.data.pending) setSweep({ session: s, pending: ex.data.pending })
+      else setErr(ex.message)
+    } finally { setBusyId(null) }
+  }
+  const reopen = async (s) => {
+    setBusyId(s.id); setErr(null)
+    try { await api.clinic.reopenSession(s.id); await onChanged() }
+    catch (ex) { setErr(ex.message) } finally { setBusyId(null) }
+  }
+  // مرضى لم ينتهوا ⇒ الملخّص مباشرةً (هو نفسه سؤال)؛ وإلّا تأكيدٌ بسيط
+  const askClose = (s) => (s.pending_count > 0 ? close(s) : setAsk(s))
+
+  if (!sessions) return <div className="card"><p className="empty">جارٍ التحميل…</p></div>
+  if (sessions.length === 0) return (
+    <div className="card cbx-empty">
+      <p className="empty">لا عيادات في هذا اليوم.</p>
+      {role === 'clinic_admin' && <p className="muted">ولّدي جلسات اليوم من تبويب «توليد الجلسات».</p>}
+    </div>
+  )
+  return (
+    <div className="card cbx-card">
+      {err && <p className="error">{err}</p>}
+      <table className="rtable cbx-table">
+        <thead>
+          <tr><th>الدكتور</th><th>الوقت</th><th>الحالة</th><th className="num">باقي</th><th className="num">خلصوا</th><th></th></tr>
+        </thead>
+        <tbody>
+          {sessions.map((s) => {
+            const st = clinicState(s)
+            return (
+              <tr key={s.id} className={`cbx-row is-${st.key}`}>
+                <td className="rt-title">
+                  <div className="cbx-doc">
+                    <span className="cbx-name">{s.doctor_name}{rooms && <RoomBadge room={rooms[s.doctor_id]} />}</span>
+                    {s.specialty && <span className="cbx-spec">{s.specialty}</span>}
+                  </div>
+                </td>
+                <td className="num" data-label="الوقت">
+                  <bdi dir="ltr">{fmtTime(s.start_time)} – {fmtTime(s.end_time)}</bdi>
+                  {s.flow_mode !== 'attendance' && <div className="cbx-mode"><FlowModeTag mode={s.flow_mode} /></div>}
+                </td>
+                <td data-label="الحالة"><span className={`cbx-state is-${st.tone}`}>{st.label}</span></td>
+                <td className="num cbx-n" data-label="باقي">{s.pending_count}</td>
+                <td className="num cbx-n" data-label="خلصوا">{s.done_count}</td>
+                <td className="rt-actions cbx-actions">
+                  <button type="button" className="cbx-open" onClick={() => onOpen(s)}>فتح الدور</button>
+                  {canCloseSession && !s.apologized && s.status !== 'cancelled' && (s.manual_closed_at ? (
+                    <button type="button" className="ghost cbx-close" disabled={busyId === s.id} onClick={() => reopen(s)}>
+                      {busyId === s.id ? '…' : 'إعادة فتح'}</button>
+                  ) : (
+                    <button type="button" className="ghost cbx-close" disabled={busyId === s.id} onClick={() => askClose(s)}>
+                      {busyId === s.id ? '…' : 'إغلاق العيادة'}</button>
+                  ))}
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+      {ask && (
+        <ConfirmDialog title={`تسكير عيادة ${ask.doctor_name}؟`}
+          body={`ما رح يعود ينقبل حضور أو حجز على هالعيادة اليوم${date ? '' : ''}. فيكِ ترجّعي تفتحيها بعدين بـ«إعادة فتح».`}
+          confirmLabel="إغلاق العيادة" cancelLabel="رجوع" busy={busyId === ask.id}
+          onConfirm={() => close(ask)} onClose={() => setAsk(null)} />
+      )}
+      {sweep && (
+        <CloseSweepDialog session={sweep.session} pending={sweep.pending}
+          onClose={() => setSweep(null)}
+          onDone={() => { setSweep(null); onChanged() }} />
+      )}
+    </div>
+  )
+}
+
+// ═══ تبويب «توليد الجلسات» — المسؤولة وحدها، بعيداً عن باقي الأزرار (طلب المستخدم 2026-11-18) ═══
+function GenerateTab({ date, onGenerated }) {
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState(null)
+  const [result, setResult] = useState(null)
+  useEffect(() => { setResult(null); setErr(null) }, [date])
+  const generate = async () => {
+    setBusy(true); setErr(null); setResult(null)
+    try {
+      const r = await api.clinic.generateSessions(date)
+      setResult({ text: generateSummary(date, r), created: (r.created || []).length })
+      onGenerated()
+    } catch (ex) { setErr(ex.message) } finally { setBusy(false) }
+  }
+  return (
+    <div className="card cbx-gen">
+      <h3>توليد جلسات اليوم</h3>
+      <p className="subtitle">يُنشئ جلسات اليوم المختار من جداول دوام الدكاترة. مَن تولّدت جلسته من قبل ما بيتكرّر، والمعتذر ما بتنعمل جلسته.</p>
+      <button type="button" className="cbx-gen-btn" disabled={busy || !date} onClick={generate}>
+        {busy ? 'جارٍ التوليد…' : generateLabel(date)}</button>
+      {err && <p className="error">{err}</p>}
+      {result && <p className={`cbx-gen-result${result.created ? ' is-good' : ''}`} role="status">{result.text}</p>}
+    </div>
+  )
+}
+
 export default function ClinicBoard() {
   const today = todayLocal()
   const [date, setDate] = useState(today)
@@ -345,32 +467,21 @@ export default function ClinicBoard() {
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
   const [sessions, setSessions] = useState(null)
   const [err, setErr] = useState(null)
-  const [busy, setBusy] = useState(false)
   const { clinicRole: role } = useRole()
   const navigate = useNavigate()
-  const [busyId, setBusyId] = useState(null)
-  // الإغلاق الكانس: { session, pending } حين ردّ الخادم بمعلَّقين — انظر CloseSweepDialog
-  const [sweep, setSweep] = useState(null)
-  const [toastNode, showToast] = useToast()
+  const [params, setParams] = useSearchParams()
   const [generation, setGeneration] = useState(0)   // يزيد مع كل توليد ناجح — لقائمة «دكاترة اليوم»
   // من يرى الصالة هو من يعرف أنّ الدكتور غادر — الاستقبال والمشرف معاً
   const canCloseSession = role === 'clinic_admin' || role === 'clinic_reception'
   // جرد الصندوق: شاشةٌ مستقلّة (الاستقبال والمشرفة والمدير) — تفتح على اليوم المختار هنا
   const canCashReport = canSeeCashReport(role)
-
-  const toggleClose = async (s) => {
-    setBusyId(s.id); setErr(null)
-    try {
-      if (s.manual_closed_at) await api.clinic.reopenSession(s.id)
-      else await api.clinic.closeSession(s.id)
-      await load()
-    } catch (ex) {
-      // معلَّقون: لا خطأ بل سؤال — النافذة تعرض الملخّص، والإغلاق بلا معلَّقين يمرّ بلا أسئلة
-      if (ex.data && ex.data.code === 'CLOSE_PENDING' && ex.data.pending) setSweep({ session: s, pending: ex.data.pending })
-      else setErr(ex.message)
-    }
-    finally { setBusyId(null) }
-  }
+  // التبويبات (2026-11-18): الاستقبال «العيادات» وحدها بلا شريط؛ المدراء + «الدكاترة والاعتذارات» اطّلاعاً؛
+  // والمسؤولة + «توليد الجلسات»
+  const tabs = [['clinics', 'العيادات'],
+    ...(APOLOGY_VIEWERS.includes(role) ? [['doctors', 'الدكاترة والاعتذارات']] : []),
+    ...(role === 'clinic_admin' ? [['generate', 'توليد الجلسات']] : [])]
+  const tab = tabs.some(([k]) => k === params.get('tab')) ? params.get('tab') : 'clinics'
+  const setTab = (k) => setParams(k === 'clinics' ? {} : { tab: k }, { replace: true })
 
   const load = () => api.clinic.sessions(date).then(setSessions).catch((e) => setErr(e.message))
   useEffect(() => { setSessions(null); load() }, [date])
@@ -383,34 +494,19 @@ export default function ClinicBoard() {
     .catch(() => setRooms(null))
   useEffect(() => { loadRooms() }, [])
 
-  const generate = async () => {
-    setBusy(true); setErr(null)
-    try {
-      const r = await api.clinic.generateSessions(date)
-      await load()
-      setGeneration((g) => g + 1)
-      showToast(generateSummary(date, r), r.created?.length ? 'success' : 'info')
-    }
-    catch (ex) { setErr(ex.message) }
-    finally { setBusy(false) }
-  }
-
   return (
     <>
       <div className="page-head">
         <div>
-          <h2>لوحة العيادات</h2>
-          <p className="subtitle">جلسات الدكاترة لليوم المحدد وطول الدور عند كلٍّ منها — تنقّل بالأيام للحجز المسبق</p>
+          <h2>اللوحة اليومية</h2>
+          <p className="subtitle">عيادات اليوم المختار ودور كلّ دكتور — تنقّلي بالأيام للحجز المسبق</p>
         </div>
         <div className="board-head-actions" style={{ display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }}>
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          <input type="date" value={date} aria-label="اليوم" onChange={(e) => e.target.value && setDate(e.target.value)} />
           {canCashReport && (
             <button type="button" className="ghost" style={{ whiteSpace: 'nowrap' }}
               onClick={() => navigate(`/clinic/cash-report${date < today ? `?date=${date}` : ''}`,
                 { state: { from: 'board' } })}>جرد الصندوق</button>
-          )}
-          {role === 'clinic_admin' && (
-            <button style={{ whiteSpace: 'nowrap' }} onClick={generate} disabled={busy || !date}>{busy ? 'جارٍ التوليد…' : generateLabel(date)}</button>
           )}
         </div>
       </div>
@@ -442,67 +538,26 @@ export default function ClinicBoard() {
 
       {err && <p className="error">{err}</p>}
 
-      {/* الاستقبال لا يرى هذا القسم إطلاقاً — ولا الخادم يُجيبه عليه */}
-      {APOLOGY_VIEWERS.includes(role) && (
+      {tabs.length > 1 && (
+        <div className="pcx-tabs cbx-tabs" role="tablist">
+          {tabs.map(([k, label]) => (
+            <button key={k} type="button" role="tab" aria-selected={tab === k}
+              className={`pcx-tab${tab === k ? ' is-on' : ''}`} onClick={() => setTab(k)}>{label}</button>
+          ))}
+        </div>
+      )}
+
+      {tab === 'clinics' && (
+        <ClinicsTab sessions={sessions} rooms={rooms} role={role} date={date} canCloseSession={canCloseSession}
+          onOpen={(s) => navigate(`/clinic/session/${s.id}`)} onChanged={load} />
+      )}
+      {/* الاستقبال لا يرى هذا التبويب إطلاقاً — ولا الخادم يُجيبه عليه */}
+      {tab === 'doctors' && (
         <DayDoctors date={date} generation={generation} canEdit={role === 'clinic_admin'} onChanged={load}
           allRooms={rooms ? Object.values(rooms) : []} onRoomChanged={loadRooms} />
       )}
-
-      <div className="card">
-        {!sessions ? (
-          <p className="empty">جارٍ التحميل…</p>
-        ) : sessions.length === 0 ? (
-          <p className="empty">
-            لا جلسات في هذا اليوم.
-            {role === 'clinic_admin' && ` اضغط «${generateLabel(date)}» إن وُجد دوام مطابق في جداول الدكاترة.`}
-          </p>
-        ) : (
-          <table className="rtable">
-            <thead>
-              <tr><th>الدكتور</th><th>الاختصاص</th><th>الوقت</th><th>النمط</th><th>الحالة</th><th>الدور</th><th></th></tr>
-            </thead>
-            <tbody>
-              {sessions.map((s) => (
-                <tr key={s.id} className={`clickable ${s.apologized ? 'row-faded' : ''}`} onClick={() => navigate(`/clinic/session/${s.id}`)}>
-                  <td className="rt-title">{s.doctor_name}{rooms && <RoomBadge room={rooms[s.doctor_id]} />}</td>
-                  <td data-label="الاختصاص">{s.specialty || '—'}</td>
-                  <td className="num" data-label="الوقت"><bdi dir="ltr">{fmtTime(s.start_time)} – {fmtTime(s.end_time)}</bdi></td>
-                  {/* نمط الجلسة يُثبَّت عند توليدها — يُعرض كي لا يُفاجأ أحد يوم التبديل */}
-                  <td data-label="النمط"><FlowModeTag mode={s.flow_mode} /></td>
-                  <td className="rt-badge">
-                    {/* معتذرٌ عليه حجوزات: لا «مفتوحة» — الخادم لا يُرسل جلسة المعتذر إلا لأجلها */}
-                    {s.apologized
-                      ? <span className="badge bad" title="الدكتور معتذر — الحجز ممنوع، وحجوزاته القائمة تنتظر الاتصال بأصحابها">معتذر</span>
-                      : sessionBadge(s.status)}
-                    {/* «مغلقة» حالةٌ محسوبة تعلو حالة الجلسة المخزّنة:
-                        انتهى الدوام فعلاً وإن بقيت الجلسة «مفتوحة» في القاعدة */}
-                    {s.closed && <span className="badge" style={{ marginInlineStart: 5 }}>مغلقة</span>}
-                  </td>
-                  <td className="num" data-label="الدور">{s.active_count} نشِط / {s.total_count} إجمالي</td>
-                  <td className="rt-actions" onClick={(e) => e.stopPropagation()}>
-                    <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }}
-                      onClick={() => navigate(`/clinic/session/${s.id}`)}>فتح الدور</button>
-                    {canCloseSession && (
-                      <button type="button" className="ghost"
-                        style={{ padding: '3px 10px', fontSize: 11.5, marginInlineStart: 6 }}
-                        disabled={busyId === s.id}
-                        onClick={() => toggleClose(s)}>
-                        {busyId === s.id ? '…' : s.manual_closed_at ? 'إعادة فتح' : 'إغلاق العيادة'}
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      {toastNode}
-      {sweep && (
-        <CloseSweepDialog session={sweep.session} pending={sweep.pending}
-          onClose={() => setSweep(null)}
-          onDone={() => { setSweep(null); load() }} />
+      {tab === 'generate' && (
+        <GenerateTab date={date} onGenerated={() => { load(); setGeneration((g) => g + 1) }} />
       )}
     </>
   )

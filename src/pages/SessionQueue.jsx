@@ -1160,40 +1160,52 @@ function QueueNote({ appt }) {
 
 // طابور نمط الحضور: بترتيب الخادم (قيد الكشف، ثم الحاضرون — الإسعافي أولاً ثم الأقدم
 // حضوراً — ثم من لم يحضر). لا عمود موعد ولا انتظار متوقَّع: لا خانات ولا تقدير هنا.
+// ★ مضغوط (طلب المستخدم 2026-11-18): الموبايل ونوع الزيارة تحت الاسم، و«السعر» في صفحة الزيارة لا هنا،
+//   والسطر كلّه يفتح الزيارة (لا زرّ «تفاصيل») — الأزرار وحدها لا تفتحها.
 function AttendanceQueueTable({ data, rows, tab, actions }) {
   const { reload, toast } = actions
   const offset = serverOffsetOf(data)
+  const open = useOpenVisit()
   return (
-      <table className="rtable">
+      <table className="rtable qx-table">
         <thead>
           <tr>
-            <th>الدور</th><th>الاسم</th><th>الموبايل</th><th>نوع الزيارة</th><th>السعر</th>
-            <th>وقت الحضور</th><th>الحالة</th><th>قبله</th><th></th>
+            <th>الدور</th><th>الاسم</th><th>الحالة</th><th>وقت الحضور</th><th>قبله</th><th></th>
           </tr>
         </thead>
         <tbody>
           {rows.map((a) => (
             <Fragment key={a.id}>
-            <tr className={urgentRowClass(a)}>
+            <tr className={`clickable ${urgentRowClass(a)}`} onClick={(e) => { if (!e.target.closest('a,button,input')) open(a) }}>
               <td className="num" data-label="الدور"><AttendanceNumber appt={a} /><AttendanceBadge priority={a.priority} /></td>
-              <td className="rt-title"><VisitLink appt={a} /> <MissingBadge appt={a} /><QueueNote appt={a} /></td>
-              <td data-label="الموبايل"><bdi dir="ltr">{a.mobile || '—'}</bdi></td>
-              <td data-label="نوع الزيارة">
-                {isProcedureOnly(a) ? <ProcedureOnlyBadge appt={a} /> : (VISIT_TYPES[a.visit_type] || a.visit_type)}
-                {a.followup_override_by && (
-                  <span className="badge warn" style={{ marginInlineStart: 6 }}
-                    title={a.followup_override_reason || ''}>تجاوز</span>
-                )}
+              <td className="rt-title">
+                <div className="qx-who">
+                  <span className="qx-name"><VisitLink appt={a} /> <MissingBadge appt={a} /></span>
+                  <span className="qx-sub">
+                    <bdi dir="ltr">{a.mobile || '—'}</bdi>
+                    <span className="qx-kind">
+                      {isProcedureOnly(a) ? <ProcedureOnlyBadge appt={a} /> : (VISIT_TYPES[a.visit_type] || a.visit_type)}
+                      {a.followup_override_by && (
+                        <span className="badge warn sm" style={{ marginInlineStart: 6 }}
+                          title={a.followup_override_reason || ''}>تجاوز</span>
+                      )}
+                    </span>
+                  </span>
+                  {/* «السعر» خرج عموداً، لكنّ سطر العمل يبقى تحت الاسم حين يوجد ما يُقبض أو يُنبَّه إليه:
+                      إجراءٌ («خذي … زيادة»، «بانتظار المحاسبة») أو إحالة أو «إجراء فقط» — والمعاينة العادية بلا شيء */}
+                  {(a.procedures_total > 0 || (a.referrals || []).length > 0 || isProcedureOnly(a)) && (
+                    <div className="qx-fee"><FeeCell appt={a} /></div>
+                  )}
+                  <QueueNote appt={a} />
+                </div>
               </td>
-              <td className="num" data-label="السعر" style={{ whiteSpace: 'nowrap' }}><FeeCell appt={a} /></td>
-              <td data-label="وقت الحضور"><bdi dir="ltr">{a.arrived_at ? fmtClock(a.arrived_at) : '—'}</bdi></td>
               <td className="rt-badge"><StatusCell appt={a} offset={offset} /></td>
-              <td className="num" data-label="قبله">{a.ahead_count ?? '—'}</td>
-              <td className="queue-row-actions rt-actions">
+              <td data-label="وقت الحضور"><bdi dir="ltr">{a.arrived_at ? fmtClock(a.arrived_at) : '—'}</bdi></td>
+              <td className="num qx-ahead" data-label="قبله">{a.ahead_count ?? '—'}</td>
+              <td className="queue-row-actions rt-actions qx-actions">
                 <VisitActions appt={a} data={data} actions={actions}
                   onDone={(msg) => { toast(msg, 'success'); reload() }} onError={(msg) => { toast(msg); reload() }} />{' '}
                 {a.status === 'waiting' && <><NoShowButton appt={a} onChanged={reload} onError={toast} />{' '}</>}
-                <OpenVisit appt={a} />
               </td>
             </tr>
             </Fragment>
@@ -1692,14 +1704,15 @@ export default function SessionQueue() {
   return (
     <>
       <h2 className="queue-head">دور {data.doctor_name}<RoomBadge room={data.room} size="lg" /><FlowModeTag mode={data.flow_mode} /></h2>
-      <p className="subtitle">
-        {data.specialty || '—'} · {fmtTime(data.start_time)} – {fmtTime(data.end_time)} ·
-        مدة الكشف المتوقعة {data.expected_visit_minutes} دقيقة ·
-        معاينة {fmtMoney(data.consultation_fee)} · مراجعة {fmtMoney(data.followup_fee)}
-        {' '}(خلال {data.followup_window_days} أيام) ·
-        الإيراد المتوقع {fmtMoney(data.expected_revenue)}
-        {/* يشمل الإجراءات — للعرض وحده، لا يُكتب في الخزينة */}
-      </p>
+      {/* شاراتٌ مرتّبة بدل سطرٍ طويل بالنقاط (2026-11-18) — الإيراد المتوقّع للعرض وحده، لا يُكتب في الخزينة */}
+      <div className="qx-facts">
+        {data.specialty && <span className="qx-fact">{data.specialty}</span>}
+        <span className="qx-fact"><bdi dir="ltr">{fmtTime(data.start_time)} – {fmtTime(data.end_time)}</bdi></span>
+        <span className="qx-fact">معاينة <b>{fmtMoney(data.consultation_fee)}</b></span>
+        <span className="qx-fact" title={`المراجعة خلال ${data.followup_window_days} أيام من المعاينة`}>مراجعة <b>{fmtMoney(data.followup_fee)}</b></span>
+        <span className="qx-fact">الكشف ≈ {data.expected_visit_minutes} دقيقة</span>
+        <span className="qx-fact">الإيراد المتوقع <b>{fmtMoney(data.expected_revenue)}</b></span>
+      </div>
 
       {toast}
 
