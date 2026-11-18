@@ -63,8 +63,10 @@ function AddedProcedures({ added = [], pending = [] }) {
 // اللمسة على الإجراء تعلّمه (يتلوّن وعليه ✓) ولا تُضيفه؛ زرّ التأكيد أسفل الورقة يحمل العدد
 // ويُضيف المختار كلّه بطلبٍ واحد (كلّها أو لا شيء). إجراءٌ واحد = السلوك نفسه: تعليم + «إضافة (1)»
 // — من «قيد الكشف» إلى «مضاف» ثلاث لمسات.
-// المواد: لكلّ إجراءٍ مختار سطرٌ تحت الشبكة بـ«+ مواد» خاصّةٍ به — داخل الورقة نفسها، اختيارية.
-// draft: { selected: [{id, name, mats, open}], errorId, error } — يبقى في الأب فيعود كما كان إن رُفض.
+// ★ خطوتان (طلب المستخدم 2026-11-18: «المواد مو واضحة أبداً — تحت بآخر الورقة»): الخطوة 1 الشبكة
+//   وحدها و«التالي: المواد (n)»، والخطوة 2 بطاقةٌ لكلّ إجراءٍ مختار فيها قائمة المواد المنسدلة
+//   والمستهلكات، ثمّ «إضافة (n)» — أو «إضافة بلا مواد (n)» إن لم يختر شيئاً (المواد اختيارية دائماً).
+// draft: { selected: [{id, name, mats, cons}], step, errorId, error } — يبقى في الأب فيعود كما كان إن رُفض.
 // الأسعار (طلب المستخدم 2026-11-16): سعر كلّ إجراءٍ تحت اسمه، وسعر **البيع** لكلّ مادة ومبلغ سطرها،
 // وتحت المختار مجموعٌ: «على المريض» = مجموع أسعار الإجراءات (ما يدفعه فعلاً)، و«المواد بسعر البيع»
 // سطرٌ وحده — المواد تُخصم من سعر الإجراء داخلياً ولا تُضاف على المريض، فجمعها معه كان يكذب.
@@ -93,11 +95,20 @@ function AddProcedureSheet({ appt, catalog, usage, matCatalog, loadMaterials, dr
   // عدّاد المستهلكات لكلّ إجراءٍ مختار (بعد القلبة) — تقديرٌ يضعه الدكتور
   const consTotal = feeMode ? sel.reduce((t, x) => t + Number(x.cons || 0), 0) : 0
   const onPatient = feeMode ? procTotal + consTotal + matTotal : procTotal
+  const step = draft.step === 2 && sel.length > 0 ? 2 : 1
+  const setStep = (n) => setDraft((d) => ({ ...d, step: n }))
+  const anyMats = sel.some((x) => x.mats.length > 0 || x.cons)
+  const n = sel.length.toLocaleString('ar-SY-u-nu-latn')
   return (
-    <BottomSheet title={`إجراء لـ ${appt.full_name}`}
-      subtitle="علّم الإجراءات ثمّ «إضافة» — وتبقى «بانتظار المحاسبة» حتى يدفع المريض"
+    <BottomSheet title={step === 1 ? `إجراء لـ ${appt.full_name}` : `المواد — ${appt.full_name}`}
+      subtitle={step === 1 ? 'الخطوة 1 من 2: علّم الإجراءات، ثمّ «التالي: المواد»'
+        : 'الخطوة 2 من 2: أضف المواد والمستهلكات لكلّ إجراء، ثمّ «إضافة»'}
       onClose={onClose}
-      footer={(
+      footer={step === 1 ? (
+        <button type="button" className="dk-confirm" disabled={sel.length === 0} onClick={() => setStep(2)}>
+          التالي: المواد ({n}) ←
+        </button>
+      ) : (
         <>
           {sel.length > 0 && (
             <div className="dk-total" role="status">
@@ -109,12 +120,12 @@ function AddProcedureSheet({ appt, catalog, usage, matCatalog, loadMaterials, dr
             </div>
           )}
           <button type="button" className="dk-confirm" disabled={!valid} onClick={onConfirm}>
-            إضافة ({sel.length.toLocaleString('ar-SY-u-nu-latn')})
+            {anyMats ? `إضافة (${n})` : `إضافة بلا مواد (${n})`}
           </button>
         </>
       )}>
       {draft.error && <p className="error dk-sheet-error" role="alert">{draft.error}</p>}
-      {catalog == null ? <p className="empty">جارٍ التحميل…</p>
+      {step === 1 && (catalog == null ? <p className="empty">جارٍ التحميل…</p>
         : items.length === 0 ? <p className="empty">لا إجراءات لاختصاصك في الكتالوج — راجع مشرفة العيادات.</p> : (
           <div className="dk-pick-grid">
             {items.map((p) => {
@@ -132,11 +143,14 @@ function AddProcedureSheet({ appt, catalog, usage, matCatalog, loadMaterials, dr
               )
             })}
           </div>
-        )}
-      {sel.length > 0 && (
+        ))}
+      {step === 2 && (
+        <button type="button" className="ghost dk-step-back" onClick={() => setStep(1)}>→ رجوع للإجراءات</button>
+      )}
+      {step === 2 && (
         <ul className="dk-sel">
           {sel.map((x) => (
-            <li key={x.id} className="dk-sel-item">
+            <li key={x.id} className={`dk-sel-item${String(draft.errorId) === String(x.id) ? ' is-bad' : ''}`}>
               <div className="dk-sel-row">
                 <span className="dk-sel-name">{x.name}</span>
                 <span className="dk-sel-price">{fmtMoney(priceOf(x.id))}</span>
@@ -154,7 +168,85 @@ function AddProcedureSheet({ appt, catalog, usage, matCatalog, loadMaterials, dr
           ))}
         </ul>
       )}
-      {sel.length > 0 && feeMode && <p className="cons-hint">{CONSUMABLES_HINT}</p>}
+      {step === 2 && feeMode && <p className="cons-hint">{CONSUMABLES_HINT}</p>}
+    </BottomSheet>
+  )
+}
+
+// ═══ «+ مواد» على إجراءٍ مضاف — زيادةٌ فقط (قرار المستخدم 2026-11-18) ═══
+// «يمكن يضيف الإجراء وما يعرف قديش استخدامات، بس يخلص إجراء يضيف المواد تبعته». ما في السطر يظهر
+// نصّاً لا يُعدَّل، وتحته قائمة المواد المنسدلة للإضافة: مادةٌ موجودة تُختار ثانيةً ⇒ تُجمع كمّيتها.
+// والمستهلكات (بعد القلبة) لا تنزل عن قيمتها. التنقيص والحذف وما بعد الدفع من الاستقبال — والخادم
+// يحرس الثلاثة (DOCTOR_NO_DECREASE، DOCTOR_LINE_PAID، يوم الجلسة).
+function AddMaterialsSheet({ lines, patientName, matCatalog, loadMaterials, onClose, onSaved }) {
+  useEffect(() => { loadMaterials() }, [])
+  const [picked, setPicked] = useState(lines.length === 1 ? lines[0] : null)
+  if (!picked) return (
+    <BottomSheet title="مواد لأيّ إجراء؟" subtitle={patientName} onClose={onClose}>
+      <div className="dk-pick-grid">
+        {lines.map((l) => (
+          <button key={l.id} type="button" className="dk-pick" onClick={() => setPicked(l)}>
+            <span className="dk-pick-name">{l.name}</span>
+          </button>
+        ))}
+      </div>
+    </BottomSheet>
+  )
+  return <MaterialsForLine line={picked} patientName={patientName} matCatalog={matCatalog}
+    onBack={lines.length > 1 ? () => setPicked(null) : null} onClose={onClose} onSaved={onSaved} />
+}
+
+function MaterialsForLine({ line, patientName, matCatalog, onBack, onClose, onSaved }) {
+  const v3 = line.fee !== null && line.fee !== undefined
+  const oldCons = Number(line.consumables || 0)
+  const [extra, setExtra] = useState([])
+  const [cons, setCons] = useState(oldCons)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState(null)
+  const existing = line.materials || []
+  const more = materialsValue(extra, matCatalog) + (v3 ? cons - oldCons : 0)
+  const changed = extra.length > 0 || cons !== oldCons
+  const save = async () => {
+    setSaving(true); setError(null)
+    // القائمة كاملةً (الخادم يستبدلها): الموجود + الإضافات، والمادة المكرّرة تُجمع كمّيتها
+    const merged = new Map(existing.map((m) => [String(m.material_id), Number(m.qty)]))
+    for (const m of toPayload(extra)) merged.set(String(m.material_id), (merged.get(String(m.material_id)) || 0) + m.qty)
+    try {
+      await api.clinic.setLineMaterials(line.appointment_id, line.id, {
+        materials: [...merged].map(([id, qty]) => ({ material_id: Number(id), qty: Math.round(qty * 100) / 100 })),
+        ...(v3 && cons !== oldCons ? { consumables: cons } : {}),
+      })
+      onSaved(line)
+    } catch (ex) { setError(ex.message); setSaving(false) }
+  }
+  return (
+    <BottomSheet title={`مواد «${line.name}»`} subtitle={patientName}
+      onClose={onClose}
+      footer={(
+        <>
+          {v3 && more > 0 && (
+            <div className="dk-total" role="status"><span>يزيد على المريض <strong>{fmtMoney(more)}</strong></span></div>
+          )}
+          <button type="button" className="dk-confirm" disabled={!changed || !qtyValid(extra) || saving} onClick={save}>
+            {saving ? 'يُحفظ…' : 'حفظ المواد'}
+          </button>
+        </>
+      )}>
+      {error && <p className="error dk-sheet-error" role="alert">{error}</p>}
+      {onBack && <button type="button" className="ghost dk-step-back" onClick={onBack}>→ إجراءٌ آخر</button>}
+      <p className="dk-mats-now">
+        {existing.length === 0 ? 'لا مواد عليه بعد.'
+          : <>عليه الآن: {existing.map((m) => `${m.name} ×${Number(m.qty)}`).join('، ')}</>}
+      </p>
+      <div className="dk-mats-body">
+        {matCatalog == null ? <p className="empty">جارٍ تحميل المواد…</p>
+          : <MaterialsEditor withPrice comboHint="أضف مادة: اكتب اسمها للبحث، أو المس لعرضها كلّها…" catalog={matCatalog} value={extra} onChange={setExtra} />}
+        {!qtyValid(extra) && <p className="error">صحّح الكمّية (رقم أكبر من صفر).</p>}
+      </div>
+      {v3 && (
+        <ConsumablesCounter hint={false} value={cons} onChange={(v) => setCons(Math.max(oldCons, v))} />
+      )}
+      <p className="cons-hint">تقدر تزيد بس. التنقيص أو الحذف من الاستقبال.</p>
     </BottomSheet>
   )
 }
@@ -168,7 +260,7 @@ const SWIPE = 30
 // الجملة نفسها. والخادم يرفض بـ DOCTOR_BUSY إن وصله طلبٌ رغم ذلك (شاشةٌ متأخّرة، جهازٌ ثانٍ).
 const ACTIVE_HINT = 'أنهِ الكشف الحالي أولاً قبل نداء التالي أو بدء كشف مريض.'
 
-function TodayBar({ lines, toast }) {
+function TodayBar({ lines, toast, onMaterials }) {
   const [open, setOpen] = useState(false)
   const startY = useRef(null)
   const swiped = useRef(false)
@@ -209,6 +301,10 @@ function TodayBar({ lines, toast }) {
                 </div>
                 <span className={`dk-today-state ${l.paid_at ? 'is-paid' : 'is-unpaid'}`}>
                   {l.paid_at ? 'تمت المحاسبة' : 'بانتظار المحاسبة'}</span>
+                {!l.paid_at && onMaterials && (
+                  <button type="button" className="dk-mats-btn" tabIndex={open ? 0 : -1}
+                    onClick={() => onMaterials(l)}>+ مواد</button>
+                )}
               </li>
             ))}
           </ul>
@@ -238,7 +334,8 @@ export default function DoctorScreen() {
   const [mine, setMine] = useState(null)
   const [adding, setAdding] = useState([])          // إضافاتٌ متفائلة: {tempId, appointment_id, name}
   const [sheetFor, setSheetFor] = useState(null)    // id الحجز الذي تُضاف له
-  const emptyDraft = { selected: [], errorId: null, error: null }
+  const [matsFor, setMatsFor] = useState(null)      // «+ مواد»: { lines, patient } — زيادة مواد إجراءٍ مضاف
+  const emptyDraft = { selected: [], step: 1, errorId: null, error: null }
   const [draft, setDraft] = useState(emptyDraft)     // المختار في الورقة — يعود كما كان إن رُفض
   const [catalog, setCatalog] = useState(null)
   const [matCatalog, setMatCatalog] = useState(null)
@@ -542,12 +639,22 @@ export default function DoctorScreen() {
                         عمودا التابلت)، وثلاثةٌ ⇒ صفٌّ واحد. والبطاقة العريضة (لابتوب) ⇒ كلّها صفٌّ واحد،
                         الأساسيّ أعرض. القرار بعرض البطاقة نفسها (container query) لا بعرض الشاشة. */}
                     {(() => {
-                      const more = [
-                        withProcedures && (
-                          <button key="add" type="button" className="ghost dk-btn dk-btn-add" onClick={() => openSheet(current)}>
+                      // «+ إجراء» و«+ مواد» صفٌّ وحدهما بحجمٍ واحد (طلب المستخدم 2026-11-18: المواد واضحة)؛
+                      // «+ مواد» لما لم يُقبض من إجراءاته — وأكثر من واحد ⇒ الورقة تسأل على أيّها أوّلاً
+                      const matLines = (current.procedures || []).filter((l) => !l.removed_at && !l.paid_at)
+                      const procRow = withProcedures && (
+                        <div className="dk-proc-row">
+                          <button type="button" className="ghost dk-btn dk-btn-add" onClick={() => openSheet(current)}>
                             + إجراء
                           </button>
-                        ),
+                          <button type="button" className="ghost dk-btn dk-btn-add" disabled={matLines.length === 0}
+                            title={matLines.length === 0 ? 'أضف إجراءً أولاً — المواد تُضاف على إجراء' : 'مواد ومستهلكات على إجراءٍ أضفته'}
+                            onClick={() => setMatsFor({ lines: matLines.map((l) => ({ ...l, appointment_id: current.id })), patient: current.full_name })}>
+                            + مواد
+                          </button>
+                        </div>
+                      )
+                      const more = [
                         <RecallButton key="recall" apptId={current.id} onError={showToast} icon={false} className="ghost dk-btn dk-light" />,
                         needsStart ? (
                           // نودي ولم يدخل ⇒ «تأخّر المريض» (لا «لم يحضر»: من قطع بطاقته حاضر). يخرج من الدور
@@ -589,7 +696,10 @@ export default function DoctorScreen() {
                               إنهاء الكشف
                             </button>
                           )}
-                          <div className="dk-more" data-n={more.length} style={{ '--n': more.length }}>{more}</div>
+                          <div className="dk-side">
+                            {procRow}
+                            <div className="dk-more" data-n={more.length} style={{ '--n': more.length }}>{more}</div>
+                          </div>
                         </div>
                       )
                     })()}
@@ -694,8 +804,18 @@ export default function DoctorScreen() {
         </>
       )}
 
-      {withProcedures ? <TodayBar lines={todayLines} toast={toast} />
+      {withProcedures ? <TodayBar lines={todayLines} toast={toast} onMaterials={(l) => setMatsFor({ lines: [l], patient: l.patient_name })} />
         : toast && <div className="dk-toast-float">{toast}</div>}
+
+      {matsFor && (
+        <AddMaterialsSheet key={matsFor.lines.map((l) => l.id).join()} lines={matsFor.lines} patientName={matsFor.patient}
+          matCatalog={matCatalog} loadMaterials={loadMaterials} onClose={() => setMatsFor(null)}
+          onSaved={(l) => {
+            setMatsFor(null)
+            showToast(`حُفظت مواد «${l.name}» — بانتظار المحاسبة`, 'success', 3500)
+            loadQueue(); loadMine()
+          }} />
+      )}
 
       {sheetAppt && (
         <AddProcedureSheet appt={sheetAppt} catalog={catalog} usage={mine?.usage || {}}
