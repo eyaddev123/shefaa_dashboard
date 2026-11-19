@@ -877,7 +877,7 @@ export default function IronSessions() {
   return (
     <>
       {toast}
-      <div className="page-head">
+      <div className="page-head svc-head">
         <div>
           <h2>خدمات العيادة</h2>
           <p className="subtitle">حديد، رذاذ، تحاليل… تُسجَّل وتُقبض فوراً — بلا دور ولا عيادة ولا حجز.</p>
@@ -885,7 +885,7 @@ export default function IronSessions() {
         {canCollectIron(role) && <button type="button" onClick={() => setAdding({ serviceId: null })}>+ إضافة جلسة</button>}
       </div>
       {tabs.length > 0 && (
-        <div className="inline proc-tabs inv-tabs" role="tablist">
+        <div className="inline proc-tabs inv-tabs svc-tabs" role="tablist">
           {tabs.map(([k, label]) => (
             <button key={k} type="button" role="tab" aria-selected={tab === k}
               className={tab === k ? '' : 'ghost'} onClick={() => setParams(k === 'log' ? {} : { tab: k })}>{label}</button>

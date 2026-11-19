@@ -6379,3 +6379,11 @@ button.dk-pick:disabled .dk-pick-price { opacity: 0.7; }
 .svc-card > .earn-head h3 { margin: 0; }
 .svc-card > .earn-head button { padding: 8px 18px; min-height: 0; font-size: 14px; }
 .svc-card > .earn-note { margin-top: 14px; }
+
+/* رأس «خدمات العيادة»: فسحةٌ تحت الرأس قبل التبويبات، وعلى الجوال التبويبات الثلاثة تملأ السطر بعرضٍ متساوٍ
+   (ملاحظة المستخدم 2026-11-19: زرّ «+ إضافة جلسة» ملتصقٌ بالتبويبات، والتبويبات غير متساوية) */
+.svc-head { margin-bottom: 14px; }
+@media (max-width: 639px) {
+  .svc-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .svc-tabs button { width: 100%; padding-inline: 6px; }
+}
