@@ -3,7 +3,7 @@ import { api, fmtMoney, todayLocal } from '../../api.js'
 import { matchesAr } from '../../arabic-search.js'
 import { useDialogs } from '../../dialogs.jsx'
 import {
-  Modal, UnitSelect, unitPayload, unitChosen, fmtQty, fmtPct, parseNum, materialsCount, REASONS,
+  Modal, UnitSelect, unitPayload, unitChosen, fmtQty, fmtPct, parseNum, materialsCount, REASONS, costText,
 } from './shared.jsx'
 
 const opt = <span className="opt">(اختياري)</span>
@@ -344,7 +344,7 @@ export function CostDialog({ material, onClose, onSaved }) {
     <Modal title={material.purchase_price === null ? 'كتابة سعر الشراء' : 'تغيير سعر الشراء'} subtitle={material.name} onClose={onClose} busy={busy}>
       <form onSubmit={submit} className="inv-form invx-form">
         <div className="invx-now">
-          <span>سعر الشراء هلأ</span><strong>{material.purchase_price === null ? 'ما انكتب' : fmtMoney(material.purchase_price)}</strong>
+          <span>سعر الشراء هلأ</span><strong>{material.purchase_price === null ? 'ما انكتب' : costText(material.purchase_price)}</strong>
           {material.last_cost !== null && <span className="invx-muted">آخر شراء بـ {fmtMoney(material.last_cost)}</span>}
         </div>
         <div className="field"><label htmlFor="cs-new">بكم اشترينا الواحدة؟ (ل.س)</label>

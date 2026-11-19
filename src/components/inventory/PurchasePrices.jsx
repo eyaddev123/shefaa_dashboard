@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { api, fmtMoney } from '../../api.js'
 import { matchesAr } from '../../arabic-search.js'
-import { EmptyState, fmtQty, materialsCount, parseNum } from './shared.jsx'
+import { EmptyState, costText, fmtQty, materialsCount, parseNum } from './shared.jsx'
 
 // ═══ أسعار الشراء ═══
 // سعر شراء القطعة لكلّ مادة — المتوسّط المرجّح، وبه تُطرح المواد من سعر جلسة الحديد
@@ -65,7 +65,7 @@ export default function PurchasePrices({ materials, canWrite, onSaved, initialOn
                     <input className={`inv-count${invalid ? ' is-bad' : ''}`} value={v} inputMode="decimal" placeholder="—"
                       aria-label={`سعر شراء ${m.name}`} aria-invalid={invalid}
                       onChange={(e) => setVals({ ...vals, [m.id]: e.target.value })} />
-                  ) : (m.purchase_price === null ? '—' : fmtMoney(m.purchase_price))}
+                  ) : (m.purchase_price === null ? '—' : costText(m.purchase_price))}
                   {loss && <span className="badge bad sm" style={{ marginInlineStart: 6 }}
                     title="سعر البيع أقلّ من سعر الشراء">عم تنباع بخسارة</span>}
                 </td>

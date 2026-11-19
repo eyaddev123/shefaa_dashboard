@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, fmtMoney, todayLocal } from '../../api.js'
-import { EmptyState, fmtDay, fmtQty, fmtSignedMoney, materialsCount } from './shared.jsx'
+import { EmptyState, costText, fmtDay, fmtQty, fmtSignedMoney, materialsCount } from './shared.jsx'
 
 const monthStart = () => `${todayLocal().slice(0, 8)}01`
 const GROUPS = [['material', 'المادة'], ['doctor', 'الدكتور'], ['procedure', 'الإجراء']]
@@ -94,7 +94,7 @@ function Consumption({ showToast, withCost }) {
                         <>
                           <td className="num" data-label="كلفة الشراء">
                             {r.cost_value === null ? <span className="inv-muted">بلا سعر شراء</span> : fmtMoney(r.cost_value)}
-                            {r.unit_cost !== null && <span className="inv-sub">{fmtMoney(r.unit_cost)} للوحدة</span>}
+                            {r.unit_cost !== null && <span className="inv-sub">{costText(r.unit_cost)} للوحدة</span>}
                           </td>
                           <td className={`num inv-margin${r.margin !== null && r.margin < 0 ? ' neg' : ''}`} data-label="الهامش">
                             {r.margin === null ? '—' : <bdi dir="rtl">{fmtSignedMoney(r.margin)}</bdi>}
