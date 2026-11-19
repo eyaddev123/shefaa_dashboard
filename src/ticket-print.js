@@ -324,13 +324,8 @@ export const ironReceiptFrom = (s) => ({
     // الحديد كما كان: «إيصال جلسة تسريب حديد» — وغيره باسم خدمته، والنوع للخدمة ذات السعرين وحدها
     title: !s.service || s.service === 'حديد' ? 'إيصال جلسة تسريب حديد' : `إيصال جلسة ${s.service}`,
     lines: [(s.service_dual ?? s.serviceDual) === false ? null : (s.with_drug ?? s.withDrug) ? 'مع دواء' : 'بلا دواء',
-      // الزيادة فوق المشمول: سطرٌ بموادّها ومبلغها (يدفعها المريض)
-      // «أجرة + مواد»: الأجرة ثمّ المواد والمستهلكات بمبالغها — وقبلها: الزيادة فوق المشمول
-      ...((s.fee_mode ?? s.feeMode) ? [
-        `الأجرة: ${Number(s.base_price ?? s.basePrice).toLocaleString('en-US')}`,
-        (s.extras || []).length ? `مواد: ${s.extras.map((x) => `${x.name} ×${Number(x.qty)}`).join('، ')} — ${Number((s.extras_total ?? s.extrasTotal) - (s.consumables || 0)).toLocaleString('en-US')}` : null,
-        Number(s.consumables) > 0 ? `مستهلكات: ${Number(s.consumables).toLocaleString('en-US')}` : null,
-      ] : [(s.extras_total ?? s.extrasTotal) > 0 ? `مواد زيادة: ${(s.extras || []).map((x) => `${x.name} ×${Number(x.qty)}`).join('، ')} — ${Number(s.extras_total ?? s.extrasTotal).toLocaleString('en-US')}` : null]),
+      // ★ بلا تفاصيل مواد ولا أجرة ولا مستهلكات (طلب المستخدم 2026-11-19): المريض يرى المبلغ الكلّي وحده —
+      //   التفصيل للموظفين في الشاشة وورقة الجلسة
       s.doctor, s.by && `القابضة: ${s.by}`].filter(Boolean),
   },
   full_name: s.patient,
