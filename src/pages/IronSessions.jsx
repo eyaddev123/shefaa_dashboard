@@ -592,7 +592,7 @@ function ShareField({ id, label, kind, value, disabled, onKind, onValue, hint })
   )
 }
 
-function ServiceForm({ service, canWrite, onSaved, showToast }) {
+function ServiceForm({ service, canWrite, onSaved, showToast, onClose }) {
   const isNew = !service
   const [f, setF] = useState(() => (isNew ? BLANK_SERVICE : formOf(service)))
   const [err, setErr] = useState(null)
@@ -622,7 +622,6 @@ function ServiceForm({ service, canWrite, onSaved, showToast }) {
   const off = !canWrite || busy
   return (
     <form onSubmit={save} className="svc-form">
-      <div className="earn-head"><h3>{isNew ? 'خدمة جديدة' : service.name}{!isNew && !service.is_active && <span className="badge sm"> موقوفة</span>}</h3></div>
       <div className="field">
         <label htmlFor="iron-svc-name">اسم الخدمة</label>
         <input id="iron-svc-name" value={f.name} disabled={off} placeholder="مثال: رذاذ، تحليل سكر، إبرة عضل" onChange={(e) => set('name')(e.target.value)} />
@@ -659,7 +658,54 @@ function ServiceForm({ service, canWrite, onSaved, showToast }) {
       {err && <p className="error" role="alert">{err}</p>}
       {canWrite && <button type="submit" disabled={!dirty || busy}>{busy ? 'جارٍ الحفظ…' : isNew ? 'إضافة الخدمة' : 'حفظ'}</button>}
       {canWrite && !isNew && <button type="button" className="ghost svc-toggle" disabled={busy} onClick={toggle}>{service.is_active ? 'إيقاف الخدمة' : 'تفعيل الخدمة'}</button>}
+      {onClose && <button type="button" className="ghost svc-toggle" disabled={busy} onClick={onClose}>{canWrite ? 'رجوع' : 'إغلاق'}</button>}
     </form>
+  )
+}
+
+/** معاينة توزيع الخدمة بلا مواد — داخل نافذتها */
+function ServicePreview({ svc }) {
+  return (
+    <div className="svc-preview">
+      <h4>معاينة التوزيع بلا مواد</h4>
+      <p className="earn-note">المواد المضافة تُنقص الباقي: تأخذ الشفاء منه حتى سقفها، والزيادة للصندوق.</p>
+      <table className="rtable earn-table">
+        <thead><tr><th>الحالة</th><th>السعر</th><th>الممرضة</th><th>الدكتور</th><th>الشفاء</th><th>الزيادة للصندوق</th></tr></thead>
+        <tbody>
+          {svc.preview.map((s) => (
+            <tr key={scenarioText(svc, s)} className={s.negative ? 'earn-neg' : undefined}>
+              <td className="rt-title">{scenarioText(svc, s)}</td>
+              <td className="num" data-label="السعر">{fmtNum(s.price)}</td>
+              <td className="num" data-label="الممرضة">{fmtNum(s.nurse)}</td>
+              <td className="num" data-label="الدكتور">{fmtNum(s.doctor)}</td>
+              <td className="num" data-label="الشفاء">{fmtNum(s.shifa)}</td>
+              <td className={`num${s.negative ? ' neg' : ''}`} data-label="الفاضل">
+                {s.negative ? 'الحصص فوق السعر ⚠' : fmtNum(s.surplus)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {svc.preview.some((s) => s.negative) && (
+        <p className="share-warn" role="alert">⚠ الحالة المعلَّمة تُرفض عند التسجيل حتى تُحدَّث الأرقام: مجموع الحصّتين أكبر من سعر الجلسة.</p>
+      )}
+    </div>
+  )
+}
+
+/** بطاقة خدمة في الكتالوج: الضغط يفتح نافذة تعديلها */
+function ServiceCard({ x, onOpen }) {
+  const rows = [
+    ['السعر', x.dual_price ? <><bdi>{fmtNum(x.price)}</bdi> بلا دواء · <bdi>{fmtNum(x.price_with_drug)}</bdi> مع دواء</> : <bdi>{fmtNum(x.price)}</bdi>],
+    ['الممرضة', <bdi>{shareText(x.nurse)}</bdi>],
+    ['الدكتور', x.doctor.value > 0 ? <bdi>{shareText(x.doctor)}</bdi> : 'بلا دكتور'],
+    ['سقف الشفاء', <bdi>{fmtNum(x.shifa_cap)}</bdi>],
+  ]
+  return (
+    <button type="button" className={`svc-cardx${x.is_active ? '' : ' is-off'}`} onClick={onOpen} aria-label={`${x.name} — تعديل`}>
+      <span className="svc-cardx-head"><strong>{x.name}</strong>{!x.is_active && <span className="badge sm">موقوفة</span>}</span>
+      <dl>{rows.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
+    </button>
   )
 }
 
@@ -667,19 +713,16 @@ function SettingsTab({ canWrite, showToast }) {
   const dialogs = useDialogs()
   const [data, setData] = useState(null)
   const [err, setErr] = useState(null)
-  const [sel, setSel] = useState(null)       // معرّف الخدمة المختارة، أو 'new'
+  const [open, setOpen] = useState(null)     // null · 'new' · معرّف الخدمة المفتوحة في نافذتها
   const [newNurse, setNewNurse] = useState('')
 
-  const load = (pickId) => api.clinic.clinicServices().then((d) => {
-    setData(d)
-    setSel((cur) => pickId ?? (cur && (cur === 'new' || d.services.some((x) => x.id === cur)) ? cur : d.services[0]?.id ?? 'new'))
-  }).catch((e) => setErr(e.message))
+  const load = () => api.clinic.clinicServices().then(setData).catch((e) => setErr(e.message))
   useEffect(() => { load() }, [])
 
   if (err && !data) return <p className="error">{err}</p>
   if (!data) return <p className="empty">جارٍ التحميل…</p>
 
-  const svc = sel === 'new' ? null : data.services.find((x) => x.id === sel)
+  const svc = open && open !== 'new' ? data.services.find((x) => x.id === open) : null
   const addNurse = async (e) => {
     e.preventDefault()
     if (!newNurse.trim()) return
@@ -699,48 +742,23 @@ function SettingsTab({ canWrite, showToast }) {
     <>
       <div className="card earn-card svc-card">
         <div className="earn-head"><h3>الخدمات</h3>
-          {canWrite && <button type="button" className={sel === 'new' ? '' : 'ghost'} onClick={() => setSel('new')}>+ خدمة جديدة</button>}</div>
-        <div className="svc-layout">
-          <ul className="svc-list" aria-label="الخدمات">
-            {data.services.map((x) => (
-              <li key={x.id}>
-                <button type="button" className={`svc-item${sel === x.id ? ' is-on' : ''}${x.is_active ? '' : ' is-off'}`} aria-pressed={sel === x.id} onClick={() => setSel(x.id)}>
-                  <strong>{x.name}</strong>
-                  <span className="svc-item-meta"><bdi>{priceText(x)}</bdi> ل.س · ممرضة <bdi>{shareText(x.nurse)}</bdi>{x.doctor.value > 0 ? <> · دكتور <bdi>{shareText(x.doctor)}</bdi></> : ' · بلا دكتور'}</span>
-                  {!x.is_active && <span className="badge sm">موقوفة</span>}
-                </button>
-              </li>
-            ))}
-          </ul>
-          <ServiceForm key={sel} service={svc} canWrite={canWrite} showToast={showToast} onSaved={(id) => load(id)} />
-        </div>
+          {canWrite && <button type="button" onClick={() => setOpen('new')}>+ خدمة جديدة</button>}</div>
+        {data.services.length === 0 ? <p className="empty">لا خدمات بعد.</p> : (
+          <div className="svc-cards">
+            {data.services.map((x) => <ServiceCard key={x.id} x={x} onOpen={() => setOpen(x.id)} />)}
+          </div>
+        )}
+        <p className="earn-note">اضغطي على الخدمة لتعديل سعرها وحصصها أو إيقافها — التعديل يسري على الجلسات القادمة وحدها.</p>
       </div>
 
-      {svc && (
-        <div className="card earn-card">
-          <div className="earn-head"><h3>معاينة توزيع «{svc.name}» بلا مواد</h3></div>
-          <p className="earn-note">المواد المضافة تُنقص الباقي: تأخذ الشفاء منه حتى سقفها، والزيادة للصندوق.</p>
-          <table className="rtable earn-table">
-            <thead><tr><th>الحالة</th><th>السعر</th><th>الممرضة</th><th>الدكتور</th><th>الشفاء</th><th>الزيادة للصندوق</th></tr></thead>
-            <tbody>
-              {svc.preview.map((s) => (
-                <tr key={scenarioText(svc, s)} className={s.negative ? 'earn-neg' : undefined}>
-                  <td className="rt-title">{scenarioText(svc, s)}</td>
-                  <td className="num" data-label="السعر">{fmtNum(s.price)}</td>
-                  <td className="num" data-label="الممرضة">{fmtNum(s.nurse)}</td>
-                  <td className="num" data-label="الدكتور">{fmtNum(s.doctor)}</td>
-                  <td className="num" data-label="الشفاء">{fmtNum(s.shifa)}</td>
-                  <td className={`num${s.negative ? ' neg' : ''}`} data-label="الفاضل">
-                    {s.negative ? 'الحصص فوق السعر ⚠' : fmtNum(s.surplus)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {svc.preview.some((s) => s.negative) && (
-            <p className="share-warn" role="alert">⚠ الحالة المعلَّمة تُرفض عند التسجيل حتى تُحدَّث الأرقام: مجموع الحصّتين أكبر من سعر الجلسة.</p>
-          )}
-        </div>
+      {open && (open === 'new' || svc) && (
+        <Modal title={open === 'new' ? 'خدمة جديدة' : `${canWrite ? 'تعديل' : ''} ${svc.name}`.trim()}
+          subtitle={open === 'new' ? 'تظهر للاستقبال فور إضافتها' : svc.is_active ? 'تسري التعديلات على الجلسات القادمة وحدها' : 'موقوفة — لا تظهر للاستقبال'}
+          onClose={() => setOpen(null)} wide sheet>
+          <ServiceForm key={open} service={svc} canWrite={canWrite} showToast={showToast}
+            onClose={() => setOpen(null)} onSaved={async () => { setOpen(null); await load() }} />
+          {svc && <ServicePreview svc={svc} />}
+        </Modal>
       )}
 
       <div className="card earn-card">

@@ -6331,19 +6331,23 @@ button.dk-pick:disabled .dk-pick-price { opacity: 0.7; }
 .ir-svc-filter { max-width: 320px; margin: 4px 0 10px; }
 .iron-svc-field { max-width: 420px; }
 .iron-cash-svcs { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0; padding: 0 18px 6px; font-size: 13px; color: var(--text-secondary); }
-.svc-layout { display: grid; grid-template-columns: minmax(220px, 300px) 1fr; gap: 18px; align-items: start; }
-.svc-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.svc-item {
-  width: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; text-align: start;
-  padding: 10px 12px; background: var(--surface-1); color: var(--text-primary);
-  border: 1.5px solid var(--border); border-radius: 10px;
+.svc-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+.svc-cardx {
+  display: flex; flex-direction: column; align-items: stretch; gap: 10px; text-align: start; width: 100%;
+  padding: 14px 16px; background: var(--surface-1); color: var(--text-primary);
+  border: 1.5px solid var(--border); border-radius: 12px; cursor: pointer;
 }
-.svc-item.is-on { border-color: var(--primary); background: var(--primary-soft); }
-.svc-item.is-off strong { color: var(--muted); }
-.svc-item-meta { font-size: 12.5px; color: var(--text-secondary); }
+.svc-cardx:hover, .svc-cardx:focus-visible { border-color: var(--primary); }
+.svc-cardx.is-off { opacity: .65; }
+.svc-cardx-head { display: flex; align-items: center; gap: 8px; font-size: 16px; }
+.svc-cardx dl { margin: 0; display: grid; gap: 4px; font-size: 13px; }
+.svc-cardx dl > div { display: flex; justify-content: space-between; gap: 8px; }
+.svc-cardx dt { color: var(--muted); }
+.svc-cardx dd { margin: 0; font-weight: 600; }
 .svc-form { min-width: 0; }
-.svc-form .earn-head { padding: 0; margin-bottom: 8px; }
 .svc-form > .field { margin-bottom: 12px; }
+.svc-preview { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 14px; }
+.svc-preview h4 { margin: 0 0 4px; }
 .svc-label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
 .svc-kind { display: inline-flex; border: 1.5px solid var(--border); border-radius: 9px; overflow: hidden; }
 .svc-kind button { border: none; border-radius: 0; background: var(--surface-1); color: var(--text-secondary); padding: 6px 12px; min-width: 44px; }
@@ -6353,5 +6357,4 @@ button.dk-pick:disabled .dk-pick-price { opacity: 0.7; }
 .svc-share-row input { flex: 1; min-width: 0; }
 .svc-toggle { margin-inline-start: 8px; }
 @media (max-width: 760px) {
-  .svc-layout { grid-template-columns: 1fr; }
 }
