@@ -18,6 +18,9 @@ import { blankReferral, referralReady, ironReferralPayload, ironDraftDiscount, d
 // ★ منذ 2026-11-19: الخدمة من الكتالوج أوّلاً (initialServiceId من زرّها في رأس الصفحة، أو تُختار هنا حين يكون
 //   في الكتالوج أكثر من خدمة). منها السعر — واحدٌ أو سعران (مع/بلا دوا) — وهل لها دكتور: الخدمة بلا حصّة دكتور
 //   لا يظهر لها حقل الدكتور، والخدمة بسعرٍ واحد لا يظهر لها «النوع».
+// ★ المشمول (جولة 2): باختيار الخدمة والنوع تُعبّأ المواد المشمولة بسعرها (للجلسة الجديدة، ما لم تُغيَّر المواد يدوياً)،
+//   وما يُصرف فوقها على المريض بسعر البيع: المبلغ من الخادم (/clinic/iron/quote) — الاستقبال لا يرى سعر مادة إلا هنا،
+//   ثمنَ الزيادة التي تقبضها.
 // تسجيلٌ وقبضٌ بضغطةٍ واحدة: لا دور ولا عيادة ولا حجز. «مع/بلا دوا» يحدّد السعر وحده، والخادم هو من
 // يحسبه ويوزّعه. «مع/بلا دوا» والممرضة بلا اختيارٍ مسبق: تغيّران المبلغ والمستحقات، فلا يمرّان بافتراضٍ
 // لم يره أحد. والدكتور اختياري: الافتراض «بلا دكتور» وهو خيارٌ مكتوبٌ في القائمة.
@@ -213,12 +216,38 @@ export default function IronSessionDialog({ onClose, onSaved, session = null, in
   const dual = !!service?.dual
   const kind = dual ? withDrug : service ? false : null
   // سعر النوع المسجَّل سعرُ الجلسة نفسه (لقطة)، والنوع الآخر والخدمة الأخرى من الكتالوج — كما يحسبه الخادم
+  const sessBase = editing ? (session.basePrice ?? session.price) : null
   const prices = !opts || !service ? null : !sameService ? service.prices : {
-    without_drug: session.withDrug ? service.prices.without_drug : session.price,
-    with_drug: session.withDrug ? session.price : service.prices.with_drug }
-  const price = prices && kind !== null ? (kind ? prices.with_drug : prices.without_drug) : null
+    without_drug: session.withDrug ? service.prices.without_drug : sessBase,
+    with_drug: session.withDrug ? sessBase : service.prices.with_drug }
+  const basePrice = prices && kind !== null ? (kind ? prices.with_drug : prices.without_drug) : null
   // حقل الدكتور: للخدمة التي لها حصّة دكتور — أو جلسةٍ قائمة لها دكتور أصلاً (يُرفع منها)
   const showDoctor = !!service && (service.with_doctor || (sameService && !!session.doctorId))
+  // ═══ المشمول والزيادة ═══
+  const included = service && kind !== null ? (service.included?.[kind && dual ? 'with' : 'without'] || []) : []
+  const prefilled = useRef(null)   // آخر ما عُبّئ تلقائياً: يُستبدل بتغيير الخدمة/النوع ما لم تُغيَّر المواد يدوياً
+  useEffect(() => {
+    if (editing || !service || kind === null) return
+    const same = (a, b) => JSON.stringify(toPayload(a)) === JSON.stringify(toPayload(b))
+    if (items.length > 0 && !(prefilled.current && same(items, prefilled.current))) return
+    const next = included.map((m) => ({ material_id: m.material_id, name: m.name, unit: m.unit, qty: String(m.qty) }))
+    prefilled.current = next
+    if (!same(items, next)) setItems(next)
+  }, [serviceId, kind, opts])
+  const [quote, setQuote] = useState(null)   // {key, extras_total, extras, price}
+  const quoteKey = JSON.stringify([serviceId, kind, qtyValid(items) ? toPayload(items) : null])
+  useEffect(() => {
+    if (!service || kind === null || !qtyValid(items) || !(service.charge_extras || editing)) { setQuote(null); return }
+    const t = setTimeout(() => {
+      api.clinic.ironQuote({ service_id: service.id, with_drug: kind, materials: toPayload(items), ...(editing ? { session_id: session.id } : {}) })
+        .then((q) => setQuote({ ...q, key: quoteKey })).catch(() => setQuote(null))
+    }, 250)
+    return () => clearTimeout(t)
+  }, [quoteKey])
+  const extras = quote && quote.key === quoteKey ? quote : null
+  const extrasTotal = extras ? extras.extras_total : 0
+  // المبلغ = الأساس + الزيادة (من المعاينة؛ وقبل وصولها في التعديل: زيادة الجلسة كما كانت إن لم تتغيّر المواد)
+  const price = basePrice === null ? null : basePrice + (extras ? extrasTotal : 0)
   // التعديل: إحالة الجلسة القائمة تُعاد على السعر الجديد (الخادم يحسبها) — والمعاينة مرآتها
   const editRef = editing && session.referral ? draftFromIronReferral(session.referral) : null
   const discount = editRef ? ironDraftDiscount(editRef, price) : referral ? ironDraftDiscount(referral, price) : 0
@@ -413,8 +442,20 @@ export default function IronSessionDialog({ onClose, onSaved, session = null, in
 
           <Section n={N.materials} title="المواد" note="أمبولة، قسطرة، محلول…">
             <div className="iron-materials">
+              {service?.charge_extras && kind !== null && (
+                <small className="hint iron-included-hint">
+                  {included.length ? <>مشمولٌ بالسعر: {included.map((m) => `${m.name} ×${fmtNum(m.qty)}`).join('، ')} — وما فوقه على المريض.</>
+                    : 'لا مواد مشمولة بسعر هذه الخدمة — كلّ مادة تُضاف على المريض.'}
+                </small>
+              )}
               <MaterialsEditor catalog={catalog} value={items} onChange={setItems} disabled={busy} saved={savedItems.current} />
               {items.length === 0 && <small className="hint">لم تُضف مواد بعد.</small>}
+              {extras && extras.extras.length > 0 && (
+                <div className="iron-extras" aria-live="polite">
+                  <strong>زيادة على المريض: {fmtNum(extrasTotal)} ل.س</strong>
+                  <ul>{extras.extras.map((x) => <li key={x.material_id}>{x.name} ×{fmtNum(x.qty)} فوق المشمول — {fmtNum(x.amount)}</li>)}</ul>
+                </div>
+              )}
               <FieldError id="iron-err-materials" msg={errors.materials} />
             </div>
           </Section>
@@ -482,6 +523,7 @@ export default function IronSessionDialog({ onClose, onSaved, session = null, in
               {price === null
                 ? <span className="iron-pay-none">{service ? 'اختاري النوع أولاً' : 'اختاري الخدمة أولاً'}</span>
                 : <strong className="iron-pay-amount">{fmtNum(pay)} <small>ل.س</small></strong>}
+              {price !== null && extrasTotal > 0 && <small className="iron-pay-ref">السعر {fmtNum(basePrice)} + مواد زيادة {fmtNum(extrasTotal)}</small>}
               {price !== null && discount > 0 && <small className="iron-pay-ref">بعد خصم الإحالة {fmtNum(discount)} من {fmtNum(price)}</small>}
               {editing && pay !== null && (
                 <small className={`iron-pay-diff${pay > oldPaid ? ' is-more' : pay < oldPaid ? ' is-less' : ''}`} aria-live="polite">

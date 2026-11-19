@@ -6,7 +6,7 @@ import { useToast } from '../action-feedback.jsx'
 import { useDialogs } from '../dialogs.jsx'
 import { canCancelIron, canCollectIron, canSeeIronSplit, canWriteIronSettings } from '../permissions.js'
 import IronSessionDialog, { printIronReceipt } from '../components/IronSessionDialog.jsx'
-import { materialsSummary } from '../components/MaterialsEditor.jsx'
+import MaterialsEditor, { materialsSummary, qtyValid, toPayload } from '../components/MaterialsEditor.jsx'
 import { Modal, fmtQty } from '../components/inventory/shared.jsx'
 import Combobox from '../components/Combobox.jsx'
 import { loadPrinter } from '../ticket-print.js'
@@ -301,6 +301,7 @@ function SessionSheet({ r, split, actions, onClose }) {
             <span>{r.referral ? 'دفعه المريض' : 'المبلغ المقبوض'}</span>
             <strong><Money value={r.paid ?? r.price} /></strong>
             {r.referral && <small>من {fmtNum(r.price)} — خصم {fmtNum(r.discount)} على {r.referral.source}{r.referral.referral_doc_number && <> (ورقة <bdi>{r.referral.referral_doc_number}</bdi>)</>}</small>}
+            {r.extrasTotal > 0 && <small>السعر {fmtNum(r.basePrice)} + مواد زيادة {fmtNum(r.extrasTotal)} ({r.extras.map((x) => `${x.name} ×${fmtNum(x.qty)}`).join('، ')})</small>}
           </div>
           <div className="ir-fact"><span>الخدمة</span><strong>{r.service || 'حديد'}</strong></div>
           {r.serviceDual !== false && <div className="ir-fact"><span>النوع</span><strong>{drugText(r.withDrug)}</strong></div>}
@@ -555,22 +556,29 @@ function DuesTab() {
 // ═══════ الإعدادات: كتالوج الخدمات + الممرضات ═══════
 // قائمة الخدمات بجانب نموذج المختارة منها (حاسوب الاستقبال أوّلاً، وعلى الجوال تحتها). كلّ خدمة: الاسم، سعرٌ واحد
 // أو سعران، حصّتا الممرضة والدكتور مبلغاً أو نسبة (لفوق لأقرب 50)، وسقف الشفاء. وتحتها معاينة توزيعها بلا مواد.
+// المشمول بسعر الخدمة (جولة 2): [{material_id, name, unit, qty}] لكلّ نوع، و charge_extras: ما فوقه على المريض
 const BLANK_SERVICE = { name: '', dual_price: false, price: '', price_with_drug: '', nurse_kind: 'fixed', nurse_value: '',
-  doctor_kind: 'fixed', doctor_value: '0', shifa_cap: '' }
+  doctor_kind: 'fixed', doctor_value: '0', shifa_cap: '', charge_extras: true, inc_without: [], inc_with: [] }
+const incForm = (list) => (list || []).map((m) => ({ material_id: m.material_id, name: m.name, unit: m.unit, qty: String(m.qty) }))
 const formOf = (x) => ({
   name: x.name, dual_price: x.dual_price, price: String(x.price), price_with_drug: x.price_with_drug === null ? '' : String(x.price_with_drug),
   nurse_kind: x.nurse.kind, nurse_value: String(x.nurse.value), doctor_kind: x.doctor.kind, doctor_value: String(x.doctor.value),
-  shifa_cap: String(x.shifa_cap),
+  shifa_cap: String(x.shifa_cap), charge_extras: !!x.charge_extras,
+  inc_without: incForm(x.included?.without), inc_with: incForm(x.included?.with),
 })
 const payloadOf = (f) => ({
   name: f.name, dual_price: f.dual_price, price: f.price, ...(f.dual_price ? { price_with_drug: f.price_with_drug } : {}),
   nurse: { kind: f.nurse_kind, value: f.nurse_value }, doctor: { kind: f.doctor_kind, value: f.doctor_value }, shifa_cap: f.shifa_cap,
+  charge_extras: f.charge_extras,
+  included: { without: toPayload(f.inc_without), ...(f.dual_price ? { with: toPayload(f.inc_with) } : {}) },
 })
+const includedSummary = (list) => (list?.length ? list.map((m) => `${m.name} ×${fmtNum(m.qty)}`).join('، ') : 'لا شيء')
 const shareText = (sh) => (sh.kind === 'percent' ? `${fmtNum(sh.value)}%` : fmtNum(sh.value))
 const priceText = (x) => (x.dual_price ? `${fmtNum(x.price)} / ${fmtNum(x.price_with_drug)}` : fmtNum(x.price))
 const HISTORY_LABELS = { created: 'أُضيفت', name: 'الاسم', dual_price: 'سعران', price: 'السعر (بلا دواء)', price_with_drug: 'السعر مع دواء',
-  nurse: 'حصّة الممرضة', doctor: 'حصّة الدكتور', shifa_cap: 'سقف حصّة الشفاء', is_active: 'فعّالة' }
-const historyValue = (field, v) => (v === null ? '—' : field === 'dual_price' || field === 'is_active' ? (v === 'true' ? 'نعم' : 'لا') : v)
+  nurse: 'حصّة الممرضة', doctor: 'حصّة الدكتور', shifa_cap: 'سقف حصّة الشفاء', is_active: 'فعّالة',
+  charge_extras: 'الزيادة على المريض', included: 'المشمول', included_with: 'المشمول مع دواء' }
+const historyValue = (field, v) => (v === null ? '—' : ['dual_price', 'is_active', 'charge_extras'].includes(field) ? (v === 'true' ? 'نعم' : 'لا') : v)
 const scenarioText = (x, s) => [x.dual_price ? (s.with_drug ? 'مع دواء' : 'بلا دواء') : 'السعر', x.doctor.value > 0 ? (s.with_doctor ? '+ دكتور' : '— بلا دكتور') : null].filter(Boolean).join(' ')
 
 /** مبلغ أو نسبة: حقل القيمة وبجانبه المفتاح — والقيمة بمعرّفها القديم (iron-nurse_share…) */
@@ -598,9 +606,16 @@ function ServiceForm({ service, canWrite, onSaved, showToast, onClose }) {
   const [err, setErr] = useState(null)
   const [busy, setBusy] = useState(false)
   useEffect(() => { setF(isNew ? BLANK_SERVICE : formOf(service)); setErr(null) }, [service?.id, isNew])
+  // كتالوج المواد للمشمول: المخزون للمشرفة، وقائمة العيادة لغيرها (المدير يطالع والحقول معطّلة)
+  const [catalog, setCatalog] = useState(null)
+  useEffect(() => {
+    api.inventory.materials().then((d) => d.materials).catch(() => api.clinic.materials())
+      .then((r) => setCatalog(r.filter((m) => m.is_active !== false && m.material_kind !== 'consumable'))).catch(() => setCatalog([]))
+  }, [])
   const set = (k) => (v) => setF((x) => ({ ...x, [k]: v }))
   const base = isNew ? BLANK_SERVICE : formOf(service)
-  const dirty = Object.keys(f).some((k) => String(f[k]) !== String(base[k]))
+  const dirty = Object.keys(f).some((k) => JSON.stringify(f[k]) !== JSON.stringify(base[k]))
+  const incBad = !qtyValid(f.inc_without) || (f.dual_price && !qtyValid(f.inc_with))
   const save = async (e) => {
     e.preventDefault()
     if (busy) return
@@ -655,8 +670,25 @@ function ServiceForm({ service, canWrite, onSaved, showToast, onClose }) {
           <small className="hint">ما يزيد بعد الحصص والمواد يذهب لصندوق العيادات</small>
         </div>
       </div>
+      <fieldset className="svc-included">
+        <legend>المواد المشمولة بالسعر</legend>
+        <p className="hint">ما يُصرف عادةً في الجلسة. عند التسجيل تُعبّأ وحدها، والاستقبال تزيد أو تنقص.</p>
+        <label className="svc-extras-toggle">
+          <input type="checkbox" checked={f.charge_extras} disabled={off} onChange={(e) => set('charge_extras')(e.target.checked)} />
+          ما يُصرف فوق المشمول يُضاف على المريض بسعر البيع
+        </label>
+        {!f.charge_extras && <small className="hint warn-hint">متوقّف: كلّ المواد تُطرح من سعر الجلسة كما كان، والمريض يدفع السعر وحده.</small>}
+        {[['inc_without', f.dual_price ? 'بلا دواء' : null], ...(f.dual_price ? [['inc_with', 'مع دواء']] : [])].map(([k, title]) => (
+          <div key={k} className="svc-inc-group">
+            {title && <h5>{title}</h5>}
+            <MaterialsEditor catalog={catalog} value={f[k]} onChange={set(k)} disabled={off} comboHint="أضيفي مادة مشمولة…" />
+            {f[k].length === 0 && <small className="hint">{f.charge_extras ? 'لا شيء مشمول — كلّ مادة تُضاف على المريض.' : 'لا شيء مشمول.'}</small>}
+          </div>
+        ))}
+        {incBad && <small className="iron-err" role="alert">صحّحي الكمّية المعلَّمة: رقمٌ أكبر من صفر</small>}
+      </fieldset>
       {err && <p className="error" role="alert">{err}</p>}
-      {canWrite && <button type="submit" disabled={!dirty || busy}>{busy ? 'جارٍ الحفظ…' : isNew ? 'إضافة الخدمة' : 'حفظ'}</button>}
+      {canWrite && <button type="submit" disabled={!dirty || busy || incBad}>{busy ? 'جارٍ الحفظ…' : isNew ? 'إضافة الخدمة' : 'حفظ'}</button>}
       {canWrite && !isNew && <button type="button" className="ghost svc-toggle" disabled={busy} onClick={toggle}>{service.is_active ? 'إيقاف الخدمة' : 'تفعيل الخدمة'}</button>}
       {onClose && <button type="button" className="ghost svc-toggle" disabled={busy} onClick={onClose}>{canWrite ? 'رجوع' : 'إغلاق'}</button>}
     </form>
@@ -700,11 +732,15 @@ function ServiceCard({ x, onOpen }) {
     ['الممرضة', <bdi>{shareText(x.nurse)}</bdi>],
     ['الدكتور', x.doctor.value > 0 ? <bdi>{shareText(x.doctor)}</bdi> : 'بلا دكتور'],
     ['سقف الشفاء', <bdi>{fmtNum(x.shifa_cap)}</bdi>],
+    ['المشمول بالسعر', x.charge_extras ? (x.dual_price
+      ? <><span>بلا دواء: {includedSummary(x.included?.without)}</span><span>مع دواء: {includedSummary(x.included?.with)}</span></>
+      : includedSummary(x.included?.without))
+      : 'الزيادة على المريض متوقّفة'],
   ]
   return (
     <button type="button" className={`svc-cardx${x.is_active ? '' : ' is-off'}`} onClick={onOpen} aria-label={`${x.name} — تعديل`}>
       <span className="svc-cardx-head"><strong>{x.name}</strong>{!x.is_active && <span className="badge sm">موقوفة</span>}</span>
-      <dl>{rows.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
+      <dl>{rows.map(([k, v]) => <div key={k} className={k === 'المشمول بالسعر' ? 'svc-inc-row' : undefined}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
     </button>
   )
 }

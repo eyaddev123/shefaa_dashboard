@@ -324,6 +324,8 @@ export const ironReceiptFrom = (s) => ({
     // الحديد كما كان: «إيصال جلسة تسريب حديد» — وغيره باسم خدمته، والنوع للخدمة ذات السعرين وحدها
     title: !s.service || s.service === 'حديد' ? 'إيصال جلسة تسريب حديد' : `إيصال جلسة ${s.service}`,
     lines: [(s.service_dual ?? s.serviceDual) === false ? null : (s.with_drug ?? s.withDrug) ? 'مع دواء' : 'بلا دواء',
+      // الزيادة فوق المشمول: سطرٌ بموادّها ومبلغها (يدفعها المريض)
+      (s.extras_total ?? s.extrasTotal) > 0 ? `مواد زيادة: ${(s.extras || []).map((x) => `${x.name} ×${Number(x.qty)}`).join('، ')} — ${Number(s.extras_total ?? s.extrasTotal).toLocaleString('en-US')}` : null,
       s.doctor, s.by && `القابضة: ${s.by}`].filter(Boolean),
   },
   full_name: s.patient,

@@ -6358,3 +6358,24 @@ button.dk-pick:disabled .dk-pick-price { opacity: 0.7; }
 .svc-toggle { margin-inline-start: 8px; }
 @media (max-width: 760px) {
 }
+
+/* المواد المشمولة بسعر الخدمة (جولة 2) */
+.svc-included { border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px 14px; margin: 0 0 14px; }
+.svc-included legend { font-weight: 700; padding: 0 6px; }
+.svc-included .hint { margin: 0 0 8px; display: block; }
+.svc-extras-toggle { display: flex !important; align-items: center; justify-content: flex-start; gap: 8px; font-weight: 600; margin-bottom: 6px; width: auto; }
+.svc-extras-toggle input { width: auto !important; flex: none; margin: 0; }
+.svc-inc-group { margin-top: 10px; }
+.svc-inc-group h5 { margin: 0 0 6px; font-size: 13px; color: var(--text-secondary); }
+.svc-cardx dl > div.svc-inc-row { flex-direction: column; gap: 2px; border-top: 1px dashed var(--border); padding-top: 6px; margin-top: 2px; }
+.svc-cardx dl > div.svc-inc-row dd { font-weight: 500; }
+.svc-cardx dl > div.svc-inc-row dd span { display: block; }
+.iron-extras { margin: 8px 0 0; padding: 8px 12px; border-radius: 8px; background: var(--primary-soft); font-size: 13px; }
+.iron-extras ul { margin: 4px 0 0; padding-inline-start: 18px; }
+.iron-included-hint { display: block; margin-bottom: 6px; }
+
+/* رأس كتالوج الخدمات: العنوان والزرّ في سطرٍ واحد، وفسحةٌ قبل البطاقات (ملاحظة المستخدم: الزرّ ملتصق بالبطاقات) */
+.svc-card > .earn-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+.svc-card > .earn-head h3 { margin: 0; }
+.svc-card > .earn-head button { padding: 8px 18px; min-height: 0; font-size: 14px; }
+.svc-card > .earn-note { margin-top: 14px; }
