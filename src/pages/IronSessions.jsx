@@ -14,7 +14,9 @@ import { fundOf, previewShareEdit } from '../iron-shares.js'
 import { ReferralRow, useReferralOptions } from '../components/ReferralFields.jsx'
 import { blankReferral, draftFromIronReferral, ironDraftDiscount, ironReferralPayload, referralReady, amountText } from '../referral.js'
 
-// ═══ جلسات الحديد ═══
+// ═══ خدمات العيادة (كانت «جلسات الحديد») ═══
+// ★ منذ 2026-11-19: حديد، رذاذ، تحاليل… كلّها خدماتٌ من كتالوجٍ تكتبه المشرفة (clinic-services.js في الخادم):
+//   لكلّ خدمة سعرٌ أو سعران، وحصّة ممرضة ودكتور (مبلغ أو نسبة)، وسقف الشفاء. وفي رأس الصفحة زرٌّ لكلّ خدمة.
 // خدمةٌ مباشرة تُقبض لحظة تسجيلها: بلا دور ولا عيادة ولا حجز. ثلاثة تبويبات:
 //   السجلّ      الجلسات لفترة — للاستقبال بلا توزيع (لا يصله من الخادم أصلاً)، وللمشرفة والاطّلاع معه
 //   المستحقات   الممرضات والدكاترة، وما ذهب للشفاء وللصندوق
@@ -28,6 +30,8 @@ function Money({ value }) {
   return <>{fmtNum(value)}<span className="cash-unit">ل.س</span></>
 }
 const sessionsText = (n) => `${fmtNum(n)} ${n === 1 ? 'جلسة' : 'جلسات'}`
+/** نوع الجلسة بالكلام: «حديد · مع دواء» — والخدمة بسعرٍ واحد باسمها وحده */
+const kindText = (r) => `${r.service || 'حديد'}${r.serviceDual === false ? '' : ` · ${r.withDrug ? 'مع دواء' : 'بلا دواء'}`}`
 
 // ═══════ تعديل حصّة جلسة: بسبب، وبلا مساس بالإعدادات ═══════
 // المعاينة تحسب بأرقام الجلسة نفسها قبل الحفظ، والخادم يعيد الحساب ويقرّر
@@ -147,7 +151,7 @@ function ReferralDialog({ row, onClose, onSaved }) {
     if (ok) run(() => api.clinic.removeIronReferral(row.id, reason.trim()), () => 'حُذفت الإحالة')
   }
   return (
-    <Modal title={`${existing ? 'تعديل إحالة' : 'إحالة على'} جلسة ${row.patient}`} subtitle={`${row.withDrug ? 'مع دواء' : 'بلا دواء'} — السعر ${fmtNum(row.price)} ل.س`} onClose={onClose} busy={busy} wide sheet>
+    <Modal title={`${existing ? 'تعديل إحالة' : 'إحالة على'} جلسة ${row.patient}`} subtitle={`${kindText(row)} — السعر ${fmtNum(row.price)} ل.س`} onClose={onClose} busy={busy} wide sheet>
       <form onSubmit={save} className="iron-form" noValidate>
         <div className="ref-box open iron-ref">
           <ReferralRow value={draft} onChange={setDraft} scopes={null} idPrefix="iron-ref" combo options={options} optionsErr={optErr}
@@ -204,12 +208,12 @@ function SessionBadges({ r }) {
 function SessionRow({ r, multiDay, onOpen, onPrint }) {
   return (
     <li className={`ir-row${r.cancelled ? ' is-cancelled' : ''}`}>
-      <button type="button" className="ir-row-main" onClick={onOpen} aria-label={`جلسة ${r.patient} — تفاصيل`}>
+      <button type="button" className="ir-row-main" onClick={onOpen} aria-label={`جلسة ${r.service || 'حديد'} ${r.patient} — تفاصيل`}>
         <span className="ir-when" dir="ltr">{multiDay && <small>{r.date.slice(5)}</small>}{r.time}</span>
         <span className="ir-who">
           <strong className="ir-patient">{r.patient}</strong>
           <span className="ir-meta">
-            <span className={`ir-type${r.withDrug ? ' is-drug' : ''}`}>{drugText(r.withDrug)}</span>
+            <span className={`ir-type${r.withDrug ? ' is-drug' : ''}`}>{kindText(r)}</span>
             <span>{r.nurse}</span>
             {r.doctor && <span>{r.doctor}</span>}
           </span>
@@ -288,7 +292,7 @@ function SessionSheet({ r, split, actions, onClose }) {
   const sum = (k) => mats.reduce((t, m) => t + (m[k] ?? 0), 0)
   const oldBasis = split && r.materials.some((m) => m.costBasis !== 'sale')
   return (
-    <Modal title={r.patient} subtitle={`جلسة حديد — ${r.date} الساعة ${r.time}`} onClose={onClose} wide sheet>
+    <Modal title={r.patient} subtitle={`جلسة ${r.service || 'حديد'} — ${r.date} الساعة ${r.time}`} onClose={onClose} wide sheet>
       <div className="ir-sheet">
         <div className="ir-sheet-badges"><SessionBadges r={r} /></div>
         <div className="ir-facts">
@@ -297,7 +301,8 @@ function SessionSheet({ r, split, actions, onClose }) {
             <strong><Money value={r.paid ?? r.price} /></strong>
             {r.referral && <small>من {fmtNum(r.price)} — خصم {fmtNum(r.discount)} على {r.referral.source}{r.referral.referral_doc_number && <> (ورقة <bdi>{r.referral.referral_doc_number}</bdi>)</>}</small>}
           </div>
-          <div className="ir-fact"><span>النوع</span><strong>{drugText(r.withDrug)}</strong></div>
+          <div className="ir-fact"><span>الخدمة</span><strong>{r.service || 'حديد'}</strong></div>
+          {r.serviceDual !== false && <div className="ir-fact"><span>النوع</span><strong>{drugText(r.withDrug)}</strong></div>}
           <div className="ir-fact"><span>الممرضة</span><strong>{r.nurse}</strong></div>
           <div className="ir-fact"><span>الدكتور</span><strong>{r.doctor || 'بلا دكتور'}</strong></div>
           <div className="ir-fact"><span>القابضة</span><strong>{r.by}</strong></div>
@@ -372,7 +377,10 @@ function LogTab({ split, canPrint, canCancel, reload, showToast }) {
   const [openId, setOpenId] = useState(null)       // الورقة من السطر الحيّ: تتحدّث بعد كلّ حفظ
   const [mode, setMode] = useState(null)           // null | 'edit' | 'shares' | 'refer' — نافذةٌ واحدة فوق الورقة
   const [data, err] = useLoad(() => api.clinic.ironSessions(p.query), p.key, reload + bump)
+  const [svc, setSvc] = useState(null)              // تصفية السجلّ بخدمة — على الأسطر المحمّلة
   const r = openId && data?.rows.find((x) => x.id === openId)
+  const byService = data?.totals.byService || []
+  const shown = !data ? [] : svc && byService.some((g) => g.id === svc) ? data.rows.filter((x) => x.serviceId === svc) : data.rows
   const refresh = () => setBump((n) => n + 1)
   // الاستقبال يوم الجلسة وحده، والمشرفة أيّ وقت (canCancel = المشرفة) — والخادم يحرس الاثنين
   const inTime = (x) => canCancel || isToday(x)
@@ -406,11 +414,14 @@ function LogTab({ split, canPrint, canCancel, reload, showToast }) {
     <div className="card earn-card ir-log">
       <PeriodPicker p={p} data={data} formal />
       {err ? <p className="error">{err}</p> : !data ? <p className="empty">جارٍ التحميل…</p>
-        : data.rows.length === 0 ? <p className="empty">لا جلسات حديد في هذه الفترة.</p> : (
+        : data.rows.length === 0 ? <p className="empty">لا جلسات في هذه الفترة.</p> : (
         <>
           <div className="ir-strip">
             <div className="ir-stat"><span>الجلسات</span><strong>{fmtNum(t.count)}</strong>
-              <small>{t.withDrug > 0 ? `منها ${fmtNum(t.withDrug)} مع دواء` : 'كلّها بلا دواء'}{t.cancelled > 0 && ` · ملغاة ${fmtNum(t.cancelled)}`}</small></div>
+              {/* خدمةٌ واحدة في الفترة: «مع دواء» كما كان · أكثر: عدد كلّ خدمة (والتصفية تحتها) */}
+              <small>{byService.length > 1 ? byService.map((g) => `${g.name} ${fmtNum(g.count)}`).join(' · ')
+                : t.withDrug > 0 ? `منها ${fmtNum(t.withDrug)} مع دواء` : byService[0] && !data.rows.some((x) => x.serviceDual !== false) ? byService[0].name : 'كلّها بلا دواء'}
+                {t.cancelled > 0 && ` · ملغاة ${fmtNum(t.cancelled)}`}</small></div>
             <div className="ir-stat is-hero"><span>المقبوض</span><strong><Money value={t.paid ?? t.price} /></strong>
               {t.discount > 0 && <small>بعد خصم إحالات {fmtNum(t.discount)} على الجهات</small>}</div>
             {split && t.split && <>
@@ -420,9 +431,18 @@ function LogTab({ split, canPrint, canCancel, reload, showToast }) {
                 <small>ممرضات {fmtNum(t.split.nurse)}{t.split.doctor > 0 && ` · دكاترة ${fmtNum(t.split.doctor)}`}</small></div>
             </>}
           </div>
+          {byService.length > 1 && (
+            <div className="inline ir-svc-filter" role="group" aria-label="تصفية بالخدمة">
+              <button type="button" className={svc ? 'ghost' : ''} aria-pressed={!svc} onClick={() => setSvc(null)}>الكل <small>{fmtNum(t.count)}</small></button>
+              {byService.map((g) => (
+                <button key={g.id} type="button" className={svc === g.id ? '' : 'ghost'} aria-pressed={svc === g.id} onClick={() => setSvc(g.id)}>
+                  {g.name} <small>{fmtNum(g.count)} · {fmtNum(g.paid)}</small></button>
+              ))}
+            </div>
+          )}
           {t.overPrice > 0 && <p className="ir-alert">جلسات موادّها فوق السعر: {fmtNum(t.overPrice)} — الشفاء فيها صفر. افتحي الجلسة لمراجعتها.</p>}
           <ul className="ir-list">
-            {data.rows.map((x) => (
+            {shown.map((x) => (
               <SessionRow key={x.id} r={x} multiDay={data.from !== data.to} onOpen={() => { setOpenId(x.id); setMode(null) }}
                 onPrint={canPrint ? () => print(x) : null} />
             ))}
@@ -490,7 +510,7 @@ function FragmentRows({ g, open, onToggle }) {
       {open && g.lines.map((l) => (
         <tr key={l.id} className="iron-line">
           <td className="rt-title">{l.patient}</td>
-          <td data-label="التاريخ"><bdi dir="ltr">{l.date} {l.time}</bdi> — {l.withDrug ? 'مع دواء' : 'بلا دواء'}</td>
+          <td data-label="التاريخ"><bdi dir="ltr">{l.date} {l.time}</bdi> — {kindText(l)}</td>
           <td className="num" data-label="الحصّة">{fmtNum(l.share)}</td>
           <td className="rt-actions" />
         </tr>
@@ -509,7 +529,7 @@ function DuesTab() {
         <div className="earn-head"><h3>توزيع الفترة</h3></div>
         <PeriodPicker p={p} data={data} />
         {err ? <p className="error">{err}</p> : !data ? <p className="empty">جارٍ التحميل…</p>
-          : data.totals.count === 0 ? <p className="empty">لا جلسات حديد في هذه الفترة.</p> : (
+          : data.totals.count === 0 ? <p className="empty">لا جلسات في هذه الفترة.</p> : (
           <div className="tiles earn-tiles">
             <div className="tile"><div className="label">المقبوض ({sessionsText(data.totals.count)})</div><div className="value"><Money value={data.totals.paid ?? data.totals.price} /></div>
               {data.totals.discount > 0 && <div className="hint">والسعر الكامل {fmtNum(data.totals.price)} — الفرق على الجهات المحيلة</div>}</div>
@@ -524,7 +544,7 @@ function DuesTab() {
       {data && data.totals.count > 0 && (
         <>
           <DuesTable title="مستحقات الممرضات" rows={data.nurses} empty="لا مستحقات." />
-          <DuesTable title="مستحقات الدكاترة من الحديد" rows={data.doctors} empty="لا جلسات بدكتور في هذه الفترة."
+          <DuesTable title="مستحقات الدكاترة من خدمات العيادة" rows={data.doctors} empty="لا جلسات بدكتور في هذه الفترة."
             note={<>تظهر أيضاً مميَّزةً في <Link to="/clinic/payroll">الرواتب والأجور</Link> مع حصصهم من الإجراءات.</>} />
         </>
       )}
@@ -532,44 +552,134 @@ function DuesTab() {
   )
 }
 
-// ═══════ الإعدادات ═══════
-const FIELDS = [
-  ['price_without_drug', 'سعر الجلسة بلا دواء'],
-  ['price_with_drug', 'سعر الجلسة مع دواء'],
-  ['nurse_share', 'حصّة الممرضة (إلزامية)'],
-  ['doctor_share', 'حصّة الدكتور (إن وُجد)'],
-  ['shifa_share', 'سقف حصّة الشفاء'],
-]
-const HISTORY_LABELS = { ...Object.fromEntries(FIELDS), drug_material: 'مادة الدواء (سابقاً)' }
-const scenarioText = (s) => `${s.with_drug ? 'مع دواء' : 'بلا دواء'} ${s.with_doctor ? '+ دكتور' : '— بلا دكتور'}`
+// ═══════ الإعدادات: كتالوج الخدمات + الممرضات ═══════
+// قائمة الخدمات بجانب نموذج المختارة منها (حاسوب الاستقبال أوّلاً، وعلى الجوال تحتها). كلّ خدمة: الاسم، سعرٌ واحد
+// أو سعران، حصّتا الممرضة والدكتور مبلغاً أو نسبة (لفوق لأقرب 50)، وسقف الشفاء. وتحتها معاينة توزيعها بلا مواد.
+const BLANK_SERVICE = { name: '', dual_price: false, price: '', price_with_drug: '', nurse_kind: 'fixed', nurse_value: '',
+  doctor_kind: 'fixed', doctor_value: '0', shifa_cap: '' }
+const formOf = (x) => ({
+  name: x.name, dual_price: x.dual_price, price: String(x.price), price_with_drug: x.price_with_drug === null ? '' : String(x.price_with_drug),
+  nurse_kind: x.nurse.kind, nurse_value: String(x.nurse.value), doctor_kind: x.doctor.kind, doctor_value: String(x.doctor.value),
+  shifa_cap: String(x.shifa_cap),
+})
+const payloadOf = (f) => ({
+  name: f.name, dual_price: f.dual_price, price: f.price, ...(f.dual_price ? { price_with_drug: f.price_with_drug } : {}),
+  nurse: { kind: f.nurse_kind, value: f.nurse_value }, doctor: { kind: f.doctor_kind, value: f.doctor_value }, shifa_cap: f.shifa_cap,
+})
+const shareText = (sh) => (sh.kind === 'percent' ? `${fmtNum(sh.value)}%` : fmtNum(sh.value))
+const priceText = (x) => (x.dual_price ? `${fmtNum(x.price)} / ${fmtNum(x.price_with_drug)}` : fmtNum(x.price))
+const HISTORY_LABELS = { created: 'أُضيفت', name: 'الاسم', dual_price: 'سعران', price: 'السعر (بلا دواء)', price_with_drug: 'السعر مع دواء',
+  nurse: 'حصّة الممرضة', doctor: 'حصّة الدكتور', shifa_cap: 'سقف حصّة الشفاء', is_active: 'فعّالة' }
+const historyValue = (field, v) => (v === null ? '—' : field === 'dual_price' || field === 'is_active' ? (v === 'true' ? 'نعم' : 'لا') : v)
+const scenarioText = (x, s) => [x.dual_price ? (s.with_drug ? 'مع دواء' : 'بلا دواء') : 'السعر', x.doctor.value > 0 ? (s.with_doctor ? '+ دكتور' : '— بلا دكتور') : null].filter(Boolean).join(' ')
+
+/** مبلغ أو نسبة: حقل القيمة وبجانبه المفتاح — والقيمة بمعرّفها القديم (iron-nurse_share…) */
+function ShareField({ id, label, kind, value, disabled, onKind, onValue, hint }) {
+  return (
+    <div className="field svc-share">
+      <label htmlFor={id}>{label}</label>
+      <div className="svc-share-row">
+        <input id={id} value={value} inputMode="decimal" disabled={disabled} onChange={(e) => onValue(e.target.value)} />
+        <div className="svc-kind" role="radiogroup" aria-label={`${label}: مبلغ أو نسبة`}>
+          {[['fixed', 'ل.س'], ['percent', '%']].map(([k, t]) => (
+            <button key={k} type="button" role="radio" aria-checked={kind === k} disabled={disabled}
+              className={kind === k ? 'is-on' : ''} onClick={() => onKind(k)}>{t}</button>
+          ))}
+        </div>
+      </div>
+      {hint && <small className="hint">{hint}</small>}
+    </div>
+  )
+}
+
+function ServiceForm({ service, canWrite, onSaved, showToast }) {
+  const isNew = !service
+  const [f, setF] = useState(() => (isNew ? BLANK_SERVICE : formOf(service)))
+  const [err, setErr] = useState(null)
+  const [busy, setBusy] = useState(false)
+  useEffect(() => { setF(isNew ? BLANK_SERVICE : formOf(service)); setErr(null) }, [service?.id, isNew])
+  const set = (k) => (v) => setF((x) => ({ ...x, [k]: v }))
+  const base = isNew ? BLANK_SERVICE : formOf(service)
+  const dirty = Object.keys(f).some((k) => String(f[k]) !== String(base[k]))
+  const save = async (e) => {
+    e.preventDefault()
+    if (busy) return
+    setBusy(true); setErr(null)
+    try {
+      const out = isNew ? await api.clinic.addClinicService(payloadOf(f)) : await api.clinic.updateClinicService(service.id, payloadOf(f))
+      showToast(isNew ? `أُضيفت خدمة «${f.name.trim()}» — تظهر للاستقبال فوراً` : 'حُفظت الخدمة — تسري على الجلسات القادمة وحدها', 'success', 3500)
+      await onSaved(isNew ? out.id : service.id)
+    } catch (ex) { setErr(ex.message) } finally { setBusy(false) }
+  }
+  const toggle = async () => {
+    setBusy(true); setErr(null)
+    try {
+      await api.clinic.updateClinicService(service.id, { is_active: !service.is_active })
+      showToast(service.is_active ? `أُوقفت «${service.name}» — لا تظهر للاستقبال، وجلساتها القديمة باقية` : `فُعّلت «${service.name}»`, 'success', 3500)
+      await onSaved(service.id)
+    } catch (ex) { setErr(ex.message) } finally { setBusy(false) }
+  }
+  const off = !canWrite || busy
+  return (
+    <form onSubmit={save} className="svc-form">
+      <div className="earn-head"><h3>{isNew ? 'خدمة جديدة' : service.name}{!isNew && !service.is_active && <span className="badge sm"> موقوفة</span>}</h3></div>
+      <div className="field">
+        <label htmlFor="iron-svc-name">اسم الخدمة</label>
+        <input id="iron-svc-name" value={f.name} disabled={off} placeholder="مثال: رذاذ، تحليل سكر، إبرة عضل" onChange={(e) => set('name')(e.target.value)} />
+      </div>
+      <div className="field">
+        <span className="svc-label">السعر</span>
+        <div className="svc-kind svc-dual" role="radiogroup" aria-label="سعر واحد أو سعران">
+          {[[false, 'سعر واحد'], [true, 'سعران: بلا دواء / مع دواء']].map(([v, t]) => (
+            <button key={t} type="button" role="radio" aria-checked={f.dual_price === v} disabled={off}
+              className={f.dual_price === v ? 'is-on' : ''} onClick={() => set('dual_price')(v)}>{t}</button>
+          ))}
+        </div>
+      </div>
+      <div className="iron-settings-grid">
+        <div className="field">
+          <label htmlFor="iron-price_without_drug">{f.dual_price ? 'سعر الجلسة بلا دواء' : 'سعر الجلسة'}</label>
+          <input id="iron-price_without_drug" value={f.price} inputMode="decimal" disabled={off} onChange={(e) => set('price')(e.target.value)} />
+        </div>
+        {f.dual_price && <div className="field">
+          <label htmlFor="iron-price_with_drug">سعر الجلسة مع دواء</label>
+          <input id="iron-price_with_drug" value={f.price_with_drug} inputMode="decimal" disabled={off} onChange={(e) => set('price_with_drug')(e.target.value)} />
+        </div>}
+        <ShareField id="iron-nurse_share" label="حصّة الممرضة" kind={f.nurse_kind} value={f.nurse_value} disabled={off}
+          onKind={set('nurse_kind')} onValue={set('nurse_value')} hint={f.nurse_kind === 'percent' ? 'نسبةٌ من سعر الجلسة، لفوق لأقرب 50' : null} />
+        <ShareField id="iron-doctor_share" label="حصّة الدكتور" kind={f.doctor_kind} value={f.doctor_value} disabled={off}
+          onKind={set('doctor_kind')} onValue={set('doctor_value')}
+          hint={Number(f.doctor_value) === 0 ? 'صفر: خدمة بلا دكتور — لا يُسأل عنه عند التسجيل' : 'إن سُجّلت بدكتور'} />
+        <div className="field">
+          <label htmlFor="iron-shifa_share">سقف حصّة الشفاء</label>
+          <input id="iron-shifa_share" value={f.shifa_cap} inputMode="decimal" disabled={off} onChange={(e) => set('shifa_cap')(e.target.value)} />
+          <small className="hint">ما يزيد بعد الحصص والمواد يذهب لصندوق العيادات</small>
+        </div>
+      </div>
+      {err && <p className="error" role="alert">{err}</p>}
+      {canWrite && <button type="submit" disabled={!dirty || busy}>{busy ? 'جارٍ الحفظ…' : isNew ? 'إضافة الخدمة' : 'حفظ'}</button>}
+      {canWrite && !isNew && <button type="button" className="ghost svc-toggle" disabled={busy} onClick={toggle}>{service.is_active ? 'إيقاف الخدمة' : 'تفعيل الخدمة'}</button>}
+    </form>
+  )
+}
 
 function SettingsTab({ canWrite, showToast }) {
   const dialogs = useDialogs()
   const [data, setData] = useState(null)
-  const [form, setForm] = useState({})
   const [err, setErr] = useState(null)
-  const [busy, setBusy] = useState(false)
+  const [sel, setSel] = useState(null)       // معرّف الخدمة المختارة، أو 'new'
   const [newNurse, setNewNurse] = useState('')
 
-  const load = () => api.clinic.ironSettings().then((d) => {
+  const load = (pickId) => api.clinic.clinicServices().then((d) => {
     setData(d)
-    setForm(Object.fromEntries(FIELDS.map(([k]) => [k, String(d.settings[k])])))
+    setSel((cur) => pickId ?? (cur && (cur === 'new' || d.services.some((x) => x.id === cur)) ? cur : d.services[0]?.id ?? 'new'))
   }).catch((e) => setErr(e.message))
   useEffect(() => { load() }, [])
 
   if (err && !data) return <p className="error">{err}</p>
   if (!data) return <p className="empty">جارٍ التحميل…</p>
 
-  const dirty = FIELDS.some(([k]) => form[k] !== String(data.settings[k]))
-  const save = async (e) => {
-    e.preventDefault()
-    setBusy(true); setErr(null)
-    try {
-      await api.clinic.setIronSettings(form)
-      showToast('حُفظت الإعدادات — تسري على الجلسات القادمة وحدها', 'success', 3500)
-      await load()
-    } catch (ex) { setErr(ex.message) } finally { setBusy(false) }
-  }
+  const svc = sel === 'new' ? null : data.services.find((x) => x.id === sel)
   const addNurse = async (e) => {
     e.preventDefault()
     if (!newNurse.trim()) return
@@ -587,47 +697,51 @@ function SettingsTab({ canWrite, showToast }) {
 
   return (
     <>
-      <div className="card earn-card">
-        <div className="earn-head"><h3>الأسعار والحصص</h3></div>
-        <form onSubmit={save}>
-          <div className="iron-settings-grid">
-            {FIELDS.map(([k, label]) => (
-              <div className="field" key={k}>
-                <label htmlFor={`iron-${k}`}>{label}</label>
-                <input id={`iron-${k}`} value={form[k]} inputMode="decimal" disabled={!canWrite}
-                  onChange={(e) => setForm((f) => ({ ...f, [k]: e.target.value }))} />
-              </div>
+      <div className="card earn-card svc-card">
+        <div className="earn-head"><h3>الخدمات</h3>
+          {canWrite && <button type="button" className={sel === 'new' ? '' : 'ghost'} onClick={() => setSel('new')}>+ خدمة جديدة</button>}</div>
+        <div className="svc-layout">
+          <ul className="svc-list" aria-label="الخدمات">
+            {data.services.map((x) => (
+              <li key={x.id}>
+                <button type="button" className={`svc-item${sel === x.id ? ' is-on' : ''}${x.is_active ? '' : ' is-off'}`} aria-pressed={sel === x.id} onClick={() => setSel(x.id)}>
+                  <strong>{x.name}</strong>
+                  <span className="svc-item-meta"><bdi>{priceText(x)}</bdi> ل.س · ممرضة <bdi>{shareText(x.nurse)}</bdi>{x.doctor.value > 0 ? <> · دكتور <bdi>{shareText(x.doctor)}</bdi></> : ' · بلا دكتور'}</span>
+                  {!x.is_active && <span className="badge sm">موقوفة</span>}
+                </button>
+              </li>
             ))}
-          </div>
-          {err && <p className="error" role="alert">{err}</p>}
-          {canWrite && <button type="submit" disabled={!dirty || busy}>{busy ? 'جارٍ الحفظ…' : 'حفظ'}</button>}
-        </form>
+          </ul>
+          <ServiceForm key={sel} service={svc} canWrite={canWrite} showToast={showToast} onSaved={(id) => load(id)} />
+        </div>
       </div>
 
-      <div className="card earn-card">
-        <div className="earn-head"><h3>معاينة التوزيع بلا مواد</h3></div>
-        <p className="earn-note">المواد المضافة تُنقص الباقي: تأخذ الشفاء منه حتى سقفها، والزيادة للصندوق.</p>
-        <table className="rtable earn-table">
-          <thead><tr><th>الحالة</th><th>السعر</th><th>الممرضة</th><th>الدكتور</th><th>الشفاء</th><th>الزيادة للصندوق</th></tr></thead>
-          <tbody>
-            {data.preview.map((s) => (
-              <tr key={scenarioText(s)} className={s.negative ? 'earn-neg' : undefined}>
-                <td className="rt-title">{scenarioText(s)}</td>
-                <td className="num" data-label="السعر">{fmtNum(s.price)}</td>
-                <td className="num" data-label="الممرضة">{fmtNum(s.nurse)}</td>
-                <td className="num" data-label="الدكتور">{fmtNum(s.doctor)}</td>
-                <td className="num" data-label="الشفاء">{fmtNum(s.shifa)}</td>
-                <td className={`num${s.negative ? ' neg' : ''}`} data-label="الفاضل">
-                  {s.negative ? 'الحصص فوق السعر ⚠' : fmtNum(s.surplus)}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {data.preview.some((s) => s.negative) && (
-          <p className="share-warn" role="alert">⚠ الحالة المعلَّمة تُرفض عند التسجيل حتى تُحدَّث الأرقام: مجموع الحصّتين أكبر من سعر الجلسة.</p>
-        )}
-      </div>
+      {svc && (
+        <div className="card earn-card">
+          <div className="earn-head"><h3>معاينة توزيع «{svc.name}» بلا مواد</h3></div>
+          <p className="earn-note">المواد المضافة تُنقص الباقي: تأخذ الشفاء منه حتى سقفها، والزيادة للصندوق.</p>
+          <table className="rtable earn-table">
+            <thead><tr><th>الحالة</th><th>السعر</th><th>الممرضة</th><th>الدكتور</th><th>الشفاء</th><th>الزيادة للصندوق</th></tr></thead>
+            <tbody>
+              {svc.preview.map((s) => (
+                <tr key={scenarioText(svc, s)} className={s.negative ? 'earn-neg' : undefined}>
+                  <td className="rt-title">{scenarioText(svc, s)}</td>
+                  <td className="num" data-label="السعر">{fmtNum(s.price)}</td>
+                  <td className="num" data-label="الممرضة">{fmtNum(s.nurse)}</td>
+                  <td className="num" data-label="الدكتور">{fmtNum(s.doctor)}</td>
+                  <td className="num" data-label="الشفاء">{fmtNum(s.shifa)}</td>
+                  <td className={`num${s.negative ? ' neg' : ''}`} data-label="الفاضل">
+                    {s.negative ? 'الحصص فوق السعر ⚠' : fmtNum(s.surplus)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {svc.preview.some((s) => s.negative) && (
+            <p className="share-warn" role="alert">⚠ الحالة المعلَّمة تُرفض عند التسجيل حتى تُحدَّث الأرقام: مجموع الحصّتين أكبر من سعر الجلسة.</p>
+          )}
+        </div>
+      )}
 
       <div className="card earn-card">
         <div className="earn-head"><h3>الممرضات</h3></div>
@@ -658,11 +772,11 @@ function SettingsTab({ canWrite, showToast }) {
 
       {data.history.length > 0 && (
         <details className="card earn-card iron-history">
-          <summary>سجلّ تعديل الإعدادات</summary>
+          <summary>سجلّ تعديل الخدمات</summary>
           <ul>
             {data.history.map((h) => (
               <li key={h.id}>
-                {HISTORY_LABELS[h.field]}: <bdi>{h.old_value ?? '—'}</bdi> ← <bdi>{h.new_value ?? '—'}</bdi>
+                <strong>{h.service}</strong> — {h.field === 'created' ? 'أُضيفت' : <>{HISTORY_LABELS[h.field]}: <bdi>{historyValue(h.field, h.old_value)}</bdi> ← <bdi>{historyValue(h.field, h.new_value)}</bdi></>}
                 <span className="muted"> — {h.by_name} — {fmtDateTime(h.changed_at)}</span>
               </li>
             ))}
@@ -682,8 +796,14 @@ export default function IronSessions() {
   const [params, setParams] = useSearchParams()
   const tab = tabs.some(([k]) => k === params.get('tab')) ? params.get('tab') : 'log'
   const [toast, showToast] = useToast()
-  const [adding, setAdding] = useState(false)
+  const [adding, setAdding] = useState(false)      // false | {serviceId}
   const [reload, setReload] = useState(0)
+  // الخدمات الفعّالة لأزرار الرأس — للاستقبال والمشرفة (من يسجّل)، وتُعاد بعد كلّ حفظ
+  const [services, setServices] = useState([])
+  useEffect(() => {
+    if (!canCollectIron(role)) return
+    api.clinic.ironOptions().then((o) => setServices(o.services || [])).catch(() => setServices([]))
+  }, [role, reload, tab])
 
   // النافذة أُغلقت: الجلسة ظاهرة في سجلّ اليوم أيّاً كان التبويب أو الفترة، والرسالة تحمل ما كانت تقوله شاشة
   // النجاح من تحذيرات. الجلسة سُجّلت قبل هذا كلّه: فشل الطباعة رسالةٌ لا تراجع.
@@ -711,10 +831,20 @@ export default function IronSessions() {
       {toast}
       <div className="page-head">
         <div>
-          <h2>جلسات الحديد</h2>
-          <p className="subtitle">تسريب حديد مباشر: يُسجَّل ويُقبض فوراً — بلا دور ولا عيادة ولا حجز.</p>
+          <h2>خدمات العيادة</h2>
+          <p className="subtitle">حديد، رذاذ، تحاليل… تُسجَّل وتُقبض فوراً — بلا دور ولا عيادة ولا حجز.</p>
         </div>
-        {canCollectIron(role) && <button type="button" onClick={() => setAdding(true)}>+ جلسة حديد</button>}
+        {canCollectIron(role) && (
+          <div className="inline svc-add-btns">
+            {/* زرٌّ لكلّ خدمة (حتى ثلاث)، والباقي من «خدمة أخرى» — الخدمة تُختار داخل النافذة أيضاً */}
+            {(services.length > 4 ? services.slice(0, 3) : services).map((x, i) => (
+              <button key={x.id} type="button" className={i === 0 ? '' : 'ghost'} onClick={() => setAdding({ serviceId: x.id })}>+ جلسة {x.name}</button>
+            ))}
+            {(services.length === 0 || services.length > 4) && (
+              <button type="button" className={services.length ? 'ghost' : ''} onClick={() => setAdding({ serviceId: null })}>{services.length ? '+ خدمة أخرى' : '+ جلسة'}</button>
+            )}
+          </div>
+        )}
       </div>
       {tabs.length > 0 && (
         <div className="inline proc-tabs inv-tabs" role="tablist">
@@ -727,7 +857,7 @@ export default function IronSessions() {
       {tab === 'log' && <LogTab split={split} canPrint={canCollectIron(role)} canCancel={canCancelIron(role)} reload={reload} showToast={showToast} />}
       {tab === 'dues' && <DuesTab />}
       {tab === 'settings' && <SettingsTab canWrite={canWriteIronSettings(role)} showToast={showToast} />}
-      {adding && <IronSessionDialog onClose={() => setAdding(false)} onSaved={sessionSaved} />}
+      {adding && <IronSessionDialog initialServiceId={adding.serviceId} onClose={() => setAdding(false)} onSaved={sessionSaved} />}
     </>
   )
 }

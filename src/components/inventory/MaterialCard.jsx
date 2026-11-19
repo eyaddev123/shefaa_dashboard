@@ -41,7 +41,7 @@ function describe(e, unit) {
       return { tone: 'out', icon: '−', title: `استُعملت ${q(e.quantity)}${e.procedure_name ? ` — ${e.procedure_name}` : ''}`,
         details: [e.doctor_name && `عند ${e.doctor_name}`, e.patient_name && `للمريض ${e.patient_name}`] }
     case 'iron_return':
-      return { tone: 'good', icon: '+', title: `رجعت ${q(e.quantity)} من جلسة حديد انلغت`, details: [e.patient_name && `للمريض ${e.patient_name}`, e.note] }
+      return { tone: 'good', icon: '+', title: `رجعت ${q(e.quantity)} من ${e.procedure_name || 'جلسة'} انلغت`, details: [e.patient_name && `للمريض ${e.patient_name}`, e.note] }
     case 'adjustment':
       return { tone: 'warn', icon: '≈', title: `صحّحنا العدد بعد الجرد: ${e.quantity > 0 ? 'زادت' : 'نقصت'} ${q(e.quantity)}`,
         // ملاحظة الجرد الآلية («جرد: النظام … — الفعلي …») تكرارٌ للعنوان بأرقامٍ لاتينية: لا تُعرض
@@ -199,7 +199,7 @@ export default function MaterialCard({ id, refreshKey, canWrite, onBack, onPurch
             : costText(m.purchase_price)}
           sub={[m.purchase_price !== null && !Number.isInteger(m.purchase_price) && 'متوسّط الشراءات',
             m.last_cost === null ? 'ما في شراء مسجّل لسّا' : `آخر شراء بـ ${fmtMoney(m.last_cost)}${m.last_cost_date ? ` — ${fmtDay(m.last_cost_date)}` : ''}`].filter(Boolean).join(' — ')}
-          warn={m.purchase_price === null && !cons && m.is_active ? 'بيلزم لنعرف الربح ولتنحسب بجلسات الحديد صح' : null}
+          warn={m.purchase_price === null && !cons && m.is_active ? 'بيلزم لنعرف الربح ولتنحسب بخدمات العيادة صح' : null}
           action={write ? (m.purchase_price === null ? 'اكتبي السعر' : 'تغيير') : null} onAction={() => onEditCost(m)} />
         {!cons && (
           <Tile label="نبّهيني لما توصل لـ"

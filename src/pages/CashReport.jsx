@@ -228,27 +228,31 @@ function DoctorBlock({ d, open, onToggle, onLog }) {
   )
 }
 
-// جلسات الحديد: كتلةٌ مستقلّة بلا دكتورٍ تُنسب إليه — مبلغها داخل المجموع الكلي.
+// خدمات العيادة (حديد، رذاذ…): كتلةٌ مستقلّة بلا دكتورٍ تُنسب إليه — مبلغها داخل المجموع الكلي، وكلّ خدمةٍ باسمها.
 // وعليها إحالة: السعر والخصم بجانب المقبوض (السعر − الخصم)، كأعمدة الزيارة
 function IronBlock({ iron }) {
   const anyRef = iron.rows.some((r) => r.discount > 0)
   return (
     <section className="card cash-doc is-open iron-cash">
       <div className="iron-cash-head">
-        <strong>جلسات الحديد</strong>
+        <strong>خدمات العيادة</strong>
         <span className="cash-doc-count">{fmtNum(iron.totals.count)} {iron.totals.count === 1 ? 'جلسة' : 'جلسات'}</span>
         <span className="cash-doc-total"><Money value={iron.totals.total} /></span>
       </div>
+      {iron.totals.byService?.length > 1 && (
+        <p className="iron-cash-svcs">{iron.totals.byService.map((g) => (
+          <span key={g.name}>{g.name} <bdi>{fmtNum(g.count)}</bdi> — <bdi>{fmtNum(g.total)}</bdi></span>))}</p>
+      )}
       <div className="cash-doc-body">
         <table className="rtable earn-table">
-          <thead><tr><th>الوقت</th><th>المريض</th><th>النوع</th><th>الممرضة</th><th>الدكتور</th><th>القابضة</th>
+          <thead><tr><th>الوقت</th><th>المريض</th><th>الخدمة</th><th>الممرضة</th><th>الدكتور</th><th>القابضة</th>
             {anyRef && <><th>السعر</th><th>إحالة</th><th>خصم الإحالة</th></>}<th>المقبوض</th></tr></thead>
           <tbody>
             {iron.rows.map((r) => (
               <tr key={r.id}>
                 <td className="rt-badge" dir="ltr">{r.time}</td>
                 <td className="rt-title">{r.name}</td>
-                <td data-label="النوع">{r.kind}</td>
+                <td data-label="الخدمة">{r.service || 'حديد'}{r.kind && <span className="muted"> — {r.kind}</span>}</td>
                 <td data-label="الممرضة">{r.nurse}</td>
                 <td data-label="الدكتور">{r.doctor || <span className="muted">بلا دكتور</span>}</td>
                 <td data-label="القابضة">{r.by}</td>
@@ -280,7 +284,7 @@ function GrandTotal({ data }) {
             <span>{patientsText(totals.patients)}</span>
             <span>كشوف <bdi>{fmtNum(totals.fee)}</bdi></span>
             <span>إجراءات <bdi>{fmtNum(totals.procTotal)}</bdi></span>
-            {totals.iron > 0 && <span>جلسات الحديد <bdi>{fmtNum(totals.iron)}</bdi></span>}
+            {totals.iron > 0 && <span>خدمات العيادة <bdi>{fmtNum(totals.iron)}</bdi></span>}
             {totals.discount > 0 && <span>خصومات الإحالات <bdi dir="rtl">− {fmtNum(totals.discount)}</bdi></span>}
           </div>
         </div>
@@ -349,7 +353,7 @@ export default function CashReport() {
         <div>
           <h2>جرد الصندوق</h2>
           <p className="subtitle">
-            ما دخل الصندوق {date === today ? 'اليوم' : <>يوم <bdi dir="ltr">{date}</bdi></>} — دكتوراً دكتوراً، من حضر وحده، ومعه جلسات الحديد
+            ما دخل الصندوق {date === today ? 'اليوم' : <>يوم <bdi dir="ltr">{date}</bdi></>} — دكتوراً دكتوراً، من حضر وحده، ومعه خدمات العيادة
           </p>
         </div>
         <div className="cash-head-actions">

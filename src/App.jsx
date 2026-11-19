@@ -133,7 +133,7 @@ function Sidebar({ onNavigate }) {
         {/* العيادات: اليوميّ أولاً، ثمّ الإدارة (الدكاترة، الإجراءات، الإحالات)، ثمّ المال والتقارير. */}
         {canReadClinic(clinicRole) && <div className="nav-section">العيادات</div>}
         {canSeeClinicBoard(clinicRole) && <NavLink to="/clinic/board">{I.clinic} اللوحة اليومية</NavLink>}
-        {canSeeIronLog(clinicRole) && <NavLink to="/clinic/iron">{I.clinic} جلسات الحديد</NavLink>}
+        {canSeeIronLog(clinicRole) && <NavLink to="/clinic/iron">{I.clinic} خدمات العيادة</NavLink>}
         {canSeeDoctorScreen(clinicRole) && <NavLink to="/clinic/doctor">{I.clinic} شاشتي</NavLink>}
         {/* أرقام الطبيب في صفحتها وحدها — الشاشة الرئيسية بلا مبالغ */}
         {canSeeDoctorScreen(clinicRole) && <NavLink to="/clinic/my-patients">{I.clinic} مرضاي</NavLink>}

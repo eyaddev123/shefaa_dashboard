@@ -235,7 +235,7 @@ function Summary({ data, active }) {
         <strong className="dr-stat-val">{fmtNum(t.due)}<small> ل.س</small></strong>
         <span className="dr-stat-sub">رواتب {fmtNum(t.salary)}</span>
         <span className="dr-stat-foot">{t.procDoctor > 0 || t.ironDoctor > 0
-          ? ['وحصصهم من', t.procDoctor > 0 && `الإجراءات ${fmtNum(t.procDoctor)}`, t.ironDoctor > 0 && `${t.procDoctor > 0 ? 'و' : ''}الحديد ${fmtNum(t.ironDoctor)}`].filter(Boolean).join(' ')
+          ? ['وحصصهم من', t.procDoctor > 0 && `الإجراءات ${fmtNum(t.procDoctor)}`, t.ironDoctor > 0 && `${t.procDoctor > 0 ? 'و' : ''}خدمات العيادة ${fmtNum(t.ironDoctor)}`].filter(Boolean).join(' ')
           : 'بلا حصص من الإجراءات'}</span>
       </div>
       {data.punct && (
@@ -463,8 +463,8 @@ export function DoctorsTab({ canWrite, linkDashboard = false }) {
 
             {data.iron?.count > 0 && (
               <p className="dr-note iron-revenue">
-                جلسات الحديد ({fmtNum(data.iron.count)}) أدخلت للشفاء <strong>{fmtNum(data.iron.shifa)} ل.س</strong> خارج حساب الدكاترة —
-                فدخل الشفاء كلّه مع الحديد <strong>{fmtNum(data.revenue)} ل.س</strong>.
+                خدمات العيادة ({fmtNum(data.iron.count)} جلسة) أدخلت للشفاء <strong>{fmtNum(data.iron.shifa)} ل.س</strong> خارج حساب الدكاترة —
+                فدخل الشفاء كلّه مع الخدمات <strong>{fmtNum(data.revenue)} ل.س</strong>.
               </p>
             )}
             {data.noPay > 0 && (
@@ -497,7 +497,7 @@ export function DoctorsTab({ canWrite, linkDashboard = false }) {
                 <dt>الراتب</dt>
                 <dd>بإعداد الدكتور الحالي: مجموع ما اختير له من المرضى × سعر المريض، والأيام × اليومية، والساعات × سعر الساعة.</dd>
                 <dt>المستحقّ للدكتور</dt>
-                <dd>ما يُدفع له عن الفترة: راتبه بمكوّناته، ومعه حصّته من كلّ إجراءٍ قُبض في الفترة، وحصّته من جلسات الحديد.
+                <dd>ما يُدفع له عن الفترة: راتبه بمكوّناته، ومعه حصّته من كلّ إجراءٍ قُبض في الفترة، وحصّته من خدمات العيادة.
                   في وضع «يوم» هو حساب ذلك اليوم وحده، وتفصيله يوماً بيوم في لوحة الدكتور.</dd>
               </dl>
             </details>

@@ -79,9 +79,9 @@ function Totals({ t, iron, grand, purchase, doctorLabel = 'للدكاترة' }) 
     <section className="pex-totals" aria-label="المجموع">
       <div className="pex-big">
         <div className="pex-big-item is-hero">
-          <span className="pex-big-label">{doctorLabel}{hasIron ? ' (مع الحديد)' : ''}</span>
+          <span className="pex-big-label">{doctorLabel}{hasIron ? ' (مع الخدمات)' : ''}</span>
           <Money value={hasIron ? grand : t.doctor} className="pex-big-value" />
-          {hasIron && <span className="pex-big-sub">الإجراءات {fmtNum(t.doctor)}، والحديد {fmtNum(iron.share)} ({sessionsText(iron.count)})</span>}
+          {hasIron && <span className="pex-big-sub">الإجراءات {fmtNum(t.doctor)}، وخدمات العيادة {fmtNum(iron.share)} ({sessionsText(iron.count)})</span>}
         </div>
         <div className="pex-big-item">
           <span className="pex-big-label">للشفاء</span>
@@ -169,7 +169,7 @@ function DoctorDetail({ doctor, multiDay, canEdit, onReload, showToast }) {
       {doctor.iron?.count > 0 && (
         <div className="pex-day">
           <div className="refx-day-head">
-            <span><span className="badge sm iron-badge">حديد</span> جلسات الحديد</span>
+            <span><span className="badge sm iron-badge">خدمة</span> خدمات العيادة</span>
             <span className="refx-day-sum"><span className="refx-day-n">{sessionsText(doctor.iron.count)}</span>
               <span>حصّته <Money value={doctor.iron.share} /></span></span>
           </div>
@@ -179,7 +179,7 @@ function DoctorDetail({ doctor, multiDay, canEdit, onReload, showToast }) {
                 <div className="pex-line-main">
                   <span className="pex-time" dir="ltr">{l.time}</span>
                   <div className="pex-what">
-                    <span className="pex-proc">{l.withDrug ? 'جلسة حديد مع دواء' : 'جلسة حديد بلا دواء'}</span>
+                    <span className="pex-proc">جلسة {l.service || 'حديد'}{l.serviceDual === false ? '' : l.withDrug ? ' مع دواء' : ' بلا دواء'}</span>
                     <span className="pex-meta">{l.patient}، الممرضة {l.nurse}{multiDay && <>، {fmtLong(l.date)}</>}</span>
                   </div>
                   <div className="pex-split">
@@ -364,7 +364,7 @@ export default function ProcedureEarnings({ showToast, canEdit }) {
                       <button type="button" className="pex-doc" onClick={() => open(d.doctorId)} aria-label={`تفصيل ${d.doctor}`}>
                         <span className="pex-doc-who">
                           <span className="pex-doc-name">{d.doctor}</span>
-                          <span className="pex-meta">{d.specialty ? `${d.specialty}، ` : ''}{procsText(d.totals.count)}{d.iron?.count > 0 && `، و${sessionsText(d.iron.count)} حديد`}</span>
+                          <span className="pex-meta">{d.specialty ? `${d.specialty}، ` : ''}{procsText(d.totals.count)}{d.iron?.count > 0 && `، و${sessionsText(d.iron.count)} خدمات`}</span>
                           {(d.noRule > 0 || d.negative > 0) && (
                             <span className="pex-flags">
                               {d.negative > 0 && <span className="badge bad sm">الشفاء سالبة ({fmtNum(d.negative)})</span>}
@@ -385,7 +385,7 @@ export default function ProcedureEarnings({ showToast, canEdit }) {
                 })}
               </ul>
               <p className="pex-note">الأرقام من لقطة كلّ سطر لحظة تسجيله — تغيير قاعدةٍ أو سعرٍ لاحقاً لا يمسّها، والإجراء المُزال لا يُحسب.
-                {data.iron?.count > 0 && ' و«حصّته» تشمل الحديد.'}</p>
+                {data.iron?.count > 0 && ' و«حصّته» تشمل خدمات العيادة.'}</p>
             </section>
           </>
         )}

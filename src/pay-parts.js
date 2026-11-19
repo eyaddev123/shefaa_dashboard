@@ -81,7 +81,7 @@ export function accountLines(src, q) {
   const out = parts ? partLines(parts, src, q) : []
   if (src.procedures > 0) out.push({ key: 'procedures', label: 'الإجراءات',
     qty: countText(src.procedures, 'إجراء واحد', 'إجراءان', 'إجراءات', 'إجراءً'), value: src.procDoctor })
-  if (src.ironCount > 0) out.push({ key: 'iron', label: 'الحديد',
+  if (src.ironCount > 0) out.push({ key: 'iron', label: 'خدمات العيادة',
     qty: countText(src.ironCount, 'جلسة واحدة', 'جلستان', 'جلسات', 'جلسة'), value: src.ironDoctor })
   return out
 }

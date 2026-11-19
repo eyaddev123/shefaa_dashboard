@@ -81,7 +81,7 @@ function StatementBody({ st }) {
         <div className="dr-stat">
           <span className="dr-stat-lbl">من الإجراءات</span>
           <strong className="dr-stat-val">{fmtMoney(d.procDoctor)}</strong>
-          <span className="dr-stat-sub">{n(c.procedures)} إجراء{d.ironCount ? ` · حديد ${fmtMoney(d.ironDoctor)}` : ''}</span>
+          <span className="dr-stat-sub">{n(c.procedures)} إجراء{d.ironCount ? ` · خدمات ${fmtMoney(d.ironDoctor)}` : ''}</span>
         </div>
       </div>
 
@@ -136,7 +136,7 @@ function StatementBody({ st }) {
 
       {st.iron.length > 0 && (
         <section className="card pr-section">
-          <h3>جلسات الحديد ({n(st.iron.length)})</h3>
+          <h3>خدمات العيادة ({n(st.iron.length)})</h3>
           <table className="rtable pr-table">
             <thead><tr><th>التاريخ</th><th>المريض</th><th>الجلسة</th><th className="num">للطبيب</th></tr></thead>
             <tbody>
@@ -144,7 +144,7 @@ function StatementBody({ st }) {
                 <tr key={i}>
                   <td data-label="التاريخ" className="pr-nowrap">{dayOf(x.date)}</td>
                   <td className="rt-title">{x.patient}</td>
-                  <td data-label="الجلسة">{x.withDrug ? 'مع الدواء' : 'بلا دواء'}</td>
+                  <td data-label="الجلسة">{x.service || 'حديد'}{x.serviceDual === false ? '' : x.withDrug ? ' — مع الدواء' : ' — بلا دواء'}</td>
                   <td data-label="للطبيب" className="num">{fmtMoney(x.share)}</td>
                 </tr>
               ))}

@@ -14,7 +14,10 @@ import { printViaHelper } from '../print-helper.js'
 import { ReferralRow, useReferralOptions } from './ReferralFields.jsx'
 import { blankReferral, referralReady, ironReferralPayload, ironDraftDiscount, draftFromIronReferral } from '../referral.js'
 
-// ═══ تسجيل جلسة حديد — نافذة الاستقبال ═══
+// ═══ تسجيل جلسة خدمة عيادة (حديد، رذاذ، تحاليل…) — نافذة الاستقبال ═══
+// ★ منذ 2026-11-19: الخدمة من الكتالوج أوّلاً (initialServiceId من زرّها في رأس الصفحة، أو تُختار هنا حين يكون
+//   في الكتالوج أكثر من خدمة). منها السعر — واحدٌ أو سعران (مع/بلا دوا) — وهل لها دكتور: الخدمة بلا حصّة دكتور
+//   لا يظهر لها حقل الدكتور، والخدمة بسعرٍ واحد لا يظهر لها «النوع».
 // تسجيلٌ وقبضٌ بضغطةٍ واحدة: لا دور ولا عيادة ولا حجز. «مع/بلا دوا» يحدّد السعر وحده، والخادم هو من
 // يحسبه ويوزّعه. «مع/بلا دوا» والممرضة بلا اختيارٍ مسبق: تغيّران المبلغ والمستحقات، فلا يمرّان بافتراضٍ
 // لم يره أحد. والدكتور اختياري: الافتراض «بلا دكتور» وهو خيارٌ مكتوبٌ في القائمة.
@@ -38,10 +41,10 @@ const NO_DOCTOR = 'بلا دكتور / محوّل من خارج الجمعية'
 const MIN_CLOSE_MS = 300
 const isThreePart = (v) => v.trim().split(/\s+/).filter(Boolean).length >= 3
 // حقول الخادم (field في ردّ الخطأ) بأسماء النموذج
-const SERVER_FIELDS = { full_name: 'name', mobile: 'mobile', nurse_id: 'nurse', doctor_id: 'doctor', with_drug: 'with_drug', reason: 'ov_reason', edit_reason: 'edit_reason', doctor_share: 'ov_doctor', nurse_share: 'ov_nurse',
+const SERVER_FIELDS = { service_id: 'service', full_name: 'name', mobile: 'mobile', nurse_id: 'nurse', doctor_id: 'doctor', with_drug: 'with_drug', reason: 'ov_reason', edit_reason: 'edit_reason', doctor_share: 'ov_doctor', nurse_share: 'ov_nurse',
   'referral.referral_source_id': 'referral', 'referral.discount_type': 'referral', 'referral.discount_value': 'referral' }
 // بترتيب ظهورها: التركيز ينزل لأوّل ناقص
-const FOCUS_ORDER = [['name', '#iron-name'], ['mobile', '#iron-mobile'], ['nurse', '#iron-nurse'], ['doctor', '#iron-doctor'], ['with_drug', '.iron-choice'],
+const FOCUS_ORDER = [['service', '.iron-svc'], ['name', '#iron-name'], ['mobile', '#iron-mobile'], ['nurse', '#iron-nurse'], ['doctor', '#iron-doctor'], ['with_drug', '.iron-choice'],
   ['materials', '.mat-qty.is-bad'], ['referral', '#iron-ref-source'], ['ov_doctor', '#iron-ov-doctor'], ['ov_nurse', '#iron-ov-nurse'], ['ov_reason', '#iron-ov-reason'],
   ['edit_reason', '#iron-edit-reason']]
 
@@ -84,18 +87,34 @@ function DrugChoice({ value, prices, onPick }) {
   )
 }
 
+/** اختيار الخدمة: زرٌّ لكلّ خدمةٍ فعّالة، بسعرها (أو «من … إلى …» للسعرين) */
+function ServiceChoice({ services, value, onPick }) {
+  return (
+    <div className="iron-choices iron-svcs" role="radiogroup" aria-label="الخدمة">
+      {services.map((s) => (
+        <button key={s.id} type="button" role="radio" aria-checked={value === s.id}
+          className={`iron-choice iron-svc${value === s.id ? ' is-on' : ''}`} onClick={() => onPick(s.id)}>
+          <span className="iron-choice-label">{s.name}</span>
+          <span className="iron-choice-price">{s.dual ? `${fmtNum(s.prices.without_drug)} – ${fmtNum(s.prices.with_drug)}` : fmtNum(s.prices.without_drug)} <small>ل.س</small></span>
+        </button>
+      ))}
+    </div>
+  )
+}
+
 /**
  * ما سيتغيّر في الجلسة بالكلام — مرآة ما يكتبه الخادم في أثرها (iron_session_edits)، للعرض قبل الحفظ.
  * @returns {{key:string, label:string, old:string|null, new:string|null}[]}
  */
-function changeList({ session, picked, name, nurseId, doctorId, withDrug, items, price, opts }) {
+function changeList({ session, picked, name, nurseId, doctorId, withDrug, items, price, opts, service }) {
   const out = []
   const nameOf = (list, id) => list.find((x) => String(x.id) === String(id))?.name
   const add = (key, label, o, n) => out.push({ key, label, old: o, new: n })
+  if (service && session.serviceId && String(service.id) !== String(session.serviceId)) add('service', 'الخدمة', session.service, service.name)
   if (picked ? String(picked.id) !== String(session.patientId) : name.trim() !== '') add('patient', 'المريض', session.patient, picked ? picked.full_name : name.trim())
   if (String(nurseId) !== String(session.nurseId)) add('nurse', 'الممرضة', session.nurse, nameOf(opts.nurses, nurseId) || '—')
   if (String(doctorId || '') !== String(session.doctorId || '')) add('doctor', 'الدكتور', session.doctor || 'بلا دكتور', doctorId ? nameOf(opts.doctors, doctorId) || '—' : 'بلا دكتور')
-  if (withDrug !== null && withDrug !== session.withDrug) add('with_drug', 'النوع', session.withDrug ? 'مع دواء' : 'بلا دواء', withDrug ? 'مع دواء' : 'بلا دواء')
+  if (withDrug !== null && withDrug !== session.withDrug && (service?.dual || session.serviceDual !== false)) add('with_drug', 'النوع', session.withDrug ? 'مع دواء' : 'بلا دواء', withDrug ? 'مع دواء' : 'بلا دواء')
   if (price !== null && price !== session.price) add('price', 'السعر', fmtNum(session.price), fmtNum(price))
   const before = new Map(session.materials.map((m) => [String(m.material_id), m]))
   const after = new Map(items.map((m) => [String(m.material_id), m]))
@@ -125,7 +144,7 @@ function ChangePreview({ changes }) {
   )
 }
 
-export default function IronSessionDialog({ onClose, onSaved, session = null }) {
+export default function IronSessionDialog({ onClose, onSaved, session = null, initialServiceId = null }) {
   const editing = session !== null
   const { clinicRole: role } = useRole()
   const canOverride = canWriteIronSettings(role)
@@ -139,6 +158,7 @@ export default function IronSessionDialog({ onClose, onSaved, session = null }) 
   const [referral, setReferral] = useState(null)    // null = بلا إحالة · مسوّدة ورقة (بلا نطاق)
   const refOpts = useReferralOptions(referral !== null)
   const [loadErr, setLoadErr] = useState(null)
+  const [serviceId, setServiceId] = useState(editing ? session.serviceId : initialServiceId)
   const [withDrug, setWithDrug] = useState(editing ? session.withDrug : null)
   const [nurseId, setNurseId] = useState(editing ? session.nurseId : '')
   const [doctorId, setDoctorId] = useState(editing ? session.doctorId || '' : '')
@@ -157,7 +177,11 @@ export default function IronSessionDialog({ onClose, onSaved, session = null }) 
   // ضغطتان سريعتان تسبقان رسم الزرّ معطّلاً: جلستان ومالٌ مرّتين. القفل مرجعٌ لا حالة.
   const sending = useRef(false)
 
-  const load = () => api.clinic.ironOptions().then(setOpts).catch((e) => setLoadErr(e.message))
+  const load = () => api.clinic.ironOptions().then((o) => {
+    setOpts(o)
+    // خدمةٌ واحدة فعّالة: هي المختارة (لا اختيار غيرها) — وأكثر: تُختار صراحةً أو من زرّها
+    setServiceId((v) => v ?? (o.services?.length === 1 ? o.services[0].id : null))
+  }).catch((e) => setLoadErr(e.message))
   useEffect(() => {
     load()
     // التعديل: المريض مختارٌ من البداية — «ليس هو» يفتح البحث لغيره
@@ -192,35 +216,46 @@ export default function IronSessionDialog({ onClose, onSaved, session = null }) 
   // رقمٌ مكتوب يختلف عن رقم المختار؟ (الفارغ ليس تغييراً)
   const pickedMobileDiffers = picked && cleanMobile(mobile) !== '' && cleanMobile(mobile) !== cleanMobile(picked.mobile || '')
 
-  // سعر النوع المسجَّل سعرُ الجلسة نفسه (لقطة)، والنوع الآخر من الإعدادات — كما يحسبه الخادم
-  const prices = !opts ? null : !editing ? opts.prices : {
-    without_drug: session.withDrug ? opts.prices.without_drug : session.price,
-    with_drug: session.withDrug ? session.price : opts.prices.with_drug }
-  const price = prices && withDrug !== null ? (withDrug ? prices.with_drug : prices.without_drug) : null
+  // الخدمة المختارة — والجلسة القائمة على خدمةٍ أُوقفت بعدها: تبقى لها بلقطتها
+  const services = opts?.services || []
+  const sameService = editing && String(serviceId) === String(session.serviceId)
+  const service = services.find((x) => String(x.id) === String(serviceId))
+    || (sameService ? { id: session.serviceId, name: session.service, dual: session.serviceDual !== false,
+      prices: { without_drug: session.price, with_drug: session.price }, with_doctor: true } : null)
+  const dual = !!service?.dual
+  const kind = dual ? withDrug : service ? false : null
+  // سعر النوع المسجَّل سعرُ الجلسة نفسه (لقطة)، والنوع الآخر والخدمة الأخرى من الكتالوج — كما يحسبه الخادم
+  const prices = !opts || !service ? null : !sameService ? service.prices : {
+    without_drug: session.withDrug ? service.prices.without_drug : session.price,
+    with_drug: session.withDrug ? session.price : service.prices.with_drug }
+  const price = prices && kind !== null ? (kind ? prices.with_drug : prices.without_drug) : null
+  // حقل الدكتور: للخدمة التي لها حصّة دكتور — أو جلسةٍ قائمة لها دكتور أصلاً (يُرفع منها)
+  const showDoctor = !!service && (service.with_doctor || (sameService && !!session.doctorId))
   // التعديل: إحالة الجلسة القائمة تُعاد على السعر الجديد (الخادم يحسبها) — والمعاينة مرآتها
   const editRef = editing && session.referral ? draftFromIronReferral(session.referral) : null
   const discount = editRef ? ironDraftDiscount(editRef, price) : referral ? ironDraftDiscount(referral, price) : 0
   const pay = price === null ? null : Math.max(0, price - discount)
   const oldPaid = editing ? (session.paid ?? session.price) : null
-  const changes = editing && opts ? changeList({ session, picked, name, nurseId, doctorId, withDrug, items, price, opts }) : []
+  const changes = editing && opts ? changeList({ session, picked, name, nurseId, doctorId: showDoctor ? doctorId : '', withDrug: kind, items, price, opts, service }) : []
 
   const validate = () => {
     const e = {}
+    if (!service) e.service = 'اختاري الخدمة — منها يتحدّد المبلغ'
     if (!picked && !name.trim()) e.name = 'اكتبي اسم المريض'
     else if (!picked && !isThreePart(name)) e.name = 'الاسم الثلاثي مطلوب: الاسم واسم الأب والكنية'
     if ((!picked || pickedMobileDiffers) && mobileError(mobile)) e.mobile = mobileError(mobile)
     if (!nurseId) e.nurse = 'اختاري الممرضة'
-    if (withDrug === null) e.with_drug = 'اختاري النوع: مع دواء أو بلا دواء — منه يتحدّد المبلغ'
+    if (service && dual && withDrug === null) e.with_drug = 'اختاري النوع: مع دواء أو بلا دواء — منه يتحدّد المبلغ'
     if (!qtyValid(items)) e.materials = 'صحّحي الكمّية المعلَّمة: رقمٌ أكبر من صفر'
     if (editing && !editReason.trim()) e.edit_reason = 'اكتبي سبب التعديل — يُحفظ مع الجلسة'
     if (referral && !referralReady(referral))
       e.referral = !referral.referral_source_id ? 'اختاري الجهة المحيلة — أو ألغي «معه إحالة؟»' : 'قيمة الخصم رقمٌ أكبر من صفر (النسبة حتى 100%)'
     if (override) {
-      const d = doctorId ? readAmountInput(override.doctor_share) : { empty: true }
+      const d = showDoctor && doctorId ? readAmountInput(override.doctor_share) : { empty: true }
       const n = readAmountInput(override.nurse_share)
       if (d.error) e.ov_doctor = 'مبلغٌ غير صالح'
       if (n.error) e.ov_nurse = 'مبلغٌ غير صالح'
-      if (d.empty && n.empty) e[doctorId ? 'ov_doctor' : 'ov_nurse'] = 'اكتبي الحصّة المعدَّلة'
+      if (d.empty && n.empty) e[showDoctor && doctorId ? 'ov_doctor' : 'ov_nurse'] = 'اكتبي الحصّة المعدَّلة'
       if (!override.reason.trim()) e.ov_reason = 'سبب تعديل الحصّة مطلوب'
     }
     return e
@@ -255,11 +290,12 @@ export default function IronSessionDialog({ onClose, onSaved, session = null }) 
     sending.current = true
     setBusy(true)
     const startedAt = Date.now()
+    const docId = showDoctor ? doctorId || null : null
     const body = {
-      with_drug: withDrug, nurse_id: nurseId, doctor_id: doctorId || null, materials: toPayload(items),
+      service_id: service.id, with_drug: kind, nurse_id: nurseId, doctor_id: docId, materials: toPayload(items),
       ...(editing ? { reason: editReason } : {}),
       ...(!editing && referral ? { referral: ironReferralPayload(referral) } : {}),
-      ...(!editing && override ? { share_override: { ...override, doctor_share: doctorId ? override.doctor_share : '' } } : {}),
+      ...(!editing && override ? { share_override: { ...override, doctor_share: docId ? override.doctor_share : '' } } : {}),
       ...(picked
         ? { patient_id: picked.id,
             ...(mobileDecision === 'update' ? { update_mobile: true, mobile: cleanMobile(mobile) } : {}) }
@@ -292,18 +328,33 @@ export default function IronSessionDialog({ onClose, onSaved, session = null }) 
       } else setErr(ex.message)
       // ممرضةٌ أُوقفت بعد فتح النافذة: تختفي من القائمة فلا تبقى مختارةً خفيةً
       if (ex.data?.field === 'nurse_id') { setNurseId(''); load() }
+      // خدمةٌ أُوقفت بعد فتح النافذة: تختفي من الاختيار
+      if (ex.data?.code === 'SERVICE_INACTIVE') { setServiceId(null); load() }
     } finally { sending.current = false; setBusy(false) }
   }
+  // ترقيم المجموعات بما يظهر منها: الخدمة (إن اختيرت هنا) ⇐ المريض ⇐ الطاقم ⇐ النوع (للسعرين) ⇐ المواد ⇐ الأخيرة
+  const N = (() => {
+    const order = [...((services.length > 1 || (editing && !sameService) || !service) ? ['service'] : []), 'patient', 'staff', ...(dual ? ['kind'] : []), 'materials', 'last']
+    return Object.fromEntries(order.map((k, i) => [k, String(i + 1)]))
+  })()
   // Enter في حقل نصّ لا يقبض مالاً: الحفظ بالزرّ وحده (وبحث المواد له Enter خاصّ به)
   const noEnterSubmit = (e) => { if (e.key === 'Enter' && e.target.tagName === 'INPUT') e.preventDefault() }
 
   return (
-    <Modal title={editing ? `تعديل جلسة ${session.patient}` : 'جلسة حديد جديدة'}
+    <Modal title={editing ? `تعديل جلسة ${session.patient}` : service ? `جلسة ${service.name} جديدة` : 'جلسة جديدة'}
       subtitle={editing ? `سُجّلت ${session.date} الساعة ${session.time} — كلّ تعديلٍ يُحفظ بسببه ويراه من يفتح الجلسة` : 'تُسجَّل وتُقبض فوراً — بلا دور ولا عيادة'}
       onClose={onClose} busy={busy} wide sheet>
       {loadErr ? <p className="error">{loadErr}</p> : !opts ? <p className="empty">جارٍ التحميل…</p> : (
         <form onSubmit={submit} onKeyDown={noEnterSubmit} onChange={() => setServerField(null)} className="iron-form" noValidate>
-          <Section n="1" title="المريض">
+          {(services.length > 1 || (editing && !sameService) || !service) && (
+            <Section n={N.service} title="الخدمة" note="يحدّد المبلغ">
+              <ServiceChoice services={services} value={serviceId == null ? null : String(serviceId)}
+                onPick={(v) => { setServiceId(v); setWithDrug(editing && String(v) === String(session.serviceId) ? session.withDrug : null); setServerField(null) }} />
+              {services.length === 0 && <small className="hint warn-hint">ما في خدمات فعّالة — تُضاف من الإعدادات</small>}
+              <FieldError id="iron-err-service" msg={errors.service} />
+            </Section>
+          )}
+          <Section n={N.patient} title="المريض">
             <div className="bf-row">
               <div className="field">
                 <label htmlFor="iron-name">اسم المريض الثلاثي</label>
@@ -343,7 +394,7 @@ export default function IronSessionDialog({ onClose, onSaved, session = null }) 
             )}
           </Section>
 
-          <Section n="2" title="الطاقم">
+          <Section n={N.staff} title="الطاقم">
             <div className="bf-row">
               <div className="field">
                 <label htmlFor="iron-nurse">الممرضة</label>
@@ -353,22 +404,22 @@ export default function IronSessionDialog({ onClose, onSaved, session = null }) 
                 <FieldError id="iron-err-nurse" msg={errors.nurse} />
                 {opts.nurses.length === 0 && <small className="hint warn-hint">ما في ممرضات — تُضاف من الإعدادات</small>}
               </div>
-              <div className="field">
+              {showDoctor && <div className="field">
                 <label htmlFor="iron-doctor">الدكتور <span className="opt">(اختياري)</span></label>
                 <Combobox id="iron-doctor" value={doctorId} onChange={(v) => { setDoctorId(v); setServerField(null) }}
                   options={[{ value: '', label: NO_DOCTOR }, ...[...opts.doctors].sort(byNameAr).map((d) => ({ value: d.id, label: d.name }))]}
                   invalid={!!errors.doctor} describedBy={errors.doctor ? 'iron-err-doctor' : undefined} />
                 <FieldError id="iron-err-doctor" msg={errors.doctor} />
-              </div>
+              </div>}
             </div>
           </Section>
 
-          <Section n="3" title="النوع" note="يحدّد المبلغ">
+          {dual && <Section n={N.kind} title="النوع" note="يحدّد المبلغ">
             <DrugChoice value={withDrug} prices={prices} onPick={setWithDrug} />
             <FieldError id="iron-err-with_drug" msg={errors.with_drug} />
-          </Section>
+          </Section>}
 
-          <Section n="4" title="المواد" note="أمبولة، قسطرة، محلول…">
+          <Section n={N.materials} title="المواد" note="أمبولة، قسطرة، محلول…">
             <div className="iron-materials">
               <MaterialsEditor catalog={catalog} value={items} onChange={setItems} disabled={busy} saved={savedItems.current} />
               {items.length === 0 && <small className="hint">لم تُضف مواد بعد.</small>}
@@ -376,7 +427,7 @@ export default function IronSessionDialog({ onClose, onSaved, session = null }) 
             </div>
           </Section>
 
-          {!editing && <Section n="5" title="الإحالة" note="اختياري">
+          {!editing && <Section n={N.last} title="الإحالة" note="اختياري">
             <div className={`ref-box iron-ref${referral ? ' open' : ''}`}>
               <label className="ref-toggle">
                 <input type="checkbox" checked={referral !== null} disabled={busy}
@@ -388,7 +439,7 @@ export default function IronSessionDialog({ onClose, onSaved, session = null }) 
                   <ReferralRow value={referral} onChange={setReferral} scopes={null} idPrefix="iron-ref" combo
                     options={refOpts.options} optionsErr={refOpts.err} discount={{ total: discount }} disabled={busy} />
                   <p className="ref-due" aria-live="polite">
-                    {price === null ? 'اختاري النوع ليظهر الخصم.' : <>السعر {fmtNum(price)} ← خصم الإحالة {fmtNum(discount)} ← المطلوب من المريض <strong>{fmtNum(pay)}</strong></>}
+                    {price === null ? (service ? 'اختاري النوع ليظهر الخصم.' : 'اختاري الخدمة ليظهر الخصم.') : <>السعر {fmtNum(price)} ← خصم الإحالة {fmtNum(discount)} ← المطلوب من المريض <strong>{fmtNum(pay)}</strong></>}
                   </p>
                   <small className="hint">الخصم على الجهة المحيلة — حصص الممرضة والدكتور والشفاء تبقى من السعر الكامل.</small>
                 </>
@@ -398,7 +449,7 @@ export default function IronSessionDialog({ onClose, onSaved, session = null }) 
           </Section>}
 
           {editing && (
-            <Section n="5" title="ما سيتغيّر" note="يُحفظ مع سببه">
+            <Section n={N.last} title="ما سيتغيّر" note="يُحفظ مع سببه">
               <ChangePreview changes={changes} />
               {session.referral && <small className="hint">إحالة {session.referral.source}: خصمها يُعاد على السعر الجديد تلقائياً — وتُعدَّل من زرّ «الإحالة».</small>}
               <div className="field iron-edit-reason">
@@ -418,7 +469,7 @@ export default function IronSessionDialog({ onClose, onSaved, session = null }) 
             <fieldset className="iron-override">
               <legend>تعديل الحصّة لهذه الجلسة وحدها</legend>
               <div className="bf-row">
-                {doctorId && <div className="field"><label htmlFor="iron-ov-doctor">حصّة الدكتور</label>
+                {showDoctor && doctorId && <div className="field"><label htmlFor="iron-ov-doctor">حصّة الدكتور</label>
                   <input id="iron-ov-doctor" inputMode="decimal" value={override.doctor_share} {...invalidProps('ov_doctor')} onChange={(e) => setOverride((o) => ({ ...o, doctor_share: e.target.value }))} />
                   <FieldError id="iron-err-ov_doctor" msg={errors.ov_doctor} /></div>}
                 <div className="field"><label htmlFor="iron-ov-nurse">حصّة الممرضة</label>
@@ -437,7 +488,7 @@ export default function IronSessionDialog({ onClose, onSaved, session = null }) 
             <div className="iron-pay">
               <span className="iron-pay-label">{editing ? 'المبلغ بعد التعديل' : 'المبلغ الذي سيُقبض'}</span>
               {price === null
-                ? <span className="iron-pay-none">اختاري النوع أولاً</span>
+                ? <span className="iron-pay-none">{service ? 'اختاري النوع أولاً' : 'اختاري الخدمة أولاً'}</span>
                 : <strong className="iron-pay-amount">{fmtNum(pay)} <small>ل.س</small></strong>}
               {price !== null && discount > 0 && <small className="iron-pay-ref">بعد خصم الإحالة {fmtNum(discount)} من {fmtNum(price)}</small>}
               {editing && pay !== null && (

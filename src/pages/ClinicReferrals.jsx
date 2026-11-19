@@ -247,7 +247,7 @@ export default function ClinicReferrals() {
     && (!needle || matchesAr(v.patient, needle) || matchesAr(v.doctor, needle) || String(v.doc).includes(needle)))
   const due = scoped.reduce((s, v) => s + v.due, 0)
   const byKind = (k) => scopedLines.filter((l) => l.kind === k).reduce((s, l) => s + l.discount, 0)
-  const parts = [['visit', 'الكشف'], ['procedure', 'الإجراءات'], ['iron', 'الحديد']]
+  const parts = [['visit', 'الكشف'], ['procedure', 'الإجراءات'], ['iron', 'خدمات العيادة']]
     .map(([k, label]) => ({ k, label, v: byKind(k) })).filter((p) => p.v > 0)
   const patients = new Set(scoped.map((v) => v.patient)).size
   const totals = data?.totals || []

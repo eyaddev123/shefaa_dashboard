@@ -55,13 +55,13 @@ export default function StatementSheet({ st, printedAt }) {
 
       {st.iron.length > 0 && (
         <>
-          <h2 className="pay-h2" data-unit>جلسات الحديد ({n(st.iron.length)})</h2>
+          <h2 className="pay-h2" data-unit>خدمات العيادة ({n(st.iron.length)})</h2>
           <table className="pay-table">
             <thead><tr data-unit><th className="pay-num">#</th><th>التاريخ</th><th>اسم المريض</th><th>الجلسة</th><th className="pay-amt">للطبيب</th></tr></thead>
             <tbody>
               {st.iron.map((x, i) => (
                 <tr key={i} data-unit><td className="pay-num">{n(i + 1)}</td><td className="pay-date">{day(x.date)}</td>
-                  <td className="pay-name">{x.patient}</td><td>{x.withDrug ? 'مع الدواء' : 'بلا دواء'}</td><td className="pay-amt">{n(x.share)}</td></tr>
+                  <td className="pay-name">{x.patient}</td><td>{x.service || 'حديد'}{x.serviceDual === false ? '' : x.withDrug ? ' — مع الدواء' : ' — بلا دواء'}</td><td className="pay-amt">{n(x.share)}</td></tr>
               ))}
             </tbody>
           </table>

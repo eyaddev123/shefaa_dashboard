@@ -244,6 +244,10 @@ export const api = {
     ironSessions: ({ period, from, to }) => http(`/clinic/iron/sessions?${new URLSearchParams(period ? { period } : { from, to: to || from })}`),
     ironDues: ({ period, from, to }) => http(`/clinic/iron/dues?${new URLSearchParams(period ? { period } : { from, to: to || from })}`),
     ironSettings: () => http('/clinic/iron/settings'),
+    // كتالوج خدمات العيادة (حديد، رذاذ، تحاليل…) — قراءةٌ لمن يرى التوزيع، وكتابةٌ للمشرفة
+    clinicServices: () => http('/clinic/services'),
+    addClinicService: (body) => http('/clinic/services', { method: 'POST', body: JSON.stringify(body) }),
+    updateClinicService: (id, body) => http(`/clinic/services/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
     setIronSettings: (body) => http('/clinic/iron/settings', { method: 'PUT', body: JSON.stringify(body) }),
     addNurse: (body) => http('/clinic/iron/nurses', { method: 'POST', body: JSON.stringify(body) }),
     updateNurse: (id, body) => http(`/clinic/iron/nurses/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),

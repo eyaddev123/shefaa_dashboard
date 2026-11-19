@@ -11,7 +11,7 @@ import { fmtNum, signed, pctText, DailyChart } from './ProfitBoard.jsx'
 export const GROUPS = [
   { key: 'materials', label: 'مواد الإجراءات', filter: 'الداخل من المواد', hint: 'ثمن المواد المصروفة للمرضى',
     kinds: ['material_sale', 'material_edit', 'material_reversal'], count: 'material_sale', unit: 'إجراء' },
-  { key: 'iron', label: 'جلسات الحديد', filter: 'الداخل من الحديد', hint: 'استرداد الدواء والفائض',
+  { key: 'iron', label: 'خدمات العيادة', filter: 'الداخل من خدمات العيادة', hint: 'استرداد الدواء والفائض',
     kinds: ['iron_drug', 'iron_surplus', 'iron_materials', 'iron_drug_rev', 'iron_surplus_rev', 'iron_materials_rev', 'iron_materials_edit', 'iron_surplus_edit'],
     count: 'iron_surplus', unit: 'جلسة' },
   { key: 'purchase', label: 'شراء المواد', filter: 'المسحوب لشراء المواد', hint: 'تحوّل إلى بضاعة في المخزون',
