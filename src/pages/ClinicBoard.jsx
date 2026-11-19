@@ -389,7 +389,9 @@ function ClinicsTab({ sessions, rooms, role, date, canCloseSession, onOpen, onCh
           {sessions.map((s) => {
             const st = clinicState(s)
             return (
-              <tr key={s.id} className={`cbx-row is-${st.key}`}>
+              // السطر كلّه يفتح الدور كما كان قبل النفض (طلب المستخدم 2026-11-19) — الأزرار وحدها لا تفتحه
+              <tr key={s.id} className={`cbx-row is-${st.key} clickable`}
+                onClick={(e) => { if (!e.target.closest('button,a,input')) onOpen(s) }}>
                 <td className="rt-title">
                   <div className="cbx-doc">
                     <span className="cbx-name">{s.doctor_name}{rooms && <RoomBadge room={rooms[s.doctor_id]} />}</span>

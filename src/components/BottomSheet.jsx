@@ -12,12 +12,19 @@ export default function BottomSheet({ title, subtitle, onClose, children, footer
   const start = useRef(null)
   const cardRef = useRef(null)
 
+  // ★ (2026-11-19) كان التأثير يتبع onClose — دالّةٌ جديدة مع كلّ رسم عند الأب — فيُعاد مع كلّ حرف
+  //   ويسحب التركيز إلى الورقة: «نحذف حرفاً فيقف، ونكبس على الخانة من جديد». الآن: Esc عبر ref،
+  //   والتركيز مرّةً واحدة عند الفتح وحده، ولا يُنتزع من خانةٍ داخل الورقة (autoFocus).
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
   useEffect(() => {
-    const k = (e) => { if (e.key === 'Escape') onClose() }
+    const k = (e) => { if (e.key === 'Escape') onCloseRef.current() }
     window.addEventListener('keydown', k)
-    cardRef.current?.focus()
     return () => window.removeEventListener('keydown', k)
-  }, [onClose])
+  }, [])
+  useEffect(() => {
+    if (!cardRef.current?.contains(document.activeElement)) cardRef.current?.focus()
+  }, [])
 
   // زرّ الإغلاق داخل منطقة السحب: لا يُلتقط مؤشّره وإلا ابتلع الالتقاطُ نقرته
   const down = (e) => {
