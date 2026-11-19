@@ -6328,13 +6328,8 @@ button.dk-pick:disabled .dk-pick-price { opacity: 0.7; }
 :root .visit-head .vs-trigger { border-color: color-mix(in srgb, var(--text-secondary) 35%, transparent); }
 
 /* ═══ خدمات العيادة (2026-11-19): أزرار الرأس، اختيار الخدمة، الكتالوج ═══ */
-.svc-add-btns { gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
-.iron-choices.iron-svcs { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
-.iron-form .iron-svc { min-height: 72px; }
-.iron-form .iron-svc .iron-choice-price { font-size: 15px; }
-.ir-svc-filter { gap: 6px; flex-wrap: wrap; margin: 4px 0 10px; }
-.ir-svc-filter button { padding: 5px 12px; }
-.ir-svc-filter small { color: inherit; opacity: .75; margin-inline-start: 4px; }
+.ir-svc-filter { max-width: 320px; margin: 4px 0 10px; }
+.iron-svc-field { max-width: 420px; }
 .iron-cash-svcs { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0; padding: 0 18px 6px; font-size: 13px; color: var(--text-secondary); }
 .svc-layout { display: grid; grid-template-columns: minmax(220px, 300px) 1fr; gap: 18px; align-items: start; }
 .svc-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
@@ -6359,5 +6354,4 @@ button.dk-pick:disabled .dk-pick-price { opacity: 0.7; }
 .svc-toggle { margin-inline-start: 8px; }
 @media (max-width: 760px) {
   .svc-layout { grid-template-columns: 1fr; }
-  .svc-add-btns { justify-content: flex-start; }
 }

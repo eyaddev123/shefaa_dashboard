@@ -8,6 +8,7 @@ import { canCancelIron, canCollectIron, canSeeIronSplit, canWriteIronSettings } 
 import IronSessionDialog, { printIronReceipt } from '../components/IronSessionDialog.jsx'
 import { materialsSummary } from '../components/MaterialsEditor.jsx'
 import { Modal, fmtQty } from '../components/inventory/shared.jsx'
+import Combobox from '../components/Combobox.jsx'
 import { loadPrinter } from '../ticket-print.js'
 import { usePeriod, PeriodPicker, useLoad } from './ClinicFunds.jsx'
 import { fundOf, previewShareEdit } from '../iron-shares.js'
@@ -419,7 +420,7 @@ function LogTab({ split, canPrint, canCancel, reload, showToast }) {
           <div className="ir-strip">
             <div className="ir-stat"><span>الجلسات</span><strong>{fmtNum(t.count)}</strong>
               {/* خدمةٌ واحدة في الفترة: «مع دواء» كما كان · أكثر: عدد كلّ خدمة (والتصفية تحتها) */}
-              <small>{byService.length > 1 ? byService.map((g) => `${g.name} ${fmtNum(g.count)}`).join(' · ')
+              <small>{byService.length > 1 ? `${fmtNum(byService.length)} خدمات — ${byService.slice(0, 2).map((g) => `${g.name} ${fmtNum(g.count)}`).join(' · ')}${byService.length > 2 ? '…' : ''}`
                 : t.withDrug > 0 ? `منها ${fmtNum(t.withDrug)} مع دواء` : byService[0] && !data.rows.some((x) => x.serviceDual !== false) ? byService[0].name : 'كلّها بلا دواء'}
                 {t.cancelled > 0 && ` · ملغاة ${fmtNum(t.cancelled)}`}</small></div>
             <div className="ir-stat is-hero"><span>المقبوض</span><strong><Money value={t.paid ?? t.price} /></strong>
@@ -432,12 +433,11 @@ function LogTab({ split, canPrint, canCancel, reload, showToast }) {
             </>}
           </div>
           {byService.length > 1 && (
-            <div className="inline ir-svc-filter" role="group" aria-label="تصفية بالخدمة">
-              <button type="button" className={svc ? 'ghost' : ''} aria-pressed={!svc} onClick={() => setSvc(null)}>الكل <small>{fmtNum(t.count)}</small></button>
-              {byService.map((g) => (
-                <button key={g.id} type="button" className={svc === g.id ? '' : 'ghost'} aria-pressed={svc === g.id} onClick={() => setSvc(g.id)}>
-                  {g.name} <small>{fmtNum(g.count)} · {fmtNum(g.paid)}</small></button>
-              ))}
+            <div className="field ir-svc-filter">
+              <label htmlFor="ir-svc-filter">الخدمة</label>
+              <Combobox id="ir-svc-filter" value={svc || ''} onChange={(v) => setSvc(v || null)}
+                options={[{ value: '', label: 'كل الخدمات', meta: `${fmtNum(t.count)} ${t.count === 1 ? 'جلسة' : 'جلسات'}` },
+                  ...byService.map((g) => ({ value: g.id, label: g.name, meta: `${fmtNum(g.count)} · ${fmtNum(g.paid)} ل.س` }))]} />
             </div>
           )}
           {t.overPrice > 0 && <p className="ir-alert">جلسات موادّها فوق السعر: {fmtNum(t.overPrice)} — الشفاء فيها صفر. افتحي الجلسة لمراجعتها.</p>}
@@ -798,12 +798,6 @@ export default function IronSessions() {
   const [toast, showToast] = useToast()
   const [adding, setAdding] = useState(false)      // false | {serviceId}
   const [reload, setReload] = useState(0)
-  // الخدمات الفعّالة لأزرار الرأس — للاستقبال والمشرفة (من يسجّل)، وتُعاد بعد كلّ حفظ
-  const [services, setServices] = useState([])
-  useEffect(() => {
-    if (!canCollectIron(role)) return
-    api.clinic.ironOptions().then((o) => setServices(o.services || [])).catch(() => setServices([]))
-  }, [role, reload, tab])
 
   // النافذة أُغلقت: الجلسة ظاهرة في سجلّ اليوم أيّاً كان التبويب أو الفترة، والرسالة تحمل ما كانت تقوله شاشة
   // النجاح من تحذيرات. الجلسة سُجّلت قبل هذا كلّه: فشل الطباعة رسالةٌ لا تراجع.
@@ -834,17 +828,7 @@ export default function IronSessions() {
           <h2>خدمات العيادة</h2>
           <p className="subtitle">حديد، رذاذ، تحاليل… تُسجَّل وتُقبض فوراً — بلا دور ولا عيادة ولا حجز.</p>
         </div>
-        {canCollectIron(role) && (
-          <div className="inline svc-add-btns">
-            {/* زرٌّ لكلّ خدمة (حتى ثلاث)، والباقي من «خدمة أخرى» — الخدمة تُختار داخل النافذة أيضاً */}
-            {(services.length > 4 ? services.slice(0, 3) : services).map((x, i) => (
-              <button key={x.id} type="button" className={i === 0 ? '' : 'ghost'} onClick={() => setAdding({ serviceId: x.id })}>+ جلسة {x.name}</button>
-            ))}
-            {(services.length === 0 || services.length > 4) && (
-              <button type="button" className={services.length ? 'ghost' : ''} onClick={() => setAdding({ serviceId: null })}>{services.length ? '+ خدمة أخرى' : '+ جلسة'}</button>
-            )}
-          </div>
-        )}
+        {canCollectIron(role) && <button type="button" onClick={() => setAdding({ serviceId: null })}>+ إضافة جلسة</button>}
       </div>
       {tabs.length > 0 && (
         <div className="inline proc-tabs inv-tabs" role="tablist">

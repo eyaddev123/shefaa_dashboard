@@ -44,7 +44,7 @@ const isThreePart = (v) => v.trim().split(/\s+/).filter(Boolean).length >= 3
 const SERVER_FIELDS = { service_id: 'service', full_name: 'name', mobile: 'mobile', nurse_id: 'nurse', doctor_id: 'doctor', with_drug: 'with_drug', reason: 'ov_reason', edit_reason: 'edit_reason', doctor_share: 'ov_doctor', nurse_share: 'ov_nurse',
   'referral.referral_source_id': 'referral', 'referral.discount_type': 'referral', 'referral.discount_value': 'referral' }
 // بترتيب ظهورها: التركيز ينزل لأوّل ناقص
-const FOCUS_ORDER = [['service', '.iron-svc'], ['name', '#iron-name'], ['mobile', '#iron-mobile'], ['nurse', '#iron-nurse'], ['doctor', '#iron-doctor'], ['with_drug', '.iron-choice'],
+const FOCUS_ORDER = [['service', '#iron-service'], ['name', '#iron-name'], ['mobile', '#iron-mobile'], ['nurse', '#iron-nurse'], ['doctor', '#iron-doctor'], ['with_drug', '.iron-choice'],
   ['materials', '.mat-qty.is-bad'], ['referral', '#iron-ref-source'], ['ov_doctor', '#iron-ov-doctor'], ['ov_nurse', '#iron-ov-nurse'], ['ov_reason', '#iron-ov-reason'],
   ['edit_reason', '#iron-edit-reason']]
 
@@ -87,20 +87,8 @@ function DrugChoice({ value, prices, onPick }) {
   )
 }
 
-/** اختيار الخدمة: زرٌّ لكلّ خدمةٍ فعّالة، بسعرها (أو «من … إلى …» للسعرين) */
-function ServiceChoice({ services, value, onPick }) {
-  return (
-    <div className="iron-choices iron-svcs" role="radiogroup" aria-label="الخدمة">
-      {services.map((s) => (
-        <button key={s.id} type="button" role="radio" aria-checked={value === s.id}
-          className={`iron-choice iron-svc${value === s.id ? ' is-on' : ''}`} onClick={() => onPick(s.id)}>
-          <span className="iron-choice-label">{s.name}</span>
-          <span className="iron-choice-price">{s.dual ? `${fmtNum(s.prices.without_drug)} – ${fmtNum(s.prices.with_drug)}` : fmtNum(s.prices.without_drug)} <small>ل.س</small></span>
-        </button>
-      ))}
-    </div>
-  )
-}
+/** اختيار الخدمة: قائمةٌ منسدلة بالبحث (الكتالوج قد يبلغ عشرين خدمة — طلب المستخدم: لا مربّعات) */
+const servicePriceText = (s) => (s.dual ? `${fmtNum(s.prices.without_drug)} / ${fmtNum(s.prices.with_drug)} ل.س` : `${fmtNum(s.prices.without_drug)} ل.س`)
 
 /**
  * ما سيتغيّر في الجلسة بالكلام — مرآة ما يكتبه الخادم في أثرها (iron_session_edits)، للعرض قبل الحفظ.
@@ -348,10 +336,14 @@ export default function IronSessionDialog({ onClose, onSaved, session = null, in
         <form onSubmit={submit} onKeyDown={noEnterSubmit} onChange={() => setServerField(null)} className="iron-form" noValidate>
           {(services.length > 1 || (editing && !sameService) || !service) && (
             <Section n={N.service} title="الخدمة" note="يحدّد المبلغ">
-              <ServiceChoice services={services} value={serviceId == null ? null : String(serviceId)}
-                onPick={(v) => { setServiceId(v); setWithDrug(editing && String(v) === String(session.serviceId) ? session.withDrug : null); setServerField(null) }} />
-              {services.length === 0 && <small className="hint warn-hint">ما في خدمات فعّالة — تُضاف من الإعدادات</small>}
-              <FieldError id="iron-err-service" msg={errors.service} />
+              <div className="field iron-svc-field">
+                <label htmlFor="iron-service">نوع الجلسة</label>
+                <Combobox id="iron-service" value={serviceId == null ? '' : String(serviceId)} placeholder="— اختاري الخدمة —"
+                  onChange={(v) => { setServiceId(v); setWithDrug(editing && String(v) === String(session.serviceId) ? session.withDrug : null); setServerField(null) }}
+                  options={services.map((x) => ({ value: String(x.id), label: x.name, meta: servicePriceText(x) }))}
+                  emptyText="ما في خدمات فعّالة — تُضاف من الإعدادات" invalid={!!errors.service} describedBy={errors.service ? 'iron-err-service' : undefined} />
+                <FieldError id="iron-err-service" msg={errors.service} />
+              </div>
             </Section>
           )}
           <Section n={N.patient} title="المريض">
