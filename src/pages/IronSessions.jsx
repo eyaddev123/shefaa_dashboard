@@ -301,7 +301,9 @@ function SessionSheet({ r, split, actions, onClose }) {
             <span>{r.referral ? 'دفعه المريض' : 'المبلغ المقبوض'}</span>
             <strong><Money value={r.paid ?? r.price} /></strong>
             {r.referral && <small>من {fmtNum(r.price)} — خصم {fmtNum(r.discount)} على {r.referral.source}{r.referral.referral_doc_number && <> (ورقة <bdi>{r.referral.referral_doc_number}</bdi>)</>}</small>}
-            {r.extrasTotal > 0 && <small>السعر {fmtNum(r.basePrice)} + مواد زيادة {fmtNum(r.extrasTotal)} ({r.extras.map((x) => `${x.name} ×${fmtNum(x.qty)}`).join('، ')})</small>}
+            {r.extrasTotal > 0 && (r.feeMode
+              ? <small>الأجرة {fmtNum(r.basePrice)} + مواد {fmtNum(r.extrasTotal - r.consumables)}{r.consumables > 0 && ` + مستهلكات ${fmtNum(r.consumables)}`}</small>
+              : <small>السعر {fmtNum(r.basePrice)} + مواد زيادة {fmtNum(r.extrasTotal)} ({r.extras.map((x) => `${x.name} ×${fmtNum(x.qty)}`).join('، ')})</small>)}
           </div>
           <div className="ir-fact"><span>الخدمة</span><strong>{r.service || 'حديد'}</strong></div>
           {r.serviceDual !== false && <div className="ir-fact"><span>النوع</span><strong>{drugText(r.withDrug)}</strong></div>}
@@ -579,7 +581,7 @@ const HISTORY_LABELS = { created: 'أُضيفت', name: 'الاسم', dual_price
   nurse: 'حصّة الممرضة', doctor: 'حصّة الدكتور', shifa_cap: 'سقف حصّة الشفاء', is_active: 'فعّالة',
   charge_extras: 'الزيادة على المريض', included: 'المشمول', included_with: 'المشمول مع دواء' }
 const historyValue = (field, v) => (v === null ? '—' : ['dual_price', 'is_active', 'charge_extras'].includes(field) ? (v === 'true' ? 'نعم' : 'لا') : v)
-const scenarioText = (x, s) => [x.dual_price ? (s.with_drug ? 'مع دواء' : 'بلا دواء') : 'السعر', x.doctor.value > 0 ? (s.with_doctor ? '+ دكتور' : '— بلا دكتور') : null].filter(Boolean).join(' ')
+const scenarioText = (x, s) => [x.dual_price ? (s.with_drug ? 'مع دواء' : 'بلا دواء') : 'الأجرة', x.doctor.value > 0 ? (s.with_doctor ? '+ دكتور' : '— بلا دكتور') : null].filter(Boolean).join(' ')
 
 /** مبلغ أو نسبة: حقل القيمة وبجانبه المفتاح — والقيمة بمعرّفها القديم (iron-nurse_share…) */
 function ShareField({ id, label, kind, value, disabled, onKind, onValue, hint }) {
@@ -600,7 +602,7 @@ function ShareField({ id, label, kind, value, disabled, onKind, onValue, hint })
   )
 }
 
-function ServiceForm({ service, canWrite, onSaved, showToast, onClose }) {
+function ServiceForm({ service, canWrite, onSaved, showToast, onClose, feeMode = false }) {
   const isNew = !service
   const [f, setF] = useState(() => (isNew ? BLANK_SERVICE : formOf(service)))
   const [err, setErr] = useState(null)
@@ -621,7 +623,8 @@ function ServiceForm({ service, canWrite, onSaved, showToast, onClose }) {
     if (busy) return
     setBusy(true); setErr(null)
     try {
-      const out = isNew ? await api.clinic.addClinicService(payloadOf(f)) : await api.clinic.updateClinicService(service.id, payloadOf(f))
+      const body = payloadOf(feeMode ? { ...f, dual_price: false } : f)
+      const out = isNew ? await api.clinic.addClinicService(body) : await api.clinic.updateClinicService(service.id, body)
       showToast(isNew ? `أُضيفت خدمة «${f.name.trim()}» — تظهر للاستقبال فوراً` : 'حُفظت الخدمة — تسري على الجلسات القادمة وحدها', 'success', 3500)
       await onSaved(isNew ? out.id : service.id)
     } catch (ex) { setErr(ex.message) } finally { setBusy(false) }
@@ -641,7 +644,7 @@ function ServiceForm({ service, canWrite, onSaved, showToast, onClose }) {
         <label htmlFor="iron-svc-name">اسم الخدمة</label>
         <input id="iron-svc-name" value={f.name} disabled={off} placeholder="مثال: رذاذ، تحليل سكر، إبرة عضل" onChange={(e) => set('name')(e.target.value)} />
       </div>
-      <div className="field">
+      {!feeMode && <div className="field">
         <span className="svc-label">السعر</span>
         <div className="svc-kind svc-dual" role="radiogroup" aria-label="سعر واحد أو سعران">
           {[[false, 'سعر واحد'], [true, 'سعران: بلا دواء / مع دواء']].map(([v, t]) => (
@@ -649,40 +652,42 @@ function ServiceForm({ service, canWrite, onSaved, showToast, onClose }) {
               className={f.dual_price === v ? 'is-on' : ''} onClick={() => set('dual_price')(v)}>{t}</button>
           ))}
         </div>
-      </div>
+      </div>}
       <div className="iron-settings-grid">
         <div className="field">
-          <label htmlFor="iron-price_without_drug">{f.dual_price ? 'سعر الجلسة بلا دواء' : 'سعر الجلسة'}</label>
+          <label htmlFor="iron-price_without_drug">{feeMode ? 'أجرة الإيد' : f.dual_price ? 'سعر الجلسة بلا دواء' : 'سعر الجلسة'}</label>
           <input id="iron-price_without_drug" value={f.price} inputMode="decimal" disabled={off} onChange={(e) => set('price')(e.target.value)} />
         </div>
-        {f.dual_price && <div className="field">
+        {!feeMode && f.dual_price && <div className="field">
           <label htmlFor="iron-price_with_drug">سعر الجلسة مع دواء</label>
           <input id="iron-price_with_drug" value={f.price_with_drug} inputMode="decimal" disabled={off} onChange={(e) => set('price_with_drug')(e.target.value)} />
         </div>}
         <ShareField id="iron-nurse_share" label="حصّة الممرضة" kind={f.nurse_kind} value={f.nurse_value} disabled={off}
-          onKind={set('nurse_kind')} onValue={set('nurse_value')} hint={f.nurse_kind === 'percent' ? 'نسبةٌ من سعر الجلسة، لفوق لأقرب 50' : null} />
+          onKind={set('nurse_kind')} onValue={set('nurse_value')} hint={f.nurse_kind === 'percent' ? `نسبةٌ من ${feeMode ? 'الأجرة' : 'سعر الجلسة'}، لفوق لأقرب 50` : null} />
         <ShareField id="iron-doctor_share" label="حصّة الدكتور" kind={f.doctor_kind} value={f.doctor_value} disabled={off}
           onKind={set('doctor_kind')} onValue={set('doctor_value')}
           hint={Number(f.doctor_value) === 0 ? 'صفر: خدمة بلا دكتور — لا يُسأل عنه عند التسجيل' : 'إن سُجّلت بدكتور'} />
         <div className="field">
           <label htmlFor="iron-shifa_share">سقف حصّة الشفاء</label>
           <input id="iron-shifa_share" value={f.shifa_cap} inputMode="decimal" disabled={off} onChange={(e) => set('shifa_cap')(e.target.value)} />
-          <small className="hint">ما يزيد بعد الحصص والمواد يذهب لصندوق العيادات</small>
+          <small className="hint">{feeMode ? 'ما يزيد من الأجرة بعد الحصص يذهب لصندوق العيادات' : 'ما يزيد بعد الحصص والمواد يذهب لصندوق العيادات'}</small>
         </div>
       </div>
+      {feeMode && <p className="hint svc-fee-hint">الحصص والشفاء من الأجرة وحدها، والمواد (والدواء منها) والمستهلكات تُضاف فوقها على المريض.</p>}
       <fieldset className="svc-included">
-        <legend>المواد المشمولة بالسعر</legend>
-        <p className="hint">ما يُصرف عادةً في الجلسة. عند التسجيل تُعبّأ وحدها، والاستقبال تزيد أو تنقص.</p>
-        <label className="svc-extras-toggle">
+        <legend>{feeMode ? 'المواد المعتادة' : 'المواد المشمولة بالسعر'}</legend>
+        <p className="hint">{feeMode ? 'ما يُصرف عادةً في الجلسة: يُعبّأ وحده عند التسجيل، والاستقبال تزيد أو تنقص أو تشيل. كلّ مادة على المريض بسعر بيعها — لا أثر لهذه القائمة بالسعر.'
+          : 'ما يُصرف عادةً في الجلسة. عند التسجيل تُعبّأ وحدها، والاستقبال تزيد أو تنقص.'}</p>
+        {!feeMode && <label className="svc-extras-toggle">
           <input type="checkbox" checked={f.charge_extras} disabled={off} onChange={(e) => set('charge_extras')(e.target.checked)} />
           ما يُصرف فوق المشمول يُضاف على المريض بسعر البيع
-        </label>
-        {!f.charge_extras && <small className="hint warn-hint">متوقّف: كلّ المواد تُطرح من سعر الجلسة كما كان، والمريض يدفع السعر وحده.</small>}
-        {[['inc_without', f.dual_price ? 'بلا دواء' : null], ...(f.dual_price ? [['inc_with', 'مع دواء']] : [])].map(([k, title]) => (
+        </label>}
+        {!feeMode && !f.charge_extras && <small className="hint warn-hint">متوقّف: كلّ المواد تُطرح من سعر الجلسة كما كان، والمريض يدفع السعر وحده.</small>}
+        {[['inc_without', f.dual_price && !feeMode ? 'بلا دواء' : null], ...(f.dual_price && !feeMode ? [['inc_with', 'مع دواء']] : [])].map(([k, title]) => (
           <div key={k} className="svc-inc-group">
             {title && <h5>{title}</h5>}
-            <MaterialsEditor catalog={catalog} value={f[k]} onChange={set(k)} disabled={off} comboHint="أضيفي مادة مشمولة…" />
-            {f[k].length === 0 && <small className="hint">{f.charge_extras ? 'لا شيء مشمول — كلّ مادة تُضاف على المريض.' : 'لا شيء مشمول.'}</small>}
+            <MaterialsEditor catalog={catalog} value={f[k]} onChange={set(k)} disabled={off} comboHint={feeMode ? 'أضيفي مادة معتادة…' : 'أضيفي مادة مشمولة…'} />
+            {f[k].length === 0 && <small className="hint">{feeMode ? 'لا مواد معتادة — الاستقبال تضيف ما يُصرف.' : f.charge_extras ? 'لا شيء مشمول — كلّ مادة تُضاف على المريض.' : 'لا شيء مشمول.'}</small>}
           </div>
         ))}
         {incBad && <small className="iron-err" role="alert">صحّحي الكمّية المعلَّمة: رقمٌ أكبر من صفر</small>}
@@ -726,8 +731,14 @@ function ServicePreview({ svc }) {
 }
 
 /** بطاقة خدمة في الكتالوج: الضغط يفتح نافذة تعديلها */
-function ServiceCard({ x, onOpen }) {
-  const rows = [
+function ServiceCard({ x, onOpen, feeMode = false }) {
+  const rows = feeMode ? [
+    ['الأجرة', <bdi>{fmtNum(x.price)}</bdi>],
+    ['الممرضة', <bdi>{shareText(x.nurse)}</bdi>],
+    ['الدكتور', x.doctor.value > 0 ? <bdi>{shareText(x.doctor)}</bdi> : 'بلا دكتور'],
+    ['سقف الشفاء', <bdi>{fmtNum(x.shifa_cap)}</bdi>],
+    ['المواد المعتادة', includedSummary(x.included?.without)],
+  ] : [
     ['السعر', x.dual_price ? <><bdi>{fmtNum(x.price)}</bdi> بلا دواء · <bdi>{fmtNum(x.price_with_drug)}</bdi> مع دواء</> : <bdi>{fmtNum(x.price)}</bdi>],
     ['الممرضة', <bdi>{shareText(x.nurse)}</bdi>],
     ['الدكتور', x.doctor.value > 0 ? <bdi>{shareText(x.doctor)}</bdi> : 'بلا دكتور'],
@@ -740,7 +751,7 @@ function ServiceCard({ x, onOpen }) {
   return (
     <button type="button" className={`svc-cardx${x.is_active ? '' : ' is-off'}`} onClick={onOpen} aria-label={`${x.name} — تعديل`}>
       <span className="svc-cardx-head"><strong>{x.name}</strong>{!x.is_active && <span className="badge sm">موقوفة</span>}</span>
-      <dl>{rows.map(([k, v]) => <div key={k} className={k === 'المشمول بالسعر' ? 'svc-inc-row' : undefined}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
+      <dl>{rows.map(([k, v]) => <div key={k} className={k === 'المشمول بالسعر' || k === 'المواد المعتادة' ? 'svc-inc-row' : undefined}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
     </button>
   )
 }
@@ -781,7 +792,7 @@ function SettingsTab({ canWrite, showToast }) {
           {canWrite && <button type="button" onClick={() => setOpen('new')}>+ خدمة جديدة</button>}</div>
         {data.services.length === 0 ? <p className="empty">لا خدمات بعد.</p> : (
           <div className="svc-cards">
-            {data.services.map((x) => <ServiceCard key={x.id} x={x} onOpen={() => setOpen(x.id)} />)}
+            {data.services.map((x) => <ServiceCard key={x.id} x={x} feeMode={!!data.fee_mode} onOpen={() => setOpen(x.id)} />)}
           </div>
         )}
         <p className="earn-note">اضغطي على الخدمة لتعديل سعرها وحصصها أو إيقافها — التعديل يسري على الجلسات القادمة وحدها.</p>
@@ -791,7 +802,7 @@ function SettingsTab({ canWrite, showToast }) {
         <Modal title={open === 'new' ? 'خدمة جديدة' : `${canWrite ? 'تعديل' : ''} ${svc.name}`.trim()}
           subtitle={open === 'new' ? 'تظهر للاستقبال فور إضافتها' : svc.is_active ? 'تسري التعديلات على الجلسات القادمة وحدها' : 'موقوفة — لا تظهر للاستقبال'}
           onClose={() => setOpen(null)} wide sheet>
-          <ServiceForm key={open} service={svc} canWrite={canWrite} showToast={showToast}
+          <ServiceForm key={open} service={svc} canWrite={canWrite} showToast={showToast} feeMode={!!data.fee_mode}
             onClose={() => setOpen(null)} onSaved={async () => { setOpen(null); await load() }} />
           {svc && <ServicePreview svc={svc} />}
         </Modal>

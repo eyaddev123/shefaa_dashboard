@@ -325,7 +325,12 @@ export const ironReceiptFrom = (s) => ({
     title: !s.service || s.service === 'حديد' ? 'إيصال جلسة تسريب حديد' : `إيصال جلسة ${s.service}`,
     lines: [(s.service_dual ?? s.serviceDual) === false ? null : (s.with_drug ?? s.withDrug) ? 'مع دواء' : 'بلا دواء',
       // الزيادة فوق المشمول: سطرٌ بموادّها ومبلغها (يدفعها المريض)
-      (s.extras_total ?? s.extrasTotal) > 0 ? `مواد زيادة: ${(s.extras || []).map((x) => `${x.name} ×${Number(x.qty)}`).join('، ')} — ${Number(s.extras_total ?? s.extrasTotal).toLocaleString('en-US')}` : null,
+      // «أجرة + مواد»: الأجرة ثمّ المواد والمستهلكات بمبالغها — وقبلها: الزيادة فوق المشمول
+      ...((s.fee_mode ?? s.feeMode) ? [
+        `الأجرة: ${Number(s.base_price ?? s.basePrice).toLocaleString('en-US')}`,
+        (s.extras || []).length ? `مواد: ${s.extras.map((x) => `${x.name} ×${Number(x.qty)}`).join('، ')} — ${Number((s.extras_total ?? s.extrasTotal) - (s.consumables || 0)).toLocaleString('en-US')}` : null,
+        Number(s.consumables) > 0 ? `مستهلكات: ${Number(s.consumables).toLocaleString('en-US')}` : null,
+      ] : [(s.extras_total ?? s.extrasTotal) > 0 ? `مواد زيادة: ${(s.extras || []).map((x) => `${x.name} ×${Number(x.qty)}`).join('، ')} — ${Number(s.extras_total ?? s.extrasTotal).toLocaleString('en-US')}` : null]),
       s.doctor, s.by && `القابضة: ${s.by}`].filter(Boolean),
   },
   full_name: s.patient,

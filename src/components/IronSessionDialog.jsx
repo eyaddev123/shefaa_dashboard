@@ -6,6 +6,7 @@ import { Modal } from './inventory/shared.jsx'
 import Combobox, { byNameAr } from './Combobox.jsx'
 import { readAmountInput } from '../iron-shares.js'
 import MaterialsEditor, { qtyValid, toPayload } from './MaterialsEditor.jsx'
+import ConsumablesCounter from './ConsumablesCounter.jsx'
 import { useDialogs } from '../dialogs.jsx'
 import { useRole } from '../RoleContext.jsx'
 import { canSeeInventory, canWriteIronSettings } from '../permissions.js'
@@ -21,6 +22,8 @@ import { blankReferral, referralReady, ironReferralPayload, ironDraftDiscount, d
 // ★ المشمول (جولة 2): باختيار الخدمة والنوع تُعبّأ المواد المشمولة بسعرها (للجلسة الجديدة، ما لم تُغيَّر المواد يدوياً)،
 //   وما يُصرف فوقها على المريض بسعر البيع: المبلغ من الخادم (/clinic/iron/quote) — الاستقبال لا يرى سعر مادة إلا هنا،
 //   ثمنَ الزيادة التي تقبضها.
+// ★ «أجرة + مواد» (جولة 3، بعد القلبة opts.fee_mode — أو جلسةٌ بالإصدار 3 في التعديل): أجرة الخدمة وحدها، وكلّ
+//   المواد (والدواء منها) وعدّاد المستهلكات فوقها على المريض. «المواد المعتادة» تُعبّأ وحدها ولا أثر لها بالسعر.
 // تسجيلٌ وقبضٌ بضغطةٍ واحدة: لا دور ولا عيادة ولا حجز. «مع/بلا دوا» يحدّد السعر وحده، والخادم هو من
 // يحسبه ويوزّعه. «مع/بلا دوا» والممرضة بلا اختيارٍ مسبق: تغيّران المبلغ والمستحقات، فلا يمرّان بافتراضٍ
 // لم يره أحد. والدكتور اختياري: الافتراض «بلا دكتور» وهو خيارٌ مكتوبٌ في القائمة.
@@ -224,6 +227,9 @@ export default function IronSessionDialog({ onClose, onSaved, session = null, in
   // حقل الدكتور: للخدمة التي لها حصّة دكتور — أو جلسةٍ قائمة لها دكتور أصلاً (يُرفع منها)
   const showDoctor = !!service && (service.with_doctor || (sameService && !!session.doctorId))
   // ═══ المشمول والزيادة ═══
+  // «أجرة + مواد»: بعد القلبة للجديدة، وبإصدار الجلسة للتعديل
+  const feeMode = editing ? !!session.feeMode : !!opts?.fee_mode
+  const [consumables, setConsumables] = useState(editing ? Number(session.consumables || 0) : 0)
   const included = service && kind !== null ? (service.included?.[kind && dual ? 'with' : 'without'] || []) : []
   const prefilled = useRef(null)   // آخر ما عُبّئ تلقائياً: يُستبدل بتغيير الخدمة/النوع ما لم تُغيَّر المواد يدوياً
   useEffect(() => {
@@ -235,11 +241,12 @@ export default function IronSessionDialog({ onClose, onSaved, session = null, in
     if (!same(items, next)) setItems(next)
   }, [serviceId, kind, opts])
   const [quote, setQuote] = useState(null)   // {key, extras_total, extras, price}
-  const quoteKey = JSON.stringify([serviceId, kind, qtyValid(items) ? toPayload(items) : null])
+  const quoteKey = JSON.stringify([serviceId, kind, qtyValid(items) ? toPayload(items) : null, feeMode ? consumables : 0])
   useEffect(() => {
-    if (!service || kind === null || !qtyValid(items) || !(service.charge_extras || editing)) { setQuote(null); return }
+    if (!service || kind === null || !qtyValid(items) || !(service.charge_extras || editing || feeMode)) { setQuote(null); return }
     const t = setTimeout(() => {
-      api.clinic.ironQuote({ service_id: service.id, with_drug: kind, materials: toPayload(items), ...(editing ? { session_id: session.id } : {}) })
+      api.clinic.ironQuote({ service_id: service.id, with_drug: kind, materials: toPayload(items),
+        ...(feeMode ? { consumables } : {}), ...(editing ? { session_id: session.id } : {}) })
         .then((q) => setQuote({ ...q, key: quoteKey })).catch(() => setQuote(null))
     }, 250)
     return () => clearTimeout(t)
@@ -247,13 +254,18 @@ export default function IronSessionDialog({ onClose, onSaved, session = null, in
   const extras = quote && quote.key === quoteKey ? quote : null
   const extrasTotal = extras ? extras.extras_total : 0
   // المبلغ = الأساس + الزيادة (من المعاينة؛ وقبل وصولها في التعديل: زيادة الجلسة كما كانت إن لم تتغيّر المواد)
-  const price = basePrice === null ? null : basePrice + (extras ? extrasTotal : 0)
+  // المبلغ ينتظر المعاينة حيث تُطلب (أجرة + مواد، أو زيادة على المريض، أو تعديل): رقمٌ ناقص المواد يضلّل
+  const quoteWanted = !!service && kind !== null && qtyValid(items) && !!(service.charge_extras || editing || feeMode)
+  const quotePending = quoteWanted && !extras
+  const price = basePrice === null || quotePending ? null : basePrice + (extras ? extrasTotal : 0)
   // التعديل: إحالة الجلسة القائمة تُعاد على السعر الجديد (الخادم يحسبها) — والمعاينة مرآتها
   const editRef = editing && session.referral ? draftFromIronReferral(session.referral) : null
   const discount = editRef ? ironDraftDiscount(editRef, price) : referral ? ironDraftDiscount(referral, price) : 0
   const pay = price === null ? null : Math.max(0, price - discount)
   const oldPaid = editing ? (session.paid ?? session.price) : null
-  const changes = editing && opts ? changeList({ session, picked, name, nurseId, doctorId: showDoctor ? doctorId : '', withDrug: kind, items, price, opts, service }) : []
+  const changes0 = editing && opts ? changeList({ session, picked, name, nurseId, doctorId: showDoctor ? doctorId : '', withDrug: kind, items, price, opts, service }) : []
+  const changes = feeMode && editing && consumables !== Number(session.consumables || 0)
+    ? [...changes0, { key: 'consumables', label: 'المستهلكات', old: fmtNum(session.consumables || 0), new: fmtNum(consumables) }] : changes0
 
   const validate = () => {
     const e = {}
@@ -310,6 +322,7 @@ export default function IronSessionDialog({ onClose, onSaved, session = null, in
     const docId = showDoctor ? doctorId || null : null
     const body = {
       service_id: service.id, with_drug: kind, nurse_id: nurseId, doctor_id: docId, materials: toPayload(items),
+      ...(feeMode ? { consumables } : {}),
       ...(editing ? { reason: editReason } : {}),
       ...(!editing && referral ? { referral: ironReferralPayload(referral) } : {}),
       ...(!editing && override ? { share_override: { ...override, doctor_share: docId ? override.doctor_share : '' } } : {}),
@@ -442,7 +455,13 @@ export default function IronSessionDialog({ onClose, onSaved, session = null, in
 
           <Section n={N.materials} title="المواد" note="أمبولة، قسطرة، محلول…">
             <div className="iron-materials">
-              {service?.charge_extras && kind !== null && (
+              {feeMode && service && (
+                <small className="hint iron-included-hint">
+                  {included.length && !editing ? 'المواد المعتادة لهذه الخدمة تعبّأت — زيدي أو نقّصي أو شيلي حسب ما انصرف. ' : ''}
+                  كلّ مادة (والدواء منها) على المريض بسعر البيع فوق الأجرة.
+                </small>
+              )}
+              {!feeMode && service?.charge_extras && kind !== null && (
                 <small className="hint iron-included-hint">
                   {included.length ? <>مشمولٌ بالسعر: {included.map((m) => `${m.name} ×${fmtNum(m.qty)}`).join('، ')} — وما فوقه على المريض.</>
                     : 'لا مواد مشمولة بسعر هذه الخدمة — كلّ مادة تُضاف على المريض.'}
@@ -450,7 +469,17 @@ export default function IronSessionDialog({ onClose, onSaved, session = null, in
               )}
               <MaterialsEditor catalog={catalog} value={items} onChange={setItems} disabled={busy} saved={savedItems.current} />
               {items.length === 0 && <small className="hint">لم تُضف مواد بعد.</small>}
-              {extras && extras.extras.length > 0 && (
+              {feeMode && <ConsumablesCounter value={consumables} onChange={(v) => { setConsumables(v); setServerField(null) }} disabled={busy} />}
+              {feeMode && extras && extrasTotal > 0 && (
+                <div className="iron-extras" aria-live="polite">
+                  <strong>على المريض فوق الأجرة: {fmtNum(extrasTotal)} ل.س</strong>
+                  <ul>
+                    {extras.extras.map((x) => <li key={x.material_id}>{x.name} ×{fmtNum(x.qty)} — {fmtNum(x.amount)}</li>)}
+                    {extras.consumables > 0 && <li>المستهلكات — {fmtNum(extras.consumables)}</li>}
+                  </ul>
+                </div>
+              )}
+              {!feeMode && extras && extras.extras.length > 0 && (
                 <div className="iron-extras" aria-live="polite">
                   <strong>زيادة على المريض: {fmtNum(extrasTotal)} ل.س</strong>
                   <ul>{extras.extras.map((x) => <li key={x.material_id}>{x.name} ×{fmtNum(x.qty)} فوق المشمول — {fmtNum(x.amount)}</li>)}</ul>
@@ -521,9 +550,11 @@ export default function IronSessionDialog({ onClose, onSaved, session = null, in
             <div className="iron-pay">
               <span className="iron-pay-label">{editing ? 'المبلغ بعد التعديل' : 'المبلغ الذي سيُقبض'}</span>
               {price === null
-                ? <span className="iron-pay-none">{service ? 'اختاري النوع أولاً' : 'اختاري الخدمة أولاً'}</span>
+                ? <span className="iron-pay-none">{quotePending ? 'جارٍ حساب المبلغ…' : service ? 'اختاري النوع أولاً' : 'اختاري الخدمة أولاً'}</span>
                 : <strong className="iron-pay-amount">{fmtNum(pay)} <small>ل.س</small></strong>}
-              {price !== null && extrasTotal > 0 && <small className="iron-pay-ref">السعر {fmtNum(basePrice)} + مواد زيادة {fmtNum(extrasTotal)}</small>}
+              {price !== null && extrasTotal > 0 && (feeMode
+                ? <small className="iron-pay-ref">الأجرة {fmtNum(basePrice)} + مواد {fmtNum(extras.materials_amount)}{extras.consumables > 0 ? ` + مستهلكات ${fmtNum(extras.consumables)}` : ''}</small>
+                : <small className="iron-pay-ref">السعر {fmtNum(basePrice)} + مواد زيادة {fmtNum(extrasTotal)}</small>)}
               {price !== null && discount > 0 && <small className="iron-pay-ref">بعد خصم الإحالة {fmtNum(discount)} من {fmtNum(price)}</small>}
               {editing && pay !== null && (
                 <small className={`iron-pay-diff${pay > oldPaid ? ' is-more' : pay < oldPaid ? ' is-less' : ''}`} aria-live="polite">

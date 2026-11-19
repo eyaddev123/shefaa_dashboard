@@ -6387,3 +6387,5 @@ button.dk-pick:disabled .dk-pick-price { opacity: 0.7; }
   .svc-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
   .svc-tabs button { width: 100%; padding-inline: 6px; }
 }
+
+.svc-fee-hint { margin: -4px 0 14px; display: block; }
