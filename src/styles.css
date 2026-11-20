@@ -6389,3 +6389,13 @@ button.dk-pick:disabled .dk-pick-price { opacity: 0.7; }
 }
 
 .svc-fee-hint { margin: -4px 0 14px; display: block; }
+
+/* كشف الأجور: قائمة المرضى عمودان بالصفحة (طلب المستخدم 2026-11-20) — سطورٌ رفيعة بارتفاعٍ ثابت (الاسم سطرٌ واحد) */
+.pay-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: start; margin-bottom: 8px; }
+.pay-table.pay-mini { font-size: 11px; table-layout: fixed; }
+.pay-table.pay-mini th, .pay-table.pay-mini td { padding: 2px 5px; line-height: 1.45; vertical-align: middle; }
+.pay-table.pay-mini .pay-num { width: 26px; }
+.pay-table.pay-mini .pay-date { width: 40px; }
+.pay-table.pay-mini .pay-kind { width: 56px; white-space: nowrap; }
+.pay-table.pay-mini .pay-name { font-weight: 600; } /* بلا قصّ: html2canvas يفسد تشكيل العربية مع ellipsis، والطويل النادر يلتفّ */
+.pay-foot-note { font-size: 10.5px; color: #555; margin: 2px 0 0; }

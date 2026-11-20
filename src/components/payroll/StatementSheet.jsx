@@ -11,6 +11,18 @@ const day = (d) => fmtDay(`${d}T12:00:00Z`, { utc: true })
 const n = (v) => Number(v || 0).toLocaleString('ar-SY-u-nu-latn', { maximumFractionDigits: 2 })
 const hm = (m) => (m === null || m === undefined ? '—' : `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`)
 const BRAND = 'مجمع عيادات الشفاء الطبي'
+// كتل الصفحات لقائمة المرضى: الأولى أقصر (رأس الكشف فوقها)، وبعدها 80 بالصفحة (40 بكلّ عمود) — قرار المستخدم
+const FIRST_PAGE = 68, PER_PAGE = 80
+// التاريخ في القائمة يومٌ/شهر: السنة في رأس الكشف (الفترة)، والعرض الموفَّر للاسم
+const shortDay = (d) => { const [, m, dd] = String(d).split('-'); return `${Number(dd)}/${Number(m)}` }
+const chunks = (visits) => {
+  const all = visits.map((v, i) => ({ v, i }))
+  const out = [all.slice(0, FIRST_PAGE)]
+  for (let k = FIRST_PAGE; k < all.length; k += PER_PAGE) out.push(all.slice(k, k + PER_PAGE))
+  return out.filter((x) => x.length > 0)
+}
+// رقم المريض في القائمة يبقى معه في جدول الإجراءات — فيُعثر عليه بها
+const withProcs = (visits) => visits.map((v, i) => ({ v, i })).filter(({ v }) => v.procedures.length > 0)
 
 export default function StatementSheet({ st, printedAt }) {
   const d = st.doctor
@@ -29,28 +41,58 @@ export default function StatementSheet({ st, printedAt }) {
 
       <h2 className="pay-h2" data-unit>المرضى ({n(c.visits)} زيارة: معاينة {n(c.consultation)} · مراجعة {n(c.followup)}{c.procedureOnly ? ` · إجراء فقط ${n(c.procedureOnly)}` : ''})</h2>
       {st.visits.length === 0 ? <p className="pay-empty" data-unit>لا زيارات في هذه الفترة.</p> : (
-        <table className="pay-table">
-          <thead>
-            <tr data-unit><th className="pay-num">#</th><th>التاريخ</th><th>اسم المريض</th><th>الزيارة</th><th>الإجراءات</th><th className="pay-amt">للطبيب</th></tr>
-          </thead>
-          <tbody>
-            {st.visits.map((v, i) => (
-              <tr key={v.id} data-unit>
-                <td className="pay-num">{n(i + 1)}</td>
-                <td className="pay-date">{day(v.date)}</td>
-                <td className="pay-name">{v.patient}</td>
-                <td>{v.visitType}{!v.inRange && <small> (قبل الفترة)</small>}</td>
-                <td className="pay-procs">{v.procedures.length === 0 ? '—' : v.procedures.map((p, k) => (
-                  <span key={k} className={p.paid ? undefined : 'pay-pending'}>{k > 0 && '، '}{p.name}{!p.paid && ' (بانتظار المحاسبة)'}</span>))}</td>
-                <td className="pay-amt">{v.procShare ? n(v.procShare) : ''}</td>
-              </tr>
-            ))}
-            <tr className="pay-total" data-unit>
-              <td colSpan={5}>مجموع حصّته من الإجراءات ({n(c.procedures)} إجراء)</td>
-              <td className="pay-amt">{n(d.procDoctor)}</td>
-            </tr>
-          </tbody>
-        </table>
+        <>
+          {/* ★ عمودان بالصفحة (طلب المستخدم 2026-11-20: «200 مريض ما بطبعلهم 10 صفحات»): كلّ كتلةٍ صفحة —
+              العمود اليمين ثمّ اليسار بترقيمٍ متّصل، وكلّ كتلةٍ data-unit فلا تُقسم بين صفحتين */}
+          {chunks(st.visits).map((ch, k) => (
+            <div key={k} className="pay-cols" data-unit>
+              {[ch.slice(0, Math.ceil(ch.length / 2)), ch.slice(Math.ceil(ch.length / 2))].map((col, c) => (
+                <table key={c} className="pay-table pay-mini">
+                  <thead><tr><th className="pay-num">#</th><th className="pay-date">التاريخ</th><th>اسم المريض</th><th className="pay-kind">الزيارة</th></tr></thead>
+                  <tbody>
+                    {col.map(({ v, i }) => (
+                      <tr key={v.id}>
+                        <td className="pay-num">{n(i + 1)}</td>
+                        <td className="pay-date">{shortDay(v.date)}</td>
+                        <td className="pay-name">{v.patient}</td>
+                        <td className="pay-kind">{v.visitType}{!v.inRange && <small> *</small>}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ))}
+            </div>
+          ))}
+          {st.visits.some((v) => !v.inRange) && <p className="pay-foot-note" data-unit>* زيارةٌ قبل الفترة، محسوبٌ إجراؤها فيها.</p>}
+
+          {/* الإجراءات جدولٌ لحاله: المرضى ذوو الإجراء وحدهم، بحصّة الطبيب */}
+          {withProcs(st.visits).length > 0 && (
+            <>
+              <h2 className="pay-h2" data-unit>الإجراءات ({n(c.procedures)} إجراء)</h2>
+              <table className="pay-table">
+                <thead>
+                  <tr data-unit><th className="pay-num">#</th><th>التاريخ</th><th>اسم المريض</th><th>الإجراءات</th><th className="pay-amt">للطبيب</th></tr>
+                </thead>
+                <tbody>
+                  {withProcs(st.visits).map(({ v, i }) => (
+                    <tr key={v.id} data-unit>
+                      <td className="pay-num">{n(i + 1)}</td>
+                      <td className="pay-date">{day(v.date)}</td>
+                      <td className="pay-name">{v.patient}</td>
+                      <td className="pay-procs">{v.procedures.map((p, k) => (
+                        <span key={k} className={p.paid ? undefined : 'pay-pending'}>{k > 0 && '، '}{p.name}{!p.paid && ' (بانتظار المحاسبة)'}</span>))}</td>
+                      <td className="pay-amt">{v.procShare ? n(v.procShare) : ''}</td>
+                    </tr>
+                  ))}
+                  <tr className="pay-total" data-unit>
+                    <td colSpan={4}>مجموع حصّته من الإجراءات</td>
+                    <td className="pay-amt">{n(d.procDoctor)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </>
+          )}
+        </>
       )}
 
       {st.iron.length > 0 && (
