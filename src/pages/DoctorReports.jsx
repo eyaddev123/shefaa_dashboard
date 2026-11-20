@@ -12,7 +12,7 @@ export default function DoctorReports() {
     <>
       <h2>تقارير الدكاترة</h2>
       <p className="subtitle">حضور كلّ دكتور ومرضاه وما أدخله للشفاء وصافي الربح منه — اضغط الاسم لفتح لوحة تحكمه.</p>
-      <DoctorsTab canWrite={canWriteClinicFunds(role)} linkDashboard />
+      <DoctorsTab canWrite={canWriteClinicFunds(role)} linkDashboard profitPdf />
     </>
   )
 }

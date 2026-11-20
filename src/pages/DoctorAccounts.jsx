@@ -4,6 +4,7 @@ import { api, todayLocal, fmtDay, fmtMonth } from '../api.js'
 import { matchesAr } from '../arabic-search.js'
 import { fmtClock, clockTitle } from '../components/Punctuality.jsx'
 import { accountLines, partsOf, salaryPatientsOf } from '../pay-parts.js'
+import { useToast } from '../action-feedback.jsx'
 
 // ═══ حسابات الدكاترة — لشهر أو يوم أو فترة ═══
 // صفحة «تقارير الدكاترة» وتبويب «حسابات الدكاترة» في صندوق العيادات يعرضان هذا نفسه.
@@ -362,7 +363,34 @@ function DoctorCard({ d, share, link }) {
 }
 
 // linkDashboard: صفحة «تقارير الدكاترة» تفتح لوحة الدكتور من اسمه (بدل البروفايل للمشرفة في الصندوق)
-export function DoctorsTab({ canWrite, linkDashboard = false }) {
+// ═══ «أرباح الشفاء من الأطباء» PDF بكبسة (طلب المستخدم 2026-11-20): كلّ دكتور بنشاطٍ أو مستحقّ في الفترة،
+// الأعلى ربحاً أوّلاً — الورقة في components/reports/ProfitSheet.jsx، والمكتبات تُحمَّل عند الضغط وحده ═══
+function ProfitPdfButton({ data }) {
+  const [busy, setBusy] = useState(false)
+  const [toast, showToast] = useToast()
+  const run = async () => {
+    setBusy(true)
+    try {
+      const [{ sheetPdf }, sheet] = await Promise.all([import('../payroll-pdf.jsx'), import('../components/reports/ProfitSheet.jsx')])
+      const { default: ProfitSheet, profitRow, PROFIT_TITLE } = sheet
+      const rows = data.doctors.filter((d) => (d.due ?? 0) > 0 || hasActivity(d)).map(profitRow)
+        .sort((a, b) => b.profit - a.profit || a.doctor.localeCompare(b.doctor, 'ar'))
+      const now = new Date()
+      const printedAt = `${fmtDay(now)} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+      const period = data.month || (data.from === data.to ? data.from : `${data.from}_${data.to}`)
+      await sheetPdf(<ProfitSheet data={data} rows={rows} printedAt={printedAt} />, `${PROFIT_TITLE.replace(/ /g, '-')}-${period}.pdf`)
+    } catch (ex) { showToast(`تعذّر إنشاء الـ PDF: ${ex.message}`) } finally { setBusy(false) }
+  }
+  return (
+    <>
+      <button type="button" className="secondary dr-pdf" onClick={run} disabled={busy}>
+        {busy ? 'جارٍ إنشاء الـ PDF…' : 'أرباح الشفاء (PDF)'}</button>
+      {toast}
+    </>
+  )
+}
+
+export function DoctorsTab({ canWrite, linkDashboard = false, profitPdf = false }) {
   const [params, setParams] = useSearchParams()
   const month = /^\d{4}-\d{2}$/.test(params.get('month') || '') ? params.get('month') : null
   const day = isDay(params.get('day')) ? params.get('day') : null
@@ -434,6 +462,7 @@ export function DoctorsTab({ canWrite, linkDashboard = false }) {
               <span className="dr-count" aria-live="polite">
                 {searching ? `${fmtNum(shown.length)} من ${fmtNum(active.length)}` : `${fmtNum(active.length)} دكتور بنشاط`}
               </span>
+              {profitPdf && <ProfitPdfButton data={data} />}
             </div>
 
             {shown.length === 0 ? (

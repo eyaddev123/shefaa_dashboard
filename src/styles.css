@@ -4481,6 +4481,7 @@ button.ghost.iron-details-btn { white-space: nowrap; padding-inline: 12px; }
 .dr-clear { position: absolute; inset-inline-end: 8px; top: 50%; transform: translateY(-50%); width: 30px; height: 30px; min-height: 0;
   padding: 0; border-radius: 50%; background: var(--grid); color: var(--text-secondary); border: 0; font-size: 18px; line-height: 1; box-shadow: none; }
 .dr-count { color: var(--muted); font-size: 13px; font-weight: 700; margin-inline-start: auto; }
+.dr-pdf { white-space: nowrap; }
 
 /* بطاقات الدكاترة */
 .dr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
@@ -6434,3 +6435,16 @@ button.dk-pick:disabled .dk-pick-price { opacity: 0.7; }
 .pay-table.pay-proc-sum .pay-cnt { width: 56px; text-align: center; font-variant-numeric: tabular-nums; }
 .pay-table.pay-proc-sum .pay-amt { width: 92px; }
 .pay-table.pay-proc-sum .pay-sum-row td { background: #f1f3f5; font-weight: 700; font-size: 13px; }
+
+/* ═══ «أرباح الشفاء من الأطباء» — ورقة PDF (2026-11-20) ═══ */
+.prf-period { font-size: 14px; font-weight: 700; color: #333; }
+.pay-table.prf-table { font-size: 13px; margin-top: 12px; }
+.pay-table.prf-table th, .pay-table.prf-table td { padding: 6px 8px; vertical-align: middle; }
+.pay-table.prf-table th small { display: block; font-weight: 400; font-size: 10px; color: #666; }
+.pay-table.prf-table .prf-amt { width: 118px; text-align: end; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pay-table.prf-table .prf-spec { color: #666; font-size: 11px; }
+.pay-table.prf-table .prf-profit { font-weight: 700; }
+.pay-table.prf-table .prf-profit.is-loss { color: #b42318; }
+.pay-table.prf-table .prf-total td { background: #f1f3f5; font-weight: 700; font-size: 14px; border-top: 1.5px solid #7d858c; }
+.prf-notes { margin-top: 10px; font-size: 11px; color: #555; }
+.prf-notes p { margin: 2px 0; }
