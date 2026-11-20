@@ -132,21 +132,25 @@ async function addSheetPages(pdf, sheet, firstPage) {
   return firstPage
 }
 
-/** ورقةٌ واحدة (عنصر React) ⇒ ملفّ PDF ينزل مباشرةً — للتقارير غير كشف الأجور */
-export async function sheetPdf(element, filename) {
+/** ورقةٌ أو أوراق (عناصر React) ⇒ ملفّ PDF ينزل مباشرةً — كلّ ورقةٍ تبدأ صفحةً بترقيمها — للتقارير غير كشف الأجور */
+export async function sheetPdf(elements, filename) {
   const host = document.createElement('div')
   host.className = 'pay-host'
   host.style.width = `${CONTENT_W}px`
   document.body.appendChild(host)
   const pdf = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'portrait', compress: true })
+  let firstPage = true
   try {
     if (document.fonts?.ready) await document.fonts.ready
-    const box = document.createElement('div')
-    host.appendChild(box)
-    const root = createRoot(box)
-    flushSync(() => root.render(element))
-    await addSheetPages(pdf, box.firstElementChild, true)
-    root.unmount()
+    for (const element of Array.isArray(elements) ? elements : [elements]) {
+      const box = document.createElement('div')
+      host.appendChild(box)
+      const root = createRoot(box)
+      flushSync(() => root.render(element))
+      firstPage = await addSheetPages(pdf, box.firstElementChild, firstPage)
+      root.unmount()
+      box.remove()
+    }
     pdf.save(filename)
   } finally {
     host.remove()

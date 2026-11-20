@@ -268,6 +268,31 @@ export default function ClinicReferrals() {
     try { const name = await api.clinic.exportReferralReport({ from: range.from, to: range.to, sourceId }); showToast(`نُزّل ${name}`, 'success', 3000) }
     catch (ex) { showToast(ex.message) } finally { setExporting(false) }
   }
+  // PDF (طلب المستخدم 2026-11-20): الجهة المختارة وحدها، أو كلّ الجهات بملخّصٍ أوّلاً ثمّ جهةٌ بصفحة — بلا البحث
+  // ولا «بلا رقم ورقة» (كشفٌ يُرسل للجهة كاملاً)، والزيارات بترتيب التاريخ
+  const [pdfBusy, setPdfBusy] = useState(false)
+  const doPdf = async () => {
+    setPdfBusy(true)
+    try {
+      const [{ sheetPdf }, { ReferralsSummarySheet, ReferralsSourceSheet, REFERRALS_TITLE }] =
+        await Promise.all([import('../payroll-pdf.jsx'), import('../components/reports/ReferralsSheet.jsx')])
+      const now = new Date()
+      const printedAt = `${fmtDay(now)} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+      const pickTotals = sourceId ? totals.filter((t) => String(t.source_id) === sourceId) : totals
+      const sheets = []
+      if (!sourceId && totals.length > 1) {
+        sheets.push(<ReferralsSummarySheet key="sum" totals={totals} visits={data.visits} from={range.from} to={range.to} printedAt={printedAt} />)
+      }
+      for (const t of pickTotals) {
+        const vs = allVisits.filter((v) => String(v.sourceId) === String(t.source_id))
+          .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
+        sheets.push(<ReferralsSourceSheet key={t.source_id} source={t.source} visits={vs} from={range.from} to={range.to} printedAt={printedAt} />)
+      }
+      const who = chosenName || onlyOne
+      const stampPart = range.from === range.to ? range.from : `${range.from}_${range.to}`
+      await sheetPdf(sheets, `${REFERRALS_TITLE.replace(/ /g, '-')}${who ? `-${who.replace(/[\\/:*?"<>|\s]+/g, '_')}` : ''}-${stampPart}.pdf`)
+    } catch (ex) { showToast(`تعذّر إنشاء الـ PDF: ${ex.message}`) } finally { setPdfBusy(false) }
+  }
   const pick = (k) => set(k === 'custom'
     ? { period: 'custom', from: range.from, to: range.to }
     : { period: k === 'month' ? null : k, from: null, to: null })
@@ -322,9 +347,14 @@ export default function ClinicReferrals() {
               </ul>
             )}
             <div className="refx-hero-actions">
-              <button type="button" disabled={exporting || scoped.length === 0} onClick={doExport}>
-                {exporting ? 'جارٍ التصدير…' : chosenName || onlyOne ? 'كشف الحساب (إكسل)' : 'كشف كلّ الجهات (إكسل)'}
-              </button>
+              <div className="refx-export">
+                <button type="button" disabled={exporting || scoped.length === 0} onClick={doExport}>
+                  {exporting ? 'جارٍ التصدير…' : chosenName || onlyOne ? 'كشف الحساب (إكسل)' : 'كشف كلّ الجهات (إكسل)'}
+                </button>
+                <button type="button" className="secondary" disabled={pdfBusy || scoped.length === 0} onClick={doPdf}>
+                  {pdfBusy ? 'جارٍ إنشاء الـ PDF…' : 'PDF'}
+                </button>
+              </div>
               <span className="refx-hero-hint">الملفّ الذي يُرسل للجهة: كلّ زيارةٍ برقم ورقتها.</span>
             </div>
           </section>
