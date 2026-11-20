@@ -38,7 +38,7 @@ export default function StatementSheet({ st, printedAt }) {
         </div>
       </header>
 
-      <h2 className="pay-h2" data-unit>المرضى ({n(c.visits)} زيارة: معاينة {n(c.consultation)} · مراجعة {n(c.followup)}{c.procedureOnly ? ` · إجراء فقط ${n(c.procedureOnly)}` : ''})</h2>
+      <h2 className="pay-h2" data-unit>المرضى ({n(c.visits)} زيارة: معاينة {n(c.consultation)} · مراجعة {n(c.followup)}{c.procedureOnly ? ` · إجراء فقط ${n(c.procedureOnly)}` : ''}{c.procedures > 0 ? ` · ${n(c.procedures)} إجراء` : ''})</h2>
       {st.visits.length === 0 ? <p className="pay-empty" data-unit>لا زيارات في هذه الفترة.</p> : (
         <>
           {/* ★ عمودان بالصفحة (طلب المستخدم 2026-11-20: «200 مريض ما بطبعلهم 10 صفحات»): كلّ كتلةٍ صفحة —
