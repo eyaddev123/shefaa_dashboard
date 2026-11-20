@@ -6414,3 +6414,8 @@ button.dk-pick:disabled .dk-pick-price { opacity: 0.7; }
 .pay-sheet .pay-table tr > :first-child { border-inline-start: 0; }
 .pay-sheet .pay-table tbody tr:last-child td { border-bottom: 0; }
 .pay-sheet .pay-table.pay-mini { border: 1.2px solid #7d858c; }
+
+/* رأس كشف الدكتور على الشاشة: اسمه بارزاً ثمّ الاختصاص والفترة */
+.pr-doc-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; margin: 4px 0 14px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+.pr-doc-head h3 { margin: 0; font-size: 24px; font-weight: 800; }
+.pr-doc-meta { color: var(--text-secondary); font-size: 14px; }

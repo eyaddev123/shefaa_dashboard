@@ -182,6 +182,11 @@ function StatementView({ doctorId, query, onBack, showToast }) {
             {busy ? 'جارٍ إنشاء الـ PDF…' : 'تنزيل PDF'}</button>
         </div>
       </div>
+      {/* اسم الدكتور والفترة رأس الكشف (ملاحظة المستخدم 2026-11-20: «طالع لي اسمه… مشان اعرف بأي دكتور وقت اعمل تحميل») */}
+      <div className="pr-doc-head">
+        <h3>{d.doctor}</h3>
+        <span className="pr-doc-meta">{d.specialty ? `${d.specialty} · ` : ''}كشف الفترة من <bdi>{fmtDay(`${st.from}T12:00:00Z`, { utc: true })}</bdi> إلى <bdi>{fmtDay(`${st.to}T12:00:00Z`, { utc: true })}</bdi></span>
+      </div>
       {/* قبل التسليم: ما يجعل الرقم ناقصاً — على الشاشة وحدها، والورقة تذكره سطراً */}
       {(st.warnings.noPay || st.warnings.pendingProcedures > 0 || st.warnings.noDeparture > 0) && (
         <div className="warn-box pr-warn" role="note">
