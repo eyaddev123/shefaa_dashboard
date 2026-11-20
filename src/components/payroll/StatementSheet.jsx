@@ -48,7 +48,7 @@ export default function StatementSheet({ st, printedAt }) {
               {[ch.slice(0, Math.ceil(ch.length / 2)), ch.slice(Math.ceil(ch.length / 2))].map((col, c) => (
                 <table key={c} className="pay-table pay-mini">
                   <thead><tr><th className="pay-num">#</th><th className="pay-date">التاريخ</th><th>اسم المريض</th><th className="pay-kind">الزيارة</th>
-                    <th className="pay-proc-col">الإجراء (للطبيب)</th></tr></thead>
+                    <th className="pay-proc-col">الإجراء · حصّة الطبيب</th></tr></thead>
                   <tbody>
                     {col.map(({ v, i }) => (
                       <tr key={v.id}>
@@ -69,7 +69,7 @@ export default function StatementSheet({ st, printedAt }) {
           ))}
           {st.visits.some((v) => !v.inRange) && <p className="pay-foot-note" data-unit>* زيارةٌ قبل الفترة، محسوبٌ إجراؤها فيها.</p>}
           {c.procedures > 0 && (
-            <p className="pay-proc-total" data-unit>مجموع حصّته من الإجراءات ({n(c.procedures)} إجراء): <strong>{n(d.procDoctor)}</strong></p>
+            <p className="pay-proc-total" data-unit>مجموع حصّة الطبيب من الإجراءات ({n(c.procedures)} إجراء): <strong>{n(d.procDoctor)}</strong></p>
           )}
         </>
       )}
