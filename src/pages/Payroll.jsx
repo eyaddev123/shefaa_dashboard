@@ -6,6 +6,7 @@ import { useToast } from '../action-feedback.jsx'
 import { PeriodBar } from './DoctorAccounts.jsx'
 import ProcedureEarnings from './ProcedureEarnings.jsx'
 import { matchesAr } from '../arabic-search.js'
+import { procSummary } from '../components/payroll/proc-summary.js'
 
 // ═══ الرواتب والأجور (طلب المستخدم 2026-11-18) ═══
 // «صفحة مالية مخصّصة: رواتب الدكتور وأجوره وأجوره من الإجراءات» — و«المستحقات» خرجت من صفحة الإجراءات
@@ -59,6 +60,7 @@ function usePeriod() {
 const dayOf = (d) => fmtDay(`${d}T12:00:00Z`, { utc: true })
 function StatementBody({ st }) {
   const d = st.doctor, c = st.counts
+  const ps = procSummary(st.visits)
   const rounded = st.payable !== null && st.payable !== undefined && d.due !== null && st.payable !== d.due
   return (
     <>
@@ -114,6 +116,30 @@ function StatementBody({ st }) {
           </table>
         )}
       </section>
+
+      {ps.rows.length > 0 && (
+        <section className="card pr-section">
+          <h3>حصّة الطبيب من الإجراءات</h3>
+          {/* جدولٌ عاديّ حتى على الجوال (لا بطاقات rtable): أربعة أعمدة قصيرة تتّسع، والعين تقرأ العدد × الحصّة سطراً */}
+          <table className="pr-table pr-proc-sum">
+            <thead><tr><th>الإجراء</th><th className="num">العدد</th><th className="num">حصّة الواحد</th><th className="num">المجموع</th></tr></thead>
+            <tbody>
+              {ps.rows.map((r, i) => (
+                <tr key={i}>
+                  <td>{r.name}</td>
+                  <td className="num">{n(r.count)}</td>
+                  <td className="num">{fmtMoney(r.share)}</td>
+                  <td className="num">{fmtMoney(r.total)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot><tr className="pr-sum-row">
+              <td colSpan={3}>المجموع ({n(ps.kinds)} {ps.kinds === 1 ? 'نوع' : 'أنواع'} · {n(ps.count)} إجراء)</td>
+              <td className="num">{fmtMoney(ps.total)}</td>
+            </tr></tfoot>
+          </table>
+        </section>
+      )}
 
       {st.shifts.length > 0 && (
         <section className="card pr-section">

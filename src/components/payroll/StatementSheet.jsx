@@ -1,4 +1,5 @@
 import { fmtMoney, fmtDay } from '../../api.js'
+import { procSummary } from './proc-summary.js'
 
 // ═══ ورقة كشف أجور الدكتور — A4 ═══
 // مكوّنٌ واحد للشاشة والـ PDF (payroll-pdf.js يصوّره): ألوانٌ ثابتة فاتحة لا رموز السمة — الورقة تُطبع
@@ -40,6 +41,8 @@ const chunks = (visits, layout) => {
 export default function StatementSheet({ st, printedAt, layout }) {
   const d = st.doctor
   const c = st.counts
+  const ps = procSummary(st.visits)
+  const whole = ps.rows.length <= 25
   return (
     <article className="pay-sheet" dir="rtl">
       <header className="pay-head" data-unit>
@@ -82,10 +85,26 @@ export default function StatementSheet({ st, printedAt, layout }) {
             </div>
           ))}
           {st.visits.some((v) => !v.inRange) && <p className="pay-foot-note" data-unit>* زيارةٌ قبل الفترة، محسوبٌ إجراؤها فيها.</p>}
-          {c.procedures > 0 && (
-            <p className="pay-proc-total" data-unit>مجموع حصّة الطبيب من الإجراءات ({n(c.procedures)} إجراء): <strong>{n(d.procDoctor)}</strong></p>
-          )}
         </>
+      )}
+
+      {/* ملخّص الإجراءات حسب نوعها (طلب المستخدم 2026-11-20): العدد × حصّة الواحد = المجموع، وآخره المجموع الكلّي */}
+      {/* جدولٌ قصير لا يُقسم بين صفحتين (سطرٌ وحده أعلى صفحةٍ أخرى لا يُقرأ): كتلةٌ واحدة حتى 25 سطراً، وبعدها سطراً سطراً */}
+      {ps.rows.length > 0 && (
+        <div className="pay-proc-sum-box" data-unit={whole ? '' : undefined}>
+          <h2 className="pay-h2" data-unit={whole ? undefined : ''}>حصّة الطبيب من الإجراءات</h2>
+          <table className="pay-table pay-proc-sum">
+            <thead><tr data-unit={whole ? undefined : ''}><th>الإجراء</th><th className="pay-cnt">العدد</th><th className="pay-amt">حصّة الواحد</th><th className="pay-amt">المجموع</th></tr></thead>
+            <tbody>
+              {ps.rows.map((r, i) => (
+                <tr key={i} data-unit={whole ? undefined : ''}><td>{r.name}</td><td className="pay-cnt">{n(r.count)}</td>
+                  <td className="pay-amt">{n(r.share)}</td><td className="pay-amt">{n(r.total)}</td></tr>
+              ))}
+              <tr className="pay-sum-row" data-unit={whole ? undefined : ''}><td colSpan={3}>المجموع ({n(ps.kinds)} {ps.kinds === 1 ? 'نوع' : 'أنواع'} · {n(ps.count)} إجراء)</td>
+                <td className="pay-amt">{n(ps.total)}</td></tr>
+            </tbody>
+          </table>
+        </div>
       )}
 
       {st.iron.length > 0 && (

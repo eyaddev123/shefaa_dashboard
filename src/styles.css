@@ -6169,6 +6169,8 @@ button.dk-pick:disabled .dk-pick-price { opacity: 0.7; }
 .pr-section h3 { margin: 0 0 10px; }
 .pr-table { width: 100%; }
 .pr-table td.num, .pr-table th.num { text-align: end; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pr-table tfoot .pr-sum-row td { font-weight: 700; border-top: 2px solid var(--border); }
+@media (max-width: 640px) { .pr-proc-sum { font-size: 13px; } .pr-proc-sum th, .pr-proc-sum td { padding-inline: 4px; } }
 .pr-nowrap { white-space: nowrap; }
 .pr-calc-sub dt, .pr-calc-sub dd { color: var(--text-secondary); font-weight: 400; }
 .pr-calc-total { border-bottom: none !important; padding-top: 12px !important; }
@@ -6426,5 +6428,9 @@ button.dk-pick:disabled .dk-pick-price { opacity: 0.7; }
 .pay-table.pay-mini .pay-proc-col { width: 96px; }
 .pay-table.pay-mini .pay-procs { font-size: 10px; line-height: 1.35; }
 .pay-table.pay-mini .pay-proc-share { font-weight: 800; white-space: nowrap; }
-.pay-proc-total { margin: 6px 0 0; font-size: 12px; }
-.pay-proc-total strong { font-size: 13px; }
+/* ملخّص الإجراءات حسب نوعها (2026-11-20): العدد × حصّة الواحد = المجموع، وسطر المجموع الكلّي بارز */
+.pay-table.pay-proc-sum { font-size: 12px; }
+.pay-table.pay-proc-sum th, .pay-table.pay-proc-sum td { padding: 3px 8px; vertical-align: middle; }
+.pay-table.pay-proc-sum .pay-cnt { width: 56px; text-align: center; font-variant-numeric: tabular-nums; }
+.pay-table.pay-proc-sum .pay-amt { width: 92px; }
+.pay-table.pay-proc-sum .pay-sum-row td { background: #f1f3f5; font-weight: 700; font-size: 13px; }
