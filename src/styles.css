@@ -6402,8 +6402,9 @@ button.dk-pick:disabled .dk-pick-price { opacity: 0.7; }
 .pay-table.pay-mini tbody tr:last-child td { border-bottom: 0; }
 .pay-cols { padding-bottom: 2px; }
 .pay-table.pay-mini .pay-num { width: 26px; }
-.pay-table.pay-mini .pay-date { width: 40px; }
-.pay-table.pay-mini .pay-kind { width: 56px; white-space: nowrap; }
+.pay-table.pay-mini .pay-date { width: 38px; }
+.pay-table.pay-mini th { font-size: 9.5px; padding-inline: 3px; }
+.pay-table.pay-mini .pay-kind { width: 46px; white-space: nowrap; }
 .pay-table.pay-mini .pay-name { font-weight: 600; } /* بلا قصّ: html2canvas يفسد تشكيل العربية مع ellipsis، والطويل النادر يلتفّ */
 .pay-foot-note { font-size: 10.5px; color: #555; margin: 2px 0 0; }
 
@@ -6420,19 +6421,10 @@ button.dk-pick:disabled .dk-pick-price { opacity: 0.7; }
 .pr-doc-head h3 { margin: 0; font-size: 24px; font-weight: 800; }
 .pr-doc-meta { color: var(--text-secondary); font-size: 14px; }
 
-/* الإجراءات إجراءان بكلّ سطر: النصف الأيسر يبدأ بخطٍّ أغمق */
-.pay-table.pay-pairs { table-layout: fixed; }
-.pay-table.pay-pairs .pay-num { width: 24px; }
-.pay-table.pay-pairs .pay-date { width: 36px; }
-.pay-table.pay-pairs .pay-amt { width: 42px; }
-/* نصفان بإطارين وبينهما فراغ: لا إطار للجدول نفسه — كلّ خلية تحمل حدودها، والفراغ بلا حدود */
-.pay-sheet .pay-table.pay-pairs { border: 0; }
-.pay-sheet .pay-table.pay-pairs th:not(.pay-gap) { border-top: 1.2px solid #7d858c; }
-.pay-sheet .pay-table.pay-pairs tbody tr:last-child td:not(.pay-gap) { border-bottom: 1.2px solid #7d858c; }
-.pay-sheet .pay-table.pay-pairs .pay-pair-start { border-inline-start: 1.2px solid #7d858c; }
-.pay-sheet .pay-table.pay-pairs .pay-pair-end { border-inline-end: 1.2px solid #7d858c; }
-.pay-sheet .pay-table.pay-pairs .pay-gap { width: 10px; border: 0 !important; background: #fff; padding: 0; }
-.pay-sheet .pay-table.pay-pairs .pay-total td { border: 1.2px solid #7d858c; border-top-width: 0; }
-.pay-sheet .pay-table.pay-pairs .pay-total td + td { border-inline-start: 0; }
-.pay-table.pay-pairs .pay-procs { font-size: 10.5px; }
-.pay-table.pay-pairs .pay-proc-col { width: 84px; }
+
+/* الإجراء جنب المريض في القائمة (2026-11-20): الاسم والحصّة، والفارغ لمن لا إجراء له */
+.pay-table.pay-mini .pay-proc-col { width: 96px; }
+.pay-table.pay-mini .pay-procs { font-size: 10px; line-height: 1.35; }
+.pay-table.pay-mini .pay-proc-share { font-weight: 800; white-space: nowrap; }
+.pay-proc-total { margin: 6px 0 0; font-size: 12px; }
+.pay-proc-total strong { font-size: 13px; }

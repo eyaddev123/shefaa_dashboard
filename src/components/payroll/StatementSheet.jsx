@@ -11,8 +11,10 @@ const day = (d) => fmtDay(`${d}T12:00:00Z`, { utc: true })
 const n = (v) => Number(v || 0).toLocaleString('ar-SY-u-nu-latn', { maximumFractionDigits: 2 })
 const hm = (m) => (m === null || m === undefined ? '—' : `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`)
 const BRAND = 'مجمع عيادات الشفاء الطبي'
-// كتل الصفحات لقائمة المرضى: الأولى أقصر (رأس الكشف فوقها)، وبعدها 80 بالصفحة (40 بكلّ عمود) — قرار المستخدم
-const FIRST_PAGE = 68, PER_PAGE = 80
+// كتل الصفحات لقائمة المرضى: الأولى أقصر (رأس الكشف فوقها)، وبعدها 80 بالصفحة (40 بكلّ عمود) — قرار المستخدم.
+// مع عمود الإجراء (2026-11-20) يتّسع الاسم لنحو 22 حرفاً؛ على الإنتاج 95% من الأسماء ≤ 21 والأطول 28 (27 من 1650
+// فوق 22)، والكتلة تتّسع لنحو 8 أسماء ملتفّة بكلّ عمود قبل أن تفيض
+const FIRST_PAGE = 64, PER_PAGE = 80
 // التاريخ في القائمة يومٌ/شهر: السنة في رأس الكشف (الفترة)، والعرض الموفَّر للاسم
 const shortDay = (d) => { const [, m, dd] = String(d).split('-'); return `${Number(dd)}/${Number(m)}` }
 const chunks = (visits) => {
@@ -21,35 +23,6 @@ const chunks = (visits) => {
   for (let k = FIRST_PAGE; k < all.length; k += PER_PAGE) out.push(all.slice(k, k + PER_PAGE))
   return out.filter((x) => x.length > 0)
 }
-// رقم المريض في القائمة يبقى معه في جدول الإجراءات — فيُعثر عليه بها
-const withProcs = (visits) => visits.map((v, i) => ({ v, i })).filter(({ v }) => v.procedures.length > 0)
-const pairs = (list) => Array.from({ length: Math.ceil(list.length / 2) }, (_, r) => [list[2 * r], list[2 * r + 1]])
-// نصف السطر: الرقم، التاريخ، المريض، الإجراء، للطبيب — والنصف الأيسر بخطٍّ فاصلٍ أعرض
-// كلّ نصفٍ جدولٌ مغلق بإطاره، وبينهما عمودٌ فارغ (pay-gap) كفراغ عمودي المرضى — ملاحظة المستخدم 2026-11-20
-const sideCls = (_side, cls = '') => [cls, 'pay-pair-start'].filter(Boolean).join(' ')
-function PairHead({ side }) {
-  return (
-    <>
-      <th className={sideCls(side, 'pay-num')}>#</th><th className="pay-date">التاريخ</th><th>اسم المريض</th>
-      <th className="pay-proc-col">الإجراء</th><th className="pay-amt pay-pair-end">للطبيب</th>
-    </>
-  )
-}
-function ProcCells({ side, x }) {
-  if (!x) return <><td className={sideCls(side)} /><td /><td /><td /><td className="pay-pair-end" /></>
-  const { v, i } = x
-  return (
-    <>
-      <td className={sideCls(side, 'pay-num')}>{n(i + 1)}</td>
-      <td className="pay-date">{shortDay(v.date)}</td>
-      <td className="pay-name">{v.patient}</td>
-      <td className="pay-procs">{v.procedures.map((p, k) => (
-        <span key={k} className={p.paid ? undefined : 'pay-pending'}>{k > 0 && '، '}{p.name}{!p.paid && ' (بانتظار)'}</span>))}</td>
-      <td className="pay-amt pay-pair-end">{v.procShare ? n(v.procShare) : ''}</td>
-    </>
-  )
-}
-
 export default function StatementSheet({ st, printedAt }) {
   const d = st.doctor
   const c = st.counts
@@ -74,7 +47,8 @@ export default function StatementSheet({ st, printedAt }) {
             <div key={k} className="pay-cols" data-unit>
               {[ch.slice(0, Math.ceil(ch.length / 2)), ch.slice(Math.ceil(ch.length / 2))].map((col, c) => (
                 <table key={c} className="pay-table pay-mini">
-                  <thead><tr><th className="pay-num">#</th><th className="pay-date">التاريخ</th><th>اسم المريض</th><th className="pay-kind">الزيارة</th></tr></thead>
+                  <thead><tr><th className="pay-num">#</th><th className="pay-date">التاريخ</th><th>اسم المريض</th><th className="pay-kind">الزيارة</th>
+                    <th className="pay-proc-col">الإجراء (للطبيب)</th></tr></thead>
                   <tbody>
                     {col.map(({ v, i }) => (
                       <tr key={v.id}>
@@ -82,6 +56,10 @@ export default function StatementSheet({ st, printedAt }) {
                         <td className="pay-date">{shortDay(v.date)}</td>
                         <td className="pay-name">{v.patient}</td>
                         <td className="pay-kind">{v.visitType}{!v.inRange && <small> *</small>}</td>
+                        {/* الإجراء جنب صاحبه (قرار المستخدم 2026-11-20) — والحصّة بجانبه */}
+                        <td className="pay-procs">{v.procedures.map((p, k) => (
+                          <span key={k} className={p.paid ? undefined : 'pay-pending'}>{k > 0 && '، '}{p.name}{!p.paid && ' (بانتظار)'}</span>))}
+                          {v.procShare ? <b className="pay-proc-share"> {n(v.procShare)}</b> : null}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -90,29 +68,8 @@ export default function StatementSheet({ st, printedAt }) {
             </div>
           ))}
           {st.visits.some((v) => !v.inRange) && <p className="pay-foot-note" data-unit>* زيارةٌ قبل الفترة، محسوبٌ إجراؤها فيها.</p>}
-
-          {/* الإجراءات جدولٌ لحاله: المرضى ذوو الإجراء وحدهم، بحصّة الطبيب — **إجراءان بكلّ سطر** (طلب المستخدم
-              2026-11-20: «100 إجراء ما بيطلعوا 20 صفحة»): السطر وحدةٌ فتمتلئ الصفحة لآخرها وتُقطع بين سطرين بخطّ */}
-          {withProcs(st.visits).length > 0 && (
-            <>
-              <h2 className="pay-h2" data-unit>الإجراءات ({n(c.procedures)} إجراء)</h2>
-              <table className="pay-table pay-mini pay-pairs">
-                <thead>
-                  <tr data-unit><PairHead side={0} /><th className="pay-gap" /><PairHead side={1} /></tr>
-                </thead>
-                <tbody>
-                  {pairs(withProcs(st.visits)).map((pr, r) => (
-                    <tr key={r} data-unit>
-                      <ProcCells side={0} x={pr[0]} /><td className="pay-gap" /><ProcCells side={1} x={pr[1]} />
-                    </tr>
-                  ))}
-                  <tr className="pay-total" data-unit>
-                    <td colSpan={10}>مجموع حصّته من الإجراءات</td>
-                    <td className="pay-amt">{n(d.procDoctor)}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </>
+          {c.procedures > 0 && (
+            <p className="pay-proc-total" data-unit>مجموع حصّته من الإجراءات ({n(c.procedures)} إجراء): <strong>{n(d.procDoctor)}</strong></p>
           )}
         </>
       )}

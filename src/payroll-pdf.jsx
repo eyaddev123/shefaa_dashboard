@@ -39,11 +39,20 @@ export async function statementsPdf(statements, filename, printedAt) {
       // (ملاحظة المستخدم 2026-11-20: «مقطوش قطش»)؛ وغير ذلك يقف قبل الوحدة التالية بنقطة فلا يشرد حدّها العلويّ
       const starts = [0], rowCut = [null]
       const left0 = sheet.getBoundingClientRect().left
+      // عنوان قسمٍ أو رأس جدول لا يبقى وحده آخر الصفحة: ينزل مع أوّل سطرٍ بعده (2026-11-20)
+      const units = [...sheet.querySelectorAll('[data-unit]')]
+      const topOf = (el) => el.getBoundingClientRect().top - top0
+      const sticky = (el) => el.tagName === 'H2' || (el.tagName === 'TR' && el.parentElement?.tagName === 'THEAD')
       let start = 0
-      for (const u of sheet.querySelectorAll('[data-unit]')) {
+      for (let k = 0; k < units.length; k++) {
+        let u = units[k]
         const r = u.getBoundingClientRect()
-        const t = r.top - top0, b = r.bottom - top0
+        let t = r.top - top0
+        const b = r.bottom - top0
         if (b - start > CONTENT_H && t > start) {
+          let j = k
+          while (j > 0 && sticky(units[j - 1]) && topOf(units[j - 1]) > start) j--
+          if (j < k) { u = units[j]; t = topOf(u) }
           start = t; starts.push(t)
           // صفحةٌ تكمل جدولاً: خطّه الأعلى فوق خلايا السطر — يُرسم لأنّ الحدود المنفصلة بلا خطٍّ أعلى السطر،
           // ويتخطّى عمود الفراغ (pay-gap) في جدول الإجراءات المزدوج
