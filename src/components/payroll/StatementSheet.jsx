@@ -11,19 +11,33 @@ const day = (d) => fmtDay(`${d}T12:00:00Z`, { utc: true })
 const n = (v) => Number(v || 0).toLocaleString('ar-SY-u-nu-latn', { maximumFractionDigits: 2 })
 const hm = (m) => (m === null || m === undefined ? '—' : `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`)
 const BRAND = 'مجمع عيادات الشفاء الطبي'
-// كتل الصفحات لقائمة المرضى: الأولى أقصر (رأس الكشف فوقها)، وبعدها 80 بالصفحة (40 بكلّ عمود) — قرار المستخدم.
-// مع عمود الإجراء (2026-11-20) يتّسع الاسم لنحو 22 حرفاً؛ على الإنتاج 95% من الأسماء ≤ 21 والأطول 28 (27 من 1650
-// فوق 22)، والكتلة تتّسع لنحو 8 أسماء ملتفّة بكلّ عمود قبل أن تفيض
+// كتل الصفحات لقائمة المرضى على الشاشة: الأولى أقصر (رأس الكشف فوقها)، وبعدها 80 بالصفحة (40 بكلّ عمود) — قرار المستخدم.
+// ملفّ PDF لا يعتمد هذه الأعداد: يقيس ارتفاع كلّ سطرٍ ويمرّر layout (انظر payroll-pdf.jsx) — على الإنتاج
+// (2026-11-20) أسماء إجراءاتٍ طويلة تلتفّ سطرين وثلاثة، ففاضت الكتلة الأولى وبقيت الصفحة الأولى رأساً وحده
 const FIRST_PAGE = 64, PER_PAGE = 80
 // التاريخ في القائمة يومٌ/شهر: السنة في رأس الكشف (الفترة)، والعرض الموفَّر للاسم
 const shortDay = (d) => { const [, m, dd] = String(d).split('-'); return `${Number(dd)}/${Number(m)}` }
-const chunks = (visits) => {
-  const all = visits.map((v, i) => ({ v, i }))
-  const out = [all.slice(0, FIRST_PAGE)]
-  for (let k = FIRST_PAGE; k < all.length; k += PER_PAGE) out.push(all.slice(k, k + PER_PAGE))
-  return out.filter((x) => x.length > 0)
+const fixedLayout = (count) => {
+  const out = []
+  for (let k = 0; k < count; k += out.length ? PER_PAGE : FIRST_PAGE) {
+    const size = Math.min(count - k, out.length ? PER_PAGE : FIRST_PAGE)
+    out.push([Math.ceil(size / 2), size - Math.ceil(size / 2)])
+  }
+  return out
 }
-export default function StatementSheet({ st, printedAt }) {
+/** layout: [[عدد العمود اليمين، عدد اليسار]، …] لكلّ كتلة (صفحة) — بالترتيب ومجموعها كلّ الزيارات */
+const chunks = (visits, layout) => {
+  const all = visits.map((v, i) => ({ v, i }))
+  const out = []
+  let at = 0
+  for (const [r, l] of layout || fixedLayout(all.length)) {
+    out.push([all.slice(at, at + r), all.slice(at + r, at + r + l)])
+    at += r + l
+  }
+  if (at < all.length) out.push([all.slice(at), []])   // حارس: لا تسقط زيارةٌ من الكشف
+  return out.filter(([r, l]) => r.length + l.length > 0)
+}
+export default function StatementSheet({ st, printedAt, layout }) {
   const d = st.doctor
   const c = st.counts
   return (
@@ -43,9 +57,9 @@ export default function StatementSheet({ st, printedAt }) {
         <>
           {/* ★ عمودان بالصفحة (طلب المستخدم 2026-11-20: «200 مريض ما بطبعلهم 10 صفحات»): كلّ كتلةٍ صفحة —
               العمود اليمين ثمّ اليسار بترقيمٍ متّصل، وكلّ كتلةٍ data-unit فلا تُقسم بين صفحتين */}
-          {chunks(st.visits).map((ch, k) => (
+          {chunks(st.visits, layout).map((ch, k) => (
             <div key={k} className="pay-cols" data-unit>
-              {[ch.slice(0, Math.ceil(ch.length / 2)), ch.slice(Math.ceil(ch.length / 2))].map((col, c) => (
+              {ch.map((col, c) => (
                 <table key={c} className="pay-table pay-mini">
                   <thead><tr><th className="pay-num">#</th><th className="pay-date">التاريخ</th><th>اسم المريض</th><th className="pay-kind">الزيارة</th>
                     <th className="pay-proc-col">الإجراء · حصّة الطبيب</th></tr></thead>

@@ -14,6 +14,60 @@ const PAGE_W = 794, PAGE_H = 1123            // A4 بنقاط CSS (96 dpi)
 const MARGIN = 38                            // ≈ 1 سم
 const CONTENT_W = PAGE_W - 2 * MARGIN
 const CONTENT_H = PAGE_H - 2 * MARGIN - 18   // سطر رقم الصفحة أسفلها
+const SAFE = 6                               // هامش أمانٍ لكلّ عمود (تقريب البكسلات وخطّ الجدول)
+
+/**
+ * توزيع قائمة المرضى على الصفحات بالارتفاع المقيس لا بعددٍ ثابت (إصلاح 2026-11-20: على الإنتاج التفّت أسماء
+ * الإجراءات فطالت السطور، ففاضت كتلة الـ64 وبقيت الصفحة الأولى رأساً وحده). الورقة مرسومةٌ مرّةً بكلّ الزيارات
+ * في العمود اليمين — العمودان بعرضٍ واحد فارتفاع السطر لا يتغيّر بينهما. كلّ صفحةٍ تُملأ: اليمين حتى آخره ثمّ
+ * اليسار، والكتلة الأخيرة تُوزَّع بين العمودين بالتساوي (بالارتفاع).
+ * @returns {[number, number][] | undefined} undefined = لا قائمة (لا زيارات)
+ */
+function measureLayout(sheet, top0) {
+  const cols = sheet.querySelector('.pay-cols')
+  const table = cols?.querySelector('table')
+  if (!table) return undefined
+  const rows = [...table.tBodies[0].rows].map((tr) => tr.getBoundingClientRect().height)
+  const rowsSum = rows.reduce((a, b) => a + b, 0)
+  const overhead = table.getBoundingClientRect().height - rowsSum          // رأس الجدول وإطاره
+  const pad = cols.getBoundingClientRect().height - table.getBoundingClientRect().height
+  const perCol = CONTENT_H - overhead - pad - SAFE
+  const colsTop = cols.getBoundingClientRect().top - top0
+  const h2 = cols.previousElementSibling
+  const h2Top = h2 ? h2.getBoundingClientRect().top - top0 : colsTop
+  // الصفحة الأولى: ما بقي تحت الرأس — وإن لم يتّسع لثلاثة أسطر نزل العنوان مع القائمة لصفحةٍ جديدة
+  let first = perCol - colsTop
+  if (first < 3 * Math.max(...rows)) first = perCol - (colsTop - h2Top)
+  const fill = (from, room) => {   // كم سطراً يتّسع له عمودٌ يبدأ من from — سطرٌ واحدٌ على الأقلّ
+    let h = 0, k = from
+    while (k < rows.length && (k === from || h + rows[k] <= room)) h += rows[k++]
+    return k - from
+  }
+  const out = []
+  let at = 0
+  while (at < rows.length) {
+    const room = out.length ? perCol : first
+    const r = fill(at, room)
+    const l = fill(at + r, room)
+    if (at + r + l >= rows.length) {   // آخر كتلة: تقسيمٌ متوازنٌ بالارتفاع يتّسع له العمودان
+      const rest = rows.slice(at)
+      let best = [r, rest.length - r], bestH = Infinity, acc = 0
+      for (let i = 1; i <= rest.length; i++) {
+        acc += rest[i - 1]
+        const left = rest.slice(i).reduce((a, b) => a + b, 0)
+        if (acc > room && i > 1) break
+        if (left > room && i < rest.length) continue
+        const h = Math.max(acc, left)
+        if (h < bestH) { bestH = h; best = [i, rest.length - i] }
+      }
+      out.push(best)
+      break
+    }
+    out.push([r, l])
+    at += r + l
+  }
+  return out
+}
 
 /** @param {object[]} statements كشوف /clinic/payroll/:id · @param {string} filename */
 export async function statementsPdf(statements, filename, printedAt) {
@@ -30,7 +84,10 @@ export async function statementsPdf(statements, filename, printedAt) {
       const box = document.createElement('div')
       host.appendChild(box)
       const root = createRoot(box)
-      flushSync(() => root.render(<StatementSheet st={st} printedAt={printedAt} />))
+      // مرّتان: الأولى تقيس السطور (كلّها بالعمود اليمين)، والثانية بالتوزيع المحسوب
+      flushSync(() => root.render(<StatementSheet st={st} printedAt={printedAt} layout={[[st.visits.length, 0]]} />))
+      const layout = measureLayout(box.firstElementChild, box.firstElementChild.getBoundingClientRect().top)
+      flushSync(() => root.render(<StatementSheet st={st} printedAt={printedAt} layout={layout} />))
       const sheet = box.firstElementChild
       const top0 = sheet.getBoundingClientRect().top
       const total = Math.ceil(sheet.getBoundingClientRect().height)
