@@ -23,6 +23,31 @@ const chunks = (visits) => {
 }
 // رقم المريض في القائمة يبقى معه في جدول الإجراءات — فيُعثر عليه بها
 const withProcs = (visits) => visits.map((v, i) => ({ v, i })).filter(({ v }) => v.procedures.length > 0)
+const pairs = (list) => Array.from({ length: Math.ceil(list.length / 2) }, (_, r) => [list[2 * r], list[2 * r + 1]])
+// نصف السطر: الرقم، التاريخ، المريض، الإجراء، للطبيب — والنصف الأيسر بخطٍّ فاصلٍ أعرض
+const sideCls = (side, cls = '') => [cls, side === 1 && 'pay-pair-start'].filter(Boolean).join(' ') || undefined
+function PairHead({ side }) {
+  return (
+    <>
+      <th className={sideCls(side, 'pay-num')}>#</th><th className="pay-date">التاريخ</th><th>اسم المريض</th>
+      <th className="pay-proc-col">الإجراء</th><th className="pay-amt">للطبيب</th>
+    </>
+  )
+}
+function ProcCells({ side, x }) {
+  if (!x) return <><td className={sideCls(side)} /><td /><td /><td /><td /></>
+  const { v, i } = x
+  return (
+    <>
+      <td className={sideCls(side, 'pay-num')}>{n(i + 1)}</td>
+      <td className="pay-date">{shortDay(v.date)}</td>
+      <td className="pay-name">{v.patient}</td>
+      <td className="pay-procs">{v.procedures.map((p, k) => (
+        <span key={k} className={p.paid ? undefined : 'pay-pending'}>{k > 0 && '، '}{p.name}{!p.paid && ' (بانتظار)'}</span>))}</td>
+      <td className="pay-amt">{v.procShare ? n(v.procShare) : ''}</td>
+    </>
+  )
+}
 
 export default function StatementSheet({ st, printedAt }) {
   const d = st.doctor
@@ -65,27 +90,25 @@ export default function StatementSheet({ st, printedAt }) {
           ))}
           {st.visits.some((v) => !v.inRange) && <p className="pay-foot-note" data-unit>* زيارةٌ قبل الفترة، محسوبٌ إجراؤها فيها.</p>}
 
-          {/* الإجراءات جدولٌ لحاله: المرضى ذوو الإجراء وحدهم، بحصّة الطبيب */}
+          {/* الإجراءات جدولٌ لحاله: المرضى ذوو الإجراء وحدهم، بحصّة الطبيب — **إجراءان بكلّ سطر** (طلب المستخدم
+              2026-11-20: «100 إجراء ما بيطلعوا 20 صفحة»): السطر وحدةٌ فتمتلئ الصفحة لآخرها وتُقطع بين سطرين بخطّ */}
           {withProcs(st.visits).length > 0 && (
             <>
               <h2 className="pay-h2" data-unit>الإجراءات ({n(c.procedures)} إجراء)</h2>
-              <table className="pay-table">
+              <table className="pay-table pay-mini pay-pairs">
                 <thead>
-                  <tr data-unit><th className="pay-num">#</th><th>التاريخ</th><th>اسم المريض</th><th>الإجراءات</th><th className="pay-amt">للطبيب</th></tr>
+                  <tr data-unit>{[0, 1].map((k) => (
+                    <PairHead key={k} side={k} />
+                  ))}</tr>
                 </thead>
                 <tbody>
-                  {withProcs(st.visits).map(({ v, i }) => (
-                    <tr key={v.id} data-unit>
-                      <td className="pay-num">{n(i + 1)}</td>
-                      <td className="pay-date">{day(v.date)}</td>
-                      <td className="pay-name">{v.patient}</td>
-                      <td className="pay-procs">{v.procedures.map((p, k) => (
-                        <span key={k} className={p.paid ? undefined : 'pay-pending'}>{k > 0 && '، '}{p.name}{!p.paid && ' (بانتظار المحاسبة)'}</span>))}</td>
-                      <td className="pay-amt">{v.procShare ? n(v.procShare) : ''}</td>
+                  {pairs(withProcs(st.visits)).map((pr, r) => (
+                    <tr key={r} data-unit>
+                      {[0, 1].map((k) => <ProcCells key={k} side={k} x={pr[k]} />)}
                     </tr>
                   ))}
                   <tr className="pay-total" data-unit>
-                    <td colSpan={4}>مجموع حصّته من الإجراءات</td>
+                    <td colSpan={9}>مجموع حصّته من الإجراءات</td>
                     <td className="pay-amt">{n(d.procDoctor)}</td>
                   </tr>
                 </tbody>
