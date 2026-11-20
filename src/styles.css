@@ -6425,6 +6425,14 @@ button.dk-pick:disabled .dk-pick-price { opacity: 0.7; }
 .pay-table.pay-pairs .pay-num { width: 24px; }
 .pay-table.pay-pairs .pay-date { width: 36px; }
 .pay-table.pay-pairs .pay-amt { width: 42px; }
-.pay-sheet .pay-table.pay-pairs .pay-pair-start { border-inline-start: 1.6px solid #7d858c; }
+/* نصفان بإطارين وبينهما فراغ: لا إطار للجدول نفسه — كلّ خلية تحمل حدودها، والفراغ بلا حدود */
+.pay-sheet .pay-table.pay-pairs { border: 0; }
+.pay-sheet .pay-table.pay-pairs th:not(.pay-gap) { border-top: 1.2px solid #7d858c; }
+.pay-sheet .pay-table.pay-pairs tbody tr:last-child td:not(.pay-gap) { border-bottom: 1.2px solid #7d858c; }
+.pay-sheet .pay-table.pay-pairs .pay-pair-start { border-inline-start: 1.2px solid #7d858c; }
+.pay-sheet .pay-table.pay-pairs .pay-pair-end { border-inline-end: 1.2px solid #7d858c; }
+.pay-sheet .pay-table.pay-pairs .pay-gap { width: 10px; border: 0 !important; background: #fff; padding: 0; }
+.pay-sheet .pay-table.pay-pairs .pay-total td { border: 1.2px solid #7d858c; border-top-width: 0; }
+.pay-sheet .pay-table.pay-pairs .pay-total td + td { border-inline-start: 0; }
 .pay-table.pay-pairs .pay-procs { font-size: 10.5px; }
 .pay-table.pay-pairs .pay-proc-col { width: 84px; }

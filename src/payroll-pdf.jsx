@@ -45,9 +45,11 @@ export async function statementsPdf(statements, filename, printedAt) {
         const t = r.top - top0, b = r.bottom - top0
         if (b - start > CONTENT_H && t > start) {
           start = t; starts.push(t)
-          // صفحةٌ تكمل جدولاً: مكان خطّه الأعلى (عرض الجدول) — يُرسم لأنّ الحدود المنفصلة بلا خطٍّ أعلى السطر
-          const tbl = u.tagName === 'TR' && u.previousElementSibling?.tagName === 'TR' ? u.closest('table')?.getBoundingClientRect() : null
-          rowCut.push(tbl ? { x: tbl.left - left0, w: tbl.width } : null)
+          // صفحةٌ تكمل جدولاً: خطّه الأعلى فوق خلايا السطر — يُرسم لأنّ الحدود المنفصلة بلا خطٍّ أعلى السطر،
+          // ويتخطّى عمود الفراغ (pay-gap) في جدول الإجراءات المزدوج
+          const cont = u.tagName === 'TR' && u.previousElementSibling?.tagName === 'TR'
+          rowCut.push(cont ? [...u.children].filter((c) => !c.classList.contains('pay-gap'))
+            .map((c) => { const q = c.getBoundingClientRect(); return { x: q.left - left0, w: q.width } }) : null)
         }
       }
       // الدقّة: ضعفان ما سمح أقصى طول لوحة الرسم (≈ 32 ألف بكسل)
@@ -63,7 +65,10 @@ export async function statementsPdf(statements, filename, printedAt) {
         const ctx = page.getContext('2d')
         ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, page.width, page.height)
         ctx.drawImage(canvas, 0, Math.floor(s * scale), canvas.width, page.height, 0, 0, canvas.width, page.height)
-        if (rowCut[i]) { ctx.fillStyle = '#c8cdd2'; ctx.fillRect(Math.round(rowCut[i].x * scale), 0, Math.round(rowCut[i].w * scale), Math.max(1, Math.round(scale))) }
+        if (rowCut[i]) {
+          ctx.fillStyle = '#9aa1a7'
+          for (const seg of rowCut[i]) ctx.fillRect(Math.round(seg.x * scale), 0, Math.ceil(seg.w * scale), Math.max(1, Math.round(scale)))
+        }
         if (!firstPage) pdf.addPage()
         firstPage = false
         pdf.addImage(page.toDataURL('image/jpeg', 0.92), 'JPEG', MARGIN * k, MARGIN * k, CONTENT_W * k, (page.height / scale) * k)

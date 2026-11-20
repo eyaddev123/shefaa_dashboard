@@ -25,17 +25,18 @@ const chunks = (visits) => {
 const withProcs = (visits) => visits.map((v, i) => ({ v, i })).filter(({ v }) => v.procedures.length > 0)
 const pairs = (list) => Array.from({ length: Math.ceil(list.length / 2) }, (_, r) => [list[2 * r], list[2 * r + 1]])
 // نصف السطر: الرقم، التاريخ، المريض، الإجراء، للطبيب — والنصف الأيسر بخطٍّ فاصلٍ أعرض
-const sideCls = (side, cls = '') => [cls, side === 1 && 'pay-pair-start'].filter(Boolean).join(' ') || undefined
+// كلّ نصفٍ جدولٌ مغلق بإطاره، وبينهما عمودٌ فارغ (pay-gap) كفراغ عمودي المرضى — ملاحظة المستخدم 2026-11-20
+const sideCls = (_side, cls = '') => [cls, 'pay-pair-start'].filter(Boolean).join(' ')
 function PairHead({ side }) {
   return (
     <>
       <th className={sideCls(side, 'pay-num')}>#</th><th className="pay-date">التاريخ</th><th>اسم المريض</th>
-      <th className="pay-proc-col">الإجراء</th><th className="pay-amt">للطبيب</th>
+      <th className="pay-proc-col">الإجراء</th><th className="pay-amt pay-pair-end">للطبيب</th>
     </>
   )
 }
 function ProcCells({ side, x }) {
-  if (!x) return <><td className={sideCls(side)} /><td /><td /><td /><td /></>
+  if (!x) return <><td className={sideCls(side)} /><td /><td /><td /><td className="pay-pair-end" /></>
   const { v, i } = x
   return (
     <>
@@ -44,7 +45,7 @@ function ProcCells({ side, x }) {
       <td className="pay-name">{v.patient}</td>
       <td className="pay-procs">{v.procedures.map((p, k) => (
         <span key={k} className={p.paid ? undefined : 'pay-pending'}>{k > 0 && '، '}{p.name}{!p.paid && ' (بانتظار)'}</span>))}</td>
-      <td className="pay-amt">{v.procShare ? n(v.procShare) : ''}</td>
+      <td className="pay-amt pay-pair-end">{v.procShare ? n(v.procShare) : ''}</td>
     </>
   )
 }
@@ -97,18 +98,16 @@ export default function StatementSheet({ st, printedAt }) {
               <h2 className="pay-h2" data-unit>الإجراءات ({n(c.procedures)} إجراء)</h2>
               <table className="pay-table pay-mini pay-pairs">
                 <thead>
-                  <tr data-unit>{[0, 1].map((k) => (
-                    <PairHead key={k} side={k} />
-                  ))}</tr>
+                  <tr data-unit><PairHead side={0} /><th className="pay-gap" /><PairHead side={1} /></tr>
                 </thead>
                 <tbody>
                   {pairs(withProcs(st.visits)).map((pr, r) => (
                     <tr key={r} data-unit>
-                      {[0, 1].map((k) => <ProcCells key={k} side={k} x={pr[k]} />)}
+                      <ProcCells side={0} x={pr[0]} /><td className="pay-gap" /><ProcCells side={1} x={pr[1]} />
                     </tr>
                   ))}
                   <tr className="pay-total" data-unit>
-                    <td colSpan={9}>مجموع حصّته من الإجراءات</td>
+                    <td colSpan={10}>مجموع حصّته من الإجراءات</td>
                     <td className="pay-amt">{n(d.procDoctor)}</td>
                   </tr>
                 </tbody>
