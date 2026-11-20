@@ -6394,8 +6394,23 @@ button.dk-pick:disabled .dk-pick-price { opacity: 0.7; }
 .pay-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: start; margin-bottom: 8px; }
 .pay-table.pay-mini { font-size: 11px; table-layout: fixed; }
 .pay-table.pay-mini th, .pay-table.pay-mini td { padding: 2px 5px; line-height: 1.45; vertical-align: middle; }
+/* إطارٌ يغلق الجدول بآخر كلّ صفحة (ملاحظة المستخدم 2026-11-20: «مقطوش قطش»): الحدود المنفصلة داخل الصندوق —
+   مع collapse يقع نصف الخطّ الأخير خارج الجدول فلا يرسمه html2canvas */
+.pay-table.pay-mini { border-collapse: separate; border-spacing: 0; border: 1.2px solid #7d858c; }
+.pay-table.pay-mini th, .pay-table.pay-mini td { border: 0; border-bottom: 1px solid #c8cdd2; border-inline-start: 1px solid #c8cdd2; }
+.pay-table.pay-mini tr > :first-child { border-inline-start: 0; }
+.pay-table.pay-mini tbody tr:last-child td { border-bottom: 0; }
+.pay-cols { padding-bottom: 2px; }
 .pay-table.pay-mini .pay-num { width: 26px; }
 .pay-table.pay-mini .pay-date { width: 40px; }
 .pay-table.pay-mini .pay-kind { width: 56px; white-space: nowrap; }
 .pay-table.pay-mini .pay-name { font-weight: 600; } /* بلا قصّ: html2canvas يفسد تشكيل العربية مع ellipsis، والطويل النادر يلتفّ */
 .pay-foot-note { font-size: 10.5px; color: #555; margin: 2px 0 0; }
+
+/* كلّ جداول الكشف بحدودٍ منفصلة داخل صناديقها: آخر سطرٍ في الصفحة وآخر الجدول يُرسم خطّهما (مع collapse يقع نصف
+   الخطّ خارج الجدول فلا يرسمه html2canvas) — ملاحظة المستخدم 2026-11-20 «مقطوش قطش» */
+.pay-sheet .pay-table { border-collapse: separate; border-spacing: 0; border: 1px solid #c8cdd2; }
+.pay-sheet .pay-table th, .pay-sheet .pay-table td { border: 0; border-bottom: 1px solid #c8cdd2; border-inline-start: 1px solid #c8cdd2; }
+.pay-sheet .pay-table tr > :first-child { border-inline-start: 0; }
+.pay-sheet .pay-table tbody tr:last-child td { border-bottom: 0; }
+.pay-sheet .pay-table.pay-mini { border: 1.2px solid #7d858c; }
