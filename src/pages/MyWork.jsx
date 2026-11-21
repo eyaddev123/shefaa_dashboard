@@ -119,7 +119,7 @@ function DuesCard({ work, sal, salErr, withProcedures, pending, onRemove }) {
           </div>
           {work.lines.length > 0 && (
             <details className="dw-details">
-              <summary>تفاصيل {count(work.lines.length, ['إجراء واحد', 'إجراءين', 'إجراءات', 'إجراءً'])}</summary>
+              <summary>تفاصيل {count(work.procedures ?? work.lines.length, ['إجراء واحد', 'إجراءين', 'إجراءات', 'إجراءً'])}</summary>
               <ul className="dw-lines">
                 {work.lines.map((l) => (
                   <li key={l.id}>

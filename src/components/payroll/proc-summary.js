@@ -2,16 +2,19 @@
 // «عمل 4 ايكو، قديش حصّته؟ منضرب، وآخر شي المجموع»: سطرٌ لكلّ (إجراء، حصّة الواحد) — العدد × الحصّة = المجموع.
 // الإجراء نفسه بحصّتين (نسبةٌ تغيّر سعرها، أو تصحيحٌ يدوي) سطران متجاوران، فلا رقمٌ مخبّأ في متوسّط.
 // المحاسَب وحده (paid) — كـ«حصّته من الإجراءات» في الحساب؛ «بانتظار المحاسبة» خارجه وله تنبيهه.
-/** @param {{procedures: {name: string, share: number, paid: boolean}[]}[]} visits */
+/** @param {{procedures: {name: string, base?: string, qty?: number, share: number, paid: boolean}[]}[]} visits */
 export function procSummary(visits) {
   const groups = new Map()
   for (const v of visits) {
     for (const p of v.procedures || []) {
       if (!p.paid) continue
-      const cents = Math.round(Number(p.share || 0) * 100)
-      const key = `${p.name}\u0000${cents}`
-      const g = groups.get(key) || { name: p.name, cents, count: 0 }
-      g.count++
+      // العدد (2026-11-22): «× 4» سطرٌ بحصّةٍ مجموعة — حصّة الواحد = الحصّة ÷ العدد، والعدد يُضاف كلّه
+      const qty = Number(p.qty) || 1
+      const name = p.base || p.name
+      const cents = Math.round((Number(p.share || 0) * 100) / qty)
+      const key = `${name}\u0000${cents}`
+      const g = groups.get(key) || { name, cents, count: 0 }
+      g.count += qty
       groups.set(key, g)
     }
   }

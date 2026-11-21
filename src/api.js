@@ -468,10 +468,15 @@ export const api = {
     // على الحجز: لا سعر يُرسَل — الخادم ينسخه من الكتالوج، ويحسب المواد والحصص لحظتها
     // materials: [{material_id, qty}]
     // consumables: عدّاد المستهلكات (0–100 بخطوة 10) — بعد قلبة «أجرة + مواد» وحدها
-    addAppointmentProcedure: (appointmentId, procedureId, materials = [], consumables) =>
+    // quantity: العدد (2026-11-22) — «تخطيط أعصاب طرف × 4»، بعد القلبة وحدها
+    addAppointmentProcedure: (appointmentId, procedureId, materials = [], consumables, quantity) =>
       http(`/clinic/appointments/${appointmentId}/procedures`,
         { method: 'POST', body: JSON.stringify({ procedure_id: procedureId, materials,
-          ...(consumables ? { consumables } : {}) }) }),
+          ...(consumables ? { consumables } : {}), ...(quantity > 1 ? { quantity } : {}) }) }),
+    // تصحيح العدد قبل القبض (بعده: إزالةٌ بسبب ثمّ إضافة)
+    setLineQuantity: (appointmentId, lineId, quantity) =>
+      http(`/clinic/appointments/${appointmentId}/procedures/${lineId}/quantity`,
+        { method: 'PUT', body: JSON.stringify({ quantity }) }),
     // القائمة كاملةً تحلّ محلّ السابقة؛ legacy_materials للمشرف وحده
     setLineMaterials: (appointmentId, lineId, body) =>
       http(`/clinic/appointments/${appointmentId}/procedures/${lineId}/materials`,

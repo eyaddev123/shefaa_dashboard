@@ -24,6 +24,7 @@ import { DISCOUNT_SCOPES, amountText, availableScopes, blankReferral, coverageFu
 import MaterialsEditor, { qtyValid, toPayload, fmtQty, materialsSummary, materialsValue } from '../components/MaterialsEditor.jsx'
 import { useFeeMode } from '../fee-mode.js'
 import ConsumablesCounter from '../components/ConsumablesCounter.jsx'
+import QuantityStepper from '../components/QuantityStepper.jsx'
 import RoomBadge from '../components/RoomBadge.jsx'
 import Combobox from '../components/Combobox.jsx'
 import BottomSheet from '../components/BottomSheet.jsx'
@@ -824,6 +825,8 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
   const [pick, setPick] = useState('')
   const [newMats, setNewMats] = useState([])
   const [newCons, setNewCons] = useState(0)        // عدّاد المستهلكات للإضافة (بعد القلبة)
+  const [newQty, setNewQty] = useState(1)          // العدد للإضافة (بعد القلبة) — «× 4»
+  const [qtyEdit, setQtyEdit] = useState(null)     // { id, qty } — تصحيح عدد سطرٍ غير مقبوض
   const [editCons, setEditCons] = useState(0)      // وللسطر الجاري تعديله
   const [busy, setBusy] = useState(false)
   const [removing, setRemoving] = useState(null)   // id السطر الجاري إزالته
@@ -874,20 +877,22 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
   // بعد القلبة: المريض يدفع الأجرة + المستهلكات + المواد بسعر بيعها — تُعرض قبل الحفظ
   const chosenCons = chosen && feeMode ? newCons : 0
   const newMatsValue = chosen && feeMode ? materialsValue(newMats, matCatalog) : 0
-  const chosenTotal = chosen ? Number(chosen.price) + chosenCons + newMatsValue : 0
+  const chosenQty = chosen && feeMode ? newQty : 1
+  const chosenFee = chosen ? Number(chosen.price) * chosenQty : 0
+  const chosenTotal = chosen ? chosenFee + chosenCons + newMatsValue : 0
 
   const add = async () => {
     if (!chosen || !qtyValid(newMats)) return
     setBusy(true); setAddErr(null)
     try {
-      const r = await api.clinic.addAppointmentProcedure(appt.id, chosen.id, toPayload(newMats), feeMode ? newCons : 0)
+      const r = await api.clinic.addAppointmentProcedure(appt.id, chosen.id, toPayload(newMats), feeMode ? newCons : 0, chosenQty)
       setStockWarns(r.stock_warnings || [])
       setSplit(r.doctor_share !== undefined ? { ...r, name: chosen.name, price: chosen.price } : null)
       const withMats = newMats.length ? ` + ${newMats.length} ${newMats.length === 1 ? 'مادة' : 'مواد'}` : ''
       onToast(r.fee_snapshot != null
-        ? `أُضيف «${chosen.name}» — على المريض ${fmtMoney(r.price_snapshot)}`
+        ? `أُضيف «${chosen.name}${chosenQty > 1 ? ` × ${chosenQty}` : ''}» — على المريض ${fmtMoney(r.price_snapshot)}`
         : `أُضيف «${chosen.name}» — ${fmtMoney(chosen.price)}${withMats}`, 'success')
-      setPick(''); setNewMats([]); setNewCons(0); onChanged()
+      setPick(''); setNewMats([]); setNewCons(0); setNewQty(1); onChanged()
     } catch (ex) { setAddErr({ message: ex.message, code: ex.data?.code }) }
     finally { setBusy(false) }
   }
@@ -897,6 +902,17 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
     try {
       await api.clinic.removeAppointmentProcedure(appt.id, line.id, reason.trim())
       onToast(`أُزيل «${line.name}»`, 'success'); setRemoving(null); setReason(''); onChanged()
+    } catch (ex) { onToast(ex.message) }
+    finally { setBusy(false) }
+  }
+  // تصحيح العدد قبل القبض (الدكتور كتب 4 والمريض عمل 3) — الخادم يعيد الأجرة والحصّتين من لقطة السطر
+  const saveQty = async (line) => {
+    if (!qtyEdit) return
+    setBusy(true)
+    try {
+      const r = await api.clinic.setLineQuantity(appt.id, line.id, qtyEdit.qty)
+      onToast(r.unchanged ? 'العدد كما هو' : `«${line.name.replace(/ × \d+$/, '')}» صار × ${qtyEdit.qty} — على المريض ${fmtMoney(r.price_snapshot)}`, 'success')
+      setQtyEdit(null); onChanged()
     } catch (ex) { onToast(ex.message) }
     finally { setBusy(false) }
   }
@@ -956,7 +972,7 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
                     {fmtMoney(l.price)}
                     {/* الإصدار 3: السعر = الأجرة + المواد — التفصيل تحت المبلغ */}
                     {l.fee != null && !l.removed_at && Number(l.price) !== Number(l.fee) && (
-                      <small className="proc-fee-break">أجرة {fmtMoney(l.fee)}
+                      <small className="proc-fee-break">أجرة {Number(l.quantity) > 1 ? `${fmtMoney(Number(l.fee) / Number(l.quantity))} × ${l.quantity}` : fmtMoney(l.fee)}
                         {Number(l.price) - Number(l.fee) - Number(l.consumables || 0) > 0 && <> + مواد {fmtMoney(Number(l.price) - Number(l.fee) - Number(l.consumables || 0))}</>}
                         {Number(l.consumables) > 0 && <> + مستهلكات {fmtMoney(l.consumables)}</>}</small>
                     )}
@@ -981,6 +997,9 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
                       <span className="proc-line-actions">
                         {canEdit && <button className="ghost" style={{ padding: '2px 10px', fontSize: 11.5 }}
                           onClick={() => startEdit(l)}>المواد</button>}
+                        {/* العدد: قبل القبض وحده، وعلى «أجرة + مواد» (بعد القبض: إزالةٌ بسبب ثمّ إضافة) */}
+                        {canEdit && l.fee != null && !l.paid_at && <button className="ghost" style={{ padding: '2px 10px', fontSize: 11.5 }}
+                          onClick={() => { setEditing(null); setRemoving(null); setQtyEdit({ id: l.id, qty: Number(l.quantity) || 1 }) }}>العدد</button>}
                         {canRemove(l) && <button className="ghost" style={{ padding: '2px 10px', fontSize: 11.5 }}
                           onClick={() => { setEditing(null); setRemoving(l.id); setReason('') }}>إزالة</button>}
                       </span>
@@ -998,6 +1017,18 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
                     )}
                   </td>
                 </tr>
+                {qtyEdit?.id === l.id && !l.removed_at && (
+                  <tr className="proc-mats-row rt-sub">
+                    <td colSpan={4}>
+                      <QuantityStepper value={qtyEdit.qty} unitPrice={Number(l.fee) / (Number(l.quantity) || 1)}
+                        onChange={(qty) => setQtyEdit({ id: l.id, qty })} disabled={busy} />
+                      <div className="mat-actions">
+                        <button disabled={busy} onClick={() => saveQty(l)}>حفظ العدد</button>
+                        <button className="ghost" disabled={busy} onClick={() => setQtyEdit(null)}>إلغاء</button>
+                      </div>
+                    </td>
+                  </tr>
+                )}
                 {/* مواد السطر: بالاسم والكمّية — أو محرّرها إن فُتح */}
                 {!l.removed_at && (editing === l.id ? (
                   <tr className="proc-mats-row rt-sub">
@@ -1034,7 +1065,7 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
                 placeholder={catalog === null ? 'جارٍ التحميل…' : choices.length ? 'اختاري إجراءً… (اكتبي للبحث)' : 'لا إجراءات متاحة'}
                 emptyText="لا إجراءات متاحة"
                 options={choices.map((p) => ({ value: String(p.id), label: p.name, meta: fmtMoney(p.price) }))}
-                onChange={(v) => { setPick(v); setAddErr(null); setNewCons(0) }} />
+                onChange={(v) => { setPick(v); setAddErr(null); setNewCons(0); setNewQty(1) }} />
             </div>
             {/* المستهلكات المقدّرة لنوع الإجراء — للمشرفة وحدها (الخادم لا يرسلها للاستقبال): قراءةٌ فقط */}
             {chosen && isSupervisor && !feeMode && Number(chosen.consumables_cost) > 0 && (
@@ -1047,14 +1078,16 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
             {/* المواد بعد اختيار الإجراء: اختيارية — إجراءٌ بلا مواد يُضاف كما هو. ثمّ المبلغ و«إضافة» */}
             {chosen && (
               <div className="proc-add-mats">
-                <div className="proc-add-head"><strong>{chosen.name}</strong><span>{fmtMoney(chosen.price)}</span></div>
+                <div className="proc-add-head"><strong>{chosen.name}{chosenQty > 1 && ` × ${chosenQty}`}</strong><span>{fmtMoney(chosenFee)}</span></div>
+                {/* العدد: الإجراء نفسه بالقعدة أكثر من مرّة (بعد القلبة) */}
+                {feeMode && <QuantityStepper value={newQty} unitPrice={Number(chosen.price)} onChange={setNewQty} disabled={busy} />}
                 <MaterialsEditor withPrice={!!feeMode} catalog={matCatalog} value={newMats} onChange={setNewMats} disabled={busy}
                   comboHint="أضيفي مادة: اكتبي اسمها للبحث، أو اكبسي لعرضها كلّها…" />
                 {feeMode && <ConsumablesCounter value={newCons} onChange={setNewCons} disabled={busy} />}
                 <div className="proc-add-foot">
                   <span>على المريض <strong>{fmtMoney(feeMode ? chosenTotal : chosen.price)}</strong>
                     {feeMode && (chosenCons > 0 || newMatsValue > 0) && (
-                      <small> — أجرة {fmtMoney(chosen.price)}{chosenCons > 0 && ` + مستهلكات ${fmtMoney(chosenCons)}`}{newMatsValue > 0 && ` + مواد ${fmtMoney(newMatsValue)}`}</small>
+                      <small> — أجرة {fmtMoney(chosenFee)}{chosenCons > 0 && ` + مستهلكات ${fmtMoney(chosenCons)}`}{newMatsValue > 0 && ` + مواد ${fmtMoney(newMatsValue)}`}</small>
                     )}</span>
                   <button disabled={busy || !qtyValid(newMats)} onClick={add}>إضافة الإجراء</button>
                 </div>

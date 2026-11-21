@@ -6097,6 +6097,12 @@ button.dk-pick:disabled .dk-pick-price { opacity: 0.7; }
 .cons-label { font-weight: 600; font-size: 13.5px; }
 .cons-value { min-width: 84px; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; }
 .cons-hint { margin: 2px 0 0; font-size: 12px; color: var(--muted); line-height: 1.7; }
+/* العدد على الإجراء (2026-11-22): [−] n [+] ويُكتب باليد، وتحته «75,000 × 4 = 300,000» */
+.qty-stepper { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 8px; margin-top: 6px; }
+.qty-value { width: 52px; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; padding: 4px 2px; }
+.qty-calc { flex-basis: 100%; font-size: 12.5px; color: var(--muted); text-align: end; font-variant-numeric: tabular-nums; }
+.qty-calc strong { color: var(--text-primary); }
+.dk-sel-qty { color: var(--accent-text); }
 
 /* ═══ الرواتب والأجور (2026-11-18): القائمة والكشف — بطاقاتٌ محايدة بلا ألوان ═══ */
 .pr-page { min-width: 0; }

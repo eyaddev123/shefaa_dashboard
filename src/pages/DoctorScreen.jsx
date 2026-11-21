@@ -13,6 +13,7 @@ import { ProcedureOnlyBadge } from '../components/ProcedureOnly.jsx'
 import MaterialsEditor, { qtyValid, toPayload, materialsValue } from '../components/MaterialsEditor.jsx'
 import { useFeeMode } from '../fee-mode.js'
 import ConsumablesCounter, { CONSUMABLES_HINT } from '../components/ConsumablesCounter.jsx'
+import QuantityStepper from '../components/QuantityStepper.jsx'
 import {
   ringDoctor, primeOnFirstGesture, onAudioState, audioReady, unlockAudio,
   shouldOfferPush, dismissPushOffer, enablePush, refreshPush,
@@ -87,10 +88,12 @@ function AddProcedureSheet({ appt, catalog, usage, matCatalog, loadMaterials, dr
     selected: d.selected.map((x) => (String(x.id) === String(id) ? { ...x, ...patch } : x)) }))
   const toggle = (p) => setDraft((d) => ({ ...d, errorId: null, error: null,
     selected: isOn(p.id) ? d.selected.filter((x) => String(x.id) !== String(p.id))
-      : [...d.selected, { id: p.id, name: p.name, mats: [], cons: 0 }] }))
+      : [...d.selected, { id: p.id, name: p.name, mats: [], cons: 0, qty: 1 }] }))
   const valid = sel.length > 0 && sel.every((x) => qtyValid(x.mats))
   const priceOf = (id) => Number((catalog || []).find((p) => String(p.id) === String(id))?.price || 0)
-  const procTotal = sel.reduce((t, x) => t + priceOf(x.id), 0)
+  // العدد (2026-11-22): «× 4» ⇒ الأجرة × العدد (بعد القلبة وحدها؛ قبلها سطرٌ واحد)
+  const qtyOf = (x) => (feeMode ? Number(x.qty) || 1 : 1)
+  const procTotal = sel.reduce((t, x) => t + priceOf(x.id) * qtyOf(x), 0)
   const matTotal = sel.reduce((t, x) => t + materialsValue(x.mats, matCatalog), 0)
   // عدّاد المستهلكات لكلّ إجراءٍ مختار (بعد القلبة) — تقديرٌ يضعه الدكتور
   const consTotal = feeMode ? sel.reduce((t, x) => t + Number(x.cons || 0), 0) : 0
@@ -153,14 +156,18 @@ function AddProcedureSheet({ appt, catalog, usage, matCatalog, loadMaterials, dr
             <li key={x.id} className={`dk-sel-item${String(draft.errorId) === String(x.id) ? ' is-bad' : ''}`}>
               {/* رأس البطاقة: الإجراء وأجرته، ومجموع موادّه ومستهلكاته حين توجد (جولة التصميم 2026-11-18) */}
               <div className="dk-sel-row">
-                <span className="dk-sel-name">{x.name}</span>
+                <span className="dk-sel-name">{x.name}{qtyOf(x) > 1 && <b className="dk-sel-qty"> × {qtyOf(x)}</b>}</span>
                 <span className="dk-sel-price">
-                  {fmtMoney(priceOf(x.id))}
+                  {fmtMoney(priceOf(x.id) * qtyOf(x))}
                   {feeMode && materialsValue(x.mats, matCatalog) + Number(x.cons || 0) > 0 && (
                     <small> + مواد {fmtMoney(materialsValue(x.mats, matCatalog) + Number(x.cons || 0))}</small>
                   )}
                 </span>
               </div>
+              {/* العدد: الإجراء نفسه بالقعدة أكثر من مرّة — «تخطيط أعصاب طرف × 4» (بعد القلبة) */}
+              {feeMode && (
+                <QuantityStepper value={x.qty || 1} unitPrice={priceOf(x.id)} onChange={(qty) => update(x.id, { qty })} />
+              )}
               <div className="dk-mats-body">
                 {matCatalog == null ? <p className="empty">جارٍ تحميل المواد…</p>
                   // القائمة منسدلة ظاهرة دائماً: الكبسة تعرض المواد كلّها والكتابة تُرشّحها، ومع كلّ مادة سعر بيعها
@@ -270,8 +277,10 @@ function TodayBar({ lines, toast, onMaterials }) {
   const [open, setOpen] = useState(false)
   const startY = useRef(null)
   const swiped = useRef(false)
-  const paid = lines.filter((l) => l.paid_at).length
-  const pending = lines.length - paid
+  // العدد (2026-11-22): «× 4» أربعة إجراءات
+  const qtyOf = (l) => Number(l.quantity) || 1
+  const paid = lines.filter((l) => l.paid_at).reduce((t, l) => t + qtyOf(l), 0)
+  const pending = lines.filter((l) => !l.paid_at).reduce((t, l) => t + qtyOf(l), 0)
   const down = (e) => { startY.current = e.clientY; swiped.current = false }
   const up = (e) => {
     if (startY.current == null) return
@@ -475,12 +484,13 @@ export default function DoctorScreen() {
   const confirmAdd = async () => {
     const apptId = sheetFor
     const chosen = draft.selected
-    const temps = chosen.map((x, i) => ({ tempId: `t${Date.now()}-${i}`, appointment_id: apptId, name: x.name }))
+    const temps = chosen.map((x, i) => ({ tempId: `t${Date.now()}-${i}`, appointment_id: apptId,
+      name: Number(x.qty) > 1 ? `${x.name} × ${x.qty}` : x.name }))
     setSheetFor(null)
     setAdding((a) => [...a, ...temps])
     try {
       await api.clinic.addAppointmentProcedures(apptId, chosen.map((x) => ({ procedure_id: x.id, materials: toPayload(x.mats),
-        ...(x.cons ? { consumables: x.cons } : {}) })))
+        ...(x.cons ? { consumables: x.cons } : {}), ...(Number(x.qty) > 1 ? { quantity: Number(x.qty) } : {}) })))
       setDraft(emptyDraft)
       showToast(chosen.length === 1 ? `أُضيف «${chosen[0].name}» — بانتظار المحاسبة`
         : `أُضيفت ${chosen.length.toLocaleString('ar-SY-u-nu-latn')} إجراءات — بانتظار المحاسبة`, 'success', 3500)

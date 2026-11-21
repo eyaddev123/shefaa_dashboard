@@ -56,6 +56,8 @@ export function describeEvent(e) {
     // إجراءٌ أضافه الطبيب «بانتظار المحاسبة» ثمّ قُبض — الفاعل من قبض
     case 'procedure_paid': return { title: `تمت المحاسبة: ${e.new_value}`, tone: 'add' }
     case 'materials': return { title: `تعديل مواد «${e.old_value}»`, detail: e.new_value }
+    // العدد (2026-11-22): «تخطيط أعصاب طرف × 4» ← «× 3» قبل القبض
+    case 'procedure_quantity': return { title: `تعديل العدد: ${e.old_value} ← ${e.new_value}` }
     case 'referral':
       if (!e.old_value) return { title: `تسجيل إحالة: ${e.new_value}`, tone: 'add' }
       if (!e.new_value) return { title: `حذف الإحالة: ${e.old_value}`, tone: 'remove' }
