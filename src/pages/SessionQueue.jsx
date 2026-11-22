@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { useDialogs } from '../dialogs.jsx'
+import { Modal } from '../components/inventory/shared.jsx'
 import { loadPrinter, ticketFrom } from '../ticket-print.js'
 import { printViaHelper } from '../print-helper.js'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -990,9 +991,54 @@ function AttendanceCurrentCard({ current, returning = [], recalled, onRecalled, 
   )
 }
 
+// ═══ تصحيح الانصراف (طلب المستخدم 2026-11-22: «بالغلط كبسوا الانصراف… وما عاد يقدروا يصحّحوا») ═══
+// خياران: وقتٌ آخر، أو إلغاؤه (الطبيب ما زال في العيادة ⇒ يعود زرّ «تسجيل انصراف»). السبب اختياريّ،
+// وكلاهما سطرٌ في الأثر بمن صحّح ومتى. الاستقبال لجلسة اليوم، والمشرفة لأيّ يوم (الخادم يحرس).
+function DepartureFixDialog({ data, onClose, onDone, onError }) {
+  const [time, setTime] = useState(fmtClock(data.doctor_departed_at))
+  const [reason, setReason] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState(null)
+  const act = async (fn, okMsg) => {
+    setBusy(true); setErr(null)
+    try { await fn(); onDone(okMsg) } catch (ex) { setErr(ex.message); setBusy(false) }
+  }
+  return (
+    <Modal title="تصحيح انصراف الطبيب" subtitle={`مسجَّل الآن: ${fmtClock(data.doctor_departed_at)}`} onClose={onClose} busy={busy} sheet>
+      <div className="dep-fix">
+        <div className="dep-fix-opt">
+          <strong>الطبيب ما زال في العيادة؟</strong>
+          <p className="attn-compact-hint">الانصراف انضغط بالغلط — يُلغى ويرجع زرّ «تسجيل انصراف» لوقت خروجه.</p>
+          <button type="button" className="danger" disabled={busy}
+            onClick={() => act(() => api.clinic.undoDoctorDeparture(data.id, reason.trim() || undefined), 'أُلغي الانصراف — سجّليه حين يخرج الطبيب')}>
+            إلغاء الانصراف</button>
+        </div>
+        <div className="dep-fix-opt">
+          <strong>أو الوقت غلط؟</strong>
+          <div className="field">
+            <label htmlFor="dep-fix-time">وقت الانصراف الصحيح</label>
+            <input id="dep-fix-time" type="time" dir="ltr" value={time} disabled={busy} onChange={(e) => setTime(e.target.value)} />
+          </div>
+          <button type="button" disabled={busy || !time || time === fmtClock(data.doctor_departed_at)}
+            onClick={() => act(() => api.clinic.fixDoctorDeparture(data.id, toLatinDigits(time).trim(), reason.trim() || undefined), `صُحّح الانصراف إلى ${time}`)}>
+            احفظ الوقت</button>
+        </div>
+        <div className="field">
+          <label htmlFor="dep-fix-reason">السبب (اختياري)</label>
+          <input id="dep-fix-reason" value={reason} maxLength={300} disabled={busy} placeholder="مثال: انضغط بالغلط بدل الحضور"
+            onChange={(e) => setReason(e.target.value)} />
+        </div>
+        <p className="attn-compact-hint">يُحفظ الوقت السابق واسمك في الأثر.</p>
+        {err && <p className="error">{err}</p>}
+      </div>
+    </Modal>
+  )
+}
+
 // حضور الطبيب: «وصل الطبيب» مرّة واحدة ثم الوقت مع «تصحيح» يترك أثراً، وبعده «تسجيل انصراف»
-// مرّة واحدة بوقت الضغطة (أساس ساعات الراتب). تصحيح الانصراف عند المشرفة من لوحة الدكتور.
+// مرّة واحدة بوقت الضغطة (أساس ساعات الراتب). وبجانب الانصراف «تصحيح» (وقتٌ آخر أو إلغاؤه — 2026-11-22).
 function DoctorArrivalCard({ data, onChanged, onError, canAct }) {
+  const [fixingDep, setFixingDep] = useState(false)
   const dlg = useDialogs()
   const [busy, setBusy] = useState(false)
   const run = async (fn) => {
@@ -1014,7 +1060,7 @@ function DoctorArrivalCard({ data, onChanged, onError, canAct }) {
     const left = (data.appointments || []).filter((a) => ['arrived', 'in_service', 'waiting_return'].includes(a.status)).length
     const ok = await dlg.confirm({
       title: 'تسجيل انصراف الطبيب',
-      body: `يُسجَّل الانصراف الآن (${fmtClock(new Date())}) مرّةً واحدة — وتصحيحه بعدها عند المشرفة.${
+      body: `يُسجَّل الانصراف الآن (${fmtClock(new Date())}) — وإن ضُغط بالغلط تصحّحينه من «تصحيح» بجانبه.${
         left ? `\nما زال ${left === 1 ? 'مريضٌ واحد' : `${left} مرضى`} بالانتظار أو عند الطبيب.` : ''}`,
       confirmLabel: 'سجّل الانصراف',
     })
@@ -1024,7 +1070,7 @@ function DoctorArrivalCard({ data, onChanged, onError, canAct }) {
   const depHistory = data.doctor_departure_history || []
   // الأثر لا يضيع حين تنطوي البطاقة: كل تصحيح بقيمته السابقة ومن صحّحه ومتى — في تلميح السطر
   const trailOf = (list) => list.map((h) =>
-    `صُحّح من ${fmtClock(h.previous_value)} إلى ${fmtClock(h.new_value)} — ${h.changed_by_name || '—'} عند ${fmtClock(h.changed_at)}${
+    `${h.new_value ? `صُحّح من ${fmtClock(h.previous_value)} إلى ${fmtClock(h.new_value)}` : `أُلغي انصراف ${fmtClock(h.previous_value)}`} — ${h.changed_by_name || '—'} عند ${fmtClock(h.changed_at)}${
       h.reason ? ` (${h.reason})` : ''}`).join('\n')
   const minutes = data.doctor_departed_at
     ? Math.floor((new Date(data.doctor_departed_at) - new Date(data.doctor_arrived_at)) / 60000) : null
@@ -1055,6 +1101,7 @@ function DoctorArrivalCard({ data, onChanged, onError, canAct }) {
               <span className="attn-arrival-time" dir="ltr">{fmtClock(data.doctor_departed_at)}</span>
               <span className="badge sm">دوام {fmtDuration(minutes)}</span>
               {depHistory.length > 0 && <span className="attn-compact-hint">صُحّح</span>}
+              {canAct && <button className="link-btn" disabled={busy} onClick={() => setFixingDep(true)}>تصحيح</button>}
             </div>
           ) : canAct ? (
             <div className="attn-compact-actions">
@@ -1070,6 +1117,8 @@ function DoctorArrivalCard({ data, onChanged, onError, canAct }) {
           </div>}
         </>
       )}
+      {fixingDep && <DepartureFixDialog data={data} onClose={() => setFixingDep(false)} onError={onError}
+        onDone={() => { setFixingDep(false); onChanged() }} />}
     </div>
   )
 }

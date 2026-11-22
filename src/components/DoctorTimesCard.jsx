@@ -35,6 +35,11 @@ function FixDialog({ s, onClose, onSaved }) {
     setBusy(true); setErr(null)
     try { await api.clinic.fixDoctorTimes(s.id, body); onSaved() } catch (ex) { setErr(ex.message); setBusy(false) }
   }
+  // إلغاء انصرافٍ ضُغط بالغلط (2026-11-22) — بالسبب المكتوب، ويبقى الحضور
+  const undo = async () => {
+    setBusy(true); setErr(null)
+    try { await api.clinic.undoDoctorDeparture(s.id, reason.trim() || undefined); onSaved() } catch (ex) { setErr(ex.message); setBusy(false) }
+  }
   return (
     <Modal title="تصحيح الحضور والانصراف" subtitle={`${s.date} · الدوام ${s.start}–${s.end}`} onClose={onClose} busy={busy} sheet>
       <form onSubmit={save}>
@@ -58,6 +63,8 @@ function FixDialog({ s, onClose, onSaved }) {
         <div className="bf-actions" style={{ marginTop: 12 }}>
           <button type="submit" disabled={busy || !changed || !reason.trim()}>{busy ? 'جارٍ الحفظ…' : 'احفظ التصحيح'}</button>
           <button type="button" className="ghost" disabled={busy} onClick={onClose}>إلغاء</button>
+          {s.departed && <button type="button" className="danger" disabled={busy} onClick={undo}
+            title="الانصراف انضغط بالغلط والطبيب ما زال في العيادة">إلغاء الانصراف</button>}
         </div>
       </form>
     </Modal>
@@ -115,7 +122,7 @@ export default function DoctorTimesCard({ doctorId, period, from, to, canFix, on
                           <ul className="dt-trail">
                             {s.history.map((h, i) => (
                               <li key={i}>
-                                {FIELD[h.field]}: <span dir="ltr">{h.previous || '—'}</span> ← <span dir="ltr">{h.next}</span>
+                                {FIELD[h.field]}: <span dir="ltr">{h.previous || '—'}</span> ← {h.next ? <span dir="ltr">{h.next}</span> : 'أُلغي'}
                                 {h.reason && <> — {h.reason}</>}
                                 <span className="muted"> — {h.by || '—'} {fmtDateTime(h.at)}</span>
                               </li>

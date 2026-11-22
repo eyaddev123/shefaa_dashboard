@@ -445,6 +445,11 @@ export const api = {
       http(`/clinic/sessions/${sessionId}/doctor-arrived`, { method: 'PATCH', body: JSON.stringify({ time }) }),
     // انصراف الطبيب: مرّة واحدة لجلسة اليوم بعد وصوله — وتصحيحه عند المشرفة (fixDoctorTimes)
     doctorDeparted: (sessionId) => http(`/clinic/sessions/${sessionId}/doctor-departed`, { method: 'POST' }),
+    // تصحيح الانصراف (2026-11-22): وقتٌ آخر، أو إلغاؤه إن ضُغط بالغلط — الاستقبال لجلسة اليوم، والمشرفة لأيّ يوم
+    fixDoctorDeparture: (sessionId, time, reason) =>
+      http(`/clinic/sessions/${sessionId}/doctor-departed`, { method: 'PATCH', body: JSON.stringify({ time, reason }) }),
+    undoDoctorDeparture: (sessionId, reason) =>
+      http(`/clinic/sessions/${sessionId}/doctor-departed`, { method: 'DELETE', body: JSON.stringify({ reason }) }),
     // تحويل نمط جلسة مولَّدة — لمشرف العيادات، وللجلسة الفارغة فقط (الخادم يرفض غيرها بـ 409)
     switchSessionMode: (sessionId, flowMode) =>
       http(`/clinic/sessions/${sessionId}/flow-mode`, { method: 'PATCH', body: JSON.stringify({ flow_mode: flowMode }) }),

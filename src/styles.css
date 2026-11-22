@@ -6493,3 +6493,9 @@ button.dk-pick:disabled .dk-pick-price { opacity: 0.7; }
 .pay-sheet .pay-head { border-bottom-color: #000; }
 .pay-sheet .pay-sign-row i { border-bottom-color: #000; }
 .pay-sheet, .pay-sheet *:not(.is-loss) { color: #000 !important; }
+
+/* ═══ تصحيح انصراف الطبيب (2026-11-22): خياران واضحان — إلغاؤه أو وقتٌ آخر — ثمّ سببٌ اختياريّ ═══ */
+.dep-fix { display: grid; gap: 14px; }
+.dep-fix-opt { display: grid; gap: 8px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2, transparent); }
+.dep-fix-opt .field { margin: 0; }
+.dep-fix-opt > button { justify-self: start; }
