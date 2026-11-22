@@ -6,6 +6,7 @@ import { fmtDay, fmtMonth } from '../../api.js'
 //   أخد  = كلّ ما يأخذه منّا = «المستحقّ للطبيب»: الراتب بمكوّناته (شهري/يومي/ساعات/مرضى) + حصّته من الإجراءات والخدمات
 //   الربح = جاب − أخد  (= «صافي الربح» في البطاقة ناقص حصّته من الخدمات)
 // الأرقام من حساب «تقارير الدكاترة» نفسه (/clinic/accounts) — لا حساب جديد في الخادم.
+// 2026-11-22: وقبلها عمودان «المرضى» و«أيام الدوام» (رقما البطاقة: d.patients و d.attendance.days) بمجموعهما.
 
 const BRAND = 'مجمع عيادات الشفاء الطبي'
 export const PROFIT_TITLE = 'أرباح الشفاء من الأطباء'
@@ -19,6 +20,8 @@ export function profitRow(d) {
   const shares = (d.procDoctor || 0) + (d.ironDoctor || 0)
   const took = d.due === null || d.due === undefined ? shares : d.due
   return { id: d.doctorId, doctor: d.doctor, specialty: d.specialty, brought, took, profit: brought - took,
+    // عدد المرضى وأيام الدوام (2026-11-22) — رقما «المرضى» و«الحضور» في بطاقة الدكتور نفسها
+    patients: d.patients || 0, days: d.attendance?.days || 0,
     noSalary: d.due === null || d.due === undefined || !!d.noPay }
 }
 
@@ -28,7 +31,7 @@ export const periodText = (data) => (data.month ? `شهر ${fmtMonth(data.month)
 
 export default function ProfitSheet({ data, rows, printedAt }) {
   const sum = (k) => rows.reduce((t, r) => t + r[k], 0)
-  const total = { brought: sum('brought'), took: sum('took'), profit: sum('profit') }
+  const total = { brought: sum('brought'), took: sum('took'), profit: sum('profit'), patients: sum('patients'), days: sum('days') }
   const noSalary = rows.filter((r) => r.noSalary).length
   return (
     <article className="pay-sheet prf-sheet" dir="rtl">
@@ -41,6 +44,8 @@ export default function ProfitSheet({ data, rows, printedAt }) {
       <table className="pay-table prf-table">
         <thead><tr data-unit>
           <th className="pay-num">#</th><th>الطبيب</th>
+          <th className="prf-cnt">المرضى</th>
+          <th className="prf-cnt">أيام الدوام</th>
           <th className="prf-amt">جاب للشفاء<small>الكشوفات والإجراءات</small></th>
           <th className="prf-amt">أخد من الشفاء<small>راتبه وحصصه</small></th>
           <th className="prf-amt">ربح الشفاء</th>
@@ -50,6 +55,8 @@ export default function ProfitSheet({ data, rows, printedAt }) {
             <tr key={r.id} data-unit>
               <td className="pay-num">{n(i + 1)}</td>
               <td className="pay-name">{r.doctor}{r.noSalary && <sup> *</sup>}{r.specialty && <small className="prf-spec"> — {r.specialty}</small>}</td>
+              <td className="prf-cnt">{n(r.patients)}</td>
+              <td className="prf-cnt">{n(r.days)}</td>
               <td className="prf-amt">{n(r.brought)}</td>
               <td className="prf-amt">{n(r.took)}</td>
               <td className={`prf-amt prf-profit${r.profit < 0 ? ' is-loss' : ''}`}>{signed(r.profit)}</td>
@@ -57,6 +64,8 @@ export default function ProfitSheet({ data, rows, printedAt }) {
           ))}
           <tr className="prf-total" data-unit>
             <td colSpan={2}>المجموع ({n(rows.length)} طبيب)</td>
+            <td className="prf-cnt">{n(total.patients)}</td>
+            <td className="prf-cnt">{n(total.days)}</td>
             <td className="prf-amt">{n(total.brought)}</td>
             <td className="prf-amt">{n(total.took)}</td>
             <td className={`prf-amt prf-profit${total.profit < 0 ? ' is-loss' : ''}`}>{signed(total.profit)}</td>
@@ -65,6 +74,7 @@ export default function ProfitSheet({ data, rows, printedAt }) {
       </table>
 
       <div className="prf-notes" data-unit>
+        <p>المرضى = عدد مرضاه في الفترة. أيام الدوام = الأيام التي حضر فيها.</p>
         <p>جاب = الكشوفات + الإجراءات بعد حقّ المواد. أخد = كلّ ما يأخذه الطبيب منّا في الفترة: راتبه (شهري أو يومية أو ساعات أو مرضى) وحصّته من الإجراءات وخدمات العيادة. الربح = جاب − أخد. المبالغ بالليرة السورية.</p>
         {noSalary > 0 && <p>* بلا راتب مضبوط للفترة: «أخد» حصصه وحدها.</p>}
         {printedAt && <p className="pay-printed">أُعدّ التقرير: {printedAt}</p>}
