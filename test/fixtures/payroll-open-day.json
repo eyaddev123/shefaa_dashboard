@@ -1,0 +1,289 @@
+{
+ "list": {
+  "from": "2026-10-01",
+  "to": "2026-10-31",
+  "period": "custom",
+  "today": "2026-11-22",
+  "doctors": [
+   {
+    "doctorId": "2",
+    "doctor": "د. بلا نشاط",
+    "specialty": "أطفال",
+    "active": true,
+    "payKind": null,
+    "payAmount": null,
+    "noPay": true,
+    "payParts": null,
+    "patientRate": null,
+    "patientScope": null,
+    "salaryPatientCount": null,
+    "dailyRate": null,
+    "hourlyRate": null,
+    "settleCycle": null,
+    "attendance": {
+     "days": 0,
+     "minutes": 0,
+     "noDeparture": 0,
+     "onDuty": 0,
+     "hours": 0
+    },
+    "salaryPatients": null,
+    "salaryDays": null,
+    "salaryHours": null,
+    "patients": 0,
+    "procedures": 0,
+    "salary": 0,
+    "visitShifa": 0,
+    "procShifa": 0,
+    "shifa": 0,
+    "procDoctor": 0,
+    "ironCount": 0,
+    "ironDoctor": 0,
+    "due": 0,
+    "diff": 0,
+    "payable": 0,
+    "payableNoHours": null,
+    "openDays": []
+   },
+   {
+    "doctorId": "1",
+    "doctor": "د. سامر الحلبي",
+    "specialty": "عينية",
+    "active": true,
+    "payKind": "mixed",
+    "payAmount": 100,
+    "noPay": false,
+    "payParts": [
+     "patients",
+     "days",
+     "hours"
+    ],
+    "patientRate": 100,
+    "patientScope": "all",
+    "salaryPatientCount": 3,
+    "dailyRate": 1000,
+    "hourlyRate": 200,
+    "settleCycle": "monthly",
+    "attendance": {
+     "days": 2,
+     "minutes": 270,
+     "noDeparture": 0,
+     "onDuty": 0,
+     "hours": 4.5
+    },
+    "salaryPatients": 300,
+    "salaryDays": 2000,
+    "salaryHours": 900,
+    "patients": 3,
+    "procedures": 2,
+    "salary": 3200,
+    "visitShifa": 900,
+    "procShifa": 500,
+    "shifa": 1400,
+    "procDoctor": 800,
+    "ironCount": 0,
+    "ironDoctor": 0,
+    "due": 4000,
+    "diff": -1800,
+    "payable": 4000,
+    "payableNoHours": 3100,
+    "openDays": []
+   }
+  ],
+  "totals": {
+   "patients": 3,
+   "procedures": 2,
+   "salary": 3200,
+   "visitShifa": 900,
+   "procShifa": 500,
+   "shifa": 1400,
+   "diff": -1800,
+   "procDoctor": 800,
+   "ironCount": 0,
+   "ironDoctor": 0,
+   "due": 4000,
+   "payable": 4000,
+   "payableNoHours": 3100
+  },
+  "noPay": 1,
+  "fixedPartial": 0,
+  "noDeparture": 0,
+  "active": [
+   "1"
+  ]
+ },
+ "statement": {
+  "from": "2026-10-01",
+  "to": "2026-10-31",
+  "period": "custom",
+  "doctor": {
+   "doctorId": "1",
+   "doctor": "د. سامر الحلبي",
+   "specialty": "عينية",
+   "active": true,
+   "payKind": "mixed",
+   "payAmount": 100,
+   "noPay": false,
+   "payParts": [
+    "patients",
+    "days",
+    "hours"
+   ],
+   "patientRate": 100,
+   "patientScope": "all",
+   "salaryPatientCount": 3,
+   "dailyRate": 1000,
+   "hourlyRate": 200,
+   "settleCycle": "monthly",
+   "attendance": {
+    "days": 2,
+    "minutes": 270,
+    "noDeparture": 0,
+    "onDuty": 0,
+    "hours": 4.5
+   },
+   "salaryPatients": 300,
+   "salaryDays": 2000,
+   "salaryHours": 900,
+   "patients": 3,
+   "procedures": 2,
+   "salary": 3200,
+   "visitShifa": 900,
+   "procShifa": 500,
+   "shifa": 1400,
+   "procDoctor": 800,
+   "ironCount": 0,
+   "ironDoctor": 0,
+   "due": 4000,
+   "diff": -1800
+  },
+  "payKindLabel": "مرضى · أيام · ساعات",
+  "visits": [
+   {
+    "id": "4",
+    "date": "2026-09-28",
+    "patient": "مازن صبحي الأتاسي",
+    "visitType": "معاينة",
+    "inRange": false,
+    "done": true,
+    "patientCounted": false,
+    "procedures": [
+     {
+      "name": "إزالة جسم غريب",
+      "base": "إزالة جسم غريب",
+      "qty": 1,
+      "share": 500,
+      "paid": true
+     }
+    ],
+    "procShare": 500,
+    "pending": []
+   },
+   {
+    "id": "1",
+    "date": "2026-10-05",
+    "patient": "أمل حسين الرفاعي",
+    "visitType": "معاينة",
+    "inRange": true,
+    "done": true,
+    "patientCounted": true,
+    "procedures": [
+     {
+      "name": "قياس ضغط العين",
+      "base": "قياس ضغط العين",
+      "qty": 1,
+      "share": 300,
+      "paid": true
+     }
+    ],
+    "procShare": 300,
+    "pending": []
+   },
+   {
+    "id": "2",
+    "date": "2026-10-05",
+    "patient": "زياد فهد الحموي",
+    "visitType": "مراجعة",
+    "inRange": true,
+    "done": true,
+    "patientCounted": true,
+    "procedures": [
+     {
+      "name": "إزالة جسم غريب",
+      "base": "إزالة جسم غريب",
+      "qty": 1,
+      "share": 500,
+      "paid": false
+     }
+    ],
+    "procShare": 0,
+    "pending": [
+     "إزالة جسم غريب"
+    ]
+   },
+   {
+    "id": "3",
+    "date": "2026-10-07",
+    "patient": "سلمى بشير العظم",
+    "visitType": "معاينة",
+    "inRange": true,
+    "done": false,
+    "patientCounted": true,
+    "procedures": [],
+    "procShare": 0,
+    "pending": []
+   }
+  ],
+  "shifts": [
+   {
+    "sessionId": "1",
+    "date": "2026-10-05",
+    "arrived": "09:00",
+    "departed": "12:30",
+    "minutes": 210
+   },
+   {
+    "sessionId": "2",
+    "date": "2026-10-07",
+    "arrived": "10:00",
+    "departed": "11:00",
+    "minutes": 60
+   }
+  ],
+  "iron": [],
+  "counts": {
+   "visits": 3,
+   "consultation": 2,
+   "followup": 1,
+   "procedureOnly": 0,
+   "procedures": 2
+  },
+  "warnings": {
+   "pendingProcedures": 1,
+   "noDeparture": 0,
+   "noPay": false,
+   "openDays": []
+  },
+  "payLines": [
+   {
+    "label": "المرضى: 3 × 100",
+    "amount": 300
+   },
+   {
+    "label": "أيام الدوام: 2 × 1,000",
+    "amount": 2000
+   },
+   {
+    "label": "الساعات: 4:30 × 200 للساعة",
+    "amount": 900
+   },
+   {
+    "label": "حصّته من الإجراءات (2)",
+    "amount": 800
+   }
+  ],
+  "payable": 4000,
+  "payableNoHours": 3100,
+  "today": "2026-11-22"
+ }
+}

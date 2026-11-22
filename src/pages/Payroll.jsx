@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { api, fmtMoney, fmtDay, todayLocal } from '../api.js'
+import { api, fmtMoney, fmtDay, todayLocal, toLatinDigits } from '../api.js'
 import { useRole } from '../RoleContext.jsx'
 import { useToast } from '../action-feedback.jsx'
+import { useDialogs } from '../dialogs.jsx'
 import { PeriodBar } from './DoctorAccounts.jsx'
 import ProcedureEarnings from './ProcedureEarnings.jsx'
 import { matchesAr } from '../arabic-search.js'
@@ -189,6 +190,64 @@ function StatementBody({ st }) {
   )
 }
 
+// ═══ لا PDF ولا Excel قبل انصراف الطبيب (طلب المستخدم 2026-11-22) ═══
+// «طلعت لها تقرير بس ما كنا حاطين لها انصراف… فتقرير الشهر طلع ناقص ساعات اليوم» — «ما يطلع تقرير إلا ما يكون
+// هذا اليوم خالص على الأقل من صرف الدكتور». الكشف يُعرض، والملفّ يُقفل حتى يُسجَّل الانصراف — هنا مباشرةً:
+//   الاستقبال: دوام اليوم ⇐ «سجّل الانصراف» الآن (كزرّ اللوحة اليومية)
+//   المشرفة:   أيّ يوم ⇐ وقت الانصراف (الآن افتراضاً) بتصحيح الحضور، فيدخل سجلّ الحضور بسببه
+// والخادم يرفض الإكسل وكشوف «للكلّ» بـ 409 OPEN_DAYS بالقاعدة نفسها.
+const nowClock = () => { const d = new Date(); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}` }
+const DEPART_REASON = 'انصراف لم يُسجَّل — من كشف الأجور'
+
+function OpenDaysBox({ doctor, days, onDone, showToast }) {
+  const dlg = useDialogs()
+  const { clinicRole: role } = useRole()
+  const [busy, setBusy] = useState(false)
+  const today = todayLocal()
+  const canFix = role === 'clinic_admin'
+  const canNow = role === 'clinic_reception' || canFix
+  const record = async (x) => {
+    const isToday = x.date === today
+    try {
+      if (canFix) {
+        const t = await dlg.prompt({
+          title: `انصراف ${doctor}${isToday ? '' : ` يوم ${dayOf(x.date)}`}`,
+          body: `وصل ${x.arrived}. وقت انصرافه (ساعة:دقيقة)${isToday ? ' — الآن افتراضاً، أو الوقت الذي خرج فيه فعلاً' : ''}. ويُحفظ في سجلّ الحضور.`,
+          defaultValue: isToday ? nowClock() : '', placeholder: '15:20', confirmLabel: 'سجّل الانصراف', required: true,
+        })
+        if (!t) return
+        setBusy(true)
+        await api.clinic.fixDoctorTimes(x.sessionId, { departure: toLatinDigits(t).trim(), reason: DEPART_REASON })
+      } else {
+        const ok = await dlg.confirm({
+          title: `انصراف ${doctor}`,
+          body: `يُسجَّل الانصراف الآن (${nowClock()}). إن كان قد خرج قبل ذلك فصحّحوه بعدها من «تصحيح» في اللوحة اليومية.`,
+          confirmLabel: 'سجّل الانصراف',
+        })
+        if (!ok) return
+        setBusy(true)
+        await api.clinic.doctorDeparted(x.sessionId)
+      }
+      onDone()
+    } catch (e) { showToast(e.message) } finally { setBusy(false) }
+  }
+  return (
+    <div className="pr-open" role="alert">
+      <strong>لا PDF ولا Excel قبل انصراف الطبيب — ساعاته لم تُحسب بعد.</strong>
+      <ul>
+        {days.map((x) => (
+          <li key={x.sessionId}>
+            <span>دوام <bdi>{dayOf(x.date)}</bdi>{x.date === today ? ' (اليوم)' : ''}: وصل {x.arrived} ولم يُسجَّل انصرافه.</span>
+            {(x.date === today ? canNow : canFix)
+              ? <button type="button" className="pr-open-btn" disabled={busy} onClick={() => record(x)}>سجّل الانصراف</button>
+              : <span className="pr-open-who">{x.date === today ? 'يسجّله الاستقبال أو المشرفة.' : 'تسجّله المشرفة.'}</span>}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 function StatementView({ doctorId, query, onBack, showToast }) {
   const [st, setSt] = useState(null)
   const [err, setErr] = useState(null)
@@ -200,18 +259,23 @@ function StatementView({ doctorId, query, onBack, showToast }) {
     api.clinic.payrollStatement(doctorId, query).then((r) => live && setSt(r)).catch((e) => live && setErr(e.message))
     return () => { live = false }
   }, [doctorId, key])
+  // بعد تسجيل الانصراف: يُعاد الكشف والقديم ظاهرٌ حتى يصل الجديد (الساعات دخلت، والقفل زال)
+  const reload = () => api.clinic.payrollStatement(doctorId, query).then(setSt).catch((e) => showToast(e.message))
   if (err) return <p className="error">{err}</p>
   if (!st) return <p className="empty">جارٍ تحميل الكشف…</p>
   const d = st.doctor
   const base = `كشف-أجور-${d.doctor}-${st.from}_${st.to}`
+  const open = st.warnings.openDays || []
+  const locked = open.length > 0
+  const lockTitle = locked ? 'سجّلوا انصراف الطبيب أوّلاً' : undefined
   return (
     <div className="pr-statement">
       <div className="pr-toolbar">
         <button type="button" className="ghost" onClick={onBack}>→ كلّ الدكاترة</button>
         <div className="pr-toolbar-end">
-          <button type="button" className="ghost" disabled={busy}
+          <button type="button" className="ghost" disabled={busy || locked} title={lockTitle}
             onClick={() => api.clinic.exportPayroll(query, doctorId).catch((e) => showToast(e.message))}>Excel</button>
-          <button type="button" disabled={busy} onClick={() => downloadPdf([st], `${base}.pdf`, setBusy, showToast)}>
+          <button type="button" disabled={busy || locked} title={lockTitle} onClick={() => downloadPdf([st], `${base}.pdf`, setBusy, showToast)}>
             {busy ? 'جارٍ إنشاء الـ PDF…' : 'تنزيل PDF'}</button>
         </div>
       </div>
@@ -220,14 +284,15 @@ function StatementView({ doctorId, query, onBack, showToast }) {
         <h3>{d.doctor}</h3>
         <span className="pr-doc-meta">{d.specialty ? `${d.specialty} · ` : ''}كشف الفترة من <bdi>{fmtDay(`${st.from}T12:00:00Z`, { utc: true })}</bdi> إلى <bdi>{fmtDay(`${st.to}T12:00:00Z`, { utc: true })}</bdi></span>
       </div>
+      {locked && <OpenDaysBox doctor={d.doctor} days={open} onDone={reload} showToast={showToast} />}
       {/* قبل التسليم: ما يجعل الرقم ناقصاً — على الشاشة وحدها، والورقة تذكره سطراً */}
-      {(st.warnings.noPay || st.warnings.pendingProcedures > 0 || st.warnings.noDeparture > 0) && (
+      {(st.warnings.noPay || st.warnings.pendingProcedures > 0 || (!locked && st.warnings.noDeparture > 0)) && (
         <div className="warn-box pr-warn" role="note">
           <strong>قبل التسليم:</strong>
           <ul>
             {st.warnings.noPay && <li>لم تُضبط طريقة حساب هذا الدكتور — الراتب صفر. <Link to={`/clinic/doctors/${d.doctorId}#pf-pay`}>اضبطها من بروفايله</Link></li>}
             {st.warnings.pendingProcedures > 0 && <li>{n(st.warnings.pendingProcedures)} إجراء بانتظار المحاسبة لا يدخل المجموع. <Link to="/clinic/payroll?tab=procedures">راجعها في «تفصيل الإجراءات»</Link></li>}
-            {st.warnings.noDeparture > 0 && <li>{n(st.warnings.noDeparture)} يوم بلا انصراف مسجَّل — ساعاته لا تُحسب. سجّلوا الانصراف من اللوحة اليومية.</li>}
+            {!locked && st.warnings.noDeparture > 0 && <li>{n(st.warnings.noDeparture)} يوم بلا انصراف مسجَّل — ساعاته لا تُحسب. سجّلوا الانصراف من اللوحة اليومية.</li>}
           </ul>
         </div>
       )}
@@ -258,13 +323,13 @@ function StatementsTab({ showToast, dayOnly = false }) {
     if (id) next.set('doctor', id); else next.delete('doctor')
     setParams(next)
   }
-  const { active, idle, shown } = useMemo(() => {
+  const { active, idle, shown, openOnes } = useMemo(() => {
     const ds = data?.doctors || []
     const act = ds.filter(activityOf).sort(sort === 'name'
       ? (a, b) => a.doctor.localeCompare(b.doctor, 'ar')
       : (a, b) => (b.payableNoHours ?? b.payable ?? b.due ?? 0) - (a.payableNoHours ?? a.payable ?? a.due ?? 0) || a.doctor.localeCompare(b.doctor, 'ar'))
     const needle = q.trim()
-    return { active: act, idle: ds.filter((d) => !activityOf(d)),
+    return { active: act, idle: ds.filter((d) => !activityOf(d)), openOnes: act.filter((d) => d.openDays?.length > 0),
       shown: needle ? act.filter((d) => matchesAr(d.doctor, needle) || matchesAr(d.specialty || '', needle)) : act }
   }, [data, q, sort])
   const period = data ? (data.from === data.to ? fmtDay(`${data.from}T12:00:00Z`, { utc: true })
@@ -299,12 +364,28 @@ function StatementsTab({ showToast, dayOnly = false }) {
               <em>{n(active.length)} {active.length === 1 ? 'دكتور' : 'دكاترة'} · {period}</em>
             </div>
             <div className="pr-toolbar-end">
-              <button type="button" className="ghost" disabled={busy || !active.length}
+              <button type="button" className="ghost" disabled={busy || !active.length || openOnes.length > 0}
+                title={openOnes.length ? 'سجّلوا انصراف الأطباء أوّلاً' : undefined}
                 onClick={() => api.clinic.exportPayroll(query).catch((e) => showToast(e.message))}>Excel للكلّ</button>
-              <button type="button" disabled={busy || !active.length} onClick={allPdf}>
+              <button type="button" disabled={busy || !active.length || openOnes.length > 0}
+                title={openOnes.length ? 'سجّلوا انصراف الأطباء أوّلاً' : undefined} onClick={allPdf}>
                 {busy ? 'جارٍ إنشاء الـ PDF…' : 'PDF للكلّ'}</button>
             </div>
           </div>
+          {/* «للكلّ» يقف عند أوّل دكتورٍ بلا انصراف (قرارٌ مع المستخدم 2026-11-22: دفعةٌ ناقصة يسهل ألّا يُنتبه لها) */}
+          {openOnes.length > 0 && (
+            <div className="pr-open" role="alert">
+              <strong>«للكلّ» متوقّف: لم يُسجَّل انصراف {openOnes.length === 1 ? 'طبيب' : `${n(openOnes.length)} أطباء`} — ساعاتهم لم تُحسب بعد.</strong>
+              <ul>
+                {openOnes.map((d) => (
+                  <li key={d.doctorId}>
+                    <span>{d.doctor}: {d.openDays.map((x) => `دوام ${dayOf(x.date)} (وصل ${x.arrived})`).join('، ')}</span>
+                    <button type="button" className="pr-open-btn" onClick={() => openDoctor(d.doctorId)}>افتح كشفه</button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {data.noPay > 0 && <p className="pr-note">{n(data.noPay)} من الدكاترة بلا طريقة حساب — راتبهم صفر حتى تُضبط من البروفايل.</p>}
           {active.length === 0 ? <p className="empty">لا نشاط لأيّ دكتور في هذه الفترة.</p> : (
             <>
@@ -330,6 +411,7 @@ function StatementsTab({ showToast, dayOnly = false }) {
                             {d.doctor}</button>
                           {d.specialty && <small className="pr-spec">{d.specialty}</small>}
                           {d.noPay && <small className="pr-flag"> · بلا طريقة حساب</small>}
+                          {d.openDays?.length > 0 && <small className="pr-flag"> · بلا انصراف</small>}
                         </td>
                         <td data-label="الدوام">{d.attendance.days > 0
                           ? <>{n(d.attendance.days)} {d.attendance.days === 1 ? 'يوم' : 'أيام'}{d.attendance.minutes > 0 && <span className="muted"> · {hm(d.attendance.minutes)}</span>}</>

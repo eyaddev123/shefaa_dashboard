@@ -29,6 +29,7 @@
     "test:call-flow": "node test/call-flow-display-check.mjs",
     "test:share-pause": "node test/share-pause-check.mjs",
     "test:patient-scope": "node test/patient-scope-check.mjs",
+    "test:payroll-open": "node test/payroll-open-day-check.mjs",
     "test:iphone": "node test/iphone-doctor-sheet-check.mjs"
   },
   "dependencies": {
