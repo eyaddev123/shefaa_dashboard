@@ -70,8 +70,9 @@ function StatementBody({ st }) {
       <div className="dr-summary pr-stats">
         <div className="dr-stat">
           <span className="dr-stat-lbl">المستحقّ للطبيب</span>
-          <strong className="dr-stat-val">{st.payable === null || st.payable === undefined ? '—' : fmtMoney(st.payable)}</strong>
-          <span className="dr-stat-sub">{withHours ? `بلا الساعات: ${fmtMoney(st.payableNoHours)}` : rounded ? `قبل التقريب لأقرب 5: ${fmtMoney(d.due)}` : (st.payKindLabel || 'بلا طريقة حساب')}</span>
+          {/* يومياً يُحاسَب بلا الساعات (والساعات آخر الشهر — طلب المستخدم 2026-11-22): هو الرقم الكبير */}
+          <strong className="dr-stat-val">{withHours ? fmtMoney(st.payableNoHours) : st.payable === null || st.payable === undefined ? '—' : fmtMoney(st.payable)}</strong>
+          <span className="dr-stat-sub">{withHours ? `بلا الساعات · مع الساعات ${fmtMoney(st.payable)}` : rounded ? `قبل التقريب لأقرب 5: ${fmtMoney(d.due)}` : (st.payKindLabel || 'بلا طريقة حساب')}</span>
         </div>
         <div className="dr-stat">
           <span className="dr-stat-lbl">الدوام</span>
@@ -96,8 +97,8 @@ function StatementBody({ st }) {
           {st.payLines.map((l, i) => <div key={i}><dt>{l.label}</dt><dd>{fmtMoney(l.amount)}</dd></div>)}
           {rounded && <div className="pr-calc-sub"><dt>المجموع قبل التقريب</dt><dd>{fmtMoney(d.due)}</dd></div>}
           {/* «رقمين مع بعض» (طلب المستخدم 2026-11-22): بلا الساعات (تُعرف بعد الانصراف) ثمّ الكامل — لمن في حسابه ساعات */}
-          {withHours && <div className="pr-calc-total pr-calc-nohours"><dt>المستحقّ بلا الساعات</dt><dd>{fmtMoney(st.payableNoHours)}</dd></div>}
-          <div className="pr-calc-total"><dt>{withHours ? 'المستحقّ مع الساعات' : 'المستحقّ للطبيب'}</dt><dd>{st.payable === null || st.payable === undefined ? '—' : fmtMoney(st.payable)}</dd></div>
+          {withHours && <div className="pr-calc-total pr-calc-nohours"><dt>المستحقّ بلا الساعات <small>(يومياً)</small></dt><dd>{fmtMoney(st.payableNoHours)}</dd></div>}
+          <div className={`pr-calc-total${withHours ? ' pr-calc-withhours' : ''}`}><dt>{withHours ? <>المستحقّ مع الساعات <small>(آخر الشهر)</small></> : 'المستحقّ للطبيب'}</dt><dd>{st.payable === null || st.payable === undefined ? '—' : fmtMoney(st.payable)}</dd></div>
         </dl>
       </section>
 
@@ -261,7 +262,7 @@ function StatementsTab({ showToast, dayOnly = false }) {
     const ds = data?.doctors || []
     const act = ds.filter(activityOf).sort(sort === 'name'
       ? (a, b) => a.doctor.localeCompare(b.doctor, 'ar')
-      : (a, b) => (b.payable ?? b.due ?? 0) - (a.payable ?? a.due ?? 0) || a.doctor.localeCompare(b.doctor, 'ar'))
+      : (a, b) => (b.payableNoHours ?? b.payable ?? b.due ?? 0) - (a.payableNoHours ?? a.payable ?? a.due ?? 0) || a.doctor.localeCompare(b.doctor, 'ar'))
     const needle = q.trim()
     return { active: act, idle: ds.filter((d) => !activityOf(d)),
       shown: needle ? act.filter((d) => matchesAr(d.doctor, needle) || matchesAr(d.specialty || '', needle)) : act }
@@ -292,7 +293,9 @@ function StatementsTab({ showToast, dayOnly = false }) {
           <div className="pr-summary">
             <div className="pr-sum-text">
               <span>المستحقّ لكلّ الدكاترة</span>
-              <strong>{fmtMoney(data.totals.payable ?? data.totals.due)}</strong>
+              <strong>{fmtMoney(data.totals.payableNoHours ?? data.totals.payable ?? data.totals.due)}</strong>
+              {data.totals.payableNoHours != null && data.totals.payable != null && data.totals.payableNoHours !== data.totals.payable && (
+                <em>بلا الساعات · مع الساعات {fmtMoney(data.totals.payable)}</em>)}
               <em>{n(active.length)} {active.length === 1 ? 'دكتور' : 'دكاترة'} · {period}</em>
             </div>
             <div className="pr-toolbar-end">
@@ -333,7 +336,9 @@ function StatementsTab({ showToast, dayOnly = false }) {
                           : <span className="muted">—</span>}</td>
                         <td data-label="المرضى" className="num">{n(d.patients)}</td>
                         <td data-label="الإجراءات" className="num">{d.procedures ? n(d.procedures) : <span className="muted">—</span>}</td>
-                        <td data-label="المستحقّ" className="num pr-due">{d.payable === null || d.payable === undefined ? '—' : fmtMoney(d.payable)}</td>
+                        <td data-label="المستحقّ" className="num pr-due">{d.payableNoHours != null
+                          ? <>{fmtMoney(d.payableNoHours)}<small className="pr-due-hours">مع الساعات {fmtMoney(d.payable)}</small></>
+                          : d.payable === null || d.payable === undefined ? '—' : fmtMoney(d.payable)}</td>
                         <td className="pr-chev" aria-hidden="true">‹</td>
                       </tr>
                     ))}

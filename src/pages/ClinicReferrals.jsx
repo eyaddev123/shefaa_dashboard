@@ -269,28 +269,43 @@ export default function ClinicReferrals() {
     catch (ex) { showToast(ex.message) } finally { setExporting(false) }
   }
   // PDF (طلب المستخدم 2026-11-20): الجهة المختارة وحدها، أو كلّ الجهات بملخّصٍ أوّلاً ثمّ جهةٌ بصفحة — بلا البحث
-  // ولا «بلا رقم ورقة» (كشفٌ يُرسل للجهة كاملاً)، والزيارات بترتيب التاريخ
+  // ولا «بلا رقم ورقة» (كشفٌ يُرسل للجهة كاملاً)، والزيارات بترتيب التاريخ.
+  // ★ بنوعه (2026-11-22: «كلّ شي لحال»): قائمةٌ منسدلة — المعاينات والمراجعات · الإجراءات · خدمات العيادة · الكلّ.
+  //   الأسطر تُرشَّح بالنوع قبل التجميع، فمجاميع الجهات والملخّص من أسطر النوع وحده.
   const [pdfBusy, setPdfBusy] = useState(false)
-  const doPdf = async () => {
-    setPdfBusy(true)
+  const [pdfMenu, setPdfMenu] = useState(false)
+  const KIND_KEYS = ['visit', 'procedure', 'iron']
+  const kindAmount = (k) => scopedLines.filter((l) => k === 'all' || l.kind === k).reduce((t, l) => t + l.discount, 0)
+  const doPdf = async (kind = 'all') => {
+    setPdfMenu(false); setPdfBusy(true)
     try {
-      const [{ sheetPdf }, { ReferralsSummarySheet, ReferralsSourceSheet, REFERRALS_TITLE }] =
+      const [{ sheetPdf }, { ReferralsSummarySheet, ReferralsSourceSheet, REFERRALS_TITLE, REFERRAL_KINDS }] =
         await Promise.all([import('../payroll-pdf.jsx'), import('../components/reports/ReferralsSheet.jsx')])
       const now = new Date()
       const printedAt = `${fmtDay(now)} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
-      const pickTotals = sourceId ? totals.filter((t) => String(t.source_id) === sourceId) : totals
+      const lines = kind === 'all' ? data.lines : data.lines.filter((l) => l.kind === kind)
+      const visits = groupVisits(lines)
+      // مجاميع الجهات من أسطر النوع (مجاميع الخادم لكلّ الأنواع)
+      const kTotals = totals.map((t) => {
+        const ls = lines.filter((l) => String(l.source_id) === String(t.source_id))
+        return { ...t, due: ls.reduce((a, l) => a + l.discount, 0), visits: new Set(ls.map((l) => l.visit_key)).size }
+      }).filter((t) => t.visits > 0)
+      const pickTotals = sourceId ? kTotals.filter((t) => String(t.source_id) === sourceId) : kTotals
+      if (pickTotals.length === 0) { showToast('لا إحالات من هذا النوع في الفترة'); return }
       const sheets = []
-      if (!sourceId && totals.length > 1) {
-        sheets.push(<ReferralsSummarySheet key="sum" totals={totals} visits={data.visits} from={range.from} to={range.to} printedAt={printedAt} />)
+      if (!sourceId && kTotals.length > 1) {
+        sheets.push(<ReferralsSummarySheet key="sum" kind={kind} totals={kTotals} visits={new Set(lines.map((l) => l.visit_key)).size}
+          from={range.from} to={range.to} printedAt={printedAt} />)
       }
       for (const t of pickTotals) {
-        const vs = allVisits.filter((v) => String(v.sourceId) === String(t.source_id))
+        const vs = visits.filter((v) => String(v.sourceId) === String(t.source_id))
           .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
-        sheets.push(<ReferralsSourceSheet key={t.source_id} source={t.source} visits={vs} from={range.from} to={range.to} printedAt={printedAt} />)
+        sheets.push(<ReferralsSourceSheet key={t.source_id} kind={kind} source={t.source} visits={vs} from={range.from} to={range.to} printedAt={printedAt} />)
       }
       const who = chosenName || onlyOne
       const stampPart = range.from === range.to ? range.from : `${range.from}_${range.to}`
-      await sheetPdf(sheets, `${REFERRALS_TITLE.replace(/ /g, '-')}${who ? `-${who.replace(/[\\/:*?"<>|\s]+/g, '_')}` : ''}-${stampPart}.pdf`)
+      const kindPart = kind === 'all' ? '' : `-${REFERRAL_KINDS.find((x) => x.key === kind).title.replace(/ /g, '-')}`
+      await sheetPdf(sheets, `${REFERRALS_TITLE.replace(/ /g, '-')}${kindPart}${who ? `-${who.replace(/[\\/:*?"<>|\s]+/g, '_')}` : ''}-${stampPart}.pdf`)
     } catch (ex) { showToast(`تعذّر إنشاء الـ PDF: ${ex.message}`) } finally { setPdfBusy(false) }
   }
   const pick = (k) => set(k === 'custom'
@@ -351,9 +366,30 @@ export default function ClinicReferrals() {
                 <button type="button" disabled={exporting || scoped.length === 0} onClick={doExport}>
                   {exporting ? 'جارٍ التصدير…' : chosenName || onlyOne ? 'كشف الحساب (إكسل)' : 'كشف كلّ الجهات (إكسل)'}
                 </button>
-                <button type="button" className="secondary" disabled={pdfBusy || scoped.length === 0} onClick={doPdf}>
-                  {pdfBusy ? 'جارٍ إنشاء الـ PDF…' : 'PDF'}
-                </button>
+                {/* PDF بنوعه: قائمةٌ منسدلة، وبجانب كلّ نوعٍ مبلغه للجهة المختارة (والنوع الفارغ معطّل) */}
+                <div className="refx-pdf">
+                  <button type="button" className="secondary" disabled={pdfBusy || scoped.length === 0} aria-haspopup="menu"
+                    aria-expanded={pdfMenu} onClick={() => setPdfMenu((v) => !v)}>
+                    {pdfBusy ? 'جارٍ إنشاء الـ PDF…' : 'PDF ▾'}
+                  </button>
+                  {pdfMenu && (
+                    <>
+                      <div className="refx-pdf-backdrop" onClick={() => setPdfMenu(false)} />
+                      <ul className="refx-pdf-menu" role="menu">
+                        {[['visit', 'المعاينات والمراجعات'], ['procedure', 'الإجراءات'], ['iron', 'خدمات العيادة'], ['all', 'كلّ الأنواع']].map(([k, label]) => {
+                          const amt = kindAmount(k)
+                          return (
+                            <li key={k} role="none">
+                              <button type="button" role="menuitem" disabled={amt <= 0} onClick={() => doPdf(k)}>
+                                <span>{label}</span><Money value={amt} className="refx-pdf-amt" />
+                              </button>
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    </>
+                  )}
+                </div>
               </div>
               <span className="refx-hero-hint">الملفّ الذي يُرسل للجهة: كلّ زيارةٍ برقم ورقتها.</span>
             </div>
