@@ -26,6 +26,32 @@ export default function BottomSheet({ title, subtitle, onClose, children, footer
     if (!cardRef.current?.contains(document.activeElement)) cardRef.current?.focus()
   }, [])
 
+  // ★ (2026-11-22، آيفون الدكتورة) الكيبورد على الآيفون لا يُنقص 100vh ولا innerHeight — يُنقص المنطقة
+  //   المرئية وحدها (visualViewport) وقد يزيحها. فكانت الورقة تبقى بطولها وزرّ «إضافة» والمجموع خلف
+  //   الكيبورد، والصفحة تحتها تتمرّر معها. الآن الخلفية تأخذ المنطقة المرئية نفسها (موضعاً وطولاً)،
+  //   والصفحة تحت الورقة لا تتمرّر ما دامت مفتوحة.
+  const backRef = useRef(null)
+  useEffect(() => {
+    const vv = window.visualViewport
+    const fit = () => {
+      const b = backRef.current
+      if (!b || !vv) return
+      b.style.top = `${vv.offsetTop}px`
+      b.style.height = `${vv.height}px`
+      b.style.bottom = 'auto'
+    }
+    fit()
+    vv?.addEventListener('resize', fit)
+    vv?.addEventListener('scroll', fit)
+    const html = document.documentElement
+    const prev = [html.style.overflow, document.body.style.overflow]
+    html.style.overflow = 'hidden'; document.body.style.overflow = 'hidden'
+    return () => {
+      vv?.removeEventListener('resize', fit); vv?.removeEventListener('scroll', fit)
+      ;[html.style.overflow, document.body.style.overflow] = prev
+    }
+  }, [])
+
   // زرّ الإغلاق داخل منطقة السحب: لا يُلتقط مؤشّره وإلا ابتلع الالتقاطُ نقرته
   const down = (e) => {
     if (e.target.closest('button')) return
@@ -41,7 +67,7 @@ export default function BottomSheet({ title, subtitle, onClose, children, footer
   }
 
   return (
-    <div className="bs-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
+    <div ref={backRef} className="bs-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <div ref={cardRef} tabIndex={-1} className={`bs-card${drag ? ' is-dragging' : ''}`} role="dialog"
         aria-modal="true" aria-labelledby={id}
         style={drag ? { transform: `translateY(${drag}px)` } : undefined}>

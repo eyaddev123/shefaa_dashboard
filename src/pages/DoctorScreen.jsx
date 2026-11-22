@@ -116,9 +116,15 @@ function AddProcedureSheet({ appt, catalog, usage, matCatalog, loadMaterials, dr
           {sel.length > 0 && (
             <div className="dk-total" role="status">
               <span>على المريض <strong>{fmtMoney(onPatient)}</strong></span>
+              {/* ★ (2026-11-22) «الأجرة» = حصّة الدكتور + حصّة الشفاء وحدها: الدكتور كان يقرؤها سعر الإجراء
+                  فيقول للمريض «200» والمريض يدفعها + المواد. التفصيل ظاهرٌ دائماً، حتى بلا مواد */}
               {feeMode
-                ? (consTotal + matTotal > 0 && <span className="dk-total-mats">
-                    الأجرة {fmtMoney(procTotal)}{consTotal > 0 && ` + مستهلكات ${fmtMoney(consTotal)}`}{matTotal > 0 && ` + مواد ${fmtMoney(matTotal)}`}</span>)
+                ? <span className="dk-total-mats">
+                    الأجرة {fmtMoney(procTotal)} <span className="dk-fee-who">(للدكتور والشفاء)</span>
+                    {consTotal + matTotal > 0
+                      ? <>{consTotal > 0 && ` + مستهلكات ${fmtMoney(consTotal)}`}{matTotal > 0 && ` + مواد ${fmtMoney(matTotal)}`}</>
+                      : ' — بلا مواد ولا مستهلكات بعد'}
+                  </span>
                 : matTotal > 0 && <span className="dk-total-mats">المواد بسعر البيع {fmtMoney(matTotal)}</span>}
             </div>
           )}
@@ -140,7 +146,8 @@ function AddProcedureSheet({ appt, catalog, usage, matCatalog, loadMaterials, dr
                   className={`dk-pick${on ? ' is-on' : ''}${bad ? ' is-bad' : ''}`} onClick={() => toggle(p)}>
                   {on && <span className="dk-pick-check" aria-hidden="true">✓</span>}
                   <span className="dk-pick-name">{p.name}</span>
-                  <span className="dk-pick-price">{fmtMoney(p.price)}</span>
+                  {/* بعد القلبة السعر أجرةٌ وحدها: «+ المواد» دائماً بجانبه كي لا يُقال للمريض كأنّه السعر كلّه */}
+                  <span className="dk-pick-price">{fmtMoney(p.price)}{feeMode && <span className="dk-plus-mats"> + المواد</span>}</span>
                   {added && <span className="dk-pick-tag">✓ مضاف</span>}
                 </button>
               )
@@ -158,10 +165,10 @@ function AddProcedureSheet({ appt, catalog, usage, matCatalog, loadMaterials, dr
               <div className="dk-sel-row">
                 <span className="dk-sel-name">{x.name}{qtyOf(x) > 1 && <b className="dk-sel-qty"> × {qtyOf(x)}</b>}</span>
                 <span className="dk-sel-price">
-                  {fmtMoney(priceOf(x.id) * qtyOf(x))}
-                  {feeMode && materialsValue(x.mats, matCatalog) + Number(x.cons || 0) > 0 && (
-                    <small> + مواد {fmtMoney(materialsValue(x.mats, matCatalog) + Number(x.cons || 0))}</small>
-                  )}
+                  {feeMode && 'الأجرة '}{fmtMoney(priceOf(x.id) * qtyOf(x))}
+                  {feeMode && (materialsValue(x.mats, matCatalog) + Number(x.cons || 0) > 0
+                    ? <small> + مواد {fmtMoney(materialsValue(x.mats, matCatalog) + Number(x.cons || 0))}</small>
+                    : <small className="dk-plus-mats"> + المواد</small>)}
                 </span>
               </div>
               {/* العدد: الإجراء نفسه بالقعدة أكثر من مرّة — «تخطيط أعصاب طرف × 4» (بعد القلبة) */}
@@ -171,7 +178,7 @@ function AddProcedureSheet({ appt, catalog, usage, matCatalog, loadMaterials, dr
               <div className="dk-mats-body">
                 {matCatalog == null ? <p className="empty">جارٍ تحميل المواد…</p>
                   // القائمة منسدلة ظاهرة دائماً: الكبسة تعرض المواد كلّها والكتابة تُرشّحها، ومع كلّ مادة سعر بيعها
-                  : <MaterialsEditor withPrice comboHint="المواد: اكتب اسم مادة للبحث، أو المس لعرضها كلّها…" catalog={matCatalog} value={x.mats} onChange={(mats) => update(x.id, { mats })} />}
+                  : <MaterialsEditor withPrice comboHint="المواد: المس للعرض أو اكتب للبحث" catalog={matCatalog} value={x.mats} onChange={(mats) => update(x.id, { mats })} />}
                 {!qtyValid(x.mats) && <p className="error">صحّح الكمّية (رقم أكبر من صفر).</p>}
               </div>
               {feeMode && (
@@ -253,7 +260,7 @@ function MaterialsForLine({ line, patientName, matCatalog, onBack, onClose, onSa
       </p>
       <div className="dk-mats-body">
         {matCatalog == null ? <p className="empty">جارٍ تحميل المواد…</p>
-          : <MaterialsEditor withPrice comboHint="أضف مادة: اكتب اسمها للبحث، أو المس لعرضها كلّها…" catalog={matCatalog} value={extra} onChange={setExtra} />}
+          : <MaterialsEditor withPrice comboHint="أضف مادة: المس للعرض أو اكتب للبحث" catalog={matCatalog} value={extra} onChange={setExtra} />}
         {!qtyValid(extra) && <p className="error">صحّح الكمّية (رقم أكبر من صفر).</p>}
       </div>
       {v3 && (

@@ -8,14 +8,50 @@ import { matchesAr } from '../arabic-search.js'
 // options: [{value, label, meta?, warn?}] · meta نصٌّ ثانويّ بجانب الاسم · warn يلوّنه تحذيراً.
 // اللوحة تُرسم في document.body بموضعٍ ثابت (كلوحة الاختصاصات): النافذة تقصّ ما يفيض منها.
 // الأسهم تتنقّل، وEnter يختار، وEsc يغلق القائمة وحدها لا النافذة التي تحتها.
+// ★ الجوال (≤767px، 2026-11-22 — آيفون الدكتورة): اللوحة **داخل الصفحة** تحت الحقل مباشرةً لا طافيةً.
+//   الطافية تُحسب من innerHeight، والآيفون لا يُنقصه حين يطلع الكيبورد (ومع تكبير الصفحة يختلّ الحساب
+//   أكثر) فتنقلب اللوحة لفوق وتقفز مع كلّ تمرير. داخل الصفحة تتمرّر مع الورقة، والحقل يصعد لأعلاها.
 
 const PANEL_MIN_W = 240
 const PANEL_MAX_H = 340
 
 export const byNameAr = (a, b) => a.name.localeCompare(b.name, 'ar')
 
+const PHONE_MQ = '(max-width: 767px)'
+const isPhone = () => typeof window !== 'undefined' && !!window.matchMedia?.(PHONE_MQ).matches
+
 // مُصدَّرة لقائمة المرضى وهي تكتب (PatientPicker) — النتائج من الخادم لا من options، واللوحة نفسها
 export function ComboPanel({ anchorRef, onClose, children }) {
+  const [inline] = useState(isPhone)
+  if (inline) return <InlinePanel anchorRef={anchorRef} onClose={onClose}>{children}</InlinePanel>
+  return <FloatingPanel anchorRef={anchorRef} onClose={onClose}>{children}</FloatingPanel>
+}
+
+// الجوال: اللوحة في مكانها من الصفحة (بعد الحقل)، والحقل يُمرَّر لأعلى المنطقة المرئية كي تتّسع القائمة
+// تحته فوق الكيبورد. اللمس خارجها يغلقها كالطافية.
+function InlinePanel({ anchorRef, onClose, children }) {
+  const panelRef = useRef(null)
+  useEffect(() => {
+    const onDoc = (e) => {
+      if (anchorRef.current?.contains(e.target) || panelRef.current?.contains(e.target)) return
+      onClose()
+    }
+    window.addEventListener('mousedown', onDoc)
+    // بعد أن يستقرّ الكيبورد (الآيفون يمرّر الصفحة بنفسه أوّلاً)
+    //   داخل الورقة: الحقل لأعلاها. وفي الصفحة نفسها «nearest» وحده — فوقها شريطٌ ثابت يغطّي ما يصعد لأعلاها.
+    const t = setTimeout(() => {
+      const el = anchorRef.current
+      el?.scrollIntoView?.({ block: el.closest('.bs-body') ? 'start' : 'nearest', behavior: 'smooth' })
+    }, 320)
+    return () => {
+      window.removeEventListener('mousedown', onDoc)
+      clearTimeout(t)
+    }
+  }, [])
+  return <div className="combo-panel is-inline" ref={panelRef} dir="rtl">{children}</div>
+}
+
+function FloatingPanel({ anchorRef, onClose, children }) {
   const [pos, setPos] = useState(null)
   const panelRef = useRef(null)
   const place = () => {

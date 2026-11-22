@@ -6514,3 +6514,37 @@ button.dk-pick:disabled .dk-pick-price { opacity: 0.7; }
 .refx-pdf-menu button:disabled { opacity: .45; cursor: default; }
 .refx-pdf-menu li:last-child { border-top: 1px solid var(--border); margin-top: 4px; padding-top: 4px; }
 .refx-pdf-amt { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text-secondary); }
+
+/* ═══ الآيفون (2026-11-22، جوال الدكتورة Pro Max): «الشاشة انمدّت والدروب داون نطّت لفوق» ═══
+   ١) Safari الآيفون يكبّر الصفحة كلّها حين يُلمس حقلٌ خطّه دون 16px، ولا يُرجعها بعد الخروج منه —
+      فتصير الصفحة أعرض من الشاشة وتتحرّك يميناً ويساراً. قاعدة الـ16px العامّة للجوال كانت تغلبها
+      قواعد أخصّ (بحث المواد 13px). الآن: كلّ حقل كتابة 16px على الأقلّ على الجوال واللمس، بـ:where
+      (وزنه صفر) فتبقى الحقول المكبّرة عمداً بـ!important (عدّاد المواد 17–20px) كما هي.
+   ٢) القائمة المنسدلة على الجوال داخل الصفحة تحت الحقل (Combobox.jsx: InlinePanel). */
+@media (max-width: 767px), (hover: none) and (pointer: coarse) {
+  :where(input:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file'], [type='button'], [type='submit'])),
+  :where(select, textarea) { font-size: 16px !important; }
+}
+.combo-panel.is-inline {
+  position: static; margin-top: 6px; width: 100%; box-sizing: border-box;
+  max-height: min(300px, 46vh); max-height: min(300px, 46dvh);
+}
+.combo-panel.is-inline .combo-list { overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+.combo-panel.is-inline .combo-meta { white-space: normal; }
+.combo :is(input, .combo-trigger) { scroll-margin-top: 8px; }
+/* ٣) الورقة بطول المنطقة المرئية (BottomSheet.jsx يضع الخلفية عليها): مع الكيبورد تقصر الورقة ويبقى
+      زرّ «إضافة» والمجموع ظاهرين فوقه، والتمرير داخل الورقة لا يسحب الصفحة تحتها. */
+.bs-card { max-height: min(88vh, calc(100% - 12px)); }
+.bs-body { overscroll-behavior: contain; min-height: 0; flex: 1 1 auto; }
+.bs-grab, .bs-foot { flex: none; }
+.bs-foot { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+@media (min-width: 640px) {
+  .bs-card { max-height: min(86vh, 760px, calc(100% - 48px)); }
+}
+/* «+ المواد» بجانب الأجرة عند الطبيب (2026-11-22): الأجرة ليست سعر الإجراء على المريض */
+.dk-plus-mats { font-weight: 700; color: var(--accent-text); }
+.dk-sel-price small.dk-plus-mats { color: var(--accent-text); }
+.dk-fee-who { font-weight: 500; }
+.dk-total { align-items: center; }
+.dk-total > span:first-child { font-size: 15px; font-weight: 700; }
+.dk-total > span:first-child strong { font-size: 20px; color: var(--accent-text); }
