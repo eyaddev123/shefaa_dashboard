@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { api, fmtMoney, fmtDay } from '../api.js'
+import { api, fmtMoney, fmtDay, todayLocal } from '../api.js'
 import { useRole } from '../RoleContext.jsx'
 import { useToast } from '../action-feedback.jsx'
 import { PeriodBar } from './DoctorAccounts.jsx'
@@ -18,7 +18,8 @@ import { procSummary } from '../components/payroll/proc-summary.js'
 
 const TABS = [['statements', 'كشوف الأجور'], ['procedures', 'تفصيل الإجراءات']]
 // «يوم» كـ«تقارير الدكاترة» (طلب المستخدم 2026-11-18: «بدي يوم وشهر وفترة») — اليوم = من اليوم إلى اليوم نفسه
-const MODES = [['day', 'يوم'], ['month', 'شهر'], ['custom', 'فترة']]   // الترتيب بطلب المستخدم: يوم ثمّ شهر ثمّ فترة
+const MODES = [['day', 'يوم'], ['month', 'شهر'], ['custom', 'فترة']]
+const DAY_ONLY = [['day', 'يوم']]   // الاستقبال: يوماً بيوم   // الترتيب بطلب المستخدم: يوم ثمّ شهر ثمّ فترة
 const isDay = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v || '')
 const n = (v) => Number(v || 0).toLocaleString('ar-SY-u-nu-latn', { maximumFractionDigits: 2 })
 const hm = (m) => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`
@@ -37,12 +38,13 @@ async function downloadPdf(statements, filename, setBusy, showToast) {
   } catch (ex) { showToast(`تعذّر إنشاء الـ PDF: ${ex.message}`) } finally { setBusy(false) }
 }
 
-function usePeriod() {
+// dayOnly: الاستقبال يوماً بيوم (طلب المستخدم 2026-11-22) — لا شهر ولا فترة، وبلا يومٍ في الرابط = اليوم
+function usePeriod(dayOnly = false) {
   const [params, setParams] = useSearchParams()
-  const month = /^\d{4}-\d{2}$/.test(params.get('month') || '') ? params.get('month') : null
-  const from = isDay(params.get('from')) ? params.get('from') : null
-  const to = isDay(params.get('to')) ? params.get('to') : from
-  const day = isDay(params.get('day')) ? params.get('day') : null
+  const month = dayOnly ? null : /^\d{4}-\d{2}$/.test(params.get('month') || '') ? params.get('month') : null
+  const from = dayOnly ? null : isDay(params.get('from')) ? params.get('from') : null
+  const to = dayOnly ? null : isDay(params.get('to')) ? params.get('to') : from
+  const day = isDay(params.get('day')) ? params.get('day') : dayOnly ? todayLocal() : null
   const mode = from ? 'custom' : day ? 'day' : 'month'
   const query = mode === 'custom' ? { from, to } : mode === 'day' ? { from: day, to: day } : { month }
   const set = (patch) => {
@@ -62,13 +64,14 @@ function StatementBody({ st }) {
   const d = st.doctor, c = st.counts
   const ps = procSummary(st.visits)
   const rounded = st.payable !== null && st.payable !== undefined && d.due !== null && st.payable !== d.due
+  const withHours = st.payableNoHours !== null && st.payableNoHours !== undefined && st.payable !== null && st.payable !== undefined
   return (
     <>
       <div className="dr-summary pr-stats">
         <div className="dr-stat">
           <span className="dr-stat-lbl">المستحقّ للطبيب</span>
           <strong className="dr-stat-val">{st.payable === null || st.payable === undefined ? '—' : fmtMoney(st.payable)}</strong>
-          <span className="dr-stat-sub">{rounded ? `قبل التقريب لأقرب 5: ${fmtMoney(d.due)}` : (st.payKindLabel || 'بلا طريقة حساب')}</span>
+          <span className="dr-stat-sub">{withHours ? `بلا الساعات: ${fmtMoney(st.payableNoHours)}` : rounded ? `قبل التقريب لأقرب 5: ${fmtMoney(d.due)}` : (st.payKindLabel || 'بلا طريقة حساب')}</span>
         </div>
         <div className="dr-stat">
           <span className="dr-stat-lbl">الدوام</span>
@@ -92,31 +95,13 @@ function StatementBody({ st }) {
         <dl className="pcx-facts">
           {st.payLines.map((l, i) => <div key={i}><dt>{l.label}</dt><dd>{fmtMoney(l.amount)}</dd></div>)}
           {rounded && <div className="pr-calc-sub"><dt>المجموع قبل التقريب</dt><dd>{fmtMoney(d.due)}</dd></div>}
-          <div className="pr-calc-total"><dt>المستحقّ للطبيب</dt><dd>{st.payable === null || st.payable === undefined ? '—' : fmtMoney(st.payable)}</dd></div>
+          {/* «رقمين مع بعض» (طلب المستخدم 2026-11-22): بلا الساعات (تُعرف بعد الانصراف) ثمّ الكامل — لمن في حسابه ساعات */}
+          {withHours && <div className="pr-calc-total pr-calc-nohours"><dt>المستحقّ بلا الساعات</dt><dd>{fmtMoney(st.payableNoHours)}</dd></div>}
+          <div className="pr-calc-total"><dt>{withHours ? 'المستحقّ مع الساعات' : 'المستحقّ للطبيب'}</dt><dd>{st.payable === null || st.payable === undefined ? '—' : fmtMoney(st.payable)}</dd></div>
         </dl>
       </section>
 
-      <section className="card pr-section">
-        <h3>المرضى ({n(c.visits)})</h3>
-        {st.visits.length === 0 ? <p className="empty">لا زيارات في هذه الفترة.</p> : (
-          <table className="rtable pr-table">
-            <thead><tr><th>التاريخ</th><th>المريض</th><th>الزيارة</th><th>الإجراءات</th><th className="num">للطبيب</th></tr></thead>
-            <tbody>
-              {st.visits.map((v) => (
-                <tr key={v.id}>
-                  <td data-label="التاريخ" className="pr-nowrap">{dayOf(v.date)}</td>
-                  <td className="rt-title">{v.patient}</td>
-                  <td data-label="الزيارة">{v.visitType}{!v.inRange && <span className="muted"> (قبل الفترة)</span>}</td>
-                  <td data-label="الإجراءات">{v.procedures.length === 0 ? <span className="muted">—</span> : v.procedures.map((p, k) => (
-                    <span key={k} className={p.paid ? undefined : 'muted'}>{k > 0 && '، '}{p.name}{!p.paid && ' (بانتظار المحاسبة)'}</span>))}</td>
-                  <td data-label="للطبيب" className="num">{v.procShare ? fmtMoney(v.procShare) : <span className="muted">—</span>}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </section>
-
+      {/* الترتيب (طلب المستخدم 2026-11-22): الحساب ⇐ الإجراءات ⇐ المرضى — على الشاشة وحدها، والـ PDF كما هو */}
       {ps.rows.length > 0 && (
         <section className="card pr-section">
           <h3>حصّة الطبيب من الإجراءات</h3>
@@ -140,6 +125,27 @@ function StatementBody({ st }) {
           </table>
         </section>
       )}
+
+      <section className="card pr-section">
+        <h3>المرضى ({n(c.visits)})</h3>
+        {st.visits.length === 0 ? <p className="empty">لا زيارات في هذه الفترة.</p> : (
+          <table className="rtable pr-table">
+            <thead><tr><th>التاريخ</th><th>المريض</th><th>الزيارة</th><th>الإجراءات</th><th className="num">للطبيب</th></tr></thead>
+            <tbody>
+              {st.visits.map((v) => (
+                <tr key={v.id}>
+                  <td data-label="التاريخ" className="pr-nowrap">{dayOf(v.date)}</td>
+                  <td className="rt-title">{v.patient}</td>
+                  <td data-label="الزيارة">{v.visitType}{!v.inRange && <span className="muted"> (قبل الفترة)</span>}</td>
+                  <td data-label="الإجراءات">{v.procedures.length === 0 ? <span className="muted">—</span> : v.procedures.map((p, k) => (
+                    <span key={k} className={p.paid ? undefined : 'muted'}>{k > 0 && '، '}{p.name}{!p.paid && ' (بانتظار المحاسبة)'}</span>))}</td>
+                  <td data-label="للطبيب" className="num">{v.procShare ? fmtMoney(v.procShare) : <span className="muted">—</span>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
 
       {st.shifts.length > 0 && (
         <section className="card pr-section">
@@ -229,8 +235,8 @@ function StatementView({ doctorId, query, onBack, showToast }) {
   )
 }
 
-function StatementsTab({ showToast }) {
-  const { params, setParams, mode, month, day, from, to, query, set } = usePeriod()
+function StatementsTab({ showToast, dayOnly = false }) {
+  const { params, setParams, mode, month, day, from, to, query, set } = usePeriod(dayOnly)
   const doctorId = /^\d+$/.test(params.get('doctor') || '') ? params.get('doctor') : null
   const [data, setData] = useState(null)
   const [err, setErr] = useState(null)
@@ -276,7 +282,7 @@ function StatementsTab({ showToast }) {
       {/* كشريط «تقارير الدكاترة»: مسافةٌ عن خطّ التبويبات وعمّا تحته (طلب المستخدم 2026-11-18) */}
       <div className="pr-period">
         <PeriodBar mode={mode} cur={data?.month || month} curDay={day} from={from || data?.from} to={to || data?.to} data={data}
-          set={(p) => set(p)} modes={MODES} />
+          set={(p) => set(p)} modes={dayOnly ? DAY_ONLY : MODES} />
       </div>
       {doctorId ? (
         <StatementView doctorId={doctorId} query={query} onBack={() => openDoctor(null)} showToast={showToast} />
@@ -353,7 +359,8 @@ export default function Payroll() {
   const [params, setParams] = useSearchParams()
   const [toast, showToast] = useToast()
   const { clinicRole: role } = useRole()
-  const tab = TABS.some(([k]) => k === params.get('tab')) ? params.get('tab') : 'statements'
+  const reception = role === 'clinic_reception'   // كشوف الأجور يوماً بيوم، بلا «تفصيل الإجراءات»
+  const tab = !reception && TABS.some(([k]) => k === params.get('tab')) ? params.get('tab') : 'statements'
   // تبديل التبويب يُفرغ معايير الآخر (لكلٍّ فترته وأسماء معاييره)
   const setTab = (k) => setParams(k === 'statements' ? {} : { tab: k }, { replace: true })
   return (
@@ -361,21 +368,22 @@ export default function Payroll() {
       <div className="pcx-head">
         <h2>الرواتب والأجور</h2>
         <p className="subtitle pcx-lead">
-          {tab === 'statements'
+          {reception ? 'كشف كلّ دكتور لليوم: مرضاه وحصّته من الإجراءات والمستحقّ له — يوماً بيوم، بملف Excel أو PDF للتوقيع.'
+            : tab === 'statements'
             ? <>كشف كلّ دكتور للفترة: مرضاه، ودوامه بالساعات، وحصّته من الإجراءات، والمستحقّ له، بملف Excel أو PDF للطباعة والتوقيع.{/* بلا رابطٍ لتقارير الدكاترة (طلب المستخدم 2026-11-18) */}</>
             : 'ما طلع لكلّ دكتور من الإجراءات، وحصّة الشفاء منها — من لحظة القبض، كما سُجّل.'}
         </p>
       </div>
       {toast}
-      <div className="pcx-tabs" role="tablist">
+      {!reception && <div className="pcx-tabs" role="tablist">
         {TABS.map(([k, label]) => (
           <button key={k} type="button" role="tab" aria-selected={tab === k}
             className={`pcx-tab${tab === k ? ' is-on' : ''}`} onClick={() => setTab(k)}>{label}</button>
         ))}
-      </div>
+      </div>}
       {tab === 'procedures'
         ? <ProcedureEarnings showToast={showToast} canEdit={role === 'clinic_admin'} />
-        : <StatementsTab showToast={showToast} />}
+        : <StatementsTab showToast={showToast} dayOnly={reception} />}
     </div>
   )
 }

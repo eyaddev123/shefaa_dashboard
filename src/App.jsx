@@ -4,7 +4,7 @@ import { RoleProvider, useRole } from './RoleContext.jsx'
 import {
   canManageUsers, canReadAid, canSearchAid, canSeeClinicBoard, canSeeCashReport, canSeeDoctorsPage,
   canSeeDoctorScreen, canSeeSettings, canSeeProceduresPage, canSeePrinterSetup, canSeeInventory, canWriteInventory, canSeeReferralsPage, homePathFor,
-  canTakePayment, canAnswerNurseCall, canSeeClinicFunds, canReadClinic, canSeeDoctorDashboard, canSeeIronLog,
+  canTakePayment, canAnswerNurseCall, canSeeClinicFunds, canSeePayroll, canReadClinic, canSeeDoctorDashboard, canSeeIronLog,
 } from './permissions.js'
 import { ROLE_LABELS } from './api.js'
 import ThemeToggle from './components/ThemeToggle.jsx'
@@ -146,7 +146,7 @@ function Sidebar({ onNavigate }) {
         {canSeeReferralsPage(clinicRole) && <NavLink to="/clinic/referrals">{I.clinic} الإحالات</NavLink>}
         {canSeeInventory(clinicRole) && <NavLink to="/inventory">{I.inventory} المخزون</NavLink>}
         {canSeeClinicFunds(clinicRole) && <NavLink to="/clinic/fund">{I.treasury} صندوق العيادات</NavLink>}
-        {canSeeClinicFunds(clinicRole) && <NavLink to="/clinic/payroll">{I.treasury} الرواتب والأجور</NavLink>}
+        {canSeePayroll(clinicRole) && <NavLink to="/clinic/payroll">{I.treasury} الرواتب والأجور</NavLink>}
         {canSeeDoctorDashboard(clinicRole) && <NavLink to="/clinic/doctor-reports">{I.chart} تقارير الدكاترة</NavLink>}
         {canSeePrinterSetup(clinicRole) && <NavLink to="/clinic/printer">{I.settings} إعداد الطابعة</NavLink>}
         {(canManageUsers(role) || canSeeSettings(role)) && <div className="nav-sep" />}
@@ -255,7 +255,7 @@ function Shell() {
           <Route path="/clinic/fund" element={
             <Guard allow={canSeeClinicFunds}><ClinicFunds /></Guard>} />
           <Route path="/clinic/payroll" element={
-            <Guard allow={canSeeClinicFunds}><Payroll /></Guard>} />
+            <Guard allow={canSeePayroll}><Payroll /></Guard>} />
           <Route path="/clinic/referrals" element={
             <Guard allow={canSeeReferralsPage}><ClinicReferrals /></Guard>} />
           <Route path="/clinic/board" element={

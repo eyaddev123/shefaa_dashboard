@@ -111,6 +111,8 @@ export const canSeeEarnings = (role) => role === 'clinic_admin' || role === MANA
 // الطبيب لا يرى راتبه، والاستقبال والمجلس لا شيء: 403.
 export const canSeeClinicFunds = (role) => role === 'clinic_admin' || role === MANAGER || role === SUPER_ADMIN
 export const canWriteClinicFunds = (role) => role === 'clinic_admin'
+// «الرواتب والأجور»: قرّاء الصندوق + الاستقبال يوماً بيوم (طلب المستخدم 2026-11-22؛ الخادم يحرس اليوم الواحد)
+export const canSeePayroll = (role) => canSeeClinicFunds(role) || role === 'clinic_reception'
 
 // لوحة تحكم الدكتور (الالتزام بالدوام، أرقامه، بطاقته المالية)، «الأبرز هالأسبوع» على اللوحة اليومية،
 // و«تقارير الدكاترة»: المشرفة والمدير والمشرف العام — يطابق DASHBOARD_READERS في الخادم.
