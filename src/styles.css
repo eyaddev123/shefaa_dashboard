@@ -6476,12 +6476,16 @@ button.dk-pick:disabled .dk-pick-price { opacity: 0.7; }
 .ref-note, .ref-notes { margin-top: 8px; font-size: 11px; color: #555; }
 .ref-notes p { margin: 2px 0; }
 
-/* ═══ خطوط الأوراق المطبوعة غامقة (طلب المستخدم 2026-11-22: «طلعت كتير فاتحة مو مبينة» بين أسماء المرضى) ═══
-   لكلّ أوراق الـ PDF: كشوف الأجور، «أرباح الشفاء من الأطباء»، «مستحقات الإحالات». الرماديّ #c8cdd2 كان يضيع
-   بالطباعة ⇒ #444 للخطوط الداخلية، والإطار وفواصل المجموع #222. شاشات النظام لا تُمسّ (.pay-sheet وحدها). */
-.pay-sheet .pay-table { border-color: #222; }
-.pay-sheet .pay-table th, .pay-sheet .pay-table td { border-bottom-color: #444; border-inline-start-color: #444; }
-.pay-sheet .pay-table.pay-mini { border: 1.2px solid #222; }
-.pay-sheet .pay-table.pay-mini th, .pay-sheet .pay-table.pay-mini td { border-bottom-color: #444; border-inline-start-color: #444; }
-.pay-sheet .pay-table.prf-table .prf-total td, .pay-sheet .pay-table .ref-total td { border-top-color: #222; }
-.pay-sheet .pay-calc dl > div { border-bottom-color: #777; }
+/* ═══ أوراق الـ PDF بالأسود (طلب المستخدم 2026-11-22: «الخطوط ضلت رمادية — بدي ياها سودا، أوضح») ═══
+   لكلّ أوراق الـ PDF: كشوف الأجور، «أرباح الشفاء من الأطباء»، «مستحقات الإحالات». كانت #444 (§12-ظ٦٢) ثمّ
+   «ضلّت رمادية» ⇒ كلّ الخطوط والنصوص #000 (الصغير منها أيضاً: الملاحظات، عناوين الحقول، «أُعدّ الكشف»)،
+   إلا الخسارة بالأحمر. خلفيّة رأس الجدول وسطر المجموع تبقى رماديّةً فاتحة (تمييزٌ لا نصّ). الشاشات لا تُمسّ. */
+.pay-sheet .pay-table { border-color: #000; }
+.pay-sheet .pay-table th, .pay-sheet .pay-table td { border-bottom-color: #000; border-inline-start-color: #000; }
+.pay-sheet .pay-table.pay-mini { border: 1.2px solid #000; }
+.pay-sheet .pay-table.pay-mini th, .pay-sheet .pay-table.pay-mini td { border-bottom-color: #000; border-inline-start-color: #000; }
+.pay-sheet .pay-table.prf-table .prf-total td, .pay-sheet .pay-table .ref-total td { border-top-color: #000; }
+.pay-sheet .pay-calc dl > div { border-bottom-color: #000; }
+.pay-sheet .pay-head { border-bottom-color: #000; }
+.pay-sheet .pay-sign-row i { border-bottom-color: #000; }
+.pay-sheet, .pay-sheet *:not(.is-loss) { color: #000 !important; }

@@ -119,7 +119,7 @@ async function addSheetPages(pdf, sheet, firstPage) {
     ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, page.width, page.height)
     ctx.drawImage(canvas, 0, Math.floor(s * scale), canvas.width, page.height, 0, 0, canvas.width, page.height)
     if (rowCut[i]) {
-      ctx.fillStyle = '#444444'   // = خطوط الجدول الغامقة (2026-11-22)
+      ctx.fillStyle = '#000000'   // = خطوط الجدول السوداء (2026-11-22: «بدي ياها سودا»)
       for (const seg of rowCut[i]) ctx.fillRect(Math.round(seg.x * scale), 0, Math.ceil(seg.w * scale), Math.max(1, Math.round(scale)))
     }
     if (!firstPage) pdf.addPage()
