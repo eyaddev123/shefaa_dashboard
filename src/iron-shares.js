@@ -44,9 +44,15 @@ export function previewShareEdit(row, doctorText, nurseText) {
   const n = readAmountInput(nurseText)
   const bad = { ...(d.error ? { doctor: true } : {}), ...(n.error ? { nurse: true } : {}) }
   if (d.error || n.error) return { bad, after: null, changed: false, fundDelta: 0 }
+  // الإصدار 3 كالخادم (PATCH …/shares): المستهلكات مع المواد، والحصّتان لا تتجاوزان الأجرة وحدها
+  const doctor = d.value ?? row.split.doctor, nurse = n.value ?? row.split.nurse
+  const items = row.materials.reduce((t, m) => t + m.deduct, 0)
+  if (row.feeMode && money(doctor + nurse) > money(row.basePrice)) {
+    return { bad, after: { negative: true, doctor: money(doctor), nurse: money(nurse) }, changed: false, fundDelta: 0 }
+  }
   const after = computeIronDistribution({
-    price: row.price, doctor: d.value ?? row.split.doctor, nurse: n.value ?? row.split.nurse, cap: row.shifaCap,
-    materialsTotal: row.materials.reduce((t, m) => t + m.deduct, 0) })
+    price: row.price, doctor, nurse, cap: row.shifaCap,
+    materialsTotal: money(items + (row.feeMode ? Number(row.consumables || 0) : 0)) })
   const changed = after.doctor !== row.split.doctor || after.nurse !== row.split.nurse
   return { bad, after, changed, fundDelta: after.negative ? 0 : money(fundOf(after) - fundOf(row.split)) }
 }

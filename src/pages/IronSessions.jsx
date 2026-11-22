@@ -79,13 +79,13 @@ function EditSharesDialog({ row, onClose, onSaved }) {
         </div>
         <div className="iron-effect" aria-live="polite">
           {!a ? <p className="iron-effect-line">صحّحي المبلغ لتظهر النتيجة.</p>
-            : a.negative ? <p className="share-warn" role="alert">⚠ مجموع الحصّتين أكبر من سعر الجلسة ({fmtNum(row.price)}) — لا يُحفظ.</p> : (
+            : a.negative ? <p className="share-warn" role="alert">⚠ مجموع الحصّتين أكبر من {row.feeMode ? `أجرة الخدمة (${fmtNum(row.basePrice)})` : `سعر الجلسة (${fmtNum(row.price)})`} — لا يُحفظ.</p> : (
             <>
               <table className="iron-effect-table">
                 <thead><tr><th /><th className="num">الآن</th><th className="num">بعد التعديل</th></tr></thead>
                 <tbody>
                   <tr><td>حصّة الشفاء</td><td className="num">{fmtNum(row.split.shifa)}</td><td className="num">{fmtNum(a.shifa)}</td></tr>
-                  <tr><td>المواد</td><td className="num">{fmtNum(row.split.materials)}</td><td className="num">{fmtNum(a.materials)}</td></tr>
+                  <tr><td>{row.feeMode ? 'المواد والمستهلكات' : 'المواد'}</td><td className="num">{fmtNum(row.split.materials)}</td><td className="num">{fmtNum(a.materials)}</td></tr>
                   <tr><td>الفاضل</td><td className="num">{fmtNum(row.split.surplus)}</td><td className="num">{fmtNum(a.surplus)}</td></tr>
                   <tr className="iron-effect-fund"><td>لصندوق العيادات</td><td className="num">{fmtNum(fundOf(row.split))}</td><td className="num">{fmtNum(fundOf(a))}</td></tr>
                 </tbody>
@@ -191,6 +191,11 @@ function EditChanges({ e }) {
 }
 const drugText = (v) => (v ? 'مع دواء' : 'بلا دواء')
 const isToday = (r) => r.date === todayLocal()
+// ★ (2026-11-22) الإصداران اللذان يقبل الخادم تعديلهما (EDITABLE_VERSIONS): 2 السقف، و3 «أجرة + مواد».
+//   كانت الواجهة تقبل 2 وحده، فكلّ جلسة بعد قلبة 19/11 بدت «مجمّدة» عند المشرفة: لا «تعديل الجلسة»
+//   ولا «تعديل الحصص»، وتحت التوزيع «جلسة قبل نظام السقف». الاستقبال لا يصلها الإصدار (بلا توزيع).
+const EDITABLE_VERSIONS = [2, 3]
+const editableVersion = (r) => r.version === undefined || EDITABLE_VERSIONS.includes(r.version)
 
 /** شارات الجلسة على سطرها وفي ورقتها */
 function SessionBadges({ r }) {
@@ -350,7 +355,7 @@ function SessionSheet({ r, split, actions, onClose }) {
               ))}
             </div>
             <p className="earn-note">يدخل صندوق العيادات <bdi>{fmtNum(fundOf(s))}</bdi> ل.س (المواد والفاضل).{r.shifaCap !== null && <> سقف الشفاء لهذه الجلسة <bdi>{fmtNum(r.shifaCap)}</bdi>.</>}
-              {r.overPrice && ' المواد فوق ما بقي بعد الحصص: سُقّفت والشفاء صفر.'}{r.version !== 2 && ' جلسة قبل نظام السقف: أرقامها مجمّدة.'}</p>
+              {r.overPrice && ' المواد فوق ما بقي بعد الحصص: سُقّفت والشفاء صفر.'}{!editableVersion(r) && ' جلسة قبل نظام السقف: أرقامها مجمّدة.'}</p>
           </section>
         )}
 
@@ -388,7 +393,7 @@ function LogTab({ split, canPrint, canCancel, reload, showToast }) {
   const refresh = () => setBump((n) => n + 1)
   // الاستقبال يوم الجلسة وحده، والمشرفة أيّ وقت (canCancel = المشرفة) — والخادم يحرس الاثنين
   const inTime = (x) => canCancel || isToday(x)
-  const editable = (x) => !x.cancelled && canPrint && inTime(x) && (x.version === undefined || x.version === 2)
+  const editable = (x) => !x.cancelled && canPrint && inTime(x) && editableVersion(x)
   const print = async (x) => {
     const out = await printIronReceipt(x, 1)
     if (!out.ok) showToast(`تعذّرت الطباعة${out.reason ? ` (${out.reason})` : ''}`)
@@ -458,7 +463,7 @@ function LogTab({ split, canPrint, canCancel, reload, showToast }) {
           edit: editable(r) ? () => setMode('edit') : null,
           refer: !r.cancelled && canPrint && inTime(r) ? () => setMode('refer') : null,
           print: canPrint && !r.cancelled ? () => print(r) : null,
-          shares: canCancel && !r.cancelled && r.version === 2 ? () => setMode('shares') : null,
+          shares: canCancel && !r.cancelled && r.version !== undefined && editableVersion(r) ? () => setMode('shares') : null,
           cancel: canCancel && !r.cancelled ? () => { setOpenId(null); cancel(r) } : null,
           lockedNote: !r.cancelled && canPrint && !inTime(r) ? 'جلسة يومٍ سابق: يعدّلها ويضيف إحالتها مشرفة العيادات.' : null,
         }} />
