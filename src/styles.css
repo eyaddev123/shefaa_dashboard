@@ -5820,6 +5820,12 @@ button.dk-callbar-btn { min-height: 44px; padding: 0 24px; font-size: 15.5px; fo
 .dk-sel-item .cons-counter { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--grid); }
 .dk-sel-item.is-bad { outline: 2px solid var(--status-bad, #c0392b); outline-offset: 2px; border-radius: 10px; }
 .dk-today-item .dk-mats-btn { margin-inline-start: 6px; flex: none; }
+/* «حذف» إجراءٍ أضافه الطبيب ولم يُقبض (2026-11-23): كزرّ «+ مواد» بلون الخطر نصّاً لا تعبئةً */
+.dk-del-btn { margin-inline-start: 8px; padding: 6px 12px; min-height: 36px; font-size: 13px; font-weight: 600;
+  background: transparent; color: var(--status-bad); border: 1px solid var(--grid); border-radius: 8px; cursor: pointer; }
+.dk-del-btn:hover { background: var(--status-bad-bg); }
+.dk-today-acts { display: flex; gap: 6px; flex: none; }
+.dk-today-acts .dk-mats-btn, .dk-today-acts .dk-del-btn { margin-inline-start: 0; }
 .dk-mats-now { margin: 0 0 6px; font-size: 14px; color: var(--text-secondary); }
 
 .dk .dk-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }

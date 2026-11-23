@@ -30,7 +30,8 @@
     "test:share-pause": "node test/share-pause-check.mjs",
     "test:patient-scope": "node test/patient-scope-check.mjs",
     "test:payroll-open": "node test/payroll-open-day-check.mjs",
-    "test:iphone": "node test/iphone-doctor-sheet-check.mjs"
+    "test:iphone": "node test/iphone-doctor-sheet-check.mjs",
+    "test:doctor-remove": "node test/doctor-remove-check.mjs"
   },
   "dependencies": {
     "html2canvas": "1.4.1",

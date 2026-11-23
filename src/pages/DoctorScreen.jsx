@@ -4,6 +4,7 @@ import { api, fmtMoney, fmtTime, todayLocal, openStaffStream } from '../api.js'
 import VisitType from '../components/VisitType.jsx'
 import { AttendanceBadge, urgentRowClass, isAttendanceSession, usePolling, fmtClock, fmtTimeOfDay } from '../attendance-ui.jsx'
 import { useToast, RecallButton } from '../action-feedback.jsx'
+import { useDialogs } from '../dialogs.jsx'
 import {
   WAITING_RETURN, waitingReturnOf, serverOffsetOf, queueWithReturnees, isBackInQueue, useServerNow, isLate,
 } from '../waiting-return.jsx'
@@ -41,7 +42,10 @@ import {
 
 
 // ما أُضيف على المريض الحالي — سطرٌ نصّيّ هادئ: الاسم وحالة المحاسبة كلمةً صغيرة (لا فقاعات ملوّنة)
-function AddedProcedures({ added = [], pending = [] }) {
+// ★ «حذف» (طلب المستخدم 2026-11-23: «بقلب الكرت تبع المريض، وتحت بالإجراءات اللي قيد المحاسبة»):
+//   على ما أضافه الطبيب نفسه ولم يُقبض — كما يسمح الخادم (DOCTOR_REMOVE_FORBIDDEN). المقبوض لا زرّ له.
+const doctorRemovable = (l) => !l.removed_at && !l.paid_at && l.added_source === 'doctor'
+function AddedProcedures({ added = [], pending = [], onRemove }) {
   const live = (added || []).filter((l) => !l.removed_at)
   if (live.length === 0 && pending.length === 0) return null
   return (
@@ -49,6 +53,9 @@ function AddedProcedures({ added = [], pending = [] }) {
       {live.map((l) => (
         <li key={l.id} className={`dk-proc ${l.paid_at ? 'is-paid' : 'is-unpaid'}`}>
           {l.name} <small>{l.paid_at ? 'تمت المحاسبة' : 'بانتظار المحاسبة'}</small>
+          {onRemove && doctorRemovable(l) && (
+            <button type="button" className="dk-del-btn" aria-label={`حذف ${l.name}`} onClick={() => onRemove(l)}>حذف</button>
+          )}
         </li>
       ))}
       {pending.map((p) => (
@@ -266,7 +273,7 @@ function MaterialsForLine({ line, patientName, matCatalog, onBack, onClose, onSa
       {v3 && (
         <ConsumablesCounter hint={false} value={cons} onChange={(v) => setCons(Math.max(oldCons, v))} />
       )}
-      <p className="cons-hint">تقدر تزيد بس. التنقيص أو الحذف من الاستقبال.</p>
+      <p className="cons-hint">تقدر تزيد بس — التنقيص من الاستقبال. والإجراء كلّه تحذفه أنت بـ«حذف» قبل المحاسبة.</p>
     </BottomSheet>
   )
 }
@@ -280,7 +287,7 @@ const SWIPE = 30
 // الجملة نفسها. والخادم يرفض بـ DOCTOR_BUSY إن وصله طلبٌ رغم ذلك (شاشةٌ متأخّرة، جهازٌ ثانٍ).
 const ACTIVE_HINT = 'أنهِ الكشف الحالي أولاً قبل نداء التالي أو بدء كشف مريض.'
 
-function TodayBar({ lines, toast, onMaterials }) {
+function TodayBar({ lines, toast, onMaterials, onRemove }) {
   const [open, setOpen] = useState(false)
   const startY = useRef(null)
   const swiped = useRef(false)
@@ -323,9 +330,17 @@ function TodayBar({ lines, toast, onMaterials }) {
                 </div>
                 <span className={`dk-today-state ${l.paid_at ? 'is-paid' : 'is-unpaid'}`}>
                   {l.paid_at ? 'تمت المحاسبة' : 'بانتظار المحاسبة'}</span>
-                {!l.paid_at && onMaterials && (
-                  <button type="button" className="dk-mats-btn" tabIndex={open ? 0 : -1}
-                    onClick={() => onMaterials(l)}>+ مواد</button>
+                {!l.paid_at && (onMaterials || (l.mine && onRemove)) && (
+                  <span className="dk-today-acts">
+                    {onMaterials && (
+                      <button type="button" className="dk-mats-btn" tabIndex={open ? 0 : -1}
+                        onClick={() => onMaterials(l)}>+ مواد</button>
+                    )}
+                    {l.mine && onRemove && (
+                      <button type="button" className="dk-del-btn" tabIndex={open ? 0 : -1}
+                        aria-label={`حذف ${l.name} عن ${l.patient_name}`} onClick={() => onRemove(l)}>حذف</button>
+                    )}
+                  </span>
                 )}
               </li>
             ))}
@@ -386,6 +401,20 @@ export default function DoctorScreen() {
       })
   }, [sessionId, showToast])
   const loadMine = useCallback(() => api.clinic.myProcedures().then(setMine).catch(() => {}), [])
+  // حذف إجراءٍ أضافه الطبيب بالغلط (قبل المحاسبة): تأكيد ثمّ POST …/remove — والمواد تعود للمخزن في الخادم
+  const dialogs = useDialogs()
+  const removeLine = async (line, apptId, patient) => {
+    const ok = await dialogs.confirm({
+      title: 'حذف الإجراء؟',
+      body: `«${line.name}»${patient ? ` عن ${patient}` : ''} — مع موادّه. لم يُحاسَب بعد.`,
+      confirmLabel: 'حذف', danger: true })
+    if (!ok) return
+    try {
+      await api.clinic.removeAppointmentProcedure(apptId, line.id, '')
+      showToast(`حُذف «${line.name}»`, 'success', 3000)
+    } catch (ex) { showToast(`لم يُحذف «${line.name}»: ${ex.message}`) }
+    await Promise.all([loadQueue(), loadMine()])
+  }
   useEffect(() => { loadQueue() }, [loadQueue])
   useEffect(() => { loadMine() }, [loadMine])
 
@@ -667,7 +696,8 @@ export default function DoctorScreen() {
                         : attendance && current.started_at ? <>بدأ الكشف {fmtClock(current.started_at)}</> : null}
                       {current.reason && <span className="dk-current-note">ملاحظة الحجز: {current.reason}</span>}
                     </p>
-                    <AddedProcedures added={current.procedures} pending={pendingFor(current.id)} />
+                    <AddedProcedures added={current.procedures} pending={pendingFor(current.id)}
+                      onRemove={withProcedures ? (l) => removeLine(l, current.id, current.full_name) : undefined} />
                     {/* ═══ الأزرار: نظامٌ واحد لكلّ الشاشات ═══ الأساسيّ («بدء كشف» أو «إنهاء الكشف») سطرٌ
                         كامل، وتحته البقيّة بعرضٍ متساوٍ بلا زرٍّ يتيم: أربعةٌ ⇒ 2×2 في بطاقةٍ ضيّقة (جوال،
                         عمودا التابلت)، وثلاثةٌ ⇒ صفٌّ واحد. والبطاقة العريضة (لابتوب) ⇒ كلّها صفٌّ واحد،
@@ -832,7 +862,8 @@ export default function DoctorScreen() {
         </>
       )}
 
-      {withProcedures ? <TodayBar lines={todayLines} toast={toast} onMaterials={(l) => setMatsFor({ lines: [l], patient: l.patient_name })} />
+      {withProcedures ? <TodayBar lines={todayLines} toast={toast} onMaterials={(l) => setMatsFor({ lines: [l], patient: l.patient_name })}
+          onRemove={(l) => removeLine(l, l.appointment_id, l.patient_name)} />
         : toast && <div className="dk-toast-float">{toast}</div>}
 
       {matsFor && (
