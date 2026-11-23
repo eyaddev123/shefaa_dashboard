@@ -16,7 +16,7 @@ import { isAttendanceSession, usePolling, fmtClock, turnLabel, fmtTimeOfDay } fr
 import { useRole } from '../RoleContext.jsx'
 import { ProcedureOnlyBadge, isProcedureOnly, endedWithoutProcedure, visitKindLockReason } from '../components/ProcedureOnly.jsx'
 import { useToast } from '../action-feedback.jsx'
-import { canEditAppointmentProcedures, canEditBooking, canEditReferral, canSeeVisitAudit, canTakePayment } from '../permissions.js'
+import { canEditAppointmentProcedures, canEditBooking, canEditReferral, canOperateQueue, canSeeVisitAudit, canTakePayment } from '../permissions.js'
 import { WAITING_RETURN, serverOffsetOf, useStaffEvents } from '../waiting-return.jsx'
 import { ReferralRow, ReferralTotals, useReferralOptions } from '../components/ReferralFields.jsx'
 import { DISCOUNT_SCOPES, amountText, availableScopes, blankReferral, coverageFull, draftDiscount, draftFromReferral,
@@ -29,6 +29,7 @@ import RoomBadge from '../components/RoomBadge.jsx'
 import Combobox from '../components/Combobox.jsx'
 import BottomSheet from '../components/BottomSheet.jsx'
 import VisitTimeline from '../components/VisitTimeline.jsx'
+import { openNoShowWhatsApp, NoShowHistoryBadge } from '../components/NoShowWhatsApp.jsx'
 import { MissingBadge, StatusCell, VisitActions, missingOf, priorityBadge, useVisitActions } from './SessionQueue.jsx'
 
 // ═══ اختيارٌ بأزرارٍ جنب بعض — للقوائم القصيرة (طلب المستخدم 2026-11-18: «أزرار جنب بعض») ═══
@@ -72,6 +73,8 @@ function StatusMenu({ appt, data, onChanged, onToast, onArrived }) {
     try {
       const r = await api.clinic.saveAppointmentDetails(appt.id, { status })
       onToast(r?.message || 'تغيّرت الحالة', 'success'); onChanged()
+      // «لم يحضر» ⇒ نافذة رسالة واتساب (الزرّ فيها يفتح واتساب — لا فتح تلقائي)
+      if (status === 'no_show') openNoShowWhatsApp(appt.id)
       if (r?.was_first_arrival && onArrived) onArrived({ ...appt, ...(r || {}) }, r)
     } catch (ex) { onToast(ex.message) } finally { setBusy(false) }
   }
@@ -133,6 +136,7 @@ function VisitHeader({ appt, data, actions, onBack, onDone, onError, onChanged, 
             ? <StatusMenu appt={appt} data={data} onChanged={onChanged} onToast={onToast} onArrived={actions.autoPrint} />
             : <StatusCell appt={appt} offset={serverOffsetOf(data)} />}
           {priorityBadge(appt.priority)}
+          <NoShowHistoryBadge count={appt.prior_no_shows} />
         </h2>
         <p className="visit-where">
           {data.doctor_name}{data.specialty ? ` · ${data.specialty}` : ''}
@@ -141,6 +145,10 @@ function VisitHeader({ appt, data, actions, onBack, onDone, onError, onChanged, 
       </div>
       <div className="visit-head-actions queue-row-actions">
         <VisitActions appt={appt} data={data} actions={actions} onDone={onDone} onError={onError} />
+        {/* أُغلقت نافذة الرسالة بلا إرسال؟ الزرّ هنا يعيدها ما دام «لم يحضر» */}
+        {appt.status === 'no_show' && appt.mobile && canOperateQueue(role) && (
+          <button type="button" className="ghost nsw-open" onClick={() => openNoShowWhatsApp(appt.id)}>رسالة واتساب</button>
+        )}
       </div>
     </header>
   )

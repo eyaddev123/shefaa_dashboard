@@ -6566,3 +6566,29 @@ button.dk-pick:disabled .dk-pick-price { opacity: 0.7; }
 .pr-open-btn { padding: 6px 14px; font-size: 13px; }
 .pr-open-who { color: var(--text-secondary); font-size: 13px; }
 .pr-open strong { display: block; white-space: normal; overflow-wrap: anywhere; }
+
+/* ═══ رسالة واتساب «لم يحضر» + شارة «غاب سابقاً» (2026-11-23) ═══ */
+.nsw-body { display: flex; flex-direction: column; gap: 12px; margin-top: 10px; }
+.nsw-row { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border: 1px solid var(--border);
+  border-radius: 12px; background: var(--page); }
+.nsw-who { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.nsw-who b { font-size: 15px; }
+.nsw-mobile { font-size: 13px; color: var(--text-secondary); font-weight: 600; }
+.nsw-text { margin: 0; white-space: pre-wrap; font-family: inherit; font-size: 13.5px; line-height: 1.85;
+  color: var(--text-primary); background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+  padding: 12px 14px; max-height: 46vh; overflow-y: auto; }
+a.nsw-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; align-self: flex-start;
+  min-height: 42px; padding: 0 18px; border-radius: 10px; background: #1fa855; color: #fff; font-weight: 800;
+  font-size: 14px; text-decoration: none; }
+a.nsw-btn:hover { filter: brightness(1.06); }
+a.nsw-btn.is-opened { background: transparent; color: #15803d; border: 1.5px solid #1fa855; }
+.nsw-unavailable { margin: 0; font-size: 13px; color: var(--status-bad); font-weight: 700; }
+.nsw-preview summary { cursor: pointer; font-size: 13px; font-weight: 700; color: var(--accent-text); }
+.nsw-preview .nsw-text { margin-top: 8px; }
+.nsw-actions { display: flex; justify-content: flex-end; }
+.nsw-badge { margin-inline-start: 4px; }
+.nsw-picked-warn { margin-top: 8px; display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+  font-size: 13px; font-weight: 700; color: var(--status-bad); }
+.nsw-picked-warn .nsw-badge { margin: 0; }
+button.nsw-open { color: #15803d; border-color: #1fa855; }
+@media (max-width: 640px) { a.nsw-btn { align-self: stretch; } }

@@ -11,6 +11,7 @@ import ThemeToggle from './components/ThemeToggle.jsx'
 import NotificationsBell from './components/NotificationsBell.jsx'
 import UnpaidBell from './components/UnpaidBell.jsx'
 import NurseCallAlert from './components/NurseCallAlert.jsx'
+import { NoShowWhatsAppHost } from './components/NoShowWhatsApp.jsx'
 import Login from './pages/Login.jsx'
 import Search from './pages/Search.jsx'
 import Dashboard from './pages/Dashboard.jsx'
@@ -222,6 +223,8 @@ function Shell() {
       {canTakePayment(user.role) && <UnpaidBell role={user.role} />}
       {/* «الدكتور يحتاج ممرضة» — شريطٌ وامض أعلى أيّ صفحة للاستقبال والمشرفة */}
       {canAnswerNurseCall(user.role) && <NurseCallAlert />}
+      {/* رسالة واتساب لمن «لم يحضر» — نافذةٌ واحدة تفتحها كلّ أبواب «لم يحضر» */}
+      <NoShowWhatsAppHost />
       <main className="main">
         <Routes>
           <Route path="/" element={canSeeDoctorScreen(clinicRole) ? <Navigate to="/clinic/doctor" replace /> : <Dashboard />} />

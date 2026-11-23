@@ -418,6 +418,9 @@ export const api = {
     call: (appointmentId) => http(`/clinic/appointments/${appointmentId}/call`, { method: 'POST' }),
     done: (appointmentId) => http(`/clinic/appointments/${appointmentId}/done`, { method: 'POST' }),
     noShow: (appointmentId) => http(`/clinic/appointments/${appointmentId}/no-show`, { method: 'POST' }),
+    // رسالة واتساب «لم يحضر»: النصّ والرابط من الخادم، و«فُتحت» أثرٌ في الخط الزمني
+    noShowMessage: (appointmentId) => http(`/clinic/appointments/${appointmentId}/no-show-message`),
+    noShowMessageOpened: (appointmentId) => http(`/clinic/appointments/${appointmentId}/no-show-message/opened`, { method: 'POST' }),
     recall: (appointmentId) => http(`/clinic/appointments/${appointmentId}/recall`, { method: 'POST' }),
     // ── «خروج مؤقت»: المريض يخرج (قطرة، صورة) ويعود بلا أن يخسر دوره ──
     // للطبيب صاحب الحجز ولمشرف العيادات (طوارئ). العودة نداءٌ على شاشة الصالة،

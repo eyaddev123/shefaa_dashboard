@@ -4,8 +4,9 @@ import { Modal } from '../components/inventory/shared.jsx'
 import { loadPrinter, ticketFrom } from '../ticket-print.js'
 import { printViaHelper } from '../print-helper.js'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { api, APPOINTMENT_STATUSES, BOOKING_TYPES, VISIT_TYPES, REGULAR_VISIT_TYPES, PROCEDURE_ONLY, PRIORITIES, DELAY_CAUSES, WEEKDAYS, addDays, todayLocal, fmtMoney, fmtTime, toLatinDigits, cleanMobile, mobileError } from '../api.js'
+import { api, APPOINTMENT_STATUSES, BOOKING_TYPES, VISIT_TYPES, REGULAR_VISIT_TYPES, PROCEDURE_ONLY, PRIORITIES, DELAY_CAUSES, WEEKDAYS, addDays, todayLocal, fmtMoney, fmtTime, fmtDay, toLatinDigits, cleanMobile, mobileError } from '../api.js'
 import MobileInput from '../components/MobileInput.jsx'
+import { openNoShowWhatsApp, NoShowHistoryBadge } from '../components/NoShowWhatsApp.jsx'
 import { usePatientSearch, PatientDropdown, SameNameConfirm, MobileUpdateAsk, blockedName, nameCharsError } from '../components/PatientPicker.jsx'
 import { AttendanceBadge, urgentRowClass, isAttendanceSession, usePolling, fmtClock, FlowModeTag, FLOW_MODE_LABELS,
   AttendanceNumber, turnLabel, fmtTimeOfDay } from '../attendance-ui.jsx'
@@ -344,6 +345,13 @@ function BookingForm({ sessionId, slotTime, fees, onBooked, onCancel, urgent = f
             <span className="candidate-meta">
               {picked.mobile ? <span dir="ltr">{picked.mobile}</span> : 'بلا موبايل'}
             </span>
+            {/* «غاب سابقاً» لحظة الاختيار: الموظفة تعرف قبل أن تحجز (للعلم — لا يمنع) */}
+            {picked.no_shows?.count > 0 && (
+              <div className="nsw-picked-warn" role="note">
+                <NoShowHistoryBadge count={picked.no_shows.count} />{' '}
+                — آخر مرّة يوم {fmtDay(`${picked.no_shows.last_day}T12:00:00Z`, { weekday: true, year: false, utc: true })} عند د. {picked.no_shows.last_doctor}
+              </div>
+            )}
           </div>
           <button type="button" className="ghost" onClick={undoPick}>تراجع — ليس هو</button>
         </div>
@@ -1229,7 +1237,7 @@ function AttendanceQueueTable({ data, rows, tab, actions }) {
               <td className="num" data-label="الدور"><AttendanceNumber appt={a} /><AttendanceBadge priority={a.priority} /></td>
               <td className="rt-title">
                 <div className="qx-who">
-                  <span className="qx-name"><VisitLink appt={a} /> <MissingBadge appt={a} /></span>
+                  <span className="qx-name"><VisitLink appt={a} /> <MissingBadge appt={a} /> <NoShowHistoryBadge count={a.prior_no_shows} /></span>
                   <span className="qx-sub">
                     <bdi dir="ltr">{a.mobile || '—'}</bdi>
                     <span className="qx-kind">
@@ -1277,7 +1285,7 @@ function NoShowButton({ appt: a, onChanged, onError }) {
       confirmLabel: 'ما حضر', cancelLabel: 'تراجع', danger: true,
     })
     if (!ok) return
-    try { await api.clinic.noShow(a.id); onChanged() } catch (ex) { onError(ex.message) }
+    try { await api.clinic.noShow(a.id); onChanged(); openNoShowWhatsApp(a.id) } catch (ex) { onError(ex.message) }
   }
   return <button className="ghost" style={{ padding: '3px 10px', fontSize: 11.5 }} onClick={noShow}>ما حضر</button>
 }
@@ -1296,7 +1304,7 @@ function SlotsQueueTable({ data, rows, actions, onDone, onError }) {
         {rows.map((a) => (
           <tr key={a.id}>
             <td className="num" data-label="الدور">{a.queue_number}{priorityBadge(a.priority)}</td>
-            <td className="rt-title"><VisitLink appt={a} /><QueueNote appt={a} /></td>
+            <td className="rt-title"><VisitLink appt={a} /> <NoShowHistoryBadge count={a.prior_no_shows} /><QueueNote appt={a} /></td>
             <td data-label="الموبايل"><bdi dir="ltr">{a.mobile}</bdi></td>
             <td data-label="نوع الزيارة">
               {isProcedureOnly(a) ? <ProcedureOnlyBadge appt={a} /> : (VISIT_TYPES[a.visit_type] || a.visit_type)}

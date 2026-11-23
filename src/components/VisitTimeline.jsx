@@ -63,6 +63,7 @@ export function describeEvent(e) {
       if (!e.new_value) return { title: `حذف الإحالة: ${e.old_value}`, tone: 'remove' }
       return { title: 'تعديل الإحالة', detail: change(e) }
     case 'reason': return { title: 'تعديل ملاحظة الحجز', detail: change(e) }
+    case 'whatsapp': return { title: 'فُتحت رسالة واتساب «لم يحضر»' }
     case 'priority': return { title: `تغيير الأولوية: ${change(e)}` }
     // «رجع» من الخروج المؤقت (الاستقبال أو الطبيب) — وتراجعه
     case 'returned': return e.new_value

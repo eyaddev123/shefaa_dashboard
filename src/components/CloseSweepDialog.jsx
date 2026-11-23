@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { api, fmtMoney } from '../api.js'
 import { Modal } from './inventory/shared.jsx'
+import { openNoShowWhatsApp } from './NoShowWhatsApp.jsx'
 
 // ═══ الإغلاق الكانس — نافذة التأكيد ═══
 // الدكتور يغادر وينسى آخر مريضٍ «قيد الكشف»، والاستقبال تعلّم الباقين «لم يحضر» واحداً
@@ -63,6 +64,8 @@ export default function CloseSweepDialog({ session, pending: initial, onDone, on
         returning: Object.fromEntries(returning.map((p) => [p.id, choices[p.id]])),
       })
       onDone()
+      // من صاروا «لم يحضر» بالإغلاق: قائمةٌ بزرّ واتساب لكلٍّ منهم (المنتظرون + الخارج مؤقتاً بخيار «لم يحضر»)
+      openNoShowWhatsApp([...notArrived.map((p) => p.id), ...returning.filter((p) => choices[p.id] === 'no_show').map((p) => p.id)])
     } catch (ex) {
       if (ex.data && ex.data.pending && ['CLOSE_CHANGED', 'RETURN_CHOICE_REQUIRED', 'PAID_PROCEDURE_ON_BOOKING'].includes(ex.data.code)) {
         // الوضع تغيّر: الملخّص الجديد مكان القديم، والاختيارات تبقى لمن بقي
