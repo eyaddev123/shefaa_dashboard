@@ -15,6 +15,7 @@ import MaterialsEditor, { qtyValid, toPayload, materialsValue } from '../compone
 import { useFeeMode } from '../fee-mode.js'
 import ConsumablesCounter, { CONSUMABLES_HINT } from '../components/ConsumablesCounter.jsx'
 import QuantityStepper from '../components/QuantityStepper.jsx'
+import { usualMats, usualCons, hasUsual, USUAL_HINT } from '../usual-materials.js'
 import {
   ringDoctor, primeOnFirstGesture, onAudioState, audioReady, unlockAudio,
   shouldOfferPush, dismissPushOffer, enablePush, refreshPush,
@@ -93,9 +94,14 @@ function AddProcedureSheet({ appt, catalog, usage, matCatalog, loadMaterials, dr
   const isOn = (id) => sel.some((x) => String(x.id) === String(id))
   const update = (id, patch) => setDraft((d) => ({ ...d,
     selected: d.selected.map((x) => (String(x.id) === String(id) ? { ...x, ...patch } : x)) }))
+  const procOf = (id) => (catalog || []).find((p) => String(p.id) === String(id))
+  // ★ المعتاد (2026-11-23): الإجراء يُعلَّم ومعه موادّه ومستهلكاته المعتادة — auto ما دام الدكتور لم
+  //   يلمسها، فيتبع العدد (× 4 ⇒ المعتاد × 4). أوّل تعديلٍ للمواد أو العدّاد يثبّت ما كتبه.
   const toggle = (p) => setDraft((d) => ({ ...d, errorId: null, error: null,
     selected: isOn(p.id) ? d.selected.filter((x) => String(x.id) !== String(p.id))
-      : [...d.selected, { id: p.id, name: p.name, mats: [], cons: 0, qty: 1 }] }))
+      : [...d.selected, { id: p.id, name: p.name, mats: usualMats(p), cons: feeMode ? usualCons(p) : 0, qty: 1, auto: hasUsual(p) }] }))
+  const setQty = (x, qty) => update(x.id, x.auto
+    ? { qty, mats: usualMats(procOf(x.id), qty), cons: feeMode ? usualCons(procOf(x.id), qty) : 0 } : { qty })
   const valid = sel.length > 0 && sel.every((x) => qtyValid(x.mats))
   const priceOf = (id) => Number((catalog || []).find((p) => String(p.id) === String(id))?.price || 0)
   // العدد (2026-11-22): «× 4» ⇒ الأجرة × العدد (بعد القلبة وحدها؛ قبلها سطرٌ واحد)
@@ -180,16 +186,17 @@ function AddProcedureSheet({ appt, catalog, usage, matCatalog, loadMaterials, dr
               </div>
               {/* العدد: الإجراء نفسه بالقعدة أكثر من مرّة — «تخطيط أعصاب طرف × 4» (بعد القلبة) */}
               {feeMode && (
-                <QuantityStepper value={x.qty || 1} unitPrice={priceOf(x.id)} onChange={(qty) => update(x.id, { qty })} />
+                <QuantityStepper value={x.qty || 1} unitPrice={priceOf(x.id)} onChange={(qty) => setQty(x, qty)} />
               )}
+              {hasUsual(procOf(x.id)) && <p className="usual-hint">{x.auto ? USUAL_HINT : 'عدّلتَ المعتاد لهذا المريض.'}</p>}
               <div className="dk-mats-body">
                 {matCatalog == null ? <p className="empty">جارٍ تحميل المواد…</p>
                   // القائمة منسدلة ظاهرة دائماً: الكبسة تعرض المواد كلّها والكتابة تُرشّحها، ومع كلّ مادة سعر بيعها
-                  : <MaterialsEditor withPrice comboHint="المواد: المس للعرض أو اكتب للبحث" catalog={matCatalog} value={x.mats} onChange={(mats) => update(x.id, { mats })} />}
+                  : <MaterialsEditor withPrice comboHint="المواد: المس للعرض أو اكتب للبحث" catalog={matCatalog} value={x.mats} onChange={(mats) => update(x.id, { mats, auto: false })} />}
                 {!qtyValid(x.mats) && <p className="error">صحّح الكمّية (رقم أكبر من صفر).</p>}
               </div>
               {feeMode && (
-                <ConsumablesCounter hint={false} value={x.cons || 0} onChange={(cons) => update(x.id, { cons })} />
+                <ConsumablesCounter hint={false} value={x.cons || 0} onChange={(cons) => update(x.id, { cons, auto: false })} />
               )}
             </li>
           ))}
@@ -200,11 +207,10 @@ function AddProcedureSheet({ appt, catalog, usage, matCatalog, loadMaterials, dr
   )
 }
 
-// ═══ «+ مواد» على إجراءٍ مضاف — زيادةٌ فقط (قرار المستخدم 2026-11-18) ═══
-// «يمكن يضيف الإجراء وما يعرف قديش استخدامات، بس يخلص إجراء يضيف المواد تبعته». ما في السطر يظهر
-// نصّاً لا يُعدَّل، وتحته قائمة المواد المنسدلة للإضافة: مادةٌ موجودة تُختار ثانيةً ⇒ تُجمع كمّيتها.
-// والمستهلكات (بعد القلبة) لا تنزل عن قيمتها. التنقيص والحذف وما بعد الدفع من الاستقبال — والخادم
-// يحرس الثلاثة (DOCTOR_NO_DECREASE، DOCTOR_LINE_PAID، يوم الجلسة).
+// ═══ «+ مواد» على إجراءٍ مضاف (قرار المستخدم 2026-11-18، وتنقيصٌ منذ 2026-11-23) ═══
+// «يمكن يضيف الإجراء وما يعرف قديش استخدامات، بس يخلص إجراء يضيف المواد تبعته». كانت زيادةً فقط؛ ومع
+// المعتاد المعبّأ سلفاً صار الدكتور يعدّل القائمة كلّها قبل المحاسبة: يزيد وينقّص ويحذف، والعدّاد كذلك.
+// وما بعد الدفع من الاستقبال — والخادم يحرس (DOCTOR_LINE_PAID، يوم الجلسة).
 function AddMaterialsSheet({ lines, patientName, matCatalog, loadMaterials, onClose, onSaved }) {
   useEffect(() => { loadMaterials() }, [])
   const [picked, setPicked] = useState(lines.length === 1 ? lines[0] : null)
@@ -226,21 +232,29 @@ function AddMaterialsSheet({ lines, patientName, matCatalog, loadMaterials, onCl
 function MaterialsForLine({ line, patientName, matCatalog, onBack, onClose, onSaved }) {
   const v3 = line.fee !== null && line.fee !== undefined
   const oldCons = Number(line.consumables || 0)
-  const [extra, setExtra] = useState([])
+  const existing = line.materials || []
+  const initial = existing.map((m) => ({ material_id: String(m.material_id), name: m.name, unit: m.unit, qty: String(Number(m.qty)) }))
+  const [mats, setMats] = useState(initial)
   const [cons, setCons] = useState(oldCons)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
-  const existing = line.materials || []
-  const more = materialsValue(extra, matCatalog) + (v3 ? cons - oldCons : 0)
-  const changed = extra.length > 0 || cons !== oldCons
+  // سعر المادة القائمة لقطتها على السطر، والجديدة سعر بيعها من الكتالوج — فالفرق هو ما يتغيّر على المريض فعلاً
+  const snap = new Map(existing.filter((m) => m.unit_price != null).map((m) => [String(m.material_id), Number(m.unit_price)]))
+  const value = (list) => list.reduce((t, m) => {
+    const qn = Number(String(m.qty).replace(/[٫,]/g, '.'))
+    const unit = snap.has(String(m.material_id)) ? snap.get(String(m.material_id))
+      : Number((matCatalog || []).find((c) => String(c.id) === String(m.material_id))?.unit_price || 0)
+    return Number.isFinite(qn) && qn > 0 ? t + unit * qn : t
+  }, 0)
+  const key = (list) => list.map((m) => `${m.material_id}:${Number(String(m.qty).replace(/[٫,]/g, '.'))}`).sort().join(',')
+  const changed = key(mats) !== key(initial) || cons !== oldCons
+  const diff = Math.round((value(mats) - value(initial) + (v3 ? cons - oldCons : 0)) * 100) / 100
   const save = async () => {
     setSaving(true); setError(null)
-    // القائمة كاملةً (الخادم يستبدلها): الموجود + الإضافات، والمادة المكرّرة تُجمع كمّيتها
-    const merged = new Map(existing.map((m) => [String(m.material_id), Number(m.qty)]))
-    for (const m of toPayload(extra)) merged.set(String(m.material_id), (merged.get(String(m.material_id)) || 0) + m.qty)
     try {
+      // القائمة كاملةً (الخادم يستبدلها): المحذوفة تغيب، والمخزون يتبعها
       await api.clinic.setLineMaterials(line.appointment_id, line.id, {
-        materials: [...merged].map(([id, qty]) => ({ material_id: Number(id), qty: Math.round(qty * 100) / 100 })),
+        materials: toPayload(mats).map((m) => ({ material_id: Number(m.material_id), qty: m.qty })),
         ...(v3 && cons !== oldCons ? { consumables: cons } : {}),
       })
       onSaved(line)
@@ -251,29 +265,25 @@ function MaterialsForLine({ line, patientName, matCatalog, onBack, onClose, onSa
       onClose={onClose}
       footer={(
         <>
-          {v3 && more > 0 && (
-            <div className="dk-total" role="status"><span>يزيد على المريض <strong>{fmtMoney(more)}</strong></span></div>
+          {v3 && changed && diff !== 0 && (
+            <div className="dk-total" role="status">
+              <span>{diff > 0 ? 'يزيد على المريض' : 'ينقص عن المريض'} <strong>{fmtMoney(Math.abs(diff))}</strong></span>
+            </div>
           )}
-          <button type="button" className="dk-confirm" disabled={!changed || !qtyValid(extra) || saving} onClick={save}>
+          <button type="button" className="dk-confirm" disabled={!changed || !qtyValid(mats) || saving} onClick={save}>
             {saving ? 'يُحفظ…' : 'حفظ المواد'}
           </button>
         </>
       )}>
       {error && <p className="error dk-sheet-error" role="alert">{error}</p>}
       {onBack && <button type="button" className="ghost dk-step-back" onClick={onBack}>→ إجراءٌ آخر</button>}
-      <p className="dk-mats-now">
-        {existing.length === 0 ? 'لا مواد عليه بعد.'
-          : <>عليه الآن: {existing.map((m) => `${m.name} ×${Number(m.qty)}`).join('، ')}</>}
-      </p>
       <div className="dk-mats-body">
         {matCatalog == null ? <p className="empty">جارٍ تحميل المواد…</p>
-          : <MaterialsEditor withPrice comboHint="أضف مادة: المس للعرض أو اكتب للبحث" catalog={matCatalog} value={extra} onChange={setExtra} />}
-        {!qtyValid(extra) && <p className="error">صحّح الكمّية (رقم أكبر من صفر).</p>}
+          : <MaterialsEditor withPrice comboHint="أضف مادة: المس للعرض أو اكتب للبحث" catalog={matCatalog} value={mats} onChange={setMats} />}
+        {!qtyValid(mats) && <p className="error">صحّح الكمّية (رقم أكبر من صفر).</p>}
       </div>
-      {v3 && (
-        <ConsumablesCounter hint={false} value={cons} onChange={(v) => setCons(Math.max(oldCons, v))} />
-      )}
-      <p className="cons-hint">تقدر تزيد بس — التنقيص من الاستقبال. والإجراء كلّه تحذفه أنت بـ«حذف» قبل المحاسبة.</p>
+      {v3 && <ConsumablesCounter hint={false} value={cons} onChange={setCons} />}
+      <p className="cons-hint">زِد أو نقّص أو احذف قبل المحاسبة — بعد الدفع من الاستقبال. والإجراء كلّه تحذفه أنت بـ«حذف».</p>
     </BottomSheet>
   )
 }

@@ -5827,6 +5827,8 @@ button.dk-callbar-btn { min-height: 44px; padding: 0 24px; font-size: 15.5px; fo
 .dk-today-acts { display: flex; gap: 6px; flex: none; }
 .dk-today-acts .dk-mats-btn, .dk-today-acts .dk-del-btn { margin-inline-start: 0; }
 .dk-mats-now { margin: 0 0 6px; font-size: 14px; color: var(--text-secondary); }
+/* المعتاد للإجراء (2026-11-23): جملةٌ هادئة فوق المواد المعبّأة سلفاً — لا لون ولا إطار */
+.usual-hint { margin: 4px 0 2px; font-size: 12.5px; color: var(--text-secondary); line-height: 1.6; }
 
 .dk .dk-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
 .dk .dk-btn { width: auto; min-height: 44px; padding: 0 18px; font-size: 14.5px; font-weight: 600; border-radius: 10px; }
@@ -6082,6 +6084,11 @@ button.dk-pick:disabled .dk-pick-price { opacity: 0.7; }
 /* ═══ الإصدار 3: «أجرة + مواد» (2026-11-17) — حقول التقسيم، بطاقة الجاهزيّة، تفصيل السطر ═══ */
 .pcx-split { border: 1px solid var(--grid); border-radius: 10px; padding: 10px 12px 8px; margin: 4px 0 0; min-width: 0; }
 .pcx-split legend { font-size: 13px; color: var(--text-secondary); padding: 0 4px; }
+/* المواد المعتادة في نافذة الإجراء (2026-11-23): إطار الحصّة نفسه */
+.pcx-usual { border: 1px solid var(--grid); border-radius: 10px; padding: 10px 12px 8px; margin: 4px 0 0; min-width: 0; }
+.pcx-usual legend { font-size: 13px; color: var(--text-secondary); padding: 0 4px; }
+.pcx-usual .pcx-hint { margin-top: 0; }
+.pcx-usual .cons-counter { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--grid); }
 .pcx-split-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .pcx-split-row input { width: 120px; min-height: 40px; }
 .pcx-split-unit { color: var(--muted); font-size: 13px; }

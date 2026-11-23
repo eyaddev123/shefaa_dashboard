@@ -79,6 +79,11 @@ export function pricingText(h, side) {
     case 'split': return o ? `حصّة الدكتور من الأجرة: ${splitWords(o)} ← ${splitWords(n)}` : `حصّة الدكتور من الأجرة: ${splitWords(n)}`
     case 'draft_price': return !n ? 'مُسحت الأجرة الجديدة'
       : o ? `الأجرة الجديدة: ${fmtMoney(o.draft_price)} ← ${fmtMoney(n.draft_price)}` : `الأجرة الجديدة (قبل التفعيل): ${fmtMoney(n.draft_price)}`
+    // المعتاد (2026-11-23): نصّان جاهزان من الخادم «خيط × 1، إبرة × 2» و«—» للفارغ، وعدّاد المستهلكات
+    case 'usual': {
+      const t = (v) => `${v.materials}${Number(v.consumables) > 0 ? ` · مستهلكات ${fmtMoney(v.consumables)}` : ''}`
+      return `المواد المعتادة: ${t(o)} ← ${t(n)}`
+    }
     case 'fee_switch': return `فُعّلت «أجرة + مواد»: السعر ${fmtMoney(o.price)} ← أجرة ${fmtMoney(n.price)}${n.split ? `، الدكتور ${splitWords(n.split)}` : ''}`
     default: return 'تغيير في التسعيرة'
   }

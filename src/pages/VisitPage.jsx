@@ -25,6 +25,7 @@ import MaterialsEditor, { qtyValid, toPayload, fmtQty, materialsSummary, materia
 import { useFeeMode } from '../fee-mode.js'
 import ConsumablesCounter from '../components/ConsumablesCounter.jsx'
 import QuantityStepper from '../components/QuantityStepper.jsx'
+import { usualMats, usualCons, hasUsual } from '../usual-materials.js'
 import RoomBadge from '../components/RoomBadge.jsx'
 import Combobox from '../components/Combobox.jsx'
 import BottomSheet from '../components/BottomSheet.jsx'
@@ -834,6 +835,7 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
   const [newMats, setNewMats] = useState([])
   const [newCons, setNewCons] = useState(0)        // عدّاد المستهلكات للإضافة (بعد القلبة)
   const [newQty, setNewQty] = useState(1)          // العدد للإضافة (بعد القلبة) — «× 4»
+  const [usualAuto, setUsualAuto] = useState(false) // المعبّأ ما زال المعتاد كما هو ⇒ يتبع العدد
   const [qtyEdit, setQtyEdit] = useState(null)     // { id, qty } — تصحيح عدد سطرٍ غير مقبوض
   const [editCons, setEditCons] = useState(0)      // وللسطر الجاري تعديله
   const [busy, setBusy] = useState(false)
@@ -900,7 +902,7 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
       onToast(r.fee_snapshot != null
         ? `أُضيف «${chosen.name}${chosenQty > 1 ? ` × ${chosenQty}` : ''}» — على المريض ${fmtMoney(r.price_snapshot)}`
         : `أُضيف «${chosen.name}» — ${fmtMoney(chosen.price)}${withMats}`, 'success')
-      setPick(''); setNewMats([]); setNewCons(0); setNewQty(1); onChanged()
+      setPick(''); setNewMats([]); setNewCons(0); setNewQty(1); setUsualAuto(false); onChanged()
     } catch (ex) { setAddErr({ message: ex.message, code: ex.data?.code }) }
     finally { setBusy(false) }
   }
@@ -1073,7 +1075,12 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
                 placeholder={catalog === null ? 'جارٍ التحميل…' : choices.length ? 'اختاري إجراءً… (اكتبي للبحث)' : 'لا إجراءات متاحة'}
                 emptyText="لا إجراءات متاحة"
                 options={choices.map((p) => ({ value: String(p.id), label: p.name, meta: fmtMoney(p.price) }))}
-                onChange={(v) => { setPick(v); setAddErr(null); setNewCons(0); setNewQty(1) }} />
+                onChange={(v) => {
+                  // ★ المعتاد (2026-11-23): الإجراء يأتي بموادّه ومستهلكاته المعتادة، وتعدّلها قبل «إضافة»
+                  const p = choices.find((c) => String(c.id) === v)
+                  setPick(v); setAddErr(null); setNewQty(1)
+                  setNewMats(usualMats(p)); setNewCons(feeMode ? usualCons(p) : 0); setUsualAuto(hasUsual(p))
+                }} />
             </div>
             {/* المستهلكات المقدّرة لنوع الإجراء — للمشرفة وحدها (الخادم لا يرسلها للاستقبال): قراءةٌ فقط */}
             {chosen && isSupervisor && !feeMode && Number(chosen.consumables_cost) > 0 && (
@@ -1088,10 +1095,13 @@ function AppointmentProcedures({ appt, session, onChanged, onToast }) {
               <div className="proc-add-mats">
                 <div className="proc-add-head"><strong>{chosen.name}{chosenQty > 1 && ` × ${chosenQty}`}</strong><span>{fmtMoney(chosenFee)}</span></div>
                 {/* العدد: الإجراء نفسه بالقعدة أكثر من مرّة (بعد القلبة) */}
-                {feeMode && <QuantityStepper value={newQty} unitPrice={Number(chosen.price)} onChange={setNewQty} disabled={busy} />}
-                <MaterialsEditor withPrice={!!feeMode} catalog={matCatalog} value={newMats} onChange={setNewMats} disabled={busy}
+                {feeMode && <QuantityStepper value={newQty} unitPrice={Number(chosen.price)} disabled={busy}
+                  onChange={(q) => { setNewQty(q); if (usualAuto) { setNewMats(usualMats(chosen, q)); setNewCons(usualCons(chosen, q)) } }} />}
+                {hasUsual(chosen) && <p className="usual-hint">{usualAuto ? 'المعتاد لهذا الإجراء — زيدي أو نقّصي أو احذفي حسب الحالة.' : 'عُدّل المعتاد لهذا المريض.'}</p>}
+                <MaterialsEditor withPrice={!!feeMode} catalog={matCatalog} value={newMats} disabled={busy}
+                  onChange={(m) => { setNewMats(m); setUsualAuto(false) }}
                   comboHint="أضيفي مادة: اكتبي اسمها للبحث، أو اكبسي لعرضها كلّها…" />
-                {feeMode && <ConsumablesCounter value={newCons} onChange={setNewCons} disabled={busy} />}
+                {feeMode && <ConsumablesCounter value={newCons} onChange={(c) => { setNewCons(c); setUsualAuto(false) }} disabled={busy} />}
                 <div className="proc-add-foot">
                   <span>على المريض <strong>{fmtMoney(feeMode ? chosenTotal : chosen.price)}</strong>
                     {feeMode && (chosenCons > 0 || newMatsValue > 0) && (

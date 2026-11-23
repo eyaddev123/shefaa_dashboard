@@ -470,6 +470,8 @@ export const api = {
       http(`/clinic/procedures/${id}/specialties`, { method: 'PUT', body: JSON.stringify(body) }),
     addProcedure: (body) => http('/clinic/procedures', { method: 'POST', body: JSON.stringify(body) }),
     updateProcedure: (id, body) => http(`/clinic/procedures/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+    // المواد المعتادة للإجراء (2026-11-23): القائمة كاملةً + عدّاد المستهلكات المعتاد — المشرفة
+    setProcedureUsual: (id, body) => http(`/clinic/procedures/${id}/usual`, { method: 'PUT', body: JSON.stringify(body) }),
     // الإصدار 3: «أجرة + مواد» — الحالة (since) وجاهزيّة القلبة للمشرفة، والتفعيل مرّةً واحدة
     feeMode: () => http('/clinic/procedures/fee-mode'),
     activateFeeMode: () => http('/clinic/procedures/fee-mode/activate', { method: 'POST' }),

@@ -7,6 +7,7 @@ import { useRole } from '../RoleContext.jsx'
 import { canSeeClinicFunds } from '../permissions.js'
 import { useToast } from '../action-feedback.jsx'
 import ProcedureDialog, { splitText } from '../components/procedures/ProcedureDialog.jsx'
+import { hasUsual } from '../usual-materials.js'
 import { matchesAr } from '../arabic-search.js'
 import { DistributeRuleDialog, PricingHistoryDialog } from '../components/ShareRuleDialogs.jsx'
 import { doctorsCount } from '../share-rule.js'
@@ -190,6 +191,8 @@ function Catalog({ list, fee, role, reload, showToast }) {
                   {seesConsumables && !feeMode && Number(p.consumables_cost) > 0 && <span>مستهلكات {fmtNum(p.consumables_cost)}</span>}
                   {seesConsumables && p.doctor_split_kind && <span>الدكتور {splitText(p).replace(' من الأجرة', '')}</span>}
                   {seesConsumables && !feeMode && p.draft_price != null && <span>الأجرة الجديدة {fmtNum(p.draft_price)}</span>}
+                  {/* المعتاد (2026-11-23): كلمةٌ تقول أيّ الإجراءات جُهّز — والتفصيل في النافذة */}
+                  {feeMode && hasUsual(p) && <span>له مواد معتادة</span>}
                 </span>
               </>
             )

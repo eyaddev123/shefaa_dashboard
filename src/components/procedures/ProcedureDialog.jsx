@@ -1,4 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import MaterialsEditor, { qtyValid, toPayload, materialsValue } from '../MaterialsEditor.jsx'
+import ConsumablesCounter from '../ConsumablesCounter.jsx'
+import { usualText } from '../../usual-materials.js'
 import { ProcedureSpecialties, specialtiesText } from '../../SpecialtyPicker.jsx'
 import { useDialogs } from '../../dialogs.jsx'
 import { api, fmtMoney, toLatinDigits, fmtDay } from '../../api.js'
@@ -74,6 +77,23 @@ export default function ProcedureDialog({ proc, feeMode, canEdit, canHistory, se
   const [spec, setSpec] = useState(initialSpec)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState(null)
+  // ═══ المواد المعتادة (2026-11-23): تُعبّأ وحدها عند إضافة الإجراء (× العدد)، ويعدّلها الدكتور أو الاستقبال ═══
+  // بعد القلبة وحدها (قبلها المواد داخل السعر). المعدودة المفعّلة في البحث؛ والمعطّلة القائمة في المعتاد تبقى.
+  const initialUsual = (proc?.usual_materials || []).map((m) => ({ material_id: String(m.material_id), name: m.name, unit: m.unit, qty: String(Number(m.qty)) }))
+  const [usualMats, setUsualMats] = useState(initialUsual)
+  const [usualCons, setUsualCons] = useState(Number(proc?.usual_consumables || 0))
+  const [matCatalog, setMatCatalog] = useState(null)
+  const withUsual = !!feeMode && canEdit
+  useEffect(() => {
+    if (!withUsual) return
+    // بلا الرصيد: المعتاد قالبٌ لا صرف — فلا يقف ➕ عند رصيد اليوم
+    api.clinic.materials().then((r) => setMatCatalog(r.filter((m) => m.is_active !== false && m.material_kind !== 'consumable')
+      .map(({ balance: _b, ...m }) => m)))
+      .catch(() => setMatCatalog([]))
+  }, [withUsual])
+  const usualKey = (list, c) => `${list.map((m) => `${m.material_id}:${Number(String(m.qty).replace(/[٫,]/g, '.'))}`).sort().join(',')}|${c}`
+  const usualChanged = withUsual && usualKey(usualMats, usualCons) !== usualKey(initialUsual, Number(proc?.usual_consumables || 0))
+  const usualBody = () => ({ materials: toPayload(usualMats).map((m) => ({ material_id: Number(m.material_id), qty: m.qty })), consumables: usualCons })
 
   const submit = async (e) => {
     e.preventDefault()
@@ -83,6 +103,7 @@ export default function ProcedureDialog({ proc, feeMode, canEdit, canHistory, se
     if (feeMode && !kind) return setErr('حدّد حصّة الدكتور من الأجرة: نسبة أو مبلغ ثابت')
     if (kind && splitVal.trim() === '') return setErr(kind === 'percent' ? 'اكتب نسبة الدكتور' : 'اكتب مبلغ الدكتور')
     if (splitPreview(fee, kind, splitVal)?.over) return setErr('مبلغ الدكتور أكبر من الأجرة')
+    if (withUsual && !qtyValid(usualMats)) return setErr('المواد المعتادة: صحّح الكمّية (رقم أكبر من صفر)')
     const feeBody = {
       ...(kind && (isNew || splitChanged) ? { doctor_split_kind: kind, doctor_split_value: splitVal } : {}),
       ...(!feeMode && (isNew ? draft.trim() !== '' : draftChanged) ? { draft_price: draft.trim() } : {}),
@@ -97,6 +118,10 @@ export default function ProcedureDialog({ proc, feeMode, canEdit, canHistory, se
             await api.clinic.setProcedureSpecialties(created.id, { is_general: false, specialty_ids: spec.specialtyIds.map(Number) })
           } catch (ex) { warn = [...warn, `أُنشئ عامّاً — تعذّر إسناد الاختصاصات (${ex.message})`] }
         }
+        if (usualChanged && created?.id) {
+          try { await api.clinic.setProcedureUsual(created.id, usualBody()) }
+          catch (ex) { warn = [...warn, `أُنشئ بلا مواد معتادة — ${ex.message}`] }
+        }
         onSaved(`أُضيف «${name.trim()}»`, warn)
       } catch (ex) { setErr(ex.message) } finally { setBusy(false) }
       return
@@ -107,7 +132,7 @@ export default function ProcedureDialog({ proc, feeMode, canEdit, canHistory, se
     if (Number(cons || 0) !== Number(proc.consumables_cost || 0)) body.consumables_cost = cons || '0'
     Object.assign(body, feeBody)
     const specChanged = specKey(spec) !== specKey(initialSpec)
-    if (Object.keys(body).length === 0 && !specChanged) return onClose()
+    if (Object.keys(body).length === 0 && !specChanged && !usualChanged) return onClose()
     if (body.price !== undefined) {
       const ok = await dlg.confirm({
         title: feeMode ? 'تغيير الأجرة' : 'تغيير السعر',
@@ -131,6 +156,7 @@ export default function ProcedureDialog({ proc, feeMode, canEdit, canHistory, se
       const out = Object.keys(body).length ? await api.clinic.updateProcedure(proc.id, body) : null
       if (specChanged) await api.clinic.setProcedureSpecialties(proc.id,
         { is_general: spec.isGeneral, specialty_ids: spec.isGeneral ? [] : spec.specialtyIds.map(Number) })
+      if (usualChanged) await api.clinic.setProcedureUsual(proc.id, usualBody())
       onSaved('حُفظ التعديل', out?.warnings || [])
     } catch (ex) { setErr(ex.message) } finally { setBusy(false) }
   }
@@ -145,6 +171,7 @@ export default function ProcedureDialog({ proc, feeMode, canEdit, canHistory, se
           {seesConsumables && !feeMode && <div><dt>المستهلكات المقدّرة</dt><dd>{Number(proc.consumables_cost) > 0 ? fmtMoney(proc.consumables_cost) : 'لا شيء'}</dd></div>}
           {seesConsumables && <div><dt>حصّة الدكتور</dt><dd>{splitText(proc)}</dd></div>}
           {seesConsumables && !feeMode && proc.draft_price != null && <div><dt>الأجرة الجديدة</dt><dd>{fmtMoney(proc.draft_price)}</dd></div>}
+          {feeMode && <div><dt>المواد المعتادة</dt><dd>{usualText(proc) || 'لا شيء'}</dd></div>}
           <div><dt>الاختصاصات</dt><dd>{specialtiesText(proc)}</dd></div>
         </dl>
         <div className="bf-actions inv-actions">
@@ -202,6 +229,22 @@ export default function ProcedureDialog({ proc, feeMode, canEdit, canHistory, se
             <SplitFields idp="pcx-n" fee={draft} kind={kind} value={splitVal}
               onKind={(k) => { setKind(k); setSplitVal('') }} onValue={setSplitVal} />
           </div>
+        )}
+        {withUsual && (
+          <fieldset className="pcx-usual">
+            <legend>المواد المعتادة</legend>
+            <p className="pcx-hint">ما يُصرف بالعادة لإجراءٍ واحد. يطلع جاهزاً للدكتور والاستقبال عند إضافة الإجراء
+              (× العدد)، ويزيدون أو ينقّصون حسب الحالة. اتركه فارغاً لإجراءٍ بلا مواد. يسري على ما يُضاف بعد الحفظ فقط.</p>
+            <MaterialsEditor withPrice catalog={matCatalog} value={usualMats} onChange={setUsualMats} disabled={busy}
+              comboHint="أضف مادة: اكتب اسمها أو اكبس لعرضها كلّها…" />
+            <ConsumablesCounter hint={false} label="المستهلكات المعتادة" value={usualCons} onChange={setUsualCons} disabled={busy} />
+            {(usualMats.length > 0 || usualCons > 0) && price.trim() !== '' && (
+              <p className="pcx-split-out">على المريض بالعادة: أجرة {fmtMoney(price)}
+                {usualCons > 0 && ` + مستهلكات ${fmtMoney(usualCons)}`}
+                {materialsValue(usualMats, matCatalog) > 0 && ` + مواد ${fmtMoney(materialsValue(usualMats, matCatalog))}`}
+                {' = '}<strong>{fmtMoney(Number(price) + usualCons + materialsValue(usualMats, matCatalog))}</strong></p>
+            )}
+          </fieldset>
         )}
         <ProcedureSpecialties id="pcx-spec" isGeneral={spec.isGeneral} specialtyIds={spec.specialtyIds} canAdd onChange={setSpec} />
         {err && <p className="error">{err}</p>}
