@@ -10,7 +10,7 @@ import { Modal } from './inventory/shared.jsx'
 //
 // ★ لماذا مضيفٌ واحد لا نافذةٌ داخل كلّ زرّ: زرّ «ما حضر» في صفّ الطابور يُعيد تحميل الطابور،
 //   فينتقل الصفّ لتبويبٍ آخر ويختفي الزرّ ومعه أيّ نافذة يملكها. المضيف في التطبيق يبقى.
-// ★ ولماذا زرٌّ لا فتحٌ تلقائي: المتصفّح يمنع فتح نافذةٍ بعد انتظار الخادم (ليس بكبسة مباشرة)،
+// ★ ولماذا زرٌّ لا فتحٌ تلقائي: المتصفّح يمنع فتح التطبيق بعد انتظار الخادم (ليس بكبسة مباشرة)،
 //   والزرّ يحمي من «لم يحضر» بالغلط ثمّ التراجع عنه.
 
 const listeners = new Set()
@@ -53,7 +53,8 @@ function MessageRow({ m, opened, onOpened, showText }) {
       </div>
       {showText && m.available && <pre className="nsw-text" dir="rtl">{m.text}</pre>}
       {m.available ? (
-        <a className={`nsw-btn${opened ? ' is-opened' : ''}`} href={m.url} target="_blank" rel="noopener noreferrer"
+        // رابط التطبيق (whatsapp://) بلا target: المتصفّح يسلّمه للتطبيق والصفحة باقية — بلا تبويبٍ فارغ
+        <a className={`nsw-btn${opened ? ' is-opened' : ''}`} href={m.url}
           onClick={() => onOpened(m.appointment_id)}>
           <WhatsAppIcon /> {opened ? 'فُتحت — افتحها مرّة أخرى' : 'فتح واتساب بالرسالة'}
         </a>
